@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { TrendUp, TrendDown, Tag, ChartBar, Package } from '@phosphor-icons/react'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { TrendUp, TrendDown, Tag, ChartBar, Package, CaretDown } from '@phosphor-icons/react'
+import { cn } from '@/lib/utils'
 import type { MarketData } from '@/types'
 
 interface MarketDataPanelProps {
@@ -10,6 +13,8 @@ interface MarketDataPanelProps {
 }
 
 export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
+  const [isOpen, setIsOpen] = useState(false)
+
   if (!marketData) {
     return null
   }
@@ -35,48 +40,63 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
   }
 
   return (
-    <Card className="p-4 border-s2 bg-s1 mt-4">
-      <div className="flex items-center gap-2 mb-3">
-        <ChartBar size={20} weight="bold" className="text-b1" />
-        <h3 className="text-sm font-semibold text-fg uppercase tracking-wide">eBay Market Data</h3>
-      </div>
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="p-3 sm:p-4 border-s2 bg-fg mt-3 sm:mt-4 overflow-hidden">
+        <CollapsibleTrigger className="w-full">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              <ChartBar size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
+              <h3 className="text-xs sm:text-sm font-bold text-t1 uppercase tracking-wide">eBay Market Data</h3>
+            </div>
+            <CaretDown
+              size={18}
+              weight="bold"
+              className={cn(
+                "text-t3 transition-transform duration-200 flex-shrink-0",
+                isOpen && "rotate-180"
+              )}
+            />
+          </div>
+        </CollapsibleTrigger>
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="p-3 rounded-md bg-bg border border-s2">
-          <p className="text-xs text-s3 uppercase tracking-wide mb-1">Avg Sold Price</p>
-          <p className="text-lg font-mono font-semibold text-fg">
-            {formatPrice(marketData.ebayAvgSold)}
-          </p>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
+            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Avg Sold</p>
+            <p className="text-base sm:text-lg font-mono font-bold text-t1">
+              {formatPrice(marketData.ebayAvgSold)}
+            </p>
+          </div>
+          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
+            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Median</p>
+            <p className="text-base sm:text-lg font-mono font-bold text-t1">
+              {formatPrice(marketData.ebayMedianSold)}
+            </p>
+          </div>
+          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
+            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Sold</p>
+            <p className="text-base sm:text-lg font-mono font-bold text-green">{marketData.ebaySoldCount}</p>
+          </div>
+          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
+            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Active</p>
+            <p className="text-base sm:text-lg font-mono font-bold text-amber">{marketData.ebayActiveListings}</p>
+          </div>
         </div>
-        <div className="p-3 rounded-md bg-bg border border-s2">
-          <p className="text-xs text-s3 uppercase tracking-wide mb-1">Median Price</p>
-          <p className="text-lg font-mono font-semibold text-fg">
-            {formatPrice(marketData.ebayMedianSold)}
-          </p>
-        </div>
-        <div className="p-3 rounded-md bg-bg border border-s2">
-          <p className="text-xs text-s3 uppercase tracking-wide mb-1">Items Sold</p>
-          <p className="text-lg font-mono font-semibold text-green">{marketData.ebaySoldCount}</p>
-        </div>
-        <div className="p-3 rounded-md bg-bg border border-s2">
-          <p className="text-xs text-s3 uppercase tracking-wide mb-1">Active Listings</p>
-          <p className="text-lg font-mono font-semibold text-amber">{marketData.ebayActiveListings}</p>
-        </div>
-      </div>
+
+        <CollapsibleContent className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
 
       {marketData.ebayPriceRange && (
-        <div className="p-3 rounded-md bg-t4 border border-t3 mb-4">
+        <div className="p-2.5 sm:p-3 rounded-lg bg-bg border border-s2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-s3 uppercase tracking-wide mb-1">Price Range</p>
-              <p className="text-sm font-mono font-medium text-fg">
+              <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Price Range</p>
+              <p className="text-xs sm:text-sm font-mono font-medium text-t1">
                 {formatPrice(marketData.ebayPriceRange.min)} - {formatPrice(marketData.ebayPriceRange.max)}
               </p>
             </div>
             {marketData.ebaySellThroughRate !== undefined && (
               <div className="text-right">
-                <p className="text-xs text-s3 uppercase tracking-wide mb-1">Sell-Through</p>
-                <p className="text-sm font-mono font-semibold text-b1">
+                <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Sell-Through</p>
+                <p className="text-xs sm:text-sm font-mono font-bold text-b1">
                   {marketData.ebaySellThroughRate.toFixed(1)}%
                 </p>
               </div>
@@ -86,12 +106,12 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
       )}
 
       {marketData.recommendedPrice && (
-        <div className="p-3 rounded-md bg-green/10 border border-green/30 mb-4">
+        <div className="p-2.5 sm:p-3 rounded-lg bg-green-bg border border-green">
           <div className="flex items-center gap-2">
-            <Tag size={18} weight="bold" className="text-green" />
+            <Tag size={16} weight="bold" className="text-green sm:w-[18px] sm:h-[18px]" />
             <div>
-              <p className="text-xs text-green/80 uppercase tracking-wide">Recommended Price</p>
-              <p className="text-xl font-mono font-bold text-green">
+              <p className="text-[10px] sm:text-xs text-green uppercase tracking-wide">Recommended Price</p>
+              <p className="text-lg sm:text-xl font-mono font-black text-green">
                 {formatPrice(marketData.recommendedPrice)}
               </p>
             </div>
@@ -100,52 +120,52 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
       )}
 
       {marketData.ebayRecentSales && marketData.ebayRecentSales.length > 0 && (
-        <>
-          <Separator className="my-4" />
+        <div>
+          <Separator className="mb-3" />
           <div className="mb-2">
-            <h4 className="text-xs font-semibold text-fg uppercase tracking-wide flex items-center gap-1.5">
+            <h4 className="text-[10px] sm:text-xs font-bold text-t1 uppercase tracking-wide flex items-center gap-1.5">
               <TrendUp size={14} weight="bold" className="text-green" />
               Recent Sales ({marketData.ebayRecentSales.length})
             </h4>
           </div>
-          <ScrollArea className="h-40">
-            <div className="space-y-2">
+          <ScrollArea className="h-32 sm:h-40">
+            <div className="space-y-2 pr-3">
               {marketData.ebayRecentSales.map((sale, idx) => (
-                <div key={idx} className="p-2 rounded border border-s2 bg-bg">
+                <div key={idx} className="p-2 rounded-lg border border-s2 bg-bg">
                   <div className="flex justify-between items-start gap-2">
-                    <p className="text-xs text-fg line-clamp-2 flex-1">{sale.title}</p>
-                    <Badge variant="secondary" className="font-mono text-xs shrink-0">
+                    <p className="text-[11px] sm:text-xs text-t1 line-clamp-2 flex-1">{sale.title}</p>
+                    <Badge variant="secondary" className="font-mono text-[10px] sm:text-xs shrink-0">
                       {formatPrice(sale.price)}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-s3">{sale.condition}</span>
-                    <span className="text-xs text-s4">•</span>
-                    <span className="text-xs text-s3">{formatDate(sale.soldDate)}</span>
+                    <span className="text-[10px] sm:text-xs text-t3">{sale.condition}</span>
+                    <span className="text-[10px] sm:text-xs text-t3">•</span>
+                    <span className="text-[10px] sm:text-xs text-t3">{formatDate(sale.soldDate)}</span>
                   </div>
                 </div>
               ))}
             </div>
           </ScrollArea>
-        </>
+        </div>
       )}
 
       {marketData.ebayActiveItems && marketData.ebayActiveItems.length > 0 && (
-        <>
-          <Separator className="my-4" />
+        <div>
+          <Separator className="mb-3" />
           <div className="mb-2">
-            <h4 className="text-xs font-semibold text-fg uppercase tracking-wide flex items-center gap-1.5">
+            <h4 className="text-[10px] sm:text-xs font-bold text-t1 uppercase tracking-wide flex items-center gap-1.5">
               <Package size={14} weight="bold" className="text-amber" />
               Active Listings ({marketData.ebayActiveItems.length})
             </h4>
           </div>
-          <ScrollArea className="h-32">
-            <div className="space-y-2">
+          <ScrollArea className="h-28 sm:h-32">
+            <div className="space-y-2 pr-3">
               {marketData.ebayActiveItems.map((item, idx) => (
-                <div key={idx} className="p-2 rounded border border-s2 bg-bg">
+                <div key={idx} className="p-2 rounded-lg border border-s2 bg-bg">
                   <div className="flex justify-between items-start gap-2">
-                    <p className="text-xs text-fg line-clamp-2 flex-1">{item.title}</p>
-                    <Badge variant="outline" className="font-mono text-xs shrink-0">
+                    <p className="text-[11px] sm:text-xs text-t1 line-clamp-2 flex-1">{item.title}</p>
+                    <Badge variant="outline" className="font-mono text-[10px] sm:text-xs shrink-0">
                       {formatPrice(item.price)}
                     </Badge>
                   </div>
@@ -153,8 +173,10 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
               ))}
             </div>
           </ScrollArea>
-        </>
+        </div>
       )}
-    </Card>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   )
 }

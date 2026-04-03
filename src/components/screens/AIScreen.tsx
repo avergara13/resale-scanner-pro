@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
-import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti, PaperPlaneRight, Sparkle } from '@phosphor-icons/react'
+import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
@@ -7,6 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Card } from '@/components/ui/card'
 import { PipelinePanel } from './PipelinePanel'
 import { DecisionSignal } from './DecisionSignal'
 import { MarketDataPanel } from '../MarketDataPanel'
@@ -227,6 +229,8 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
   const [description, setDescription] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(true)
+  const [imageOpen, setImageOpen] = useState(false)
   const { isListening, startListening, isSupported } = useVoiceInput()
   const chatScrollRef = useRef<HTMLDivElement>(null)
 
@@ -376,35 +380,55 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                 )}
 
                 {hasDecision && currentItem && (
-                  <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border border-s2 rounded-xl space-y-2.5 sm:space-y-3">
-                    <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t2">QUICK SUMMARY</h3>
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                      <div className="p-2.5 sm:p-3 bg-bg rounded-lg">
-                        <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Buy Price</p>
-                        <p className="text-base sm:text-lg font-mono font-bold text-t1">${currentItem.purchasePrice.toFixed(2)}</p>
-                      </div>
-                      <div className="p-2.5 sm:p-3 bg-bg rounded-lg">
-                        <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Sell Price</p>
-                        <p className="text-base sm:text-lg font-mono font-bold text-t1">${currentItem.estimatedSellPrice?.toFixed(2) || '--'}</p>
-                      </div>
-                      <div className="p-2.5 sm:p-3 bg-bg rounded-lg">
-                        <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
-                        <p className={cn(
-                          "text-base sm:text-lg font-mono font-bold",
-                          (currentItem.profitMargin || 0) > 50 ? "text-green" :
-                          (currentItem.profitMargin || 0) > 20 ? "text-amber" : "text-red"
-                        )}>
-                          {currentItem.profitMargin?.toFixed(1) || '--'}%
-                        </p>
-                      </div>
-                      <div className="p-2.5 sm:p-3 bg-bg rounded-lg">
-                        <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
-                        <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                          ${((currentItem.estimatedSellPrice || 0) - currentItem.purchasePrice).toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
+                    <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
+                      <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <ChartBar size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
+                            <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">QUICK SUMMARY</h3>
+                          </div>
+                          <CaretDown
+                            size={18}
+                            weight="bold"
+                            className={cn(
+                              "text-t3 transition-transform duration-200 flex-shrink-0",
+                              summaryOpen && "rotate-180"
+                            )}
+                          />
+                        </div>
+                      </CollapsibleTrigger>
+                      
+                      <CollapsibleContent>
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
+                          <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Buy Price</p>
+                            <p className="text-base sm:text-lg font-mono font-bold text-t1">${currentItem.purchasePrice.toFixed(2)}</p>
+                          </div>
+                          <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Sell Price</p>
+                            <p className="text-base sm:text-lg font-mono font-bold text-t1">${currentItem.estimatedSellPrice?.toFixed(2) || '--'}</p>
+                          </div>
+                          <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
+                            <p className={cn(
+                              "text-base sm:text-lg font-mono font-bold",
+                              (currentItem.profitMargin || 0) > 50 ? "text-green" :
+                              (currentItem.profitMargin || 0) > 20 ? "text-amber" : "text-red"
+                            )}>
+                              {currentItem.profitMargin?.toFixed(1) || '--'}%
+                            </p>
+                          </div>
+                          <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
+                            <p className="text-base sm:text-lg font-mono font-bold text-t1">
+                              ${((currentItem.estimatedSellPrice || 0) - currentItem.purchasePrice).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Card>
+                  </Collapsible>
                 )}
                 
                 {currentItem?.lensAnalysis && (
@@ -416,14 +440,34 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                 )}
                 
                 {currentItem?.imageData && (
-                  <div className="mt-3 sm:mt-4">
-                    <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t2 mb-2 px-0.5 sm:px-1">SCANNED IMAGE</h3>
-                    <img
-                      src={currentItem.imageData}
-                      alt="Scanned item"
-                      className="w-full rounded-lg sm:rounded-xl border-2 border-s2 shadow-md"
-                    />
-                  </div>
+                  <Collapsible open={imageOpen} onOpenChange={setImageOpen}>
+                    <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
+                      <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Image size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
+                            <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">SCANNED IMAGE</h3>
+                          </div>
+                          <CaretDown
+                            size={18}
+                            weight="bold"
+                            className={cn(
+                              "text-t3 transition-transform duration-200 flex-shrink-0",
+                              imageOpen && "rotate-180"
+                            )}
+                          />
+                        </div>
+                      </CollapsibleTrigger>
+                      
+                      <CollapsibleContent className="mt-3">
+                        <img
+                          src={currentItem.imageData}
+                          alt="Scanned item"
+                          className="w-full rounded-lg sm:rounded-xl border-2 border-s2 shadow-md"
+                        />
+                      </CollapsibleContent>
+                    </Card>
+                  </Collapsible>
                 )}
               </div>
             )}
