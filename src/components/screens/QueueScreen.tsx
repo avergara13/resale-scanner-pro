@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -238,6 +238,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
   const [previousItemCount, setPreviousItemCount] = useState<number>(queueItems.length)
+  const [previousFilteredCount, setPreviousFilteredCount] = useState<number | null>(null)
+  const [showTrendIndicator, setShowTrendIndicator] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -522,7 +524,20 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         })
       }
     }
-  }, [sortedItems.length, previousItemCount, queueItems.length])
+
+    if (previousFilteredCount !== null && sortedItems.length !== previousFilteredCount) {
+      setShowTrendIndicator(true)
+      const timer = setTimeout(() => {
+        setShowTrendIndicator(false)
+        setPreviousFilteredCount(sortedItems.length)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+    
+    if (previousFilteredCount === null && sortedItems.length > 0) {
+      setPreviousFilteredCount(sortedItems.length)
+    }
+  }, [sortedItems.length, previousItemCount, queueItems.length, previousFilteredCount])
 
   const handleEdit = (item: ScannedItem) => {
     setEditingItem(item)
@@ -621,17 +636,34 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                     const isMediumVisibility = percentage >= 50 && percentage < 80
                     const isLowVisibility = percentage < 50
                     
+                    const trendDirection = previousFilteredCount !== null 
+                      ? sortedItems.length > previousFilteredCount 
+                        ? 'up' 
+                        : sortedItems.length < previousFilteredCount 
+                          ? 'down' 
+                          : 'same'
+                      : 'same'
+                    
                     return (
                       <Badge 
                         variant="secondary" 
                         className={cn(
-                          "h-5 px-2 text-[10px] font-bold border",
+                          "h-5 px-2 text-[10px] font-bold border transition-all duration-300",
                           isHighVisibility && "bg-green/15 text-green border-green/30",
                           isMediumVisibility && "bg-amber/15 text-amber border-amber/30",
-                          isLowVisibility && "bg-red/15 text-red border-red/30"
+                          isLowVisibility && "bg-red/15 text-red border-red/30",
+                          showTrendIndicator && "animate-pulse"
                         )}
                       >
-                        {sortedItems.length} visible ({percentage}%)
+                        <span className="flex items-center gap-1">
+                          {sortedItems.length} visible ({percentage}%)
+                          {showTrendIndicator && trendDirection === 'up' && (
+                            <TrendUp size={12} weight="bold" className="animate-bounce" />
+                          )}
+                          {showTrendIndicator && trendDirection === 'down' && (
+                            <TrendDown size={12} weight="bold" className="animate-bounce" />
+                          )}
+                        </span>
                       </Badge>
                     )
                   })()
