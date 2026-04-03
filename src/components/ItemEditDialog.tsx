@@ -8,7 +8,10 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { FloppyDisk, X, PencilSimple } from '@phosphor-icons/react'
 import { PhotoEditor } from '@/components/PhotoEditor'
-import type { ScannedItem } from '@/types'
+import { TagManager } from '@/components/TagManager'
+import { SuggestedTags } from '@/components/SuggestedTags'
+import { useKV } from '@github/spark/hooks'
+import type { ScannedItem, ItemTag } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
 
 interface ItemEditDialogProps {
@@ -30,6 +33,9 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
   })
   const [editedImage, setEditedImage] = useState<string | null>(null)
   const [isEditingPhoto, setIsEditingPhoto] = useState(false)
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([])
+  const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
 
   useEffect(() => {
     if (item) {
@@ -42,8 +48,79 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
         notes: item.notes || '',
       })
       setEditedImage(null)
+      setSelectedTags(item.tags || [])
+      
+      if (geminiService && item.productName && item.category) {
+        generateTagSuggestions(item.productName, item.category, item.description || '')
+      } else {
+        setSuggestedTags([])
+      }
     }
-  }, [item])
+  }, [item, geminiService])
+
+  const generateTagSuggestions = async (productName: string, category: string, description: string) => {
+    if (!geminiService) return
+    
+    try {
+      const promptText = `Generate 5-8 relevant tags for this product listing.
+      
+Product Name: ${productName}
+Category: ${category}
+Description: ${description}
+
+Return ONLY a JSON array of tag strings, like: ["tag1", "tag2", "tag3"]
+Tags should be:
+- Short and descriptive (1-2 words)
+- Relevant to resale/marketplace listings
+- Include condition, era, brand, style, or key features
+- Lowercase
+
+Example tags: "vintage", "rare", "new with tags", "collectible", "limited edition", "designer", "retro", "bundle"`
+
+      const response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
+      const parsed = JSON.parse(response)
+      const tags = Array.isArray(parsed) ? parsed : (parsed.tags || [])
+      setSuggestedTags(tags.slice(0, 8))
+    } catch (error) {
+      console.error('Failed to generate tag suggestions:', error)
+      setSuggestedTags([])
+    }
+  }
+
+  const handleApplySuggestedTags = (tags: string[]) => {
+    setSelectedTags((prev) => {
+      const newTags = [...prev]
+      tags.forEach(tag => {
+        if (!newTags.includes(tag)) {
+          newTags.push(tag)
+        }
+      })
+      return newTags
+    })
+  }
+
+  const handleApplySingleTag = (tag: string) => {
+    setSelectedTags((prev) => {
+      if (prev.includes(tag)) {
+        return prev.filter(t => t !== tag)
+      } else {
+        return [...prev, tag]
+      }
+    })
+  }
+
+  const handleTagsChange = (tags: string[]) => {
+    setSelectedTags(tags)
+  }
+
+  const handleCreateTag = (tag: ItemTag) => {
+    setAllTags((prev) => [...(prev || []), tag])
+  }
+
+  const handleDeleteTag = (tagId: string) => {
+    setAllTags((prev) => (prev || []).filter(t => t.id !== tagId))
+    setSelectedTags((prev) => prev.filter(id => id !== tagId))
+  }
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -64,6 +141,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
       purchasePrice: parseFloat(formData.purchasePrice) || 0,
       estimatedSellPrice: formData.estimatedSellPrice ? parseFloat(formData.estimatedSellPrice) : undefined,
       notes: formData.notes || undefined,
+      tags: selectedTags,
     }
 
     if (editedImage) {
@@ -245,6 +323,23 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
                 className="bg-bg border-s2 text-fg placeholder:text-s3 resize-none"
               />
             </div>
+
+            {suggestedTags.length > 0 && (
+              <SuggestedTags
+                suggestions={suggestedTags}
+                onApply={handleApplySuggestedTags}
+                onApplyTag={handleApplySingleTag}
+                appliedTags={selectedTags}
+              />
+            )}
+
+            <TagManager
+              tags={allTags || []}
+              selectedTags={selectedTags}
+              onTagsChange={handleTagsChange}
+              onCreateTag={handleCreateTag}
+              onDeleteTag={handleDeleteTag}
+            />
           </div>
         </ScrollArea>
 
