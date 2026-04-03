@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -21,6 +21,7 @@ import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/Advanc
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
 import { FilterPresetsManager } from '@/components/FilterPresetsManager'
 import { BulkTagOperations } from '@/components/BulkTagOperations'
+import { LocationInsights } from '@/components/LocationInsights'
 import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-preference'
 import { cn } from '@/lib/utils'
@@ -90,6 +91,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
     return Array.from(categories).sort()
   }, [queueItems])
 
+  const availableLocations = useMemo(() => {
+    const locations = new Map<string, { id: string; name: string }>()
+    queueItems.forEach(item => {
+      if (item.location) {
+        locations.set(item.location.id, {
+          id: item.location.id,
+          name: item.location.name
+        })
+      }
+    })
+    return Array.from(locations.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [queueItems])
+
   const priceRange = useMemo(() => {
     if (queueItems.length === 0) return { min: 0, max: 1000 }
     const prices = queueItems.map(item => item.purchasePrice)
@@ -134,6 +148,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
         return false
       }
     }
+
+    if (advancedFilters.locations && advancedFilters.locations.length > 0) {
+      if (!item.location || !advancedFilters.locations.includes(item.location.id)) {
+        return false
+      }
+    }
     
     if (!searchQuery.trim()) return true
     
@@ -142,12 +162,14 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
     const description = (item.description || '').toLowerCase()
     const category = (item.category || '').toLowerCase()
     const notes = (item.notes || '').toLowerCase()
+    const locationName = (item.location?.name || '').toLowerCase()
     
     return (
       productName.includes(query) ||
       description.includes(query) ||
       category.includes(query) ||
-      notes.includes(query)
+      notes.includes(query) ||
+      locationName.includes(query)
     )
   })
   
@@ -265,6 +287,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
       newFilters.categories = currentCategories.filter((c: string) => c !== value)
       if (newFilters.categories.length === 0) {
         delete newFilters.categories
+      }
+    } else if (filterKey === 'locations' && value) {
+      const currentLocations = newFilters.locations || []
+      newFilters.locations = currentLocations.filter((l: string) => l !== value)
+      if (newFilters.locations.length === 0) {
+        delete newFilters.locations
       }
     } else {
       delete newFilters[filterKey]
@@ -451,6 +479,33 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
             >
               Pending ({pendingCount})
             </Button>
+            {availableLocations.length > 0 && (
+              <Select
+                value={advancedFilters.locations?.[0] || 'all'}
+                onValueChange={(value) => {
+                  if (value === 'all') {
+                    setAdvancedFilters({ ...advancedFilters, locations: undefined })
+                  } else {
+                    setAdvancedFilters({ ...advancedFilters, locations: [value] })
+                  }
+                }}
+              >
+                <SelectTrigger className="h-8 px-3 text-xs font-medium border-s2 bg-fg text-t1 w-auto min-w-[140px] flex-shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin size={14} weight="fill" className={advancedFilters.locations?.length ? "text-b1" : "text-s4"} />
+                    <SelectValue placeholder="All Locations" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">All Locations</SelectItem>
+                  {availableLocations.map(loc => (
+                    <SelectItem key={loc.id} value={loc.id} className="text-xs">
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 
@@ -601,6 +656,11 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
         </div>
       ) : (
         <ScrollArea className="flex-1 px-4 py-4">
+          {availableLocations.length > 0 && (
+            <div className="mb-6">
+              <LocationInsights items={queueItems} />
+            </div>
+          )}
           <div className="space-y-3">
             {sortedItems.map((item) => {
               const isSelected = selectedIds.has(item.id)

@@ -24,6 +24,7 @@ export interface AdvancedFilterOptions {
     end: number
   }
   categories?: string[]
+  locations?: string[]
 }
 
 interface AdvancedFiltersProps {
@@ -56,7 +57,8 @@ export function AdvancedFilters({
     filters.priceRange && (filters.priceRange.min > priceMin || filters.priceRange.max < priceMax),
     filters.profitMarginRange,
     filters.dateRange,
-    filters.categories && filters.categories.length > 0
+    filters.categories && filters.categories.length > 0,
+    filters.locations && filters.locations.length > 0
   ].filter(Boolean).length
 
   const handleApply = () => {
