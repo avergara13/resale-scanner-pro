@@ -14,6 +14,7 @@ This is a multi-modal AI platform integrating camera vision, voice interfaces, r
 
 ### ✅ Completed Features
 - **Camera Intelligence System**: Fullscreen camera with viewfinder, price input, and dual modes (AI Lens / Listing)
+- **AI-Powered Object Detection**: Real-time product focus detection with bounding boxes to automatically identify main product in frame
 - **AI Analysis Pipeline**: 5-phase system with Google Gemini vision API integration
 - **Agent/Manual Dual Interface**: Tab switching between AI-guided and manual entry modes
 - **Voice Control Integration**: Browser-based speech recognition for hands-free text input across the app
@@ -79,11 +80,11 @@ To make this app fully operational:
 ## Next Development Phase
 
 ### Camera Intelligence System
-- **Functionality**: Fullscreen camera overlay with live viewfinder, corner bracket frame, price input field, and shutter button for capture
-- **Purpose**: Primary data input - captures product images for Google Lens search and Gemini vision analysis
+- **Functionality**: Fullscreen camera overlay with live viewfinder, corner bracket frame, price input field, shutter button, and optional AI-powered object detection with real-time bounding boxes highlighting the main product
+- **Purpose**: Primary data input - captures product images for Google Lens search and Gemini vision analysis, with intelligent framing assistance to ensure optimal product focus
 - **Trigger**: Floating camera eye button (center of bottom nav)
-- **Progression**: Tap camera button → Dark overlay opens → Frame product → Enter price → Tap shutter → Image processes through AI pipeline → Returns to AI screen with results
-- **Success criteria**: Clean 480px-max width capture, instant photo processing, seamless transition back to AI analysis screen
+- **Progression**: Tap camera button → Dark overlay opens → Frame product → (Optional) Enable object detection to see real-time product highlighting → Enter price → Tap shutter → Image processes through AI pipeline → Returns to AI screen with results
+- **Success criteria**: Clean 480px-max width capture, instant photo processing, seamless transition back to AI analysis screen, accurate product focus detection when enabled
 
 ### AI Analysis Pipeline (5-Phase System)
 - **Functionality**: Animated step cards showing real-time progress through: 1) Vision Analysis (Google Gemini), 2) Google Lens Search, 3) Market Research (eBay/Google), 4) Profit Calculation, 5) Decision Signal (GO/PASS)

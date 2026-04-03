@@ -14,6 +14,7 @@ import { SettingsScreen } from './components/screens/SettingsScreen'
 import { createEbayService } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
+import { createObjectDetectionService } from './lib/object-detection-service'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { Screen, ScannedItem, PipelineStep, Session, AppSettings } from './types'
@@ -62,6 +63,13 @@ function App() {
       settings?.googleSearchEngineId
     )
   }, [settings?.googleApiKey, settings?.googleSearchEngineId])
+
+  const objectDetectionService = useMemo(() => {
+    return createObjectDetectionService(
+      settings?.geminiApiKey,
+      settings?.preferredAiModel
+    )
+  }, [settings?.geminiApiKey, settings?.preferredAiModel])
 
   const handleCapture = useCallback(async (imageData: string, price: number) => {
     setCameraOpen(false)
@@ -589,6 +597,7 @@ function App() {
         onClose={() => setCameraOpen(false)}
         onCapture={handleCapture}
         onQuickDraft={handleQuickDraft}
+        objectDetectionService={objectDetectionService}
       />
 
       {isBatchAnalyzing && (
