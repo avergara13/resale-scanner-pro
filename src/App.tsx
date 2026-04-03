@@ -401,6 +401,44 @@ function App() {
     }
   }, [session, setSession, setQueue])
 
+  const handleMultiCapture = useCallback((products: import('@/types').DetectedProduct[], baseImageData: string, totalPrice: number) => {
+    const timestamp = Date.now()
+    const parentId = `multi-${timestamp}`
+    
+    products.forEach((product, index) => {
+      const itemPrice = totalPrice / products.length
+      
+      const multiItem: ScannedItem = {
+        id: `${parentId}-${index}`,
+        timestamp: timestamp + index,
+        imageData: product.croppedImageData,
+        purchasePrice: itemPrice,
+        productName: product.name,
+        description: `Part of multi-item capture (${index + 1} of ${products.length})`,
+        decision: 'PENDING',
+        inQueue: true,
+        isMultiProduct: true,
+        parentItemId: parentId,
+        detectedProducts: [product],
+      }
+      
+      setQueue((prev) => [...(prev || []), multiItem])
+    })
+
+    if (session?.active) {
+      setSession((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          itemsScanned: prev.itemsScanned + products.length,
+        }
+      })
+    }
+
+    toast.success(`Added ${products.length} items to queue`)
+    setScreen('queue')
+  }, [session, setSession, setQueue])
+
   const handleEditQueueItem = useCallback((itemId: string, updates: Partial<ScannedItem>) => {
     setQueue((prev) => {
       const currentQueue = prev || []
@@ -597,6 +635,7 @@ function App() {
         onClose={() => setCameraOpen(false)}
         onCapture={handleCapture}
         onQuickDraft={handleQuickDraft}
+        onMultiCapture={handleMultiCapture}
         objectDetectionService={objectDetectionService}
       />
 

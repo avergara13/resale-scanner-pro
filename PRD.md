@@ -15,6 +15,7 @@ This is a multi-modal AI platform integrating camera vision, voice interfaces, r
 ### ✅ Completed Features
 - **Camera Intelligence System**: Fullscreen camera with viewfinder, price input, and dual modes (AI Lens / Listing)
 - **AI-Powered Object Detection**: Real-time product focus detection with bounding boxes to automatically identify main product in frame
+- **Multi-Object Detection & Selection**: Detects multiple items in a single photo, allowing users to select which products to analyze separately with individual pricing
 - **AI Analysis Pipeline**: 5-phase system with Google Gemini vision API integration
 - **Agent/Manual Dual Interface**: Tab switching between AI-guided and manual entry modes
 - **Voice Control Integration**: Browser-based speech recognition for hands-free text input across the app
@@ -141,6 +142,13 @@ To make this app fully operational:
 - **Trigger**: Automatic in AI pipeline phase 3
 - **Progression**: Product identified → Query eBay Finding API (completed items, last 90 days) → Query eBay Shopping API (active listings) → Calculate avg/median prices, sell-through rate, price range → Display market data panel with recent sales and active listings → Factor into profit calculation
 - **Success criteria**: Fresh data (<5min cache), sold vs. active listing ratio with sell-through rate, recommended pricing based on median sold prices, profit margin accounting for eBay fees, display of 10 recent sales with dates and conditions
+
+### Multi-Object Detection & Selection
+- **Functionality**: Automatically detects multiple products in a single photo, displays bounding boxes around each item, allows user to select which products to analyze individually with custom pricing
+- **Purpose**: Efficient batch processing when scanning lots or bundles with multiple sellable items
+- **Trigger**: When DETECT button is enabled and multiple objects are detected during camera capture
+- **Progression**: Enable detection → Camera shows real-time bounding boxes → Capture photo → Multi-object selector appears → User taps items to select/deselect → Adjust individual prices → Confirm → Each selected item becomes a separate queue entry with cropped image
+- **Success criteria**: Accurate object detection (85%+ confidence), visual feedback for selection state, cropped images maintain product quality, individual pricing edits persist, all items added to queue in single batch
 
 ### Gemini Chatbot Assistant
 - **Functionality**: Context-aware AI assistant for questions about items, market trends, pricing strategy

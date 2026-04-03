@@ -12,6 +12,19 @@ export interface PipelineStep {
   error?: string
 }
 
+export interface DetectedProduct {
+  id: string
+  name: string
+  confidence: number
+  boundingBox: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  croppedImageData?: string
+}
+
 export interface ScannedItem {
   id: string
   timestamp: number
@@ -29,6 +42,9 @@ export interface ScannedItem {
   marketData?: MarketData
   notes?: string
   inQueue: boolean
+  detectedProducts?: DetectedProduct[]
+  isMultiProduct?: boolean
+  parentItemId?: string
 }
 
 export interface GoogleLensResult {

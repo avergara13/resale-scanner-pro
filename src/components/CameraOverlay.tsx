@@ -3,16 +3,19 @@ import { X, Lightning, Check, Scan, Crosshair } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ObjectDetectionService, DetectedObject, ObjectDetectionResult } from '@/lib/object-detection-service'
+import { MultiObjectSelector } from './MultiObjectSelector'
+import type { DetectedProduct } from '@/types'
 
 interface CameraOverlayProps {
   isOpen: boolean
   onClose: () => void
   onCapture: (imageData: string, price: number) => void
   onQuickDraft?: (imageData: string, price: number) => void
+  onMultiCapture?: (products: DetectedProduct[], baseImageData: string, totalPrice: number) => void
   objectDetectionService?: ObjectDetectionService | null
 }
 
-export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, objectDetectionService }: CameraOverlayProps) {
+export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onMultiCapture, objectDetectionService }: CameraOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -26,6 +29,8 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, object
   const [detectionEnabled, setDetectionEnabled] = useState(false)
   const [detectionResult, setDetectionResult] = useState<ObjectDetectionResult | null>(null)
   const [isDetecting, setIsDetecting] = useState(false)
+  const [showMultiSelector, setShowMultiSelector] = useState(false)
+  const [capturedImageForMulti, setCapturedImageForMulti] = useState<string>('')
 
   useEffect(() => {
     if (isOpen) {
@@ -137,7 +142,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, object
     }
   }
 
-  const handleCapture = () => {
+  const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current) return
     if (mode === 'lens' && !price) return
 
@@ -150,6 +155,14 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, object
       ctx.drawImage(video, 0, 0)
       const imageData = canvas.toDataURL('image/jpeg', 0.9)
       
+      if (detectionEnabled && detectionResult && detectionResult.objects.length > 1 && onMultiCapture && !quickDraftMode) {
+        setCapturedImageForMulti(imageData)
+        setShowMultiSelector(true)
+        setShowCaptureFlash(true)
+        setTimeout(() => setShowCaptureFlash(false), 300)
+        return
+      }
+      
       if (quickDraftMode && onQuickDraft) {
         onQuickDraft(imageData, parseFloat(price) || 0)
         setDraftCount(prev => prev + 1)
@@ -161,6 +174,15 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, object
         setPrice('')
       }
     }
+  }
+
+  const handleMultiProductsSelected = (products: DetectedProduct[]) => {
+    if (onMultiCapture) {
+      onMultiCapture(products, capturedImageForMulti, parseFloat(price) || 0)
+    }
+    setShowMultiSelector(false)
+    setCapturedImageForMulti('')
+    setPrice('')
   }
 
   return (
@@ -362,6 +384,25 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, object
 
           <canvas ref={canvasRef} className="hidden" />
         </motion.div>
+      )}
+      
+      {showMultiSelector && detectionResult && (
+        <MultiObjectSelector
+          isOpen={showMultiSelector}
+          onClose={() => {
+            setShowMultiSelector(false)
+            setCapturedImageForMulti('')
+          }}
+          imageData={capturedImageForMulti}
+          detectedObjects={detectionResult.objects.map(obj => ({
+            id: `${obj.name}-${obj.boundingBox.x}-${obj.boundingBox.y}`,
+            name: obj.name,
+            confidence: obj.confidence,
+            boundingBox: obj.boundingBox,
+          }))}
+          onSelectProducts={handleMultiProductsSelected}
+          purchasePrice={parseFloat(price) || 0}
+        />
       )}
     </AnimatePresence>
   )
