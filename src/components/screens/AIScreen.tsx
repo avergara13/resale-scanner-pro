@@ -17,6 +17,7 @@ import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ThemeToggle } from '../ThemeToggle'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useCollapsePreference } from '@/hooks/use-collapse-preference'
+import { useTabPreference } from '@/hooks/use-tab-preference'
 import { toast } from 'sonner'
 import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
 
@@ -224,7 +225,7 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
 }
 
 export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeepSearch, onSaveDraft }: AIScreenProps) {
-  const [tab, setTab] = useState<'analysis' | 'chat'>('analysis')
+  const [tab, setTab] = useTabPreference<'analysis' | 'chat'>('ai-screen', 'analysis')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [description, setDescription] = useState('')

@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ThemeToggle } from '../ThemeToggle'
+import { useTabPreference } from '@/hooks/use-tab-preference'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { ChatMessage } from '@/types'
@@ -68,6 +69,7 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
 }
 
 export function ResearchScreen() {
+  const [activeTab, setActiveTab] = useTabPreference<'chat' | 'research' | 'insights'>('research-screen', 'chat')
   const [chatMessages, setChatMessages] = useKV<ChatMessage[]>('research-chat', [])
   const [researchTasks, setResearchTasks] = useKV<ResearchTask[]>('research-tasks', [])
   const [input, setInput] = useState('')
@@ -196,7 +198,7 @@ export function ResearchScreen() {
         <ThemeToggle />
       </div>
 
-      <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="flex-1 flex flex-col min-h-0">
         <TabsList className="mx-4 mt-3 mb-0 grid grid-cols-3 bg-s1 border border-s2">
           <TabsTrigger value="chat" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-fg data-[state=active]:text-b1">
             <Sparkle size={16} weight="fill" />
