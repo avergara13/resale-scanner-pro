@@ -16,6 +16,7 @@ import { GoogleLensResults } from '../GoogleLensResults'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ThemeToggle } from '../ThemeToggle'
 import { useVoiceInput } from '@/hooks/use-voice-input'
+import { useCollapsePreference } from '@/hooks/use-collapse-preference'
 import { toast } from 'sonner'
 import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
 
@@ -229,8 +230,8 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
   const [description, setDescription] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
-  const [summaryOpen, setSummaryOpen] = useState(true)
-  const [imageOpen, setImageOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useCollapsePreference('ai-summary', true)
+  const [imageOpen, setImageOpen] = useCollapsePreference('ai-image', false)
   const { isListening, startListening, isSupported } = useVoiceInput()
   const chatScrollRef = useRef<HTMLDivElement>(null)
 

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -6,6 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { TrendUp, TrendDown, Tag, ChartBar, Package, CaretDown } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { useCollapsePreference } from '@/hooks/use-collapse-preference'
 import type { MarketData } from '@/types'
 
 interface MarketDataPanelProps {
@@ -13,7 +13,7 @@ interface MarketDataPanelProps {
 }
 
 export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useCollapsePreference('market-data', false)
 
   if (!marketData) {
     return null

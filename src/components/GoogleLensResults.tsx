@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { MagnifyingGlass, TrendUp, ShoppingBag, CaretDown } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
+import { useCollapsePreference } from '@/hooks/use-collapse-preference'
 import type { GoogleLensAnalysis } from '@/types'
 
 interface GoogleLensResultsProps {
@@ -11,7 +11,7 @@ interface GoogleLensResultsProps {
 }
 
 export function GoogleLensResults({ lensAnalysis }: GoogleLensResultsProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useCollapsePreference('google-lens', false)
 
   if (!lensAnalysis || lensAnalysis.results.length === 0) {
     return null
