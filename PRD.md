@@ -20,11 +20,11 @@ This is a multi-modal AI platform integrating camera vision, voice interfaces, r
 - **Success criteria**: Clean 480px-max width capture, instant photo processing, seamless transition back to AI analysis screen
 
 ### AI Analysis Pipeline (5-Phase System)
-- **Functionality**: Animated step cards showing real-time progress through: 1) Vision Analysis, 2) Google Lens Search, 3) Market Research (eBay/Google), 4) Profit Calculation, 5) Decision Signal (GO/PASS)
-- **Purpose**: Transparent AI workflow that builds trust and shows reasoning behind recommendations
+- **Functionality**: Animated step cards showing real-time progress through: 1) Vision Analysis (Google Gemini), 2) Google Lens Search, 3) Market Research (eBay/Google), 4) Profit Calculation, 5) Decision Signal (GO/PASS)
+- **Purpose**: Transparent AI workflow that builds trust and shows reasoning behind recommendations using real Google Gemini vision API for product identification
 - **Trigger**: Photo capture or manual item entry
-- **Progression**: Image captured → Phase 1 animates in → Gemini analyzes image → Phase 2 starts → Google Lens finds product → Phase 3 fetches market data → Phase 4 calculates margins → Phase 5 shows bold GO (green) or PASS (red) decision
-- **Success criteria**: Each phase completes in <2s, visual feedback throughout, unmissable final decision signal
+- **Progression**: Image captured → Phase 1 animates in → Gemini analyzes image with product name, brand, category, condition, confidence score → Phase 2 starts → Google Lens finds product → Phase 3 fetches market data → Phase 4 calculates margins → Phase 5 shows bold GO (green) or PASS (red) decision
+- **Success criteria**: Each phase completes in <2s, visual feedback throughout, unmissable final decision signal, real Gemini API product identification with confidence scores
 
 ### Agent/Manual Dual Interface
 - **Functionality**: Tab toggle between AI-guided workflow (Agent mode) and manual form entry (Manual mode)

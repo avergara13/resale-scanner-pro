@@ -8,6 +8,8 @@ import { SessionScreen } from './components/screens/SessionScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
 import { createEbayService } from './lib/ebay-service'
+import { createGeminiService } from './lib/gemini-service'
+import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { Screen, ScannedItem, PipelineStep, Session, AppSettings } from './types'
 
 function App() {
@@ -39,6 +41,13 @@ function App() {
     )
   }, [settings?.ebayAppId, settings?.ebayDevId, settings?.ebayCertId, settings?.ebayApiKey])
 
+  const geminiService = useMemo(() => {
+    return createGeminiService(
+      settings?.geminiApiKey,
+      settings?.preferredAiModel
+    )
+  }, [settings?.geminiApiKey, settings?.preferredAiModel])
+
   const handleCapture = useCallback(async (imageData: string, price: number) => {
     setCameraOpen(false)
     
@@ -63,12 +72,41 @@ function App() {
     setPipeline(steps)
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      let visionResult: GeminiVisionResponse | undefined
+      let mockProductName = 'Unknown Product'
       
-      const mockProductName = 'Vintage Leather Jacket'
-      setPipeline(prev => prev.map((s, i) => 
-        i === 0 ? { ...s, status: 'complete', data: `Product identified: ${mockProductName}` } : s
-      ))
+      if (geminiService) {
+        try {
+          visionResult = await geminiService.analyzeProductImage(imageData, {}, price)
+          mockProductName = visionResult.productName
+          
+          setPipeline(prev => prev.map((s, i) => 
+            i === 0 ? { 
+              ...s, 
+              status: 'complete', 
+              data: `${visionResult?.productName || mockProductName} - ${visionResult?.brand || 'Generic'} (${visionResult ? Math.round(visionResult.confidence * 100) : 0}% confident)` 
+            } : s
+          ))
+        } catch (error) {
+          console.error('Gemini vision failed:', error)
+          setPipeline(prev => prev.map((s, i) => 
+            i === 0 ? { 
+              ...s, 
+              status: 'complete', 
+              data: 'Vision analysis unavailable - configure Gemini API key in Settings' 
+            } : s
+          ))
+        }
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        setPipeline(prev => prev.map((s, i) => 
+          i === 0 ? { 
+            ...s, 
+            status: 'complete', 
+            data: 'Configure Gemini API key in Settings for real vision analysis' 
+          } : s
+        ))
+      }
       
       await new Promise(resolve => setTimeout(resolve, 500))
       setPipeline(prev => prev.map((s, i) => 
@@ -90,8 +128,9 @@ function App() {
       
       if (ebayService) {
         try {
-          const categoryId = await ebayService.getCategoryId(mockProductName)
-          const searchResults = await ebayService.searchCompletedListings(mockProductName, categoryId)
+          const searchTerm = visionResult?.searchTerms?.[0] || mockProductName
+          const categoryId = await ebayService.getCategoryId(searchTerm)
+          const searchResults = await ebayService.searchCompletedListings(searchTerm, categoryId)
           
           marketData = {
             ebayAvgSold: searchResults.averageSoldPrice,
@@ -170,9 +209,9 @@ function App() {
       
       const updatedItem: ScannedItem = {
         ...newItem,
-        productName: mockProductName,
-        description: 'Classic brown leather jacket, excellent condition',
-        category: 'Clothing & Accessories',
+        productName: visionResult?.productName || mockProductName,
+        description: visionResult?.description || 'Product analysis unavailable',
+        category: visionResult?.category || 'General',
         estimatedSellPrice: sellPrice,
         profitMargin: profitMetrics.profitMargin,
         decision,
@@ -203,7 +242,7 @@ function App() {
       })))
       toast.error('Analysis failed. Please try again.')
     }
-  }, [settings, session, setSession, ebayService])
+  }, [settings, session, setSession, ebayService, geminiService])
 
   const handleAddToQueue = useCallback(() => {
     if (currentItem && currentItem.decision === 'GO') {
