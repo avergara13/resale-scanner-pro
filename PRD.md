@@ -27,6 +27,7 @@ This is a multi-modal AI platform integrating camera vision, voice interfaces, r
 - **Photo Editing**: Brightness, contrast, saturation adjustments, and eBay optimization
 - **Dark Mode**: Toggle for low-light scanning conditions with persistent theme preference
 - **Settings Configuration**: Comprehensive API key management for all services
+- **Location-Based Insights**: Track and analyze performance across different thrift stores with automatic ranking by profitability, GO rate, and recent success
 
 ### 🚧 Ready for API Connection
 The following features are built and ready - just add API keys in Settings:

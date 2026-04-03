@@ -77,6 +77,36 @@ export interface ScannedItem {
   detectedProducts?: DetectedProduct[]
   isMultiProduct?: boolean
   parentItemId?: string
+  location?: ThriftStoreLocation
+}
+
+export interface ThriftStoreLocation {
+  id: string
+  name: string
+  address?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  latitude?: number
+  longitude?: number
+  type?: 'goodwill' | 'salvation-army' | 'thrift-store' | 'estate-sale' | 'garage-sale' | 'flea-market' | 'other'
+}
+
+export interface LocationPerformance {
+  location: ThriftStoreLocation
+  totalScans: number
+  goCount: number
+  passCount: number
+  totalProfit: number
+  averageProfit: number
+  goRate: number
+  lastVisit?: number
+  bestCategories: Array<{
+    category: string
+    count: number
+    avgProfit: number
+  }>
+  recentFinds: ScannedItem[]
 }
 
 export interface GoogleLensResult {

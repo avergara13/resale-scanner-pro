@@ -1,4 +1,4 @@
-import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy } from '@phosphor-icons/react'
+import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy, MapPin } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -8,6 +8,7 @@ import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
 import { TimeBasedRecommendations } from '../TimeBasedRecommendations'
+import { LocationInsights } from '../LocationInsights'
 import { useKV } from '@github/spark/hooks'
 import type { Session, ScannedItem, ProfitGoal } from '@/types'
 
@@ -20,6 +21,7 @@ interface SessionScreenProps {
 export function SessionScreen({ session, onStartSession, onEndSession }: SessionScreenProps) {
   const [showTrends, setShowTrends] = useState(false)
   const [showGoalTracking, setShowGoalTracking] = useState(false)
+  const [showLocations, setShowLocations] = useState(false)
   const [queue] = useKV<ScannedItem[]>('queue', [])
   const [allSessions] = useKV<Session[]>('all-sessions', [])
   const [goals] = useKV<ProfitGoal[]>('profit-goals', [])
@@ -35,7 +37,7 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-xl font-black tracking-tight text-t1">
-            {showGoalTracking ? 'GOAL ACHIEVEMENT' : showTrends ? 'PERFORMANCE TRENDS' : 'TODAY\'S SESSION'}
+            {showLocations ? 'TOP THRIFT STORES' : showGoalTracking ? 'GOAL ACHIEVEMENT' : showTrends ? 'PERFORMANCE TRENDS' : 'TODAY\'S SESSION'}
           </h1>
           <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
@@ -46,8 +48,11 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
             variant="ghost"
             size="icon"
             onClick={() => {
-              if (showGoalTracking) {
+              if (showLocations) {
+                setShowLocations(false)
+              } else if (showGoalTracking) {
                 setShowGoalTracking(false)
+                setShowLocations(true)
               } else if (showTrends) {
                 setShowTrends(false)
                 setShowGoalTracking(true)
@@ -57,7 +62,9 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
             }}
             className="h-9 w-9"
           >
-            {showGoalTracking ? (
+            {showLocations ? (
+              <MapPin size={20} weight="fill" className="text-green" />
+            ) : showGoalTracking ? (
               <Trophy size={20} weight="fill" className="text-amber" />
             ) : (
               <ChartLine size={20} weight={showTrends ? 'fill' : 'regular'} className="text-b1" />
@@ -67,7 +74,11 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
         </div>
       </div>
 
-      {showGoalTracking ? (
+      {showLocations ? (
+        <div className="flex-1 overflow-y-auto">
+          <LocationInsights items={queue || []} />
+        </div>
+      ) : showGoalTracking ? (
         <div className="flex-1 overflow-y-auto">
           <GoalAchievementTracker 
             goals={goals || []} 
