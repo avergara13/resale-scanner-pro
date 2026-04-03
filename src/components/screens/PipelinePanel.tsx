@@ -8,11 +8,46 @@ interface PipelinePanelProps {
 }
 
 const phaseConfig = {
-  vision: { icon: Eye, label: '1. IDENTIFYING ITEM', detail: 'Visual matching & OCR...' },
-  lens: { icon: MagnifyingGlass, label: '2. GOOGLE LENS', detail: 'Finding similar items...' },
-  market: { icon: TrendUp, label: '3. MARKET VELOCITY', detail: 'Sell-through rate calculation...' },
-  profit: { icon: Calculator, label: '4. EBAY MATH', detail: 'Fees, shipping & net profit...' },
-  decision: { icon: CheckCircle, label: '5. FINAL DECISION', detail: 'Agentic recommendation...' },
+  vision: { 
+    icon: Eye, 
+    label: '1. IDENTIFYING ITEM', 
+    detail: 'Visual matching & OCR...',
+    duration: 3.5,
+    progressSteps: [0, 0.25, 0.5, 0.75, 0.95],
+    progressTiming: [0, 0.25, 0.5, 0.75, 1]
+  },
+  lens: { 
+    icon: MagnifyingGlass, 
+    label: '2. GOOGLE LENS', 
+    detail: 'Finding similar items...',
+    duration: 2.8,
+    progressSteps: [0, 0.35, 0.65, 0.85, 0.95],
+    progressTiming: [0, 0.3, 0.6, 0.85, 1]
+  },
+  market: { 
+    icon: TrendUp, 
+    label: '3. MARKET VELOCITY', 
+    detail: 'Sell-through rate calculation...',
+    duration: 4.2,
+    progressSteps: [0, 0.20, 0.45, 0.70, 0.90],
+    progressTiming: [0, 0.2, 0.5, 0.8, 1]
+  },
+  profit: { 
+    icon: Calculator, 
+    label: '4. EBAY MATH', 
+    detail: 'Fees, shipping & net profit...',
+    duration: 1.8,
+    progressSteps: [0, 0.40, 0.70, 0.90, 0.95],
+    progressTiming: [0, 0.35, 0.65, 0.9, 1]
+  },
+  decision: { 
+    icon: CheckCircle, 
+    label: '5. FINAL DECISION', 
+    detail: 'Agentic recommendation...',
+    duration: 2.2,
+    progressSteps: [0, 0.30, 0.60, 0.85, 0.95],
+    progressTiming: [0, 0.3, 0.6, 0.85, 1]
+  },
 }
 
 export function PipelinePanel({ steps }: PipelinePanelProps) {
@@ -106,24 +141,29 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   className="h-full bg-gradient-to-r from-b1 via-amber to-b1 relative"
                   initial={{ width: '0%' }}
                   animate={{ 
-                    width: ['0%', '30%', '60%', '85%', '95%'],
+                    width: config.progressSteps.map(val => `${val * 100}%`),
                     backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
                   }}
                   transition={{
                     width: {
-                      duration: 2.5,
+                      duration: config.duration,
                       ease: 'easeOut',
-                      times: [0, 0.3, 0.6, 0.85, 1]
+                      times: config.progressTiming
                     },
                     backgroundPosition: {
-                      duration: 3,
+                      duration: config.duration * 0.8,
                       ease: 'linear',
                       repeat: Infinity
                     }
                   }}
                   style={{ backgroundSize: '200% 100%' }}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer-sweep_2s_ease-in-out_infinite]" />
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                    style={{
+                      animation: `shimmer-sweep ${config.duration * 0.7}s ease-in-out infinite`
+                    }}
+                  />
                 </motion.div>
               </motion.div>
             )}
