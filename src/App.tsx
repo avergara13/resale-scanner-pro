@@ -16,11 +16,12 @@ import { createEbayService } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createObjectDetectionService } from './lib/object-detection-service'
+import { createTagSuggestionService } from './lib/tag-suggestion-service'
 import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag } from './types'
 import { cn } from './lib/utils'
 
 function App() {
@@ -79,6 +80,8 @@ function App() {
       settings?.preferredAiModel
     )
   }, [settings?.geminiApiKey, settings?.preferredAiModel])
+
+  const tagSuggestionService = useMemo(() => createTagSuggestionService(), [])
 
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
     const updateInterval = 80
@@ -348,6 +351,11 @@ function App() {
         lensResults: lensAnalysis?.results,
         marketData,
       }
+      
+      const tagSuggestions = tagSuggestionService.suggestTags(updatedItem)
+      const autoTags = tagSuggestions.slice(0, 5).map(s => s.tag.id)
+      updatedItem.tags = autoTags
+      
       setCurrentItem(updatedItem)
       
       if (session?.active) {

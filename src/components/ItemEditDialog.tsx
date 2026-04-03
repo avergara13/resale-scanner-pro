@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,8 +11,10 @@ import { PhotoEditor } from '@/components/PhotoEditor'
 import { TagManager } from '@/components/TagManager'
 import { SuggestedTags } from '@/components/SuggestedTags'
 import { useKV } from '@github/spark/hooks'
+import { createTagSuggestionService } from '@/lib/tag-suggestion-service'
 import type { ScannedItem, ItemTag } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
+import type { TagSuggestion } from '@/lib/tag-suggestion-service'
 
 interface ItemEditDialogProps {
   item: ScannedItem | null
@@ -34,8 +36,10 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
   const [editedImage, setEditedImage] = useState<string | null>(null)
   const [isEditingPhoto, setIsEditingPhoto] = useState(false)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [suggestedTags, setSuggestedTags] = useState<string[]>([])
+  const [suggestedTags, setSuggestedTags] = useState<TagSuggestion[]>([])
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
+
+  const tagService = useMemo(() => createTagSuggestionService(), [])
 
   useEffect(() => {
     if (item) {
@@ -50,61 +54,29 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
       setEditedImage(null)
       setSelectedTags(item.tags || [])
       
-      if (geminiService && item.productName && item.category) {
-        generateTagSuggestions(item.productName, item.category, item.description || '')
-      } else {
-        setSuggestedTags([])
-      }
+      const suggestions = tagService.suggestTags(item)
+      setSuggestedTags(suggestions.slice(0, 8))
     }
-  }, [item, geminiService])
+  }, [item, tagService])
 
-  const generateTagSuggestions = async (productName: string, category: string, description: string) => {
-    if (!geminiService) return
-    
-    try {
-      const promptText = `Generate 5-8 relevant tags for this product listing.
-      
-Product Name: ${productName}
-Category: ${category}
-Description: ${description}
-
-Return ONLY a JSON array of tag strings, like: ["tag1", "tag2", "tag3"]
-Tags should be:
-- Short and descriptive (1-2 words)
-- Relevant to resale/marketplace listings
-- Include condition, era, brand, style, or key features
-- Lowercase
-
-Example tags: "vintage", "rare", "new with tags", "collectible", "limited edition", "designer", "retro", "bundle"`
-
-      const response = await window.spark.llm(promptText, 'gpt-4o-mini', true)
-      const parsed = JSON.parse(response)
-      const tags = Array.isArray(parsed) ? parsed : (parsed.tags || [])
-      setSuggestedTags(tags.slice(0, 8))
-    } catch (error) {
-      console.error('Failed to generate tag suggestions:', error)
-      setSuggestedTags([])
-    }
-  }
-
-  const handleApplySuggestedTags = (tags: string[]) => {
+  const handleApplySuggestedTags = (tagIds: string[]) => {
     setSelectedTags((prev) => {
       const newTags = [...prev]
-      tags.forEach(tag => {
-        if (!newTags.includes(tag)) {
-          newTags.push(tag)
+      tagIds.forEach(tagId => {
+        if (!newTags.includes(tagId)) {
+          newTags.push(tagId)
         }
       })
       return newTags
     })
   }
 
-  const handleApplySingleTag = (tag: string) => {
+  const handleApplySingleTag = (tagId: string) => {
     setSelectedTags((prev) => {
-      if (prev.includes(tag)) {
-        return prev.filter(t => t !== tag)
+      if (prev.includes(tagId)) {
+        return prev.filter(t => t !== tagId)
       } else {
-        return [...prev, tag]
+        return [...prev, tagId]
       }
     })
   }

@@ -1,42 +1,57 @@
-import { Sparkle, Tag, CheckCircle } from '@phosphor-icons/react'
+import { Sparkle, Tag, CheckCircle, Info } from '@phosphor-icons/react'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import type { TagSuggestion } from '@/lib/tag-suggestion-service'
 
 interface SuggestedTagsProps {
-  suggestions: string[]
-  onApply: (tags: string[]) => void
-  onApplyTag: (tag: string) => void
+  suggestions: TagSuggestion[]
+  onApply: (tagIds: string[]) => void
+  onApplyTag: (tagId: string) => void
   appliedTags?: string[]
 }
 
 export function SuggestedTags({ suggestions, onApply, onApplyTag, appliedTags = [] }: SuggestedTagsProps) {
   if (!suggestions || suggestions.length === 0) return null
 
-  const unappliedTags = suggestions.filter(tag => !appliedTags.includes(tag))
-  const allApplied = unappliedTags.length === 0
+  const unappliedSuggestions = suggestions.filter(s => !appliedTags.includes(s.tag.id))
+  const allApplied = unappliedSuggestions.length === 0
 
   const handleApplyAll = () => {
     if (allApplied) {
       toast.info('All tags already applied')
       return
     }
-    onApply(unappliedTags)
-    toast.success(`Applied ${unappliedTags.length} tag${unappliedTags.length !== 1 ? 's' : ''}`, {
+    onApply(unappliedSuggestions.map(s => s.tag.id))
+    toast.success(`Applied ${unappliedSuggestions.length} tag${unappliedSuggestions.length !== 1 ? 's' : ''}`, {
       icon: <CheckCircle size={16} weight="fill" className="text-green" />
     })
   }
 
-  const handleApplyTag = (tag: string) => {
-    const isApplied = appliedTags.includes(tag)
-    onApplyTag(tag)
+  const handleApplyTag = (suggestion: TagSuggestion) => {
+    const isApplied = appliedTags.includes(suggestion.tag.id)
+    onApplyTag(suggestion.tag.id)
     
     if (!isApplied) {
-      toast.success(`Applied "${tag}"`, {
-        icon: <Tag size={16} weight="fill" className="text-[var(--b1)]" />
+      toast.success(`Applied "${suggestion.tag.name}"`, {
+        icon: <Tag size={16} weight="fill" className="text-[var(--b1)]" />,
+        description: suggestion.reason
       })
     }
+  }
+
+  const getConfidenceLabel = (confidence: number) => {
+    if (confidence >= 0.9) return 'High'
+    if (confidence >= 0.8) return 'Med'
+    return 'Low'
+  }
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.9) return 'var(--green)'
+    if (confidence >= 0.8) return 'var(--amber)'
+    return 'var(--t4)'
   }
 
   return (
@@ -54,7 +69,7 @@ export function SuggestedTags({ suggestions, onApply, onApplyTag, appliedTags = 
           <div>
             <h4 className="text-xs font-bold text-[var(--t1)]">AI Suggested Tags</h4>
             <p className="text-[10px] text-[var(--t3)]">
-              {allApplied ? 'All tags applied' : `${unappliedTags.length} suggestion${unappliedTags.length !== 1 ? 's' : ''}`}
+              {allApplied ? 'All tags applied' : `${unappliedSuggestions.length} suggestion${unappliedSuggestions.length !== 1 ? 's' : ''}`}
             </p>
           </div>
         </div>
@@ -79,40 +94,65 @@ export function SuggestedTags({ suggestions, onApply, onApplyTag, appliedTags = 
         </Button>
       </div>
       
-      <div className="flex flex-wrap gap-1.5">
-        <AnimatePresence>
-          {suggestions.map((tag, index) => {
-            const isApplied = appliedTags.includes(tag)
-            return (
-              <motion.div
-                key={tag}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <Badge
-                  variant={isApplied ? 'default' : 'outline'}
-                  className="cursor-pointer transition-all hover:scale-105 active:scale-95 text-[11px] px-2.5 py-1.5 select-none"
-                  style={{
-                    backgroundColor: isApplied ? 'var(--b1)' : 'transparent',
-                    borderColor: 'var(--b1)',
-                    color: isApplied ? 'white' : 'var(--b1)',
-                  }}
-                  onClick={() => handleApplyTag(tag)}
+      <TooltipProvider delayDuration={200}>
+        <div className="flex flex-wrap gap-1.5">
+          <AnimatePresence>
+            {suggestions.map((suggestion, index) => {
+              const isApplied = appliedTags.includes(suggestion.tag.id)
+              return (
+                <motion.div
+                  key={suggestion.tag.id}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ delay: index * 0.05 }}
                 >
-                  {isApplied ? (
-                    <CheckCircle size={10} weight="fill" className="mr-1" />
-                  ) : (
-                    <Tag size={10} weight="bold" className="mr-1" />
-                  )}
-                  {tag}
-                </Badge>
-              </motion.div>
-            )
-          })}
-        </AnimatePresence>
-      </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant={isApplied ? 'default' : 'outline'}
+                        className="cursor-pointer transition-all hover:scale-105 active:scale-95 text-[11px] px-2.5 py-1.5 select-none relative group"
+                        style={{
+                          backgroundColor: isApplied ? suggestion.tag.color : 'transparent',
+                          borderColor: suggestion.tag.color,
+                          color: isApplied ? 'white' : suggestion.tag.color,
+                        }}
+                        onClick={() => handleApplyTag(suggestion)}
+                      >
+                        {isApplied ? (
+                          <CheckCircle size={10} weight="fill" className="mr-1" />
+                        ) : (
+                          <span className="mr-1">{suggestion.tag.icon}</span>
+                        )}
+                        {suggestion.tag.name}
+                        <span 
+                          className="ml-1 opacity-60 text-[9px] font-bold"
+                          style={{ color: isApplied ? 'white' : getConfidenceColor(suggestion.confidence) }}
+                        >
+                          {Math.round(suggestion.confidence * 100)}%
+                        </span>
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent 
+                      side="top" 
+                      className="max-w-[220px] text-xs"
+                    >
+                      <div className="font-bold mb-1 flex items-center gap-1">
+                        {suggestion.tag.icon} {suggestion.tag.name}
+                      </div>
+                      <div className="text-[11px] text-[var(--t3)] mb-1">{suggestion.reason}</div>
+                      <div className="text-[10px] text-[var(--t4)] flex items-center gap-1">
+                        <Info size={10} weight="fill" />
+                        Confidence: {getConfidenceLabel(suggestion.confidence)} ({Math.round(suggestion.confidence * 100)}%)
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
+        </div>
+      </TooltipProvider>
     </motion.div>
   )
 }
