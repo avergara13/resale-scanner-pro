@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, MapPin, TrendUp, TrendDown, Package, ChartBar, Trophy, Tag } from '@phosphor-icons/react'
-import { motion } from 'framer-motion'
+import { ArrowLeft, MapPin, TrendUp, TrendDown, Package, ChartBar, Trophy, Tag, CalendarBlank, CaretDown } from '@phosphor-icons/react'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { ScannedItem, ThriftStoreLocation, LocationPerformance } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -29,8 +29,21 @@ const LOCATION_TYPE_ICONS: Record<string, string> = {
   'other': '📍',
 }
 
+function getWeekStart(timestamp: number): number {
+  const date = new Date(timestamp)
+  const day = date.getDay()
+  const diff = date.getDate() - day
+  return new Date(date.getFullYear(), date.getMonth(), diff, 0, 0, 0, 0).getTime()
+}
+
+function getWeekEnd(weekStart: number): number {
+  return weekStart + 7 * 24 * 60 * 60 * 1000 - 1
+}
+
 export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreenProps) {
   const [sortBy, setSortBy] = useState<'profit' | 'goRate' | 'scans'>('profit')
+  const [showWeeklyTrends, setShowWeeklyTrends] = useState(false)
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
 
   const locationPerformance = useMemo(() => {
     const locationMap = new Map<string, LocationPerformance>()
@@ -98,6 +111,37 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
         }))
         .sort((a, b) => b.avgProfit - a.avgProfit)
         .slice(0, 3)
+
+      const weeklyMap = new Map<number, { scans: number; profit: number; goCount: number; passCount: number }>()
+      
+      items
+        .filter(item => item.location?.id === perf.location.id)
+        .forEach(item => {
+          const weekStart = getWeekStart(item.timestamp)
+          const existing = weeklyMap.get(weekStart) || { scans: 0, profit: 0, goCount: 0, passCount: 0 }
+          
+          existing.scans++
+          if (item.decision === 'GO') {
+            existing.goCount++
+            existing.profit += (item.estimatedSellPrice || 0) - item.purchasePrice
+          }
+          if (item.decision === 'PASS') {
+            existing.passCount++
+          }
+          
+          weeklyMap.set(weekStart, existing)
+        })
+
+      perf.weeklyPerformance = Array.from(weeklyMap.entries())
+        .map(([weekStart, data]) => ({
+          weekStart,
+          weekEnd: getWeekEnd(weekStart),
+          scans: data.scans,
+          profit: data.profit,
+          goCount: data.goCount,
+          passCount: data.passCount,
+        }))
+        .sort((a, b) => a.weekStart - b.weekStart)
     })
 
     return Array.from(locationMap.values())
@@ -199,6 +243,117 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
       </header>
 
       <div className="p-4 space-y-4 overflow-y-auto pb-24">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-fg border border-s2 rounded-2xl overflow-hidden"
+        >
+          <button
+            onClick={() => setShowWeeklyTrends(!showWeeklyTrends)}
+            className="w-full p-4 flex items-center justify-between hover:bg-s1/30 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <CalendarBlank size={20} weight="bold" className="text-b1" />
+              <h3 className="text-sm font-bold text-t1">📊 Weekly Profit Trends</h3>
+            </div>
+            <motion.div
+              animate={{ rotate: showWeeklyTrends ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <CaretDown size={16} weight="bold" className="text-t3" />
+            </motion.div>
+          </button>
+          
+          <AnimatePresence>
+            {showWeeklyTrends && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="p-4 pt-0 border-t border-s1">
+                  <p className="text-xs text-t3 mb-4">
+                    Compare store performance across weeks to identify trends and optimize your sourcing strategy.
+                  </p>
+                  {sortedLocations.length > 0 && sortedLocations[0].weeklyPerformance && sortedLocations[0].weeklyPerformance.length > 0 ? (
+                    <div className="space-y-3">
+                      {sortedLocations.slice(0, 3).map(loc => {
+                        if (!loc.weeklyPerformance || loc.weeklyPerformance.length === 0) return null
+                        
+                        const recentWeeks = loc.weeklyPerformance.slice(-4)
+                        const weeklyTrend = recentWeeks.length >= 2 
+                          ? recentWeeks[recentWeeks.length - 1].profit > recentWeeks[recentWeeks.length - 2].profit
+                          : null
+                        
+                        return (
+                          <div key={loc.location.id} className="p-3 bg-bg rounded-xl border border-s1">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="w-8 h-8 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
+                                  style={{ backgroundColor: `${LOCATION_TYPE_COLORS[loc.location.type || 'other']}20` }}
+                                >
+                                  {LOCATION_TYPE_ICONS[loc.location.type || 'other']}
+                                </div>
+                                <div>
+                                  <h4 className="text-xs font-bold text-t1">{loc.location.name}</h4>
+                                  <p className="text-[9px] text-t3 font-medium">{recentWeeks.length} weeks tracked</p>
+                                </div>
+                              </div>
+                              {weeklyTrend !== null && (
+                                <div className={cn(
+                                  "px-2 py-1 rounded-lg text-[9px] font-bold flex items-center gap-1",
+                                  weeklyTrend ? "bg-green-bg text-green" : "bg-red-bg text-red"
+                                )}>
+                                  {weeklyTrend ? (
+                                    <>
+                                      <TrendUp size={10} weight="bold" />
+                                      Improving
+                                    </>
+                                  ) : (
+                                    <>
+                                      <TrendDown size={10} weight="bold" />
+                                      Declining
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-4 gap-2">
+                              {recentWeeks.map((week, idx) => {
+                                const weekDate = new Date(week.weekStart)
+                                const weekLabel = weekDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                const goRate = week.scans > 0 ? (week.goCount / week.scans) * 100 : 0
+                                
+                                return (
+                                  <div key={idx} className="text-center p-2 bg-fg rounded-lg border border-s1">
+                                    <div className="text-[9px] text-t4 font-bold uppercase mb-1">{weekLabel}</div>
+                                    <div className="text-sm font-bold text-green">${week.profit.toFixed(0)}</div>
+                                    <div className="text-[8px] text-t3 mt-0.5">{week.scans} scans</div>
+                                    <div className="text-[8px] text-b1 font-bold mt-0.5">{goRate.toFixed(0)}%</div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-t3">
+                      <CalendarBlank size={32} weight="light" className="mx-auto mb-2 opacity-50" />
+                      <p className="text-xs">No weekly data yet. Start scanning with location tags!</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
         {topLocation && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}

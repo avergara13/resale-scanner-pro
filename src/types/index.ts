@@ -127,6 +127,14 @@ export interface LocationPerformance {
     avgProfit: number
   }>
   recentFinds: ScannedItem[]
+  weeklyPerformance?: Array<{
+    weekStart: number
+    weekEnd: number
+    scans: number
+    profit: number
+    goCount: number
+    passCount: number
+  }>
 }
 
 export interface GoogleLensResult {
