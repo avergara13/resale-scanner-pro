@@ -416,12 +416,12 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="ebay-dev-id" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="ebay-dev-id" className="text-xs uppercase tracking-wide text-t2">
                       eBay Dev ID
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('ebayDev')}
-                      className="text-s3 hover:text-fg"
+                      className="text-t2 hover:text-t1"
                     >
                       {showKeys.ebayDev ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -438,12 +438,12 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="ebay-cert-id" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="ebay-cert-id" className="text-xs uppercase tracking-wide text-t2">
                       eBay Cert ID (Client Secret)
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('ebayCert')}
-                      className="text-s3 hover:text-fg"
+                      className="text-t2 hover:text-t1"
                     >
                       {showKeys.ebayCert ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -460,12 +460,12 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="ebay-api-key" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="ebay-api-key" className="text-xs uppercase tracking-wide text-t2">
                       eBay OAuth Token
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('ebayToken')}
-                      className="text-s3 hover:text-fg"
+                      className="text-t2 hover:text-t1"
                     >
                       {showKeys.ebayToken ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -487,14 +487,14 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="database" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="database" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 Database & Automation
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="supabase-url" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="supabase-url" className="text-xs uppercase tracking-wide text-t2">
                       Supabase Project URL
                     </Label>
                   </div>
@@ -510,12 +510,12 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="supabase-key" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="supabase-key" className="text-xs uppercase tracking-wide text-t2">
                       Supabase Anon Key
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('supabase')}
-                      className="text-s3 hover:text-fg"
+                      className="text-t2 hover:text-t1"
                     >
                       {showKeys.supabase ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -532,7 +532,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="n8n-webhook" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="n8n-webhook" className="text-xs uppercase tracking-wide text-t2">
                       n8n Webhook URL
                     </Label>
                   </div>
@@ -544,17 +544,17 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     placeholder="https://your-n8n.app/webhook/..."
                     className="font-mono text-sm"
                   />
-                  <p className="text-xs text-s4 mt-1">For automated workflows and data sync</p>
+                  <p className="text-xs text-t2 mt-1">For automated workflows and data sync</p>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="notion-api-key" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="notion-api-key" className="text-xs uppercase tracking-wide text-t2">
                       Notion Integration Token
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('notion')}
-                      className="text-s3 hover:text-fg"
+                      className="text-t2 hover:text-t1"
                     >
                       {showKeys.notion ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -570,7 +570,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 </div>
 
                 <div>
-                  <Label htmlFor="notion-db-id" className="text-xs uppercase tracking-wide text-s4 mb-1.5">
+                  <Label htmlFor="notion-db-id" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
                     Notion Database ID
                   </Label>
                   <Input
@@ -585,17 +585,17 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="features" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="features" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 Feature Toggles
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div className="flex items-center justify-between py-2">
                   <div>
-                    <Label htmlFor="agentic-mode" className="text-sm text-fg font-medium">
+                    <Label htmlFor="agentic-mode" className="text-sm text-t1 font-medium">
                       Agentic Mode
                     </Label>
-                    <p className="text-xs text-s4 mt-0.5">AI agents assist throughout workflow</p>
+                    <p className="text-xs text-t2 mt-0.5">AI agents assist throughout workflow</p>
                   </div>
                   <Switch
                     id="agentic-mode"
@@ -606,10 +606,10 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div className="flex items-center justify-between py-2">
                   <div>
-                    <Label htmlFor="live-search" className="text-sm text-fg font-medium">
+                    <Label htmlFor="live-search" className="text-sm text-t1 font-medium">
                       Live Search
                     </Label>
-                    <p className="text-xs text-s4 mt-0.5">Real-time Google Search & Maps data</p>
+                    <p className="text-xs text-t2 mt-0.5">Real-time Google Search & Maps data</p>
                   </div>
                   <Switch
                     id="live-search"
@@ -620,10 +620,10 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div className="flex items-center justify-between py-2">
                   <div>
-                    <Label htmlFor="voice-enabled" className="text-sm text-fg font-medium">
+                    <Label htmlFor="voice-enabled" className="text-sm text-t1 font-medium">
                       Voice Input
                     </Label>
-                    <p className="text-xs text-s4 mt-0.5">Voice commands and dictation</p>
+                    <p className="text-xs text-t2 mt-0.5">Voice commands and dictation</p>
                   </div>
                   <Switch
                     id="voice-enabled"
@@ -634,10 +634,10 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div className="flex items-center justify-between py-2">
                   <div>
-                    <Label htmlFor="auto-capture" className="text-sm text-fg font-medium">
+                    <Label htmlFor="auto-capture" className="text-sm text-t1 font-medium">
                       Auto-Capture
                     </Label>
-                    <p className="text-xs text-s4 mt-0.5">Analyze immediately after photo</p>
+                    <p className="text-xs text-t2 mt-0.5">Analyze immediately after photo</p>
                   </div>
                   <Switch
                     id="auto-capture"
@@ -650,10 +650,10 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div className="space-y-3">
                   <div>
-                    <Label htmlFor="theme-mode" className="text-sm text-fg font-medium">
+                    <Label htmlFor="theme-mode" className="text-sm text-t1 font-medium">
                       Theme Mode
                     </Label>
-                    <p className="text-xs text-s4 mt-0.5">Optimized for low-light scanning</p>
+                    <p className="text-xs text-t2 mt-0.5">Optimized for low-light scanning</p>
                   </div>
                   <Select 
                     value={settings.themeMode || 'auto'}
@@ -676,20 +676,20 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     </div>
                   )}
                   {settings.themeMode === 'dark' && (
-                    <p className="text-xs text-s4">Always use dark theme for scanning</p>
+                    <p className="text-xs text-t2">Always use dark theme for scanning</p>
                   )}
                   {settings.themeMode === 'light' && (
-                    <p className="text-xs text-s4">Always use light theme</p>
+                    <p className="text-xs text-t2">Always use light theme</p>
                   )}
                 </div>
 
                 {settings.themeMode === 'auto' && (
                   <div className="flex items-center justify-between py-2 pl-4 border-l-2 border-b1">
                     <div>
-                      <Label htmlFor="use-ambient-light" className="text-sm text-fg font-medium">
+                      <Label htmlFor="use-ambient-light" className="text-sm text-t1 font-medium">
                         Use Ambient Light Sensor
                       </Label>
-                      <p className="text-xs text-s4 mt-0.5">Switch theme based on room lighting (experimental)</p>
+                      <p className="text-xs text-t2 mt-0.5">Switch theme based on room lighting (experimental)</p>
                     </div>
                     <Switch
                       id="use-ambient-light"
@@ -701,15 +701,15 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="tag-presets" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="tag-presets" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 Tag Presets
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-s4 leading-relaxed">
+                    <p className="text-xs text-t2 leading-relaxed">
                       Create and manage preset collections of tags for common product categories. Apply presets quickly when editing items in the queue.
                     </p>
                   </div>
@@ -723,13 +723,13 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="business" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="business" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 Business Rules
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div>
-                  <Label htmlFor="min-profit" className="text-xs uppercase tracking-wide text-s4 mb-1.5">
+                  <Label htmlFor="min-profit" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
                     Min. Profit Margin (%)
                   </Label>
                   <Input
@@ -742,11 +742,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     onChange={(e) => onUpdate({ minProfitMargin: parseInt(e.target.value) || 0 })}
                     className="font-mono"
                   />
-                  <p className="text-xs text-s4 mt-1">Minimum margin for GO decision</p>
+                  <p className="text-xs text-t2 mt-1">Minimum margin for GO decision</p>
                 </div>
 
                 <div>
-                  <Label htmlFor="shipping-cost" className="text-xs uppercase tracking-wide text-s4 mb-1.5">
+                  <Label htmlFor="shipping-cost" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
                     Default Shipping Cost ($)
                   </Label>
                   <Input
@@ -761,7 +761,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 </div>
 
                 <div>
-                  <Label htmlFor="ebay-fee" className="text-xs uppercase tracking-wide text-s4 mb-1.5">
+                  <Label htmlFor="ebay-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
                     eBay Fee (%)
                   </Label>
                   <Input
@@ -777,7 +777,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 </div>
 
                 <div>
-                  <Label htmlFor="paypal-fee" className="text-xs uppercase tracking-wide text-s4 mb-1.5">
+                  <Label htmlFor="paypal-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
                     PayPal Fee (%)
                   </Label>
                   <Input
@@ -798,11 +798,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
           <div className="pt-4">
             <Button 
               variant="outline" 
-              className="w-full text-red hover:bg-red hover:text-bg border-s2 hover:border-red"
+              className="w-full text-red hover:bg-red hover:text-fg border-s2 hover:border-red"
             >
               Clear All App Data
             </Button>
-            <p className="text-xs text-s4 text-center mt-2">
+            <p className="text-xs text-t2 text-center mt-2">
               This will reset all settings and stored data
             </p>
           </div>
