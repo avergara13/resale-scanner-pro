@@ -103,44 +103,44 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-3 border transition-colors",
+        "p-2 sm:p-3 border transition-colors",
         isSelected ? 'border-b1 bg-t4' : 'border-s2'
       )}
     >
-      <div className="flex gap-2.5">
-        <div className="flex flex-col gap-1.5 items-center justify-start pt-0.5">
+      <div className="flex gap-2 sm:gap-2.5">
+        <div className="flex flex-col gap-1 sm:gap-1.5 items-center justify-start pt-0.5">
           <div 
             {...attributes} 
             {...listeners}
-            className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-s1 rounded transition-colors"
+            className="cursor-grab active:cursor-grabbing touch-none p-0.5 sm:p-1 hover:bg-s1 rounded transition-colors"
             aria-label="Drag to reorder"
           >
-            <DotsSixVertical size={18} weight="bold" className="text-s3" />
+            <DotsSixVertical size={16} weight="bold" className="text-s3 sm:w-[18px] sm:h-[18px]" />
           </div>
           <Checkbox
             id={`select-${item.id}`}
             checked={isSelected}
             onCheckedChange={() => onToggleSelect(item.id)}
-            className="w-5 h-5 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+            className="w-4 h-4 sm:w-5 sm:h-5 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
           />
           {item.imageData && (
             <img
               src={item.imageData}
               alt={item.productName || 'Item'}
-              className="w-16 h-16 object-cover rounded-md border border-s2 flex-shrink-0"
+              className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md border border-s2 flex-shrink-0"
             />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-1.5 mb-1.5">
-            <h3 className="font-semibold text-t1 text-sm line-clamp-2 leading-tight">
+          <div className="flex items-start justify-between gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
+            <h3 className="font-semibold text-t1 text-xs sm:text-sm line-clamp-2 leading-tight">
               {item.productName || 'Unknown Item'}
             </h3>
             {item.profitMargin !== undefined && (
               <Badge
                 variant="secondary"
                 className={cn(
-                  "flex-shrink-0 font-mono font-bold text-[10px] h-5 px-1.5",
+                  "flex-shrink-0 font-mono font-bold text-[9px] sm:text-[10px] h-4 sm:h-5 px-1 sm:px-1.5",
                   item.profitMargin > 50
                     ? 'bg-green/20 text-green'
                     : item.profitMargin > 20
@@ -152,15 +152,15 @@ function SortableItem({
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-3 text-[11px] font-mono text-t3 mb-2">
+          <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-mono text-t3 mb-1.5 sm:mb-2">
             <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
             {item.estimatedSellPrice && (
               <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
             )}
           </div>
           {item.tags && item.tags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1 mb-2.5">
-              <Tag size={11} weight="bold" className="text-s4 flex-shrink-0" />
+            <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 mb-2 sm:mb-2.5">
+              <Tag size={10} weight="bold" className="text-s4 flex-shrink-0 sm:w-[11px] sm:h-[11px]" />
               {item.tags.map((tagId) => {
                 const tag = allTags.find(t => t.id === tagId)
                 if (!tag) return null
@@ -168,7 +168,7 @@ function SortableItem({
                   <Badge
                     key={tagId}
                     variant="outline"
-                    className="text-[9px] h-[18px] pl-1.5 pr-0.5 font-medium border flex items-center gap-0.5 group hover:opacity-80 transition-opacity"
+                    className="text-[8px] sm:text-[9px] h-[16px] sm:h-[18px] pl-1 sm:pl-1.5 pr-0.5 font-medium border flex items-center gap-0.5 group hover:opacity-80 transition-opacity"
                     style={{
                       borderColor: tag.color,
                       backgroundColor: `${tag.color}15`,
@@ -186,38 +186,38 @@ function SortableItem({
                       className="flex items-center justify-center hover:opacity-70 transition-opacity p-0.5"
                       aria-label={`Remove ${tag.name} tag`}
                     >
-                      <X size={9} weight="bold" />
+                      <X size={8} weight="bold" className="sm:w-[9px] sm:h-[9px]" />
                     </button>
                   </Badge>
                 )
               })}
             </div>
           )}
-          <div className="flex gap-1.5">
+          <div className="flex gap-1 sm:gap-1.5">
             <Button
               size="sm"
               onClick={() => onEdit(item)}
               variant="outline"
-              className="h-7 px-2.5 text-[11px] font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+              className="h-6 sm:h-7 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
             >
-              <PencilSimple size={13} weight="bold" className="mr-1" />
+              <PencilSimple size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
               Edit
             </Button>
             <Button
               size="sm"
               onClick={() => onCreateListing(item.id)}
-              className="flex-1 bg-b1 hover:bg-b2 text-white h-7 text-[11px] font-medium"
+              className="flex-1 bg-b1 hover:bg-b2 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
             >
-              <ArrowRight size={13} weight="bold" className="mr-1" />
+              <ArrowRight size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
               List
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => onRemove(item.id)}
-              className="h-7 w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
+              className="h-6 sm:h-7 w-6 sm:w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
             >
-              <Trash size={15} weight="bold" />
+              <Trash size={13} weight="bold" className="sm:w-[15px] sm:h-[15px]" />
             </Button>
           </div>
         </div>

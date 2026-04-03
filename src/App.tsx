@@ -811,7 +811,7 @@ function App() {
     <div 
       id="app-container" 
       className={cn(
-        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-[480px] mx-auto overflow-x-hidden",
+        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-[430px] sm:max-w-[768px] md:max-w-[820px] lg:max-w-[1024px] mx-auto overflow-x-hidden px-2 sm:px-4",
         captureState === 'capturing' && "capture-flash",
         captureState === 'analyzing' && "analyzing-flash",
         captureState === 'success' && "success-flash",
@@ -975,7 +975,7 @@ function App() {
         </AnimatePresence>
       </div>
 
-      <div className="h-[80px] flex-shrink-0" />
+      <div className="h-[64px] sm:h-[80px] flex-shrink-0" />
 
       <BottomNav
         currentScreen={screen}
