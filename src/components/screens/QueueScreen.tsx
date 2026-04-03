@@ -1201,6 +1201,10 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               .filter(item => item.location && item.decision === 'GO')
               .reduce((sum, item) => sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0)
             
+            const avgProfitPerStore = availableLocations.length > 0 
+              ? totalProfit / availableLocations.length 
+              : 0
+            
             return (
               <Collapsible 
                 open={locationInsightsOpen} 
@@ -1226,6 +1230,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                         className="h-5 px-2 text-[10px] font-bold bg-green/15 text-green border border-green/30"
                       >
                         ${totalProfit.toFixed(0)}
+                      </Badge>
+                      <Badge 
+                        variant="secondary" 
+                        className="h-5 px-2 text-[10px] font-bold bg-amber/15 text-amber border border-amber/30"
+                      >
+                        ~${avgProfitPerStore.toFixed(0)}/store
                       </Badge>
                     </div>
                     <CaretDown 
