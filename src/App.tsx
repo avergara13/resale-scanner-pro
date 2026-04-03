@@ -20,7 +20,7 @@ import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings } from './types'
 import { cn } from './lib/utils'
 
 function App() {
