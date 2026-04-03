@@ -1,4 +1,4 @@
-import { Trash, ArrowRight } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning } from '@phosphor-icons/react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -9,16 +9,41 @@ interface QueueScreenProps {
   queueItems: ScannedItem[]
   onRemove: (id: string) => void
   onCreateListing: (id: string) => void
+  onBatchAnalyze?: () => void
+  isBatchAnalyzing?: boolean
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnalyze, isBatchAnalyzing }: QueueScreenProps) {
   const sortedItems = [...queueItems].sort((a, b) => (b.profitMargin || 0) - (a.profitMargin || 0))
+  const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
+  const analyzedItems = queueItems.filter(item => item.productName && item.productName !== 'Quick Draft')
 
   return (
     <div id="scr-queue" className="flex flex-col h-full">
       <div className="px-4 py-6 border-b border-s2">
-        <h1 className="text-2xl font-semibold text-fg mb-2">Queue</h1>
-        <p className="text-sm text-s4">{queueItems.length} items ready to list</p>
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex-1">
+            <h1 className="text-2xl font-semibold text-fg mb-2">Queue</h1>
+            <p className="text-sm text-s4">{queueItems.length} items ready to list</p>
+          </div>
+          {unanalyzedItems.length > 0 && onBatchAnalyze && (
+            <Button
+              onClick={onBatchAnalyze}
+              disabled={isBatchAnalyzing}
+              className="bg-b1 hover:bg-b2 text-bg font-medium text-sm h-10 px-4"
+            >
+              <Lightning size={18} weight="fill" className="mr-2" />
+              {isBatchAnalyzing ? 'Analyzing...' : `Analyze ${unanalyzedItems.length}`}
+            </Button>
+          )}
+        </div>
+        {unanalyzedItems.length > 0 && (
+          <div className="bg-t4 border border-t3 rounded-md px-3 py-2 flex items-center gap-2">
+            <span className="text-xs text-t1 font-medium">
+              {unanalyzedItems.length} quick draft{unanalyzedItems.length !== 1 ? 's' : ''} pending analysis
+            </span>
+          </div>
+        )}
       </div>
 
       {queueItems.length === 0 ? (

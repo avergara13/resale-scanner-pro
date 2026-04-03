@@ -4,6 +4,7 @@ import { Toaster, toast } from 'sonner'
 import { BottomNav } from './components/BottomNav'
 import { CameraOverlay } from './components/CameraOverlay'
 import { ConnectionHealthMonitor } from './components/ConnectionHealthMonitor'
+import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { ResearchScreen } from './components/screens/ResearchScreen'
@@ -22,6 +23,8 @@ function App() {
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
+  const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -390,6 +393,137 @@ function App() {
     }
   }, [session, setSession, setQueue])
 
+  const handleBatchAnalyze = useCallback(async () => {
+    const unanalyzedItems = (queue || []).filter(item => !item.productName || item.productName === 'Quick Draft')
+    
+    if (unanalyzedItems.length === 0) {
+      toast.info('No quick drafts to analyze')
+      return
+    }
+
+    setIsBatchAnalyzing(true)
+    setBatchProgress({ current: 0, total: unanalyzedItems.length, currentItemName: '' })
+    toast.info(`Analyzing ${unanalyzedItems.length} item${unanalyzedItems.length !== 1 ? 's' : ''}...`)
+
+    let processedCount = 0
+    let goCount = 0
+    let passCount = 0
+
+    for (const item of unanalyzedItems) {
+      setBatchProgress({ current: processedCount + 1, total: unanalyzedItems.length, currentItemName: `Item ${processedCount + 1}` })
+      
+      try {
+        let visionResult: GeminiVisionResponse | undefined
+        let mockProductName = 'Unknown Product'
+        
+        if (geminiService) {
+          try {
+            visionResult = await geminiService.analyzeProductImage(item.imageData!, {}, item.purchasePrice)
+            mockProductName = visionResult.productName
+            setBatchProgress({ current: processedCount + 1, total: unanalyzedItems.length, currentItemName: visionResult.productName })
+          } catch (error) {
+            console.error('Gemini vision failed for item:', item.id, error)
+          }
+        }
+
+        let lensAnalysis: GoogleLensAnalysis | undefined
+        
+        if (googleLensService && visionResult) {
+          try {
+            lensAnalysis = await googleLensService.searchByImage(item.imageData!, visionResult.productName)
+          } catch (error) {
+            console.error('Google Lens failed for item:', item.id, error)
+          }
+        }
+
+        let marketData: typeof item.marketData = undefined
+        let ebayAvgPrice = item.purchasePrice * 4.5
+        
+        if (ebayService && visionResult) {
+          try {
+            const searchTerm = visionResult.searchTerms?.[0] || mockProductName
+            const categoryId = await ebayService.getCategoryId(searchTerm)
+            const searchResults = await ebayService.searchCompletedListings(searchTerm, categoryId)
+            
+            marketData = {
+              ebayAvgSold: searchResults.averageSoldPrice,
+              ebayMedianSold: searchResults.medianSoldPrice,
+              ebayActiveListings: searchResults.activeCount,
+              ebaySoldCount: searchResults.soldCount,
+              ebayPriceRange: searchResults.priceRange,
+              ebaySellThroughRate: searchResults.sellThroughRate,
+              ebayRecentSales: searchResults.soldItems.slice(0, 10),
+              ebayActiveItems: searchResults.activeListings.slice(0, 10),
+              recommendedPrice: searchResults.recommendedPrice,
+            }
+            
+            ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : ebayAvgPrice
+          } catch (error) {
+            console.error('eBay API error for item:', item.id, error)
+          }
+        }
+
+        const sellPrice = ebayAvgPrice
+        const profitMetrics = ebayService?.calculateProfitMetrics(
+          item.purchasePrice,
+          sellPrice,
+          settings?.defaultShippingCost || 5.0,
+          settings?.ebayFeePercent || 12.9,
+          settings?.paypalFeePercent || 3.49
+        ) || {
+          netProfit: sellPrice - item.purchasePrice,
+          profitMargin: ((sellPrice - item.purchasePrice) / sellPrice) * 100,
+          roi: ((sellPrice - item.purchasePrice) / item.purchasePrice) * 100,
+        }
+        
+        const minMargin = settings?.minProfitMargin || 30
+        const decision = profitMetrics.profitMargin > minMargin ? 'GO' : 'PASS'
+
+        const updatedItem: ScannedItem = {
+          ...item,
+          productName: visionResult?.productName || mockProductName,
+          description: visionResult?.description || 'Product analysis completed',
+          category: visionResult?.category || 'General',
+          estimatedSellPrice: sellPrice,
+          profitMargin: profitMetrics.profitMargin,
+          decision,
+          lensAnalysis,
+          lensResults: lensAnalysis?.results,
+          marketData,
+        }
+
+        setQueue((prev) => {
+          const currentQueue = prev || []
+          return currentQueue.map(qItem => qItem.id === item.id ? updatedItem : qItem)
+        })
+
+        processedCount++
+        if (decision === 'GO') goCount++
+        if (decision === 'PASS') passCount++
+
+        if (session?.active) {
+          setSession((prev) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              goCount: decision === 'GO' ? prev.goCount + 1 : prev.goCount,
+              passCount: decision === 'PASS' ? prev.passCount + 1 : prev.passCount,
+              totalPotentialProfit: decision === 'GO' ? prev.totalPotentialProfit + profitMetrics.netProfit : prev.totalPotentialProfit,
+            }
+          })
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500))
+      } catch (error) {
+        console.error('Failed to analyze item:', item.id, error)
+      }
+    }
+
+    setIsBatchAnalyzing(false)
+    setBatchProgress({ current: 0, total: 0, currentItemName: '' })
+    toast.success(`Analyzed ${processedCount} items: ${goCount} GO, ${passCount} PASS`)
+  }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
+
   return (
     <div id="app-container" className="relative">
       <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
@@ -422,6 +556,8 @@ function App() {
           queueItems={queue || []}
           onRemove={handleRemoveFromQueue}
           onCreateListing={() => toast.info('Listing creation coming soon')}
+          onBatchAnalyze={handleBatchAnalyze}
+          isBatchAnalyzing={isBatchAnalyzing}
         />
       )}
       {screen === 'settings' && settings && (
@@ -445,6 +581,14 @@ function App() {
         onCapture={handleCapture}
         onQuickDraft={handleQuickDraft}
       />
+
+      {isBatchAnalyzing && (
+        <BatchAnalysisProgress
+          current={batchProgress.current}
+          total={batchProgress.total}
+          currentItemName={batchProgress.currentItemName}
+        />
+      )}
 
       <Toaster position="top-center" richColors />
     </div>
