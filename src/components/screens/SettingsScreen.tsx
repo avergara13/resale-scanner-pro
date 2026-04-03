@@ -20,6 +20,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { CheckCircle, XCircle, Info, Eye, EyeClosed } from '@phosphor-icons/react'
+import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import type { AppSettings } from '@/types'
 
 interface SettingsScreenProps {
@@ -79,7 +80,25 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="space-y-6 max-w-md pb-20">
-          <Accordion type="multiple" defaultValue={['ai', 'features']} className="space-y-4">
+          <Accordion type="multiple" defaultValue={['health', 'ai', 'features']} className="space-y-4">
+            <AccordionItem value="health" className="border border-s2 rounded-lg px-4 bg-s1">
+              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+                Connection Health
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2">
+                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="text-b1 mt-0.5" size={16} />
+                    <p className="text-xs text-s4 leading-relaxed">
+                      Real-time monitoring of API connections. Health checks run every 30 seconds to ensure reliable service.
+                    </p>
+                  </div>
+                </div>
+
+                <ApiStatusIndicator settings={settings} liveUpdates={true} checkInterval={30000} />
+              </AccordionContent>
+            </AccordionItem>
+
             <AccordionItem value="ai" className="border border-s2 rounded-lg px-4 bg-s1">
               <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
                 AI Configuration

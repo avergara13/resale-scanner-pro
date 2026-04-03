@@ -39,7 +39,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
             </div>
             <h2 className="font-black text-sm uppercase tracking-widest">AI CENTER</h2>
           </div>
-          <ApiStatusIndicator settings={settings} compact />
+          <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
         </div>
         <div className="flex bg-s2 p-1 rounded-lg">
           <button

@@ -3,6 +3,7 @@ import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
 import { BottomNav } from './components/BottomNav'
 import { CameraOverlay } from './components/CameraOverlay'
+import { ConnectionHealthMonitor } from './components/ConnectionHealthMonitor'
 import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { ResearchScreen } from './components/screens/ResearchScreen'
@@ -347,6 +348,8 @@ function App() {
 
   return (
     <div id="app-container" className="relative">
+      <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
+      
       {screen === 'session' && (
         <SessionScreen
           session={session}
