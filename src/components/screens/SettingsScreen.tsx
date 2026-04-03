@@ -27,6 +27,7 @@ import { DetectionHistoryViewer } from '../DetectionHistoryViewer'
 import { FalsePositiveAnalyzerPanel } from '../FalsePositiveAnalyzer'
 import { ThemeToggle } from '../ThemeToggle'
 import { TagPresetsManager } from '../TagPresetsManager'
+import { CompressionAnalytics } from '../CompressionAnalytics'
 import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
@@ -777,6 +778,24 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     </div>
                   </div>
                 </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="compression" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
+                💾 Compression Analytics
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="text-b1 mt-0.5" size={16} />
+                    <p className="text-xs text-t2 leading-relaxed">
+                      Track how much storage and loading time you've saved through image compression. Analytics help you optimize quality settings for best performance.
+                    </p>
+                  </div>
+                </div>
+
+                <CompressionAnalytics />
               </AccordionContent>
             </AccordionItem>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { createImageOptimizationService, type OptimizedImage, type ImageQualityPreset } from '@/lib/image-optimization-service'
+import { useCompressionAnalytics } from './use-compression-analytics'
 
 interface ImageCache {
   [key: string]: OptimizedImage & { lastAccessed: number }
@@ -14,6 +15,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const optimizationQueueRef = useRef<Map<string, Promise<OptimizedImage>>>(new Map())
+  const { trackCompression } = useCompressionAnalytics()
 
   const service = useMemo(() => createImageOptimizationService(qualityPreset), [qualityPreset])
 
@@ -76,8 +78,19 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
 
     const optimizationPromise = (async () => {
       setIsOptimizing(true)
+      const startTime = performance.now()
       try {
         const optimized = await service.optimizeImage(imageData, true)
+        const endTime = performance.now()
+        
+        trackCompression({
+          originalSize: optimized.originalSize || 0,
+          optimizedSize: optimized.size,
+          thumbnailSize: optimized.thumbnailSize,
+          compressionRatio: optimized.compressionRatio || 1,
+          timeSavedMs: endTime - startTime,
+          qualityPreset,
+        })
         
         setCache((prev) => ({
           ...(prev || {}),
@@ -93,7 +106,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
 
     optimizationQueueRef.current.set(cacheKey, optimizationPromise)
     return optimizationPromise
-  }, [cache, getCacheKey, service, setCache])
+  }, [cache, getCacheKey, service, setCache, trackCompression, qualityPreset])
 
   const batchOptimize = useCallback(async (
     images: Array<{ id: string; imageData: string }>,
@@ -113,7 +126,19 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
         if (!forceRefresh && cache && cache[cacheKey]) {
           results.set(id, cache[cacheKey])
         } else {
+          const startTime = performance.now()
           const optimized = await service.optimizeImage(imageData, true)
+          const endTime = performance.now()
+          
+          trackCompression({
+            originalSize: optimized.originalSize || 0,
+            optimizedSize: optimized.size,
+            thumbnailSize: optimized.thumbnailSize,
+            compressionRatio: optimized.compressionRatio || 1,
+            timeSavedMs: endTime - startTime,
+            qualityPreset,
+          })
+          
           results.set(id, optimized)
           newCacheEntries[cacheKey] = { ...optimized, lastAccessed: Date.now() }
         }
@@ -133,7 +158,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
       setIsOptimizing(false)
       setProgress({ current: 0, total: 0 })
     }
-  }, [cache, getCacheKey, service, setCache])
+  }, [cache, getCacheKey, service, setCache, trackCompression, qualityPreset])
 
   const getThumbnail = useCallback(async (imageData: string): Promise<string> => {
     const cacheKey = getCacheKey(imageData)

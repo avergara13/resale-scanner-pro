@@ -19,6 +19,7 @@ export interface OptimizedImage {
   height: number
   size: number
   thumbnailSize: number
+  originalSize?: number
   compressionRatio?: number
   preset?: string
 }
@@ -244,6 +245,7 @@ export function createImageOptimizationService(preset: ImageQualityPreset = 'bal
       height: img.height,
       size: compressedSize,
       thumbnailSize: thumbnailSize || compressedSize,
+      originalSize,
       compressionRatio: originalSize > 0 ? compressedSize / originalSize : 1,
       preset
     }
