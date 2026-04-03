@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk } from '@phosphor-icons/react'
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
+import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
@@ -21,6 +23,103 @@ interface AIScreenProps {
   onAddToQueue: () => void
   onDeepSearch: () => void
   onSaveDraft: (price: number, notes: string) => void
+}
+
+function OverallProgress({ steps }: { steps: PipelineStep[] }) {
+  const overallProgress = useMemo(() => {
+    if (steps.length === 0) return 0
+    
+    let totalProgress = 0
+    steps.forEach(step => {
+      if (step.status === 'complete') {
+        totalProgress += 100
+      } else if (step.status === 'processing') {
+        totalProgress += (step.progress ?? 0)
+      }
+    })
+    
+    return Math.round(totalProgress / steps.length)
+  }, [steps])
+
+  const count = useMotionValue(0)
+  const rounded = useTransform(count, Math.round)
+
+  useEffect(() => {
+    const controls = animate(count, overallProgress, {
+      duration: 0.6,
+      ease: 'easeOut'
+    })
+    return controls.stop
+  }, [count, overallProgress])
+
+  const isComplete = overallProgress === 100
+  const isProcessing = overallProgress > 0 && overallProgress < 100
+
+  if (steps.length === 0) return null
+
+  return (
+    <div className="mb-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-t2">
+          OVERALL PROGRESS
+        </h3>
+        <motion.div className="text-lg font-mono font-black tabular-nums">
+          <motion.span
+            className={cn(
+              "transition-colors duration-300",
+              isComplete && "text-green",
+              isProcessing && "text-b1",
+              !isProcessing && !isComplete && "text-t2"
+            )}
+          >
+            {rounded}
+          </motion.span>
+          <span className="text-t3 text-sm">%</span>
+        </motion.div>
+      </div>
+      
+      <div className="h-3 bg-s1 rounded-full overflow-hidden relative border border-s2">
+        <motion.div
+          className={cn(
+            "h-full relative",
+            isComplete && "bg-gradient-to-r from-green via-green to-green",
+            isProcessing && "bg-gradient-to-r from-b1 via-amber to-b1"
+          )}
+          initial={{ width: '0%' }}
+          animate={{ 
+            width: `${overallProgress}%`,
+            backgroundPosition: isProcessing ? ['0% 50%', '100% 50%', '0% 50%'] : '0% 50%'
+          }}
+          transition={{
+            width: { duration: 0.6, ease: 'easeOut' },
+            backgroundPosition: isProcessing ? {
+              duration: 2,
+              ease: 'linear',
+              repeat: Infinity
+            } : { duration: 0 }
+          }}
+          style={{ backgroundSize: '200% 100%' }}
+        >
+          {isProcessing && (
+            <div 
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+              style={{
+                animation: 'shimmer-sweep 1.5s ease-in-out infinite'
+              }}
+            />
+          )}
+          {isComplete && (
+            <motion.div 
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              initial={{ x: '-100%' }}
+              animate={{ x: '200%' }}
+              transition={{ duration: 0.8, ease: 'easeInOut' }}
+            />
+          )}
+        </motion.div>
+      </div>
+    </div>
+  )
 }
 
 export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeepSearch, onSaveDraft }: AIScreenProps) {
@@ -81,6 +180,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
               </div>
             ) : (
               <>
+                <OverallProgress steps={pipeline} />
                 <PipelinePanel steps={pipeline} />
                 
                 {hasDecision && decision && (
