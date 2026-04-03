@@ -123,7 +123,7 @@ export function FalsePositiveAnalyzerPanel() {
 
   return (
     <div className="flex flex-col h-full bg-bg">
-      <div className="px-4 py-3 border-b border-s2">
+      <div className="px-4 py-3 border-b border-s2 bg-gradient-to-br from-s1 to-bg">
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-lg font-semibold text-fg">Detection Analysis</h1>
           <div className="flex gap-2">
@@ -146,6 +146,40 @@ export function FalsePositiveAnalyzerPanel() {
           </div>
         </div>
         <p className="text-sm text-s4">Identify and fix false positive patterns</p>
+        
+        {corrections && corrections.length > 0 && (
+          <div className="mt-3 p-3 bg-bg border border-s2 rounded-lg">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="text-xs text-s4 uppercase tracking-wide mb-1">False Positive Rate</div>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-2xl font-bold ${
+                    report.falsePositiveRate > 0.3 ? 'text-red' :
+                    report.falsePositiveRate > 0.15 ? 'text-amber' :
+                    'text-green'
+                  }`}>
+                    {(report.falsePositiveRate * 100).toFixed(1)}%
+                  </span>
+                  <span className="text-xs text-s4">
+                    ({report.totalFalsePositives}/{corrections.length})
+                  </span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="text-xs text-s4 uppercase tracking-wide mb-1">Patterns Found</div>
+                <div className="text-2xl font-bold text-fg">
+                  {patternsByFrequency.length}
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="text-xs text-s4 uppercase tracking-wide mb-1">Recommendations</div>
+                <div className="text-2xl font-bold text-b1">
+                  {report.improvementRecommendations.length}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">

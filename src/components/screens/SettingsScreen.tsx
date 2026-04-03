@@ -84,7 +84,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="space-y-6 max-w-md pb-20">
-          <Accordion type="multiple" defaultValue={['health', 'ai', 'features']} className="space-y-4">
+          <Accordion type="multiple" defaultValue={['health', 'detection', 'false-positives']} className="space-y-4">
             <AccordionItem value="health" className="border border-s2 rounded-lg px-4 bg-s1">
               <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
                 Connection Health
@@ -160,20 +160,39 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="false-positives" className="border border-s2 rounded-lg px-4 bg-s1">
+            <AccordionItem value="false-positives" className="border-2 border-b1 rounded-lg px-4 bg-gradient-to-br from-t4 to-s1">
               <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
-                  <Target size={18} weight="duotone" />
-                  False Positive Analysis
+                  <Target size={20} weight="duotone" className="text-b1" />
+                  False Positive Analysis & Optimization
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-t4 border border-t3 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-s4 leading-relaxed">
-                      Analyze false positive patterns to improve detection accuracy. Review misidentifications, confidence distributions, and get recommendations to optimize thresholds.
-                    </p>
+                <div className="p-4 bg-gradient-to-br from-amber/10 to-amber/5 border-2 border-amber/40 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber text-bg flex-shrink-0">
+                      <Target size={20} weight="duotone" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-fg">Optimize Detection Accuracy</p>
+                      <p className="text-xs text-s4 leading-relaxed">
+                        Review false positive patterns to improve multi-object detection. Analyze misidentifications, confidence distributions, and apply recommended thresholds to reduce errors.
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Badge variant="outline" className="text-xs border-amber text-amber gap-1">
+                          <CheckCircle size={12} weight="fill" />
+                          Pattern Detection
+                        </Badge>
+                        <Badge variant="outline" className="text-xs border-amber text-amber gap-1">
+                          <CheckCircle size={12} weight="fill" />
+                          Threshold Optimization
+                        </Badge>
+                        <Badge variant="outline" className="text-xs border-amber text-amber gap-1">
+                          <CheckCircle size={12} weight="fill" />
+                          AI Recommendations
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

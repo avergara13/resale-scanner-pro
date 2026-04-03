@@ -1,5 +1,24 @@
 # False Positive Analysis System
 
+## 🎯 Quick Start - Review & Optimize Detection Accuracy
+
+**Getting to the Analyzer:**
+1. Open the app and tap **Settings** in the bottom navigation
+2. Look for the **"False Positive Analysis & Optimization"** section (highlighted with blue border)
+3. Expand the section to see the full analysis dashboard
+
+**What You'll See:**
+- **Overview Tab**: Quick stats on false positive rate, pattern count, and recommendations
+- **Patterns Tab**: Specific issues grouped by type (background noise, misidentifications, etc.)
+- **Fixes Tab**: One-click actions to apply recommended thresholds
+- **History Tab**: Recent false positives with images and corrections
+
+**Taking Action:**
+- Review patterns sorted by frequency (most problematic first)
+- Click on any pattern to see example images and suggested fixes
+- Use the "Apply Optimal Threshold" button to automatically improve accuracy
+- Export data for deeper analysis or sharing with your team
+
 ## Overview
 Comprehensive false positive pattern detection and analysis system to continuously improve multi-object detection accuracy in the Resale Scanner app.
 
