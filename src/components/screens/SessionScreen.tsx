@@ -7,6 +7,7 @@ import { ThemeToggle } from '../ThemeToggle'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
+import { TimeBasedRecommendations } from '../TimeBasedRecommendations'
 import { useKV } from '@github/spark/hooks'
 import type { Session, ScannedItem, ProfitGoal } from '@/types'
 
@@ -81,21 +82,29 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
           />
         </div>
       ) : !session?.active ? (
-        <div className="flex-1 flex flex-col items-center justify-center space-y-6">
-          <div className="w-full mb-4">
+        <div className="flex-1 overflow-y-auto space-y-6">
+          <div className="w-full">
             <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
           </div>
-          <div className="w-24 h-24 rounded-full bg-s1 flex items-center justify-center">
-            <Play size={40} weight="fill" className="text-b1 ml-1" />
+          
+          <TimeBasedRecommendations 
+            sessions={allSessions || []} 
+            items={queue || []}
+          />
+          
+          <div className="flex flex-col items-center justify-center space-y-6 py-8">
+            <div className="w-24 h-24 rounded-full bg-s1 flex items-center justify-center">
+              <Play size={40} weight="fill" className="text-b1 ml-1" />
+            </div>
+            <div className="text-center space-y-2">
+              <h2 className="text-xl font-semibold text-t1">No Active Session</h2>
+              <p className="text-sm text-t3 max-w-xs">Start a session to track your scans and profits</p>
+            </div>
+            <Button onClick={onStartSession} className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white px-8 h-12 text-base font-bold shadow-lg active:scale-95 transition-all">
+              <Play size={20} weight="bold" className="mr-2" />
+              Start Session
+            </Button>
           </div>
-          <div className="text-center space-y-2">
-            <h2 className="text-xl font-semibold text-t1">No Active Session</h2>
-            <p className="text-sm text-t3 max-w-xs">Start a session to track your scans and profits</p>
-          </div>
-          <Button onClick={onStartSession} className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white px-8 h-12 text-base font-bold shadow-lg active:scale-95 transition-all">
-            <Play size={20} weight="bold" className="mr-2" />
-            Start Session
-          </Button>
         </div>
       ) : (
         <div className="flex-1 space-y-4">
