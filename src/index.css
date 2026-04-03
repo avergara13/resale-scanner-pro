@@ -707,6 +707,69 @@ button:disabled {
   }
 }
 
+@keyframes pulse-ring-analyzing {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes camera-glow-idle {
+  0%, 100% {
+    box-shadow: 0 8px 24px rgba(85, 92, 226, 0.4), 0 4px 8px rgba(0, 0, 0, 0.15), 0 0 40px rgba(85, 92, 226, 0.3);
+  }
+  50% {
+    box-shadow: 0 8px 24px rgba(85, 92, 226, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15), 0 0 60px rgba(85, 92, 226, 0.5);
+  }
+}
+
+@keyframes camera-glow-analyzing {
+  0%, 100% {
+    box-shadow: 0 8px 32px rgba(193, 124, 95, 0.5), 0 4px 12px rgba(193, 124, 95, 0.3), 0 0 50px rgba(193, 124, 95, 0.4);
+  }
+  25% {
+    box-shadow: 0 12px 40px rgba(193, 124, 95, 0.7), 0 6px 16px rgba(193, 124, 95, 0.4), 0 0 70px rgba(193, 124, 95, 0.6);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(85, 92, 226, 0.5), 0 4px 12px rgba(85, 92, 226, 0.3), 0 0 50px rgba(85, 92, 226, 0.4);
+  }
+  75% {
+    box-shadow: 0 12px 40px rgba(193, 124, 95, 0.7), 0 6px 16px rgba(193, 124, 95, 0.4), 0 0 70px rgba(193, 124, 95, 0.6);
+  }
+}
+
+@keyframes camera-glow-success {
+  0% {
+    box-shadow: 0 8px 24px rgba(193, 124, 95, 0.4), 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  50% {
+    box-shadow: 0 12px 36px rgba(125, 185, 110, 0.7), 0 6px 16px rgba(125, 185, 110, 0.4), 0 0 80px rgba(125, 185, 110, 0.6);
+  }
+  100% {
+    box-shadow: 0 8px 24px rgba(125, 185, 110, 0.4), 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+}
+
+@keyframes camera-glow-fail {
+  0% {
+    box-shadow: 0 8px 24px rgba(193, 124, 95, 0.4), 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  50% {
+    box-shadow: 0 12px 36px rgba(220, 85, 75, 0.7), 0 6px 16px rgba(220, 85, 75, 0.4), 0 0 80px rgba(220, 85, 75, 0.6);
+  }
+  100% {
+    box-shadow: 0 8px 24px rgba(220, 85, 75, 0.4), 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+}
+
 @keyframes shimmer-sweep {
   0% {
     transform: translateX(-100%) translateY(-100%) rotate(45deg);
@@ -719,7 +782,7 @@ button:disabled {
 .camera-fab-animated {
   background: linear-gradient(135deg, var(--b1) 0%, var(--b2) 50%, var(--amber) 100%);
   background-size: 250% 250%;
-  animation: gradient-shift 4s ease infinite;
+  animation: gradient-shift 4s ease infinite, camera-glow-idle 3s ease-in-out infinite;
   position: relative;
   box-shadow: 0 4px 20px rgba(193, 124, 95, 0.35), 0 2px 8px rgba(85, 92, 226, 0.25);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -727,12 +790,24 @@ button:disabled {
 
 .camera-fab-animated:hover {
   transform: scale(1.08);
-  box-shadow: 0 6px 28px rgba(193, 124, 95, 0.45), 0 4px 12px rgba(85, 92, 226, 0.35);
+  animation: gradient-shift 4s ease infinite, camera-glow-idle 1.5s ease-in-out infinite;
 }
 
 .camera-fab-animated:active {
   transform: scale(0.95);
   box-shadow: 0 2px 12px rgba(193, 124, 95, 0.3), 0 1px 4px rgba(85, 92, 226, 0.2);
+}
+
+.camera-fab-animated.camera-analyzing {
+  animation: gradient-shift 2s ease infinite, camera-glow-analyzing 2s ease-in-out infinite;
+}
+
+.camera-fab-animated.camera-success {
+  animation: gradient-shift 4s ease infinite, camera-glow-success 0.8s ease-out;
+}
+
+.camera-fab-animated.camera-fail {
+  animation: gradient-shift 4s ease infinite, camera-glow-fail 0.8s ease-out;
 }
 
 .camera-fab-animated::before {
@@ -746,6 +821,25 @@ button:disabled {
   opacity: 0.7;
   filter: blur(12px);
   z-index: -1;
+  transition: opacity 0.3s ease;
+}
+
+.camera-fab-animated.camera-analyzing::before {
+  opacity: 1;
+  animation: gradient-rotate 2s linear infinite;
+  filter: blur(16px);
+}
+
+.camera-fab-animated.camera-success::before {
+  background: linear-gradient(45deg, var(--green), var(--b1), var(--green));
+  animation: gradient-rotate 3s linear infinite;
+  filter: blur(20px);
+}
+
+.camera-fab-animated.camera-fail::before {
+  background: linear-gradient(45deg, var(--red), var(--amber), var(--red));
+  animation: gradient-rotate 3s linear infinite;
+  filter: blur(20px);
 }
 
 .camera-fab-animated::after {
@@ -756,6 +850,10 @@ button:disabled {
   background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%);
   animation: shimmer-sweep 3s ease-in-out infinite;
   pointer-events: none;
+}
+
+.camera-fab-animated.camera-analyzing::after {
+  animation: shimmer-sweep 1.5s ease-in-out infinite;
 }
 
 @keyframes gentle-pulse {

@@ -105,32 +105,43 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
         
         <div className="absolute left-1/2 -translate-x-1/2 -top-5 z-50">
           <div className={cn(
-            "absolute inset-0 w-16 h-16 rounded-full animate-[pulse-ring_2s_ease-out_infinite] transition-all",
-            captureState === 'capturing' && "capture-pulse",
-            captureState === 'analyzing' && "analyzing-pulse bg-amber/40",
-            captureState === 'success' && "success-pulse bg-green/40",
-            captureState === 'fail' && "fail-pulse bg-red/40",
-            captureState === 'idle' && "bg-b1/30"
+            "absolute inset-0 w-16 h-16 rounded-full transition-all pointer-events-none",
+            captureState === 'analyzing' && "animate-[pulse-ring-analyzing_1.5s_ease-out_infinite] bg-amber/50",
+            captureState === 'success' && "animate-[pulse-ring_1s_ease-out_3] bg-green/50",
+            captureState === 'fail' && "animate-[pulse-ring_1s_ease-out_3] bg-red/50",
+            captureState === 'idle' && "animate-[pulse-ring_3s_ease-out_infinite] bg-b1/30",
+            captureState === 'capturing' && "animate-[pulse-ring_0.8s_ease-out_2] bg-b1/60"
           )} style={{ minWidth: '64px', minHeight: '64px' }} />
           <div className={cn(
-            "absolute inset-0 w-16 h-16 rounded-full animate-[pulse-ring_2s_ease-out_infinite_0.5s] transition-all",
-            captureState === 'analyzing' && "bg-amber/20",
-            captureState === 'idle' && "bg-amber/20"
+            "absolute inset-0 w-16 h-16 rounded-full transition-all pointer-events-none",
+            captureState === 'analyzing' && "animate-[pulse-ring-analyzing_1.5s_ease-out_infinite_0.5s] bg-b1/40",
+            captureState === 'idle' && "animate-[pulse-ring_3s_ease-out_infinite_1s] bg-amber/20"
+          )} style={{ minWidth: '64px', minHeight: '64px' }} />
+          <div className={cn(
+            "absolute inset-0 w-16 h-16 rounded-full transition-all pointer-events-none",
+            captureState === 'analyzing' && "animate-[pulse-ring-analyzing_1.5s_ease-out_infinite_1s] bg-amber/30"
           )} style={{ minWidth: '64px', minHeight: '64px' }} />
           <button
             id="camera-fab"
             onClick={onCameraOpen}
             className={cn(
-              "camera-fab-animated relative w-16 h-16 text-white rounded-full border-[5px] border-fg flex items-center justify-center transition-all active:scale-95 hover:scale-110 overflow-hidden",
-              captureState === 'capturing' && "capture-pulse",
-              captureState === 'analyzing' && "analyzing-pulse shadow-[0_8px_24px_rgba(193,124,95,0.4),0_4px_8px_rgba(0,0,0,0.15)]",
-              captureState === 'success' && "success-pulse shadow-[0_8px_24px_rgba(125,185,110,0.4),0_4px_8px_rgba(0,0,0,0.15)]",
-              captureState === 'fail' && "fail-pulse shadow-[0_8px_24px_rgba(220,85,75,0.4),0_4px_8px_rgba(0,0,0,0.15)]",
-              captureState === 'idle' && "shadow-[0_8px_24px_rgba(85,92,226,0.4),0_4px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_12px_32px_rgba(85,92,226,0.5),0_6px_12px_rgba(0,0,0,0.2)]"
+              "camera-fab-animated relative w-16 h-16 text-white rounded-full border-[5px] border-fg flex items-center justify-center transition-all overflow-hidden",
+              captureState === 'analyzing' && "camera-analyzing",
+              captureState === 'success' && "camera-success",
+              captureState === 'fail' && "camera-fail"
             )}
             style={{ minWidth: '64px', minHeight: '64px' }}
           >
-            <Eye size={28} weight="bold" className="relative z-10 drop-shadow-md" />
+            <Eye 
+              size={28} 
+              weight="bold" 
+              className={cn(
+                "relative z-10 drop-shadow-md transition-all duration-300",
+                captureState === 'analyzing' && "animate-pulse scale-110",
+                captureState === 'success' && "scale-125",
+                captureState === 'fail' && "scale-90"
+              )} 
+            />
           </button>
         </div>
       </div>
