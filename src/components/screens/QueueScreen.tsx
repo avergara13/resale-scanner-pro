@@ -1196,42 +1196,54 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
             </div>
           )}
 
-          {availableLocations.length > 0 && (
-            <Collapsible 
-              open={locationInsightsOpen} 
-              onOpenChange={setLocationInsightsOpen}
-              className="mt-6"
-            >
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full h-12 px-4 border-s2 hover:bg-s1 text-t1 font-bold text-sm transition-all flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🏪</span>
-                    <span className="uppercase tracking-wide">Best Performing Stores</span>
-                    <Badge 
-                      variant="secondary" 
-                      className="h-5 px-2 text-[10px] font-bold bg-b1/15 text-b1 border border-b1/30"
-                    >
-                      {availableLocations.length}
-                    </Badge>
-                  </div>
-                  <CaretDown 
-                    size={20} 
-                    weight="bold" 
-                    className={cn(
-                      "transition-transform duration-200",
-                      locationInsightsOpen && "rotate-180"
-                    )}
-                  />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-4">
-                <LocationInsights items={queueItems} />
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+          {availableLocations.length > 0 && (() => {
+            const totalProfit = queueItems
+              .filter(item => item.location && item.decision === 'GO')
+              .reduce((sum, item) => sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0)
+            
+            return (
+              <Collapsible 
+                open={locationInsightsOpen} 
+                onOpenChange={setLocationInsightsOpen}
+                className="mt-6"
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full h-12 px-4 border-s2 hover:bg-s1 text-t1 font-bold text-sm transition-all flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🏪</span>
+                      <span className="uppercase tracking-wide">Best Performing Stores</span>
+                      <Badge 
+                        variant="secondary" 
+                        className="h-5 px-2 text-[10px] font-bold bg-b1/15 text-b1 border border-b1/30"
+                      >
+                        {availableLocations.length}
+                      </Badge>
+                      <Badge 
+                        variant="secondary" 
+                        className="h-5 px-2 text-[10px] font-bold bg-green/15 text-green border border-green/30"
+                      >
+                        ${totalProfit.toFixed(0)}
+                      </Badge>
+                    </div>
+                    <CaretDown 
+                      size={20} 
+                      weight="bold" 
+                      className={cn(
+                        "transition-transform duration-200",
+                        locationInsightsOpen && "rotate-180"
+                      )}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <LocationInsights items={queueItems} />
+                </CollapsibleContent>
+              </Collapsible>
+            )
+          })()}
         </ScrollArea>
       )}
     </div>
