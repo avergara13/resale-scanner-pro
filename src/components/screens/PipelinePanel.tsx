@@ -1,6 +1,6 @@
-import { Eye, MagnifyingGlass, TrendUp, Calculator, CheckCircle } from '@phosphor-icons/react'
-import { Card } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
+import { Eye, MagnifyingGlass, TrendUp, Calculator, CheckCircle, Lightning, Clock } from '@phosphor-icons/react'
+import { motion } from 'framer-motion'
+import { cn } from '@/lib/utils'
 import type { PipelineStep } from '@/types'
 
 interface PipelinePanelProps {
@@ -8,82 +8,80 @@ interface PipelinePanelProps {
 }
 
 const phaseConfig = {
-  vision: { icon: Eye, label: 'Vision Analysis', color: 'text-b1' },
-  lens: { icon: MagnifyingGlass, label: 'Google Lens', color: 'text-b1' },
-  market: { icon: TrendUp, label: 'Market Research', color: 'text-b1' },
-  profit: { icon: Calculator, label: 'Profit Calculation', color: 'text-b1' },
-  decision: { icon: CheckCircle, label: 'Decision', color: 'text-green' },
+  vision: { icon: Eye, label: '1. IDENTIFYING ITEM', detail: 'Visual matching & OCR...' },
+  lens: { icon: MagnifyingGlass, label: '2. GOOGLE LENS', detail: 'Finding similar items...' },
+  market: { icon: TrendUp, label: '3. MARKET VELOCITY', detail: 'Sell-through rate calculation...' },
+  profit: { icon: Calculator, label: '4. EBAY MATH', detail: 'Fees, shipping & net profit...' },
+  decision: { icon: CheckCircle, label: '5. FINAL DECISION', detail: 'Agentic recommendation...' },
 }
 
 export function PipelinePanel({ steps }: PipelinePanelProps) {
   if (steps.length === 0) {
-    return (
-      <div className="text-center py-12 text-s3">
-        <p className="text-sm">Capture an item to begin analysis</p>
-      </div>
-    )
+    return null
   }
 
   return (
-    <div id="ai-pipeline" className="space-y-3">
+    <div id="ai-pipeline" className="space-y-2">
       {steps.map((step) => {
         const config = phaseConfig[step.id]
         const Icon = config.icon
         const isProcessing = step.status === 'processing'
         const isComplete = step.status === 'complete'
         const isError = step.status === 'error'
+        const isPending = step.status === 'pending'
 
         return (
-          <Card
+          <motion.div
             key={step.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
             id={`phase-${step.id}`}
-            className={`p-4 border transition-all ${
-              isProcessing
-                ? 'border-b1 bg-t4 animate-pulse'
-                : isComplete
-                ? 'border-s2 bg-bg'
-                : isError
-                ? 'border-red bg-red/5'
-                : 'border-s2 bg-s1 opacity-50'
-            }`}
+            className={cn(
+              'p-3 rounded-xl border transition-all duration-300',
+              isComplete && 'bg-s1 border-b1',
+              isProcessing && 'bg-bg border-b1 shadow-sm ring-1 ring-b1',
+              isPending && 'bg-bg border-s2 opacity-50',
+              isError && 'bg-red/5 border-red'
+            )}
           >
-            <div className="flex items-start gap-3">
-              <div
-                className={`w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0 ${
-                  isComplete ? 'bg-green/10' : 'bg-s1'
-                }`}
-              >
-                <Icon size={20} weight="bold" className={isComplete ? 'text-green' : config.color} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-semibold text-fg">{config.label}</h3>
-                  {isComplete && (
-                    <span className="text-xs font-medium text-green uppercase tracking-wide">Complete</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    'w-6 h-6 rounded-full flex items-center justify-center',
+                    isComplete && 'bg-green text-bg',
+                    isProcessing && 'bg-b1 text-bg animate-pulse',
+                    isPending && 'bg-s2 text-t4',
+                    isError && 'bg-red text-bg'
                   )}
-                  {isProcessing && (
-                    <span className="text-xs font-medium text-b1 uppercase tracking-wide">Processing</span>
-                  )}
-                  {isError && (
-                    <span className="text-xs font-medium text-red uppercase tracking-wide">Error</span>
+                >
+                  {isComplete ? (
+                    <CheckCircle size={12} weight="bold" />
+                  ) : isProcessing ? (
+                    <Lightning size={12} weight="bold" />
+                  ) : (
+                    <Clock size={12} weight="bold" />
                   )}
                 </div>
-                {isProcessing && <Progress value={66} className="h-1 mb-2" />}
-                {step.data && (
-                  <div className="text-xs text-s4 mt-2">
-                    {typeof step.data === 'string' ? (
-                      <p>{step.data}</p>
-                    ) : (
-                      <pre className="whitespace-pre-wrap font-mono text-xs">
-                        {JSON.stringify(step.data, null, 2)}
-                      </pre>
-                    )}
-                  </div>
-                )}
-                {step.error && <p className="text-xs text-red mt-1">{step.error}</p>}
+                <div>
+                  <h4 className="text-xs font-bold text-t1 uppercase tracking-wider">{config.label}</h4>
+                  {(isProcessing || step.data) && (
+                    <p className="text-[10px] text-t3 mt-0.5">
+                      {step.data && typeof step.data === 'string' ? step.data : config.detail}
+                    </p>
+                  )}
+                  {step.error && <p className="text-[10px] text-red mt-0.5">{step.error}</p>}
+                </div>
               </div>
+              {isProcessing && (
+                <div className="flex gap-1">
+                  <div className="w-1 h-1 bg-b1 rounded-full animate-bounce" />
+                  <div className="w-1 h-1 bg-b1 rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <div className="w-1 h-1 bg-b1 rounded-full animate-bounce [animation-delay:0.4s]" />
+                </div>
+              )}
             </div>
-          </Card>
+          </motion.div>
         )
       })}
     </div>
