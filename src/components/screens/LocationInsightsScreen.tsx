@@ -127,26 +127,26 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
 
   if (locationPerformance.length === 0) {
     return (
-      <div className="flex flex-col h-full bg-[var(--bg)]">
-        <header className="p-4 border-b border-[var(--s2)] bg-[var(--fg)] sticky top-0 z-10">
+      <div className="flex flex-col h-full bg-bg">
+        <header className="p-4 border-b border-s2 bg-fg sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}
-              className="p-2 hover:bg-[var(--s1)] rounded-lg transition-colors"
+              className="p-2 hover:bg-s1 rounded-lg transition-colors"
             >
-              <ArrowLeft size={20} weight="bold" className="text-[var(--t2)]" />
+              <ArrowLeft size={20} weight="bold" className="text-t2" />
             </button>
             <div className="flex-1">
-              <h1 className="text-lg font-bold text-[var(--t1)]">Location Insights</h1>
-              <p className="text-xs text-[var(--t3)] font-medium">Profit Comparison</p>
+              <h1 className="text-lg font-bold text-t1">Location Insights</h1>
+              <p className="text-xs text-t3 font-medium">Profit Comparison</p>
             </div>
           </div>
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <MapPin size={64} weight="light" className="text-[var(--t4)] mb-4" />
-          <h3 className="text-base font-bold text-[var(--t2)] mb-2">No Location Data</h3>
-          <p className="text-sm text-[var(--t3)] max-w-xs">
+          <MapPin size={64} weight="light" className="text-t4 mb-4" />
+          <h3 className="text-base font-bold text-t2 mb-2">No Location Data</h3>
+          <p className="text-sm text-t3 max-w-xs">
             Start tagging items with locations when scanning to see performance insights.
           </p>
         </div>
@@ -155,27 +155,27 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg)]">
-      <header className="p-4 border-b border-[var(--s2)] bg-[var(--fg)] sticky top-0 z-10">
+    <div className="flex flex-col h-full bg-bg">
+      <header className="p-4 border-b border-s2 bg-fg sticky top-0 z-10">
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-[var(--s1)] rounded-lg transition-colors"
+            className="p-2 hover:bg-s1 rounded-lg transition-colors"
           >
-            <ArrowLeft size={20} weight="bold" className="text-[var(--t2)]" />
+            <ArrowLeft size={20} weight="bold" className="text-t2" />
           </button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-[var(--t1)]">Location Insights</h1>
-            <p className="text-xs text-[var(--t3)] font-medium">{locationPerformance.length} Locations Tracked</p>
+            <h1 className="text-lg font-bold text-t1">Location Insights</h1>
+            <p className="text-xs text-t3 font-medium">{locationPerformance.length} Locations Tracked</p>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
           <div className="stat-card p-3">
-            <div className="text-lg font-bold text-[var(--green)] leading-tight">
+            <div className="text-lg font-bold text-green leading-tight">
               ${totalProfitAllLocations.toFixed(0)}
             </div>
-            <div className="text-[10px] text-[var(--t3)] font-medium uppercase tracking-wider mt-1">
+            <div className="text-[10px] text-t3 font-medium uppercase tracking-wider mt-1">
               Total Profit
             </div>
           </div>
@@ -183,15 +183,15 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
             <div className="text-lg font-bold leading-tight">
               {totalScansAllLocations}
             </div>
-            <div className="text-[10px] text-[var(--t3)] font-medium uppercase tracking-wider mt-1">
+            <div className="text-[10px] text-t3 font-medium uppercase tracking-wider mt-1">
               Total Scans
             </div>
           </div>
           <div className="stat-card p-3">
-            <div className="text-lg font-bold text-[var(--b1)] leading-tight">
+            <div className="text-lg font-bold text-b1 leading-tight">
               {avgGoRateAllLocations.toFixed(0)}%
             </div>
-            <div className="text-[10px] text-[var(--t3)] font-medium uppercase tracking-wider mt-1">
+            <div className="text-[10px] text-t3 font-medium uppercase tracking-wider mt-1">
               Avg GO Rate
             </div>
           </div>
@@ -203,10 +203,10 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative p-4 bg-gradient-to-br from-[var(--b1)]/10 to-[var(--amber)]/10 border-2 border-[var(--b1)]/30 rounded-2xl overflow-hidden"
+            className="relative p-4 bg-gradient-to-br from-b1/10 to-amber/10 border-2 border-b1/30 rounded-2xl overflow-hidden"
           >
             <div className="absolute top-3 right-3">
-              <Trophy size={24} weight="fill" className="text-[var(--amber)]" />
+              <Trophy size={24} weight="fill" className="text-amber" />
             </div>
             
             <div className="flex items-start gap-3 mb-3">
@@ -217,8 +217,8 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                 {LOCATION_TYPE_ICONS[topLocation.location.type || 'other']}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-[var(--t1)] mb-1">{topLocation.location.name}</h3>
-                <p className="text-xs text-[var(--t3)] font-medium">
+                <h3 className="text-base font-bold text-t1 mb-1">{topLocation.location.name}</h3>
+                <p className="text-xs text-t3 font-medium">
                   {topLocation.location.city && topLocation.location.state 
                     ? `${topLocation.location.city}, ${topLocation.location.state}`
                     : 'Top Performing Location'}
@@ -227,27 +227,27 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <div className="bg-[var(--fg)] p-2.5 rounded-xl border border-[var(--s1)]">
-                <div className="text-sm font-bold text-[var(--green)]">
+              <div className="bg-fg p-2.5 rounded-xl border border-s1">
+                <div className="text-sm font-bold text-green">
                   ${topLocation.totalProfit.toFixed(0)}
                 </div>
-                <div className="text-[9px] text-[var(--t4)] font-bold uppercase mt-0.5">Profit</div>
+                <div className="text-[9px] text-t4 font-bold uppercase mt-0.5">Profit</div>
               </div>
-              <div className="bg-[var(--fg)] p-2.5 rounded-xl border border-[var(--s1)]">
+              <div className="bg-fg p-2.5 rounded-xl border border-s1">
                 <div className="text-sm font-bold">{topLocation.totalScans}</div>
-                <div className="text-[9px] text-[var(--t4)] font-bold uppercase mt-0.5">Scans</div>
+                <div className="text-[9px] text-t4 font-bold uppercase mt-0.5">Scans</div>
               </div>
-              <div className="bg-[var(--fg)] p-2.5 rounded-xl border border-[var(--s1)]">
-                <div className="text-sm font-bold text-[var(--b1)]">{topLocation.goRate.toFixed(0)}%</div>
-                <div className="text-[9px] text-[var(--t4)] font-bold uppercase mt-0.5">GO Rate</div>
+              <div className="bg-fg p-2.5 rounded-xl border border-s1">
+                <div className="text-sm font-bold text-b1">{topLocation.goRate.toFixed(0)}%</div>
+                <div className="text-[9px] text-t4 font-bold uppercase mt-0.5">GO Rate</div>
               </div>
             </div>
 
             {topLocation.bestCategories.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-[var(--s2)]">
+              <div className="mt-3 pt-3 border-t border-s2">
                 <div className="flex items-center gap-1.5 mb-2">
-                  <Tag size={12} weight="bold" className="text-[var(--t3)]" />
-                  <span className="text-[9px] font-bold text-[var(--t3)] uppercase tracking-wider">
+                  <Tag size={12} weight="bold" className="text-t3" />
+                  <span className="text-[9px] font-bold text-t3 uppercase tracking-wider">
                     Best Categories
                   </span>
                 </div>
@@ -255,9 +255,9 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                   {topLocation.bestCategories.map((cat, idx) => (
                     <div
                       key={idx}
-                      className="px-2 py-1 bg-[var(--fg)] border border-[var(--s2)] rounded-lg text-[10px] font-bold"
+                      className="px-2 py-1 bg-fg border border-s2 rounded-lg text-[10px] font-bold"
                     >
-                      {cat.category} <span className="text-[var(--green)]">${cat.avgProfit.toFixed(0)}</span>
+                      {cat.category} <span className="text-green">${cat.avgProfit.toFixed(0)}</span>
                     </div>
                   ))}
                 </div>
@@ -267,15 +267,15 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
         )}
 
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-[var(--t2)] uppercase tracking-wider">All Locations</h3>
-          <div className="flex gap-1 p-1 bg-[var(--s1)] rounded-lg border border-[var(--s2)]">
+          <h3 className="text-xs font-bold text-t2 uppercase tracking-wider">All Locations</h3>
+          <div className="flex gap-1 p-1 bg-s1 rounded-lg border border-s2">
             <button
               onClick={() => setSortBy('profit')}
               className={cn(
                 "px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all",
                 sortBy === 'profit' 
-                  ? "bg-[var(--fg)] text-[var(--b1)] shadow-sm" 
-                  : "text-[var(--t3)] hover:text-[var(--t2)]"
+                  ? "bg-fg text-b1 shadow-sm" 
+                  : "text-t3 hover:text-t2"
               )}
             >
               Profit
@@ -285,8 +285,8 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
               className={cn(
                 "px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all",
                 sortBy === 'goRate' 
-                  ? "bg-[var(--fg)] text-[var(--b1)] shadow-sm" 
-                  : "text-[var(--t3)] hover:text-[var(--t2)]"
+                  ? "bg-fg text-b1 shadow-sm" 
+                  : "text-t3 hover:text-t2"
               )}
             >
               GO Rate
@@ -296,8 +296,8 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
               className={cn(
                 "px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all",
                 sortBy === 'scans' 
-                  ? "bg-[var(--fg)] text-[var(--b1)] shadow-sm" 
-                  : "text-[var(--t3)] hover:text-[var(--t2)]"
+                  ? "bg-fg text-b1 shadow-sm" 
+                  : "text-t3 hover:text-t2"
               )}
             >
               Scans
@@ -319,8 +319,8 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                 className={cn(
                   "p-3.5 rounded-xl border transition-all",
                   isTop 
-                    ? "bg-[var(--fg)] border-[var(--b1)]/20" 
-                    : "bg-[var(--fg)] border-[var(--s2)] hover:border-[var(--b1)]/20"
+                    ? "bg-fg border-b1/20" 
+                    : "bg-fg border-s2 hover:border-b1/20"
                 )}
               >
                 <div className="flex items-start gap-3 mb-3">
@@ -331,10 +331,10 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                     {LOCATION_TYPE_ICONS[loc.location.type || 'other']}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-[var(--t1)] mb-0.5 truncate">
+                    <h4 className="text-sm font-bold text-t1 mb-0.5 truncate">
                       {loc.location.name}
                     </h4>
-                    <div className="flex items-center gap-2 text-[10px] text-[var(--t3)] font-medium">
+                    <div className="flex items-center gap-2 text-[10px] text-t3 font-medium">
                       {loc.location.city && (
                         <span>{loc.location.city}</span>
                       )}
@@ -350,43 +350,43 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                   </div>
                   <div className="flex items-center gap-1">
                     {profitTrend ? (
-                      <TrendUp size={16} weight="bold" className="text-[var(--green)]" />
+                      <TrendUp size={16} weight="bold" className="text-green" />
                     ) : (
-                      <TrendDown size={16} weight="bold" className="text-[var(--t4)]" />
+                      <TrendDown size={16} weight="bold" className="text-t4" />
                     )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-4 gap-2">
-                  <div className="text-center p-2 bg-[var(--bg)] rounded-lg border border-[var(--s1)]">
-                    <div className="text-sm font-bold text-[var(--green)]">
+                  <div className="text-center p-2 bg-bg rounded-lg border border-s1">
+                    <div className="text-sm font-bold text-green">
                       ${loc.totalProfit.toFixed(0)}
                     </div>
-                    <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">Profit</div>
+                    <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Profit</div>
                   </div>
-                  <div className="text-center p-2 bg-[var(--bg)] rounded-lg border border-[var(--s1)]">
+                  <div className="text-center p-2 bg-bg rounded-lg border border-s1">
                     <div className="text-sm font-bold">
                       ${loc.averageProfit.toFixed(0)}
                     </div>
-                    <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">Avg</div>
+                    <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Avg</div>
                   </div>
-                  <div className="text-center p-2 bg-[var(--bg)] rounded-lg border border-[var(--s1)]">
+                  <div className="text-center p-2 bg-bg rounded-lg border border-s1">
                     <div className="text-sm font-bold">{loc.totalScans}</div>
-                    <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">Scans</div>
+                    <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Scans</div>
                   </div>
-                  <div className="text-center p-2 bg-[var(--bg)] rounded-lg border border-[var(--s1)]">
-                    <div className="text-sm font-bold text-[var(--b1)]">
+                  <div className="text-center p-2 bg-bg rounded-lg border border-s1">
+                    <div className="text-sm font-bold text-b1">
                       {loc.goRate.toFixed(0)}%
                     </div>
-                    <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">GO</div>
+                    <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">GO</div>
                   </div>
                 </div>
 
                 {loc.bestCategories.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-[var(--s1)]">
+                  <div className="mt-3 pt-3 border-t border-s1">
                     <div className="flex items-center gap-1.5 mb-2">
-                      <Tag size={11} weight="bold" className="text-[var(--t3)]" />
-                      <span className="text-[9px] font-bold text-[var(--t3)] uppercase tracking-wider">
+                      <Tag size={11} weight="bold" className="text-t3" />
+                      <span className="text-[9px] font-bold text-t3 uppercase tracking-wider">
                         Top Categories
                       </span>
                     </div>
@@ -394,11 +394,11 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                       {loc.bestCategories.map((cat, idx) => (
                         <div
                           key={idx}
-                          className="px-2 py-1 bg-[var(--bg)] border border-[var(--s1)] rounded text-[9px] font-medium"
+                          className="px-2 py-1 bg-bg border border-s1 rounded text-[9px] font-medium"
                         >
-                          <span className="text-[var(--t2)]">{cat.category}</span>
+                          <span className="text-t2">{cat.category}</span>
                           {' '}
-                          <span className="text-[var(--green)] font-bold">${cat.avgProfit.toFixed(0)}</span>
+                          <span className="text-green font-bold">${cat.avgProfit.toFixed(0)}</span>
                         </div>
                       ))}
                     </div>
@@ -406,10 +406,10 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                 )}
 
                 {loc.recentFinds.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-[var(--s1)]">
+                  <div className="mt-3 pt-3 border-t border-s1">
                     <div className="flex items-center gap-1.5 mb-2">
-                      <Package size={11} weight="bold" className="text-[var(--t3)]" />
-                      <span className="text-[9px] font-bold text-[var(--t3)] uppercase tracking-wider">
+                      <Package size={11} weight="bold" className="text-t3" />
+                      <span className="text-[9px] font-bold text-t3 uppercase tracking-wider">
                         Recent Finds
                       </span>
                     </div>
@@ -417,23 +417,23 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                       {loc.recentFinds.slice(0, 3).map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between p-2 bg-[var(--bg)] rounded-lg border border-[var(--s1)]"
+                          className="flex items-center justify-between p-2 bg-bg rounded-lg border border-s1"
                         >
                           <div className="flex-1 min-w-0 mr-2">
-                            <p className="text-[10px] font-medium text-[var(--t2)] truncate">
+                            <p className="text-[10px] font-medium text-t2 truncate">
                               {item.productName || 'Unnamed Item'}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-[9px] text-[var(--t4)] font-medium">
+                            <span className="text-[9px] text-t4 font-medium">
                               ${item.purchasePrice.toFixed(2)}
                             </span>
                             <span 
                               className={cn(
                                 "text-[9px] font-bold px-1.5 py-0.5 rounded",
                                 item.decision === 'GO' 
-                                  ? "bg-[var(--green-bg)] text-[var(--green)]" 
-                                  : "bg-[var(--red-bg)] text-[var(--red)]"
+                                  ? "bg-green-bg text-green" 
+                                  : "bg-red-bg text-red"
                               )}
                             >
                               {item.decision}
