@@ -1,7 +1,8 @@
-import { Sparkle, Tag } from '@phosphor-icons/react'
+import { Sparkle, Tag, CheckCircle } from '@phosphor-icons/react'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 
 interface SuggestedTagsProps {
   suggestions: string[]
@@ -12,6 +13,31 @@ interface SuggestedTagsProps {
 
 export function SuggestedTags({ suggestions, onApply, onApplyTag, appliedTags = [] }: SuggestedTagsProps) {
   if (!suggestions || suggestions.length === 0) return null
+
+  const unappliedTags = suggestions.filter(tag => !appliedTags.includes(tag))
+  const allApplied = unappliedTags.length === 0
+
+  const handleApplyAll = () => {
+    if (allApplied) {
+      toast.info('All tags already applied')
+      return
+    }
+    onApply(unappliedTags)
+    toast.success(`Applied ${unappliedTags.length} tag${unappliedTags.length !== 1 ? 's' : ''}`, {
+      icon: <CheckCircle size={16} weight="fill" className="text-green" />
+    })
+  }
+
+  const handleApplyTag = (tag: string) => {
+    const isApplied = appliedTags.includes(tag)
+    onApplyTag(tag)
+    
+    if (!isApplied) {
+      toast.success(`Applied "${tag}"`, {
+        icon: <Tag size={16} weight="fill" className="text-[var(--b1)]" />
+      })
+    }
+  }
 
   return (
     <motion.div
@@ -27,16 +53,29 @@ export function SuggestedTags({ suggestions, onApply, onApplyTag, appliedTags = 
           </div>
           <div>
             <h4 className="text-xs font-bold text-[var(--t1)]">AI Suggested Tags</h4>
-            <p className="text-[10px] text-[var(--t3)]">Based on product analysis</p>
+            <p className="text-[10px] text-[var(--t3)]">
+              {allApplied ? 'All tags applied' : `${unappliedTags.length} suggestion${unappliedTags.length !== 1 ? 's' : ''}`}
+            </p>
           </div>
         </div>
         <Button
-          onClick={() => onApply(suggestions)}
+          onClick={handleApplyAll}
           size="sm"
           variant="ghost"
-          className="h-7 px-2 text-[10px] font-bold text-[var(--b1)] hover:text-[var(--b1)] hover:bg-[var(--b1)]/10"
+          disabled={allApplied}
+          className="h-7 px-2 text-[10px] font-bold text-[var(--b1)] hover:text-[var(--b1)] hover:bg-[var(--b1)]/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
-          APPLY ALL
+          {allApplied ? (
+            <>
+              <CheckCircle size={12} weight="fill" className="mr-1" />
+              ALL APPLIED
+            </>
+          ) : (
+            <>
+              <Tag size={12} weight="bold" className="mr-1" />
+              APPLY ALL
+            </>
+          )}
         </Button>
       </div>
       
@@ -54,15 +93,19 @@ export function SuggestedTags({ suggestions, onApply, onApplyTag, appliedTags = 
               >
                 <Badge
                   variant={isApplied ? 'default' : 'outline'}
-                  className="cursor-pointer transition-all hover:scale-105 text-[11px] px-2 py-1"
+                  className="cursor-pointer transition-all hover:scale-105 active:scale-95 text-[11px] px-2.5 py-1.5 select-none"
                   style={{
                     backgroundColor: isApplied ? 'var(--b1)' : 'transparent',
                     borderColor: 'var(--b1)',
                     color: isApplied ? 'white' : 'var(--b1)',
                   }}
-                  onClick={() => onApplyTag(tag)}
+                  onClick={() => handleApplyTag(tag)}
                 >
-                  <Tag size={10} weight={isApplied ? 'fill' : 'bold'} className="mr-1" />
+                  {isApplied ? (
+                    <CheckCircle size={10} weight="fill" className="mr-1" />
+                  ) : (
+                    <Tag size={10} weight="bold" className="mr-1" />
+                  )}
                   {tag}
                 </Badge>
               </motion.div>
