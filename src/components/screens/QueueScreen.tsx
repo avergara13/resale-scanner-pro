@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -27,12 +27,30 @@ import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-prefere
 import { cn } from '@/lib/utils'
 import type { ScannedItem, CategoryPreset, ItemTag } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface QueueScreenProps {
   queueItems: ScannedItem[]
   onRemove: (id: string) => void
   onCreateListing: (id: string) => void
   onEdit: (itemId: string, updates: Partial<ScannedItem>) => void
+  onReorder?: (items: ScannedItem[]) => void
   onBatchAnalyze?: () => void
   isBatchAnalyzing?: boolean
   geminiService?: GeminiService | null
@@ -41,12 +59,175 @@ interface QueueScreenProps {
 }
 
 type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
-type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc'
+type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc' | 'manual'
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onBatchAnalyze, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights }: QueueScreenProps) {
+interface SortableItemProps {
+  item: ScannedItem
+  isSelected: boolean
+  allTags: ItemTag[]
+  onToggleSelect: (id: string) => void
+  onEdit: (item: ScannedItem) => void
+  onRemove: (id: string) => void
+  onCreateListing: (id: string) => void
+  onEditTags: (itemId: string, tags: string[]) => void
+}
+
+function SortableItem({ 
+  item, 
+  isSelected, 
+  allTags, 
+  onToggleSelect, 
+  onEdit, 
+  onRemove, 
+  onCreateListing,
+  onEditTags 
+}: SortableItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <Card 
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "p-4 border transition-colors",
+        isSelected ? 'border-b1 bg-t4' : 'border-s2'
+      )}
+    >
+      <div className="flex gap-3">
+        <div className="flex flex-col gap-2 items-center justify-start pt-1">
+          <div 
+            {...attributes} 
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-s1 rounded transition-colors"
+            aria-label="Drag to reorder"
+          >
+            <DotsSixVertical size={20} weight="bold" className="text-s3" />
+          </div>
+          <Checkbox
+            id={`select-${item.id}`}
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect(item.id)}
+            className="w-5 h-5 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+          />
+          {item.imageData && (
+            <img
+              src={item.imageData}
+              alt={item.productName || 'Item'}
+              className="w-20 h-20 object-cover rounded-md border border-s2 flex-shrink-0"
+            />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <h3 className="font-semibold text-fg text-sm line-clamp-2">
+              {item.productName || 'Unknown Item'}
+            </h3>
+            {item.profitMargin !== undefined && (
+              <Badge
+                variant="secondary"
+                className={`flex-shrink-0 font-mono font-medium ${
+                  item.profitMargin > 50
+                    ? 'bg-green/20 text-green'
+                    : item.profitMargin > 20
+                    ? 'bg-amber/20 text-amber'
+                    : 'bg-red/20 text-red'
+                }`}
+              >
+                +{item.profitMargin.toFixed(0)}%
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-2">
+            <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
+            {item.estimatedSellPrice && (
+              <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
+            )}
+          </div>
+          {item.tags && item.tags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mb-3">
+              <Tag size={12} weight="bold" className="text-s4 flex-shrink-0" />
+              {item.tags.map((tagId) => {
+                const tag = allTags.find(t => t.id === tagId)
+                if (!tag) return null
+                return (
+                  <Badge
+                    key={tagId}
+                    variant="outline"
+                    className="text-[10px] h-5 pl-2 pr-1 font-medium border flex items-center gap-1 group hover:opacity-80 transition-opacity"
+                    style={{
+                      borderColor: tag.color,
+                      backgroundColor: `${tag.color}15`,
+                      color: tag.color
+                    }}
+                  >
+                    <span>{tag.name}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const updatedTags = item.tags?.filter(t => t !== tagId) || []
+                        onEditTags(item.id, updatedTags)
+                        toast.success(`Removed tag: ${tag.name}`)
+                      }}
+                      className="flex items-center justify-center hover:opacity-70 transition-opacity"
+                      aria-label={`Remove ${tag.name} tag`}
+                    >
+                      <X size={10} weight="bold" />
+                    </button>
+                  </Badge>
+                )
+              })}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => onEdit(item)}
+              variant="outline"
+              className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+            >
+              <PencilSimple size={14} weight="bold" className="mr-1" />
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => onCreateListing(item.id)}
+              className="flex-1 bg-b1 hover:bg-b2 text-white h-8 text-xs font-medium"
+            >
+              <ArrowRight size={14} weight="bold" className="mr-1" />
+              List
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onRemove(item.id)}
+              className="h-8 w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
+            >
+              <Trash size={16} weight="bold" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
-    'profit-desc',
+    'manual',
     'ALL'
   )
   const { filters: advancedFilters, setFilters: setAdvancedFilters } = useAdvancedFilterPreference('queue-screen')
@@ -56,6 +237,34 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
   const [presetsOpen, setPresetsOpen] = useState(false)
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id || !onReorder) {
+      return
+    }
+
+    const oldIndex = queueItems.findIndex((item) => item.id === active.id)
+    const newIndex = queueItems.findIndex((item) => item.id === over.id)
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const reorderedItems = arrayMove(queueItems, oldIndex, newIndex)
+      onReorder(reorderedItems)
+      toast.success('Queue reordered')
+    }
+  }
 
   const handleApplyPreset = (preset: CategoryPreset) => {
     if (preset.filters) {
@@ -174,7 +383,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
     )
   })
   
-  const sortedItems = [...filteredItems].sort((a, b) => {
+  const sortedItems = sortBy === 'manual' ? filteredItems : [...filteredItems].sort((a, b) => {
     switch (sortBy) {
       case 'profit-desc':
         return (b.profitMargin || 0) - (a.profitMargin || 0)
@@ -477,6 +686,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="manual" className="text-xs">Manual Order (Drag & Drop)</SelectItem>
                 <SelectItem value="profit-desc" className="text-xs">Profit (High to Low)</SelectItem>
                 <SelectItem value="profit-asc" className="text-xs">Profit (Low to High)</SelectItem>
                 <SelectItem value="date-desc" className="text-xs">Date (Newest First)</SelectItem>
@@ -626,126 +836,155 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               <LocationInsights items={queueItems} />
             </div>
           )}
-          <div className="space-y-3">
-            {sortedItems.map((item) => {
-              const isSelected = selectedIds.has(item.id)
-              return (
-                <Card 
-                  key={item.id} 
-                  className={`p-4 border transition-colors ${
-                    isSelected ? 'border-b1 bg-t4' : 'border-s2'
-                  }`}
-                >
-                  <div className="flex gap-3">
-                    <div className="flex flex-col gap-2 items-center justify-start pt-1">
-                      <Checkbox
-                        id={`select-${item.id}`}
-                        checked={isSelected}
-                        onCheckedChange={() => handleToggleSelect(item.id)}
-                        className="w-5 h-5 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
-                      />
-                      {item.imageData && (
-                        <img
-                          src={item.imageData}
-                          alt={item.productName || 'Item'}
-                          className="w-20 h-20 object-cover rounded-md border border-s2 flex-shrink-0"
+          {sortBy === 'manual' && onReorder ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={sortedItems.map(item => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-3">
+                  {sortedItems.map((item) => (
+                    <SortableItem
+                      key={item.id}
+                      item={item}
+                      isSelected={selectedIds.has(item.id)}
+                      allTags={allTags || []}
+                      onToggleSelect={handleToggleSelect}
+                      onEdit={handleEdit}
+                      onRemove={onRemove}
+                      onCreateListing={onCreateListing}
+                      onEditTags={(itemId, tags) => onEdit(itemId, { tags })}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <div className="space-y-3">
+              {sortedItems.map((item) => {
+                const isSelected = selectedIds.has(item.id)
+                return (
+                  <Card 
+                    key={item.id} 
+                    className={`p-4 border transition-colors ${
+                      isSelected ? 'border-b1 bg-t4' : 'border-s2'
+                    }`}
+                  >
+                    <div className="flex gap-3">
+                      <div className="flex flex-col gap-2 items-center justify-start pt-1">
+                        <Checkbox
+                          id={`select-${item.id}`}
+                          checked={isSelected}
+                          onCheckedChange={() => handleToggleSelect(item.id)}
+                          className="w-5 h-5 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
                         />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h3 className="font-semibold text-fg text-sm line-clamp-2">
-                          {item.productName || 'Unknown Item'}
-                        </h3>
-                        {item.profitMargin !== undefined && (
-                          <Badge
-                            variant="secondary"
-                            className={`flex-shrink-0 font-mono font-medium ${
-                              item.profitMargin > 50
-                                ? 'bg-green/20 text-green'
-                                : item.profitMargin > 20
-                                ? 'bg-amber/20 text-amber'
-                                : 'bg-red/20 text-red'
-                            }`}
-                          >
-                            +{item.profitMargin.toFixed(0)}%
-                          </Badge>
+                        {item.imageData && (
+                          <img
+                            src={item.imageData}
+                            alt={item.productName || 'Item'}
+                            className="w-20 h-20 object-cover rounded-md border border-s2 flex-shrink-0"
+                          />
                         )}
                       </div>
-                      <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-2">
-                        <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
-                        {item.estimatedSellPrice && (
-                          <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
-                        )}
-                      </div>
-                      {item.tags && item.tags.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1 mb-3">
-                          <Tag size={12} weight="bold" className="text-s4 flex-shrink-0" />
-                          {item.tags.map((tagId) => {
-                            const tag = (allTags || []).find(t => t.id === tagId)
-                            if (!tag) return null
-                            return (
-                              <Badge
-                                key={tagId}
-                                variant="outline"
-                                className="text-[10px] h-5 pl-2 pr-1 font-medium border flex items-center gap-1 group hover:opacity-80 transition-opacity"
-                                style={{
-                                  borderColor: tag.color,
-                                  backgroundColor: `${tag.color}15`,
-                                  color: tag.color
-                                }}
-                              >
-                                <span>{tag.name}</span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    const updatedTags = item.tags?.filter(t => t !== tagId) || []
-                                    onEdit(item.id, { tags: updatedTags })
-                                    toast.success(`Removed tag: ${tag.name}`)
-                                  }}
-                                  className="flex items-center justify-center hover:opacity-70 transition-opacity"
-                                  aria-label={`Remove ${tag.name} tag`}
-                                >
-                                  <X size={10} weight="bold" />
-                                </button>
-                              </Badge>
-                            )
-                          })}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h3 className="font-semibold text-fg text-sm line-clamp-2">
+                            {item.productName || 'Unknown Item'}
+                          </h3>
+                          {item.profitMargin !== undefined && (
+                            <Badge
+                              variant="secondary"
+                              className={`flex-shrink-0 font-mono font-medium ${
+                                item.profitMargin > 50
+                                  ? 'bg-green/20 text-green'
+                                  : item.profitMargin > 20
+                                  ? 'bg-amber/20 text-amber'
+                                  : 'bg-red/20 text-red'
+                              }`}
+                            >
+                              +{item.profitMargin.toFixed(0)}%
+                            </Badge>
+                          )}
                         </div>
-                      )}
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleEdit(item)}
-                          variant="outline"
-                          className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
-                        >
-                          <PencilSimple size={14} weight="bold" className="mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => onCreateListing(item.id)}
-                          className="flex-1 bg-b1 hover:bg-b2 text-white h-8 text-xs font-medium"
-                        >
-                          <ArrowRight size={14} weight="bold" className="mr-1" />
-                          List
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onRemove(item.id)}
-                          className="h-8 w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
-                        >
-                          <Trash size={16} weight="bold" />
-                        </Button>
+                        <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-2">
+                          <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
+                          {item.estimatedSellPrice && (
+                            <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
+                          )}
+                        </div>
+                        {item.tags && item.tags.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1 mb-3">
+                            <Tag size={12} weight="bold" className="text-s4 flex-shrink-0" />
+                            {item.tags.map((tagId) => {
+                              const tag = (allTags || []).find(t => t.id === tagId)
+                              if (!tag) return null
+                              return (
+                                <Badge
+                                  key={tagId}
+                                  variant="outline"
+                                  className="text-[10px] h-5 pl-2 pr-1 font-medium border flex items-center gap-1 group hover:opacity-80 transition-opacity"
+                                  style={{
+                                    borderColor: tag.color,
+                                    backgroundColor: `${tag.color}15`,
+                                    color: tag.color
+                                  }}
+                                >
+                                  <span>{tag.name}</span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      const updatedTags = item.tags?.filter(t => t !== tagId) || []
+                                      onEdit(item.id, { tags: updatedTags })
+                                      toast.success(`Removed tag: ${tag.name}`)
+                                    }}
+                                    className="flex items-center justify-center hover:opacity-70 transition-opacity"
+                                    aria-label={`Remove ${tag.name} tag`}
+                                  >
+                                    <X size={10} weight="bold" />
+                                  </button>
+                                </Badge>
+                              )
+                            })}
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleEdit(item)}
+                            variant="outline"
+                            className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+                          >
+                            <PencilSimple size={14} weight="bold" className="mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => onCreateListing(item.id)}
+                            className="flex-1 bg-b1 hover:bg-b2 text-white h-8 text-xs font-medium"
+                          >
+                            <ArrowRight size={14} weight="bold" className="mr-1" />
+                            List
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onRemove(item.id)}
+                            className="h-8 w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
+                          >
+                            <Trash size={16} weight="bold" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              )
-            })}
-          </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
         </ScrollArea>
       )}
     </div>

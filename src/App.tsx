@@ -544,6 +544,10 @@ function App() {
     })
   }, [setQueue])
 
+  const handleReorderQueue = useCallback((reorderedItems: ScannedItem[]) => {
+    setQueue(reorderedItems)
+  }, [setQueue])
+
   const handleBatchAnalyze = useCallback(async () => {
     const unanalyzedItems = (queue || []).filter(item => !item.productName || item.productName === 'Quick Draft')
     
@@ -835,6 +839,7 @@ function App() {
                 onRemove={handleRemoveFromQueue}
                 onCreateListing={() => toast.info('Listing creation coming soon')}
                 onEdit={handleEditQueueItem}
+                onReorder={handleReorderQueue}
                 onBatchAnalyze={handleBatchAnalyze}
                 isBatchAnalyzing={isBatchAnalyzing}
                 geminiService={geminiService}
