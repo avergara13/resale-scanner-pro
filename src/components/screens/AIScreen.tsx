@@ -9,17 +9,19 @@ import { PipelinePanel } from './PipelinePanel'
 import { DecisionSignal } from './DecisionSignal'
 import { MarketDataPanel } from '../MarketDataPanel'
 import { GoogleLensResults } from '../GoogleLensResults'
+import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { useVoiceInput } from '@/hooks/use-voice-input'
-import type { ScannedItem, PipelineStep } from '@/types'
+import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
 
 interface AIScreenProps {
   currentItem?: ScannedItem
   pipeline: PipelineStep[]
+  settings?: AppSettings
   onAddToQueue: () => void
   onDeepSearch: () => void
 }
 
-export function AIScreen({ currentItem, pipeline, onAddToQueue, onDeepSearch }: AIScreenProps) {
+export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeepSearch }: AIScreenProps) {
   const [tab, setTab] = useState<'agent' | 'manual'>('agent')
   const [description, setDescription] = useState('')
   const { isListening, startListening, isSupported } = useVoiceInput()
@@ -29,12 +31,15 @@ export function AIScreen({ currentItem, pipeline, onAddToQueue, onDeepSearch }: 
 
   return (
     <div id="scr-ai" className="flex flex-col h-full">
-      <div id="ai-topbar" className="p-4 border-b border-s2 flex items-center justify-between bg-bg sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-fg text-bg rounded flex items-center justify-center">
-            <Robot size={18} weight="bold" />
+      <div id="ai-topbar" className="p-4 border-b border-s2 bg-bg sticky top-0 z-10">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-fg text-bg rounded flex items-center justify-center">
+              <Robot size={18} weight="bold" />
+            </div>
+            <h2 className="font-black text-sm uppercase tracking-widest">AI CENTER</h2>
           </div>
-          <h2 className="font-black text-sm uppercase tracking-widest">AI CENTER</h2>
+          <ApiStatusIndicator settings={settings} compact />
         </div>
         <div className="flex bg-s2 p-1 rounded-lg">
           <button
@@ -62,10 +67,13 @@ export function AIScreen({ currentItem, pipeline, onAddToQueue, onDeepSearch }: 
         {tab === 'agent' ? (
           <div className="space-y-6">
             {pipeline.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
-                <Scan size={64} strokeWidth={1} className="mb-4" />
-                <h3 className="text-lg font-bold">Ready to Scan</h3>
-                <p className="text-sm">Tap the eye below to start analysis</p>
+              <div className="space-y-6">
+                <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
+                  <Scan size={64} strokeWidth={1} className="mb-4" />
+                  <h3 className="text-lg font-bold">Ready to Scan</h3>
+                  <p className="text-sm">Tap the eye below to start analysis</p>
+                </div>
+                <ApiStatusIndicator settings={settings} />
               </div>
             ) : (
               <>

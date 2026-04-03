@@ -361,6 +361,7 @@ function App() {
         <AIScreen
           currentItem={currentItem}
           pipeline={pipeline}
+          settings={settings}
           onAddToQueue={handleAddToQueue}
           onDeepSearch={() => toast.info('Deep search feature coming soon')}
         />
