@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag } from '@phosphor-icons/react'
+import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,7 +23,7 @@ import { FilterPresetsManager } from '@/components/FilterPresetsManager'
 import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-preference'
 import { cn } from '@/lib/utils'
-import type { ScannedItem, CategoryPreset } from '@/types'
+import type { ScannedItem, CategoryPreset, ItemTag } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
 
 interface QueueScreenProps {
@@ -49,6 +50,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [presetsOpen, setPresetsOpen] = useState(false)
+  const [allTags] = useKV<ItemTag[]>('all-tags', [])
 
   const handleApplyPreset = (preset: CategoryPreset) => {
     if (preset.filters) {
@@ -588,12 +590,35 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-3">
+                      <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-2">
                         <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
                         {item.estimatedSellPrice && (
                           <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
                         )}
                       </div>
+                      {item.tags && item.tags.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mb-3">
+                          <Tag size={12} weight="bold" className="text-s4 flex-shrink-0" />
+                          {item.tags.map((tagId) => {
+                            const tag = (allTags || []).find(t => t.id === tagId)
+                            if (!tag) return null
+                            return (
+                              <Badge
+                                key={tagId}
+                                variant="outline"
+                                className="text-[10px] h-5 px-2 font-medium border"
+                                style={{
+                                  borderColor: tag.color,
+                                  backgroundColor: `${tag.color}15`,
+                                  color: tag.color
+                                }}
+                              >
+                                {tag.name}
+                              </Badge>
+                            )
+                          })}
+                        </div>
+                      )}
                       <div className="flex gap-2">
                         <Button
                           size="sm"
