@@ -469,38 +469,42 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
           </div>
         )}
 
-        <div className="flex items-center gap-2 mb-3">
-          <ArrowsDownUp size={16} weight="bold" className="text-s4" />
-          <span className="text-xs font-medium text-s4">Sort:</span>
-          <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-            <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="profit-desc" className="text-xs">Profit (High to Low)</SelectItem>
-              <SelectItem value="profit-asc" className="text-xs">Profit (Low to High)</SelectItem>
-              <SelectItem value="date-desc" className="text-xs">Date (Newest First)</SelectItem>
-              <SelectItem value="date-asc" className="text-xs">Date (Oldest First)</SelectItem>
-              <SelectItem value="category-asc" className="text-xs">Category (A to Z)</SelectItem>
-              <SelectItem value="category-desc" className="text-xs">Category (Z to A)</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={() => setPresetsOpen(true)}
-            size="sm"
-            variant="outline"
-            className="h-9 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1 ml-auto"
-          >
-            <BookmarkSimple size={14} weight="bold" className="mr-1" />
-            Presets
-          </Button>
-          <AdvancedFilters
-            filters={advancedFilters}
-            onFiltersChange={setAdvancedFilters}
-            availableCategories={availableCategories}
-            priceMin={priceRange.min}
-            priceMax={priceRange.max}
-          />
+        <div className="flex flex-col gap-2.5 mb-3">
+          <div className="flex items-center gap-2">
+            <ArrowsDownUp size={16} weight="bold" className="text-s4 flex-shrink-0" />
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+              <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="profit-desc" className="text-xs">Profit (High to Low)</SelectItem>
+                <SelectItem value="profit-asc" className="text-xs">Profit (Low to High)</SelectItem>
+                <SelectItem value="date-desc" className="text-xs">Date (Newest First)</SelectItem>
+                <SelectItem value="date-asc" className="text-xs">Date (Oldest First)</SelectItem>
+                <SelectItem value="category-asc" className="text-xs">Category (A to Z)</SelectItem>
+                <SelectItem value="category-desc" className="text-xs">Category (Z to A)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <AdvancedFilters
+              filters={advancedFilters}
+              onFiltersChange={setAdvancedFilters}
+              availableCategories={availableCategories}
+              priceMin={priceRange.min}
+              priceMax={priceRange.max}
+            />
+            <Button
+              onClick={() => setPresetsOpen(true)}
+              size="sm"
+              variant="outline"
+              className="h-9 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1 flex-1"
+            >
+              <BookmarkSimple size={14} weight="bold" className="mr-1.5" />
+              Presets
+            </Button>
+          </div>
         </div>
 
         <FilterPresetsManager
