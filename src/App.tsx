@@ -365,6 +365,31 @@ function App() {
     setScreen('queue')
   }, [currentItem, setQueue])
 
+  const handleQuickDraft = useCallback((imageData: string, price: number) => {
+    const draftItem: ScannedItem = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      imageData,
+      purchasePrice: price,
+      decision: 'PENDING',
+      inQueue: true,
+      productName: 'Quick Draft',
+      description: 'Captured in quick draft mode - analyze later',
+    }
+
+    setQueue((prev) => [...(prev || []), draftItem])
+
+    if (session?.active) {
+      setSession((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          itemsScanned: prev.itemsScanned + 1,
+        }
+      })
+    }
+  }, [session, setSession, setQueue])
+
   return (
     <div id="app-container" className="relative">
       <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
@@ -418,6 +443,7 @@ function App() {
         isOpen={cameraOpen}
         onClose={() => setCameraOpen(false)}
         onCapture={handleCapture}
+        onQuickDraft={handleQuickDraft}
       />
 
       <Toaster position="top-center" richColors />
