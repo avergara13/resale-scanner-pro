@@ -1295,11 +1295,6 @@ button:disabled {
   }
 }
 
-    box-shadow: 0 0 0 4px oklch(0.68 0.18 75 / 0.2),
-                0 6px 20px oklch(0.68 0.18 75 / 0.25);
-  }
-}
-
 .pipeline-progress-bar {
   position: absolute;
   bottom: 0;
