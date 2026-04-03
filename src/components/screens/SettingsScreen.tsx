@@ -19,11 +19,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target } from '@phosphor-icons/react'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
 import { IncidentLogViewer } from '../IncidentLogViewer'
 import { DetectionHistoryViewer } from '../DetectionHistoryViewer'
+import { FalsePositiveAnalyzerPanel } from '../FalsePositiveAnalyzer'
 import type { AppSettings } from '@/types'
 
 interface SettingsScreenProps {
@@ -156,6 +157,27 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 </div>
 
                 <DetectionHistoryViewer />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="false-positives" className="border border-s2 rounded-lg px-4 bg-s1">
+              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Target size={18} weight="duotone" />
+                  False Positive Analysis
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2">
+                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="text-b1 mt-0.5" size={16} />
+                    <p className="text-xs text-s4 leading-relaxed">
+                      Analyze false positive patterns to improve detection accuracy. Review misidentifications, confidence distributions, and get recommendations to optimize thresholds.
+                    </p>
+                  </div>
+                </div>
+
+                <FalsePositiveAnalyzerPanel />
               </AccordionContent>
             </AccordionItem>
 

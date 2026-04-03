@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Check, Scan, Package } from '@phosphor-icons/react'
+import { useKV } from '@github/spark/hooks'
+import { X, Check, Scan, Package, PencilSimple } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from './ui/button'
+import { Input } from './ui/input'
 import { cn } from '@/lib/utils'
 import type { DetectedProduct } from '@/types'
+import type { DetectionCorrection } from '@/lib/false-positive-analyzer'
 
 interface DetectedObjectWithBox {
   id: string
@@ -36,6 +39,8 @@ export function MultiObjectSelector({
 }: MultiObjectSelectorProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [individualPrices, setIndividualPrices] = useState<Map<string, number>>(new Map())
+  const [editingNames, setEditingNames] = useState<Map<string, string>>(new Map())
+  const [corrections, setCorrections] = useKV<DetectionCorrection[]>('detection-corrections', [])
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
 
@@ -145,9 +150,27 @@ export function MultiObjectSelector({
     })
 
     const products: DetectedProduct[] = []
+    const newCorrections: DetectionCorrection[] = []
 
     for (const obj of detectedObjects) {
-      if (!selectedIds.has(obj.id)) continue
+      const isSelected = selectedIds.has(obj.id)
+      const editedName = editingNames.get(obj.id)
+      const wasNameEdited = editedName && editedName !== obj.name
+
+      const correction: DetectionCorrection = {
+        id: `${obj.id}-${Date.now()}`,
+        timestamp: Date.now(),
+        originalProductName: obj.name,
+        correctedProductName: wasNameEdited ? editedName : null,
+        wasAccepted: isSelected,
+        confidence: obj.confidence,
+        imageData,
+        boundingBox: obj.boundingBox,
+        rejectionReason: !isSelected ? 'irrelevant' : undefined,
+      }
+      newCorrections.push(correction)
+
+      if (!isSelected) continue
 
       const box = {
         x: obj.boundingBox.x * img.width,
@@ -180,12 +203,14 @@ export function MultiObjectSelector({
 
       products.push({
         id: obj.id,
-        name: obj.name,
+        name: editedName || obj.name,
         confidence: obj.confidence,
         boundingBox: obj.boundingBox,
         croppedImageData,
       })
     }
+
+    setCorrections((prev) => [...(prev || []), ...newCorrections])
 
     onSelectProducts(products)
     onClose()
@@ -249,6 +274,8 @@ export function MultiObjectSelector({
             {detectedObjects.map((obj) => {
               const isSelected = selectedIds.has(obj.id)
               const price = individualPrices.get(obj.id) || 0
+              const editedName = editingNames.get(obj.id)
+              const displayName = editedName !== undefined ? editedName : obj.name
 
               return (
                 <motion.div
@@ -274,8 +301,24 @@ export function MultiObjectSelector({
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="text-fg font-semibold text-sm truncate">{obj.name}</p>
-                      <p className="text-s4 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={displayName}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            const newNames = new Map(editingNames)
+                            newNames.set(obj.id, e.target.value)
+                            setEditingNames(newNames)
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-7 text-xs font-semibold bg-bg border-s2"
+                          placeholder="Edit product name"
+                        />
+                        {editedName && editedName !== obj.name && (
+                          <PencilSimple size={14} className="text-amber flex-shrink-0" weight="bold" />
+                        )}
+                      </div>
+                      <p className="text-s4 text-xs mt-1">
                         {Math.round(obj.confidence * 100)}% confidence
                       </p>
                     </div>
