@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
+import { ThemeToggle } from '../ThemeToggle'
 import { cn } from '@/lib/utils'
 import type { ScannedItem } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
@@ -166,16 +167,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
             <h1 className="text-xl font-black tracking-tight">LISTING QUEUE</h1>
             <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">{queueItems.length} Items Pending</p>
           </div>
-          {unanalyzedItems.length > 0 && onBatchAnalyze && (
-            <Button
-              onClick={onBatchAnalyze}
-              disabled={isBatchAnalyzing}
-              className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-sm h-10 px-4 shadow-lg active:scale-95 transition-all"
-            >
-              <Lightning size={18} weight="fill" className="mr-2" />
-              {isBatchAnalyzing ? 'Analyzing...' : `Analyze ${unanalyzedItems.length}`}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            {unanalyzedItems.length > 0 && onBatchAnalyze && (
+              <Button
+                onClick={onBatchAnalyze}
+                disabled={isBatchAnalyzing}
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-sm h-10 px-4 shadow-lg active:scale-95 transition-all"
+              >
+                <Lightning size={18} weight="fill" className="mr-2" />
+                {isBatchAnalyzing ? 'Analyzing...' : `Analyze ${unanalyzedItems.length}`}
+              </Button>
+            )}
+          </div>
         </div>
         
         <div className="px-0 pt-2 mb-4">

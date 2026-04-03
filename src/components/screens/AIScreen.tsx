@@ -10,6 +10,7 @@ import { DecisionSignal } from './DecisionSignal'
 import { MarketDataPanel } from '../MarketDataPanel'
 import { GoogleLensResults } from '../GoogleLensResults'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
+import { ThemeToggle } from '../ThemeToggle'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
 
@@ -45,7 +46,10 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
               <p className="text-[10px] text-t2 font-medium">Gemini 3 Flash · Grounded</p>
             </div>
           </div>
-          <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
+          </div>
         </div>
         <div className="tab-bar">
           <button

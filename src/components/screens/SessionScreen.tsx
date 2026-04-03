@@ -2,6 +2,7 @@ import { Play, Stop, CheckCircle, XCircle } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { ThemeToggle } from '../ThemeToggle'
 import type { Session } from '@/types'
 
 interface SessionScreenProps {
@@ -19,11 +20,14 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
 
   return (
     <div id="scr-session" className="flex flex-col h-full px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-black tracking-tight">TODAY'S SESSION</h1>
-        <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-black tracking-tight">TODAY'S SESSION</h1>
+          <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+          </p>
+        </div>
+        <ThemeToggle />
       </div>
 
       {!session?.active ? (

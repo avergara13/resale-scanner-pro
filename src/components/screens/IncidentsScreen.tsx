@@ -1,4 +1,5 @@
 import { IncidentResponsePanel } from '../IncidentResponsePanel'
+import { ThemeToggle } from '../ThemeToggle'
 import type { AppSettings } from '@/types'
 
 interface IncidentsScreenProps {
@@ -8,9 +9,12 @@ interface IncidentsScreenProps {
 export function IncidentsScreen({ settings }: IncidentsScreenProps) {
   return (
     <div id="scr-incidents" className="flex flex-col h-full">
-      <div className="px-4 py-6 border-b border-s2 bg-s1">
-        <h1 className="text-2xl font-semibold text-fg mb-2">Incident Response</h1>
-        <p className="text-sm text-s4">Automatic remediation and playbook management</p>
+      <div className="px-4 py-6 border-b border-s2 bg-s1 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-fg mb-2">Incident Response</h1>
+          <p className="text-sm text-s4">Automatic remediation and playbook management</p>
+        </div>
+        <ThemeToggle />
       </div>
 
       <div className="flex-1 overflow-auto px-4 py-6 pb-24">

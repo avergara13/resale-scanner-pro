@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
+import { ThemeToggle } from '../ThemeToggle'
 import { toast } from 'sonner'
 import type { ChatMessage } from '@/types'
 
@@ -136,9 +137,12 @@ export function ResearchScreen() {
 
   return (
     <div className="flex flex-col h-full bg-bg">
-      <div className="bg-t4 border-b border-s2 px-4 py-3 flex items-center gap-2">
-        <Robot size={24} weight="duotone" className="text-b1" />
-        <h1 className="text-lg font-semibold text-fg">AI Research Center</h1>
+      <div className="bg-t4 border-b border-s2 px-4 py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Robot size={24} weight="duotone" className="text-b1" />
+          <h1 className="text-lg font-semibold text-fg">AI Research Center</h1>
+        </div>
+        <ThemeToggle />
       </div>
 
       <Tabs defaultValue="chat" className="flex-1 flex flex-col">

@@ -25,6 +25,7 @@ import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
 import { IncidentLogViewer } from '../IncidentLogViewer'
 import { DetectionHistoryViewer } from '../DetectionHistoryViewer'
 import { FalsePositiveAnalyzerPanel } from '../FalsePositiveAnalyzer'
+import { ThemeToggle } from '../ThemeToggle'
 import type { AppSettings } from '@/types'
 
 interface SettingsScreenProps {
@@ -54,9 +55,13 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
   return (
     <div id="scr-settings" className="flex flex-col h-full">
-      <div className="px-4 py-6 border-b border-s2 bg-s1">
-        <h1 className="text-2xl font-semibold text-fg mb-2">Settings</h1>
-        <p className="text-sm text-s4">Configure AI models, APIs, and business rules</p>
+      <div className="px-4 py-6 border-b border-s2 bg-s1 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-fg mb-2">Settings</h1>
+          <p className="text-sm text-s4">Configure AI models, APIs, and business rules</p>
+        </div>
+        <ThemeToggle />
+      </div>
         
         <div className="flex flex-wrap gap-2 mt-4">
           <Badge variant={aiConfigured ? "default" : "secondary"} className="gap-1.5">
