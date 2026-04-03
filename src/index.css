@@ -1240,7 +1240,6 @@ button:disabled {
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--b1), transparent);
   transform: translateX(-100%);
-@keyframes pipeline-sweep {
 }
 
 @keyframes pipeline-sweep {
