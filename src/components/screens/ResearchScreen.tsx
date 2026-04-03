@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ThemeToggle } from '../ThemeToggle'
+import { ChatSearchDialog } from '../ChatSearchDialog'
 import { useTabPreference } from '@/hooks/use-tab-preference'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -185,6 +186,7 @@ export function ResearchScreen() {
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [showSearchDialog, setShowSearchDialog] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const activeSession = chatSessions?.find(s => s.id === activeSessionId)
@@ -352,6 +354,27 @@ Format your response to be easy to read and visually scannable.`
     }
   }, [activeSessionId, handleCreateSession, handleSendMessage])
 
+  const handleSelectSearchResult = useCallback((sessionId: string, messageId: string) => {
+    setChatSessions((prev) => 
+      (prev || []).map(s => ({ ...s, isActive: s.id === sessionId }))
+    )
+    setActiveSessionId(sessionId)
+    setActiveTab('chat')
+    
+    setTimeout(() => {
+      const messageElement = document.getElementById(`message-${messageId}`)
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        messageElement.classList.add('ring-2', 'ring-amber', 'rounded-2xl')
+        setTimeout(() => {
+          messageElement.classList.remove('ring-2', 'ring-amber', 'rounded-2xl')
+        }, 2000)
+      }
+    }, 300)
+    
+    toast.success('Jumped to message')
+  }, [setChatSessions, setActiveSessionId, setActiveTab])
+
   const handleMarketResearch = useCallback(async () => {
     if (!searchQuery.trim()) {
       toast.error('Enter a product or category to research')
@@ -475,7 +498,18 @@ Use bullet points, bold headings, and specific percentages where possible.`
           </div>
           <h1 className="text-base font-bold text-t1">AI Research Center</h1>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setShowSearchDialog(true)}
+            className="h-9 w-9 text-t2 hover:text-b1 hover:bg-blue-bg"
+            title="Search messages"
+          >
+            <MagnifyingGlass size={20} weight="bold" />
+          </Button>
+          <ThemeToggle />
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="flex-1 flex flex-col min-h-0">
@@ -598,7 +632,8 @@ Use bullet points, bold headings, and specific percentages where possible.`
               {chatMessages.map((msg) => (
                 <div
                   key={msg.id}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  id={`message-${msg.id}`}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} transition-all`}
                 >
                   <div
                     className={cn(
@@ -876,6 +911,13 @@ Use bullet points, bold headings, and specific percentages where possible.`
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ChatSearchDialog
+        isOpen={showSearchDialog}
+        onClose={() => setShowSearchDialog(false)}
+        chatSessions={chatSessions || []}
+        onSelectMessage={handleSelectSearchResult}
+      />
     </div>
   )
 }
