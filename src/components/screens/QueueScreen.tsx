@@ -1,10 +1,17 @@
 import { useState } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp } from '@phosphor-icons/react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import type { ScannedItem } from '@/types'
 
@@ -17,9 +24,11 @@ interface QueueScreenProps {
 }
 
 type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
+type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc'
 
 export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnalyze, isBatchAnalyzing }: QueueScreenProps) {
   const [filter, setFilter] = useState<FilterOption>('ALL')
+  const [sortBy, setSortBy] = useState<SortOption>('profit-desc')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   
   const filteredItems = queueItems.filter(item => {
@@ -30,7 +39,24 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnal
     return true
   })
   
-  const sortedItems = [...filteredItems].sort((a, b) => (b.profitMargin || 0) - (a.profitMargin || 0))
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    switch (sortBy) {
+      case 'profit-desc':
+        return (b.profitMargin || 0) - (a.profitMargin || 0)
+      case 'profit-asc':
+        return (a.profitMargin || 0) - (b.profitMargin || 0)
+      case 'date-desc':
+        return b.timestamp - a.timestamp
+      case 'date-asc':
+        return a.timestamp - b.timestamp
+      case 'category-asc':
+        return (a.category || 'Uncategorized').localeCompare(b.category || 'Uncategorized')
+      case 'category-desc':
+        return (b.category || 'Uncategorized').localeCompare(a.category || 'Uncategorized')
+      default:
+        return 0
+    }
+  })
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
   const analyzedItems = queueItems.filter(item => item.productName && item.productName !== 'Quick Draft')
   
@@ -182,6 +208,24 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnal
               Pending ({pendingCount})
             </Button>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-3">
+          <ArrowsDownUp size={16} weight="bold" className="text-s4" />
+          <span className="text-xs font-medium text-s4">Sort by:</span>
+          <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+            <SelectTrigger className="h-8 text-xs font-medium border-s2 bg-bg text-fg w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="profit-desc" className="text-xs">Profit (High to Low)</SelectItem>
+              <SelectItem value="profit-asc" className="text-xs">Profit (Low to High)</SelectItem>
+              <SelectItem value="date-desc" className="text-xs">Date (Newest First)</SelectItem>
+              <SelectItem value="date-asc" className="text-xs">Date (Oldest First)</SelectItem>
+              <SelectItem value="category-asc" className="text-xs">Category (A to Z)</SelectItem>
+              <SelectItem value="category-desc" className="text-xs">Category (Z to A)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         
         {filteredItems.length > 0 && (
