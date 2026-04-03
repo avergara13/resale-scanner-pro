@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Funnel, X, CaretDown, CalendarBlank, CurrencyDollar } from '@phosphor-icons/react'
+import { Funnel, X, CaretDown, CalendarBlank, CurrencyDollar, BookmarkSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
+import { FilterPresetsDialog } from '@/components/FilterPresetsDialog'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 
@@ -32,6 +33,7 @@ interface AdvancedFiltersProps {
   priceMin?: number
   priceMax?: number
   className?: string
+  showPresets?: boolean
 }
 
 export function AdvancedFilters({
@@ -40,7 +42,8 @@ export function AdvancedFilters({
   availableCategories = [],
   priceMin = 0,
   priceMax = 1000,
-  className
+  className,
+  showPresets = true
 }: AdvancedFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [localFilters, setLocalFilters] = useState<AdvancedFilterOptions>(filters)
@@ -58,6 +61,12 @@ export function AdvancedFilters({
 
   const handleApply = () => {
     onFiltersChange(localFilters)
+    setIsOpen(false)
+  }
+
+  const handleApplyPreset = (presetFilters: AdvancedFilterOptions) => {
+    setLocalFilters(presetFilters)
+    onFiltersChange(presetFilters)
     setIsOpen(false)
   }
 
@@ -112,26 +121,42 @@ export function AdvancedFilters({
   }
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className={cn(
-            "h-9 px-3 gap-2 text-xs font-semibold border-s2 bg-fg hover:bg-s1 text-t2 hover:text-t1 transition-all relative",
-            activeFilterCount > 0 && "border-b1 text-b1 hover:text-b1",
-            className
-          )}
-        >
-          <Funnel size={16} weight="bold" />
-          <span>Filters</span>
-          {activeFilterCount > 0 && (
-            <Badge className="h-5 w-5 p-0 flex items-center justify-center bg-b1 text-white text-[10px] font-bold border-0">
-              {activeFilterCount}
-            </Badge>
-          )}
-          <CaretDown size={14} weight="bold" className={cn("transition-transform", isOpen && "rotate-180")} />
-        </Button>
-      </PopoverTrigger>
+    <div className="flex items-center gap-2">
+      {showPresets && (
+        <FilterPresetsDialog
+          currentFilters={filters}
+          onApplyPreset={handleApplyPreset}
+          trigger={
+            <Button
+              variant="outline"
+              className="h-9 px-3 gap-2 text-xs font-semibold border-s2 bg-fg hover:bg-s1 text-t2 hover:text-t1"
+            >
+              <BookmarkSimple size={16} weight="bold" />
+              <span>Presets</span>
+            </Button>
+          }
+        />
+      )}
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              "h-9 px-3 gap-2 text-xs font-semibold border-s2 bg-fg hover:bg-s1 text-t2 hover:text-t1 transition-all relative",
+              activeFilterCount > 0 && "border-b1 text-b1 hover:text-b1",
+              className
+            )}
+          >
+            <Funnel size={16} weight="bold" />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <Badge className="h-5 w-5 p-0 flex items-center justify-center bg-b1 text-white text-[10px] font-bold border-0">
+                {activeFilterCount}
+              </Badge>
+            )}
+            <CaretDown size={14} weight="bold" className={cn("transition-transform", isOpen && "rotate-180")} />
+          </Button>
+        </PopoverTrigger>
       <PopoverContent 
         className="w-[340px] p-0 bg-fg border-s2 shadow-2xl" 
         align="end"
@@ -331,5 +356,6 @@ export function AdvancedFilters({
         </div>
       </PopoverContent>
     </Popover>
+    </div>
   )
 }
