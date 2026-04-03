@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -771,7 +771,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           {sortBy !== 'manual' && (
             <div className="bg-gradient-to-r from-b1/10 to-amber/10 border border-b1/30 rounded-lg px-3 py-2.5 flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-b1 animate-pulse flex-shrink-0" />
-              <span className="text-xs text-t1 font-bold">
+              <span className="text-xs text-t1 font-bold flex-1">
                 Active: {sortBy === 'profit-desc' && '↓ Profit (High to Low)'}
                 {sortBy === 'profit-asc' && '↑ Profit (Low to High)'}
                 {sortBy === 'date-desc' && '↓ Date (Newest First)'}
@@ -783,6 +783,18 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 {sortBy === 'tag-name-asc' && '↑ Tag Name (A to Z)'}
                 {sortBy === 'tag-name-desc' && '↓ Tag Name (Z to A)'}
               </span>
+              <Button
+                onClick={() => {
+                  setSortBy('manual')
+                  toast.success('Switched to manual ordering')
+                }}
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs font-bold text-b1 hover:bg-b1/20 hover:text-b1 flex-shrink-0"
+              >
+                <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
+                Reset
+              </Button>
             </div>
           )}
           {sortBy !== 'manual' && onReorder && (
