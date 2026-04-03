@@ -1,4 +1,4 @@
-import { ChartBar, Sparkle, Stack, Gear, Camera } from '@phosphor-icons/react'
+import { ChartBar, Sparkle, Stack, Gear, Camera, Robot } from '@phosphor-icons/react'
 import type { Screen } from '@/types'
 
 interface BottomNavProps {
@@ -10,7 +10,7 @@ interface BottomNavProps {
 export function BottomNav({ currentScreen, onNavigate, onCameraOpen }: BottomNavProps) {
   const navItems = [
     { id: 'session' as Screen, icon: ChartBar, label: 'Session' },
-    { id: 'ai' as Screen, icon: Sparkle, label: 'AI' },
+    { id: 'research' as Screen, icon: Robot, label: 'Research' },
     { id: 'queue' as Screen, icon: Stack, label: 'Queue' },
     { id: 'settings' as Screen, icon: Gear, label: 'Settings' },
   ]
@@ -25,15 +25,15 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen }: BottomNav
         {navItems.map((item, idx) => {
           const Icon = item.icon
           const isActive = currentScreen === item.id
-          const isCenter = idx === 1
+          const isCameraSlot = idx === 2
           
           return (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all ${
+              className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all ${
                 isActive ? 'text-b1' : 'text-s3'
-              } ${isCenter ? 'opacity-0 pointer-events-none' : ''}`}
+              } ${isCameraSlot ? 'opacity-0 pointer-events-none' : ''}`}
               style={{ minWidth: '44px', minHeight: '44px' }}
             >
               {isActive && (

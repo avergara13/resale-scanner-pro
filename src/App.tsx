@@ -5,6 +5,7 @@ import { BottomNav } from './components/BottomNav'
 import { CameraOverlay } from './components/CameraOverlay'
 import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
+import { ResearchScreen } from './components/screens/ResearchScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
 import { createEbayService } from './lib/ebay-service'
@@ -302,6 +303,9 @@ function App() {
           onStartSession={handleStartSession}
           onEndSession={handleEndSession}
         />
+      )}
+      {screen === 'research' && (
+        <ResearchScreen />
       )}
       {screen === 'ai' && (
         <AIScreen
