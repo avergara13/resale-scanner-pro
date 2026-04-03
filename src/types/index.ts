@@ -225,6 +225,15 @@ export interface ChatMessage {
   timestamp: number
 }
 
+export interface ChatSession {
+  id: string
+  name: string
+  createdAt: number
+  lastMessageAt: number
+  messages: ChatMessage[]
+  isActive: boolean
+}
+
 export interface EbayListing {
   itemId: string
   title: string

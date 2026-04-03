@@ -1,6 +1,21 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { MagnifyingGlass, Lightbulb, ChartLine, Robot, Sparkle, TrendUp, MapPin, Globe, CaretDown, CaretUp } from '@phosphor-icons/react'
+import { 
+  MagnifyingGlass, 
+  Lightbulb, 
+  ChartLine, 
+  Robot, 
+  Sparkle, 
+  TrendUp, 
+  MapPin, 
+  Globe, 
+  CaretDown, 
+  CaretUp,
+  Plus,
+  Trash,
+  ChatsCircle,
+  DotsThreeVertical
+} from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -10,7 +25,20 @@ import { ThemeToggle } from '../ThemeToggle'
 import { useTabPreference } from '@/hooks/use-tab-preference'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import type { ChatMessage } from '@/types'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import type { ChatSession, ChatMessage } from '@/types'
 
 interface ResearchTask {
   id: string
@@ -20,6 +48,55 @@ interface ResearchTask {
   timestamp: number
   result?: string
 }
+
+interface QuickExample {
+  emoji: string
+  label: string
+  question: string
+}
+
+const QUICK_EXAMPLES: QuickExample[] = [
+  {
+    emoji: '👟',
+    label: 'Sneaker Trends',
+    question: 'What are the most profitable sneaker brands and styles to resell right now?'
+  },
+  {
+    emoji: '📱',
+    label: 'Electronics Guide',
+    question: 'What electronics have the best resale value and fastest turnover?'
+  },
+  {
+    emoji: '👕',
+    label: 'Vintage Clothing',
+    question: 'How do I identify valuable vintage clothing and price it correctly?'
+  },
+  {
+    emoji: '🎮',
+    label: 'Gaming Market',
+    question: 'Which retro games and consoles have the highest profit margins?'
+  },
+  {
+    emoji: '📚',
+    label: 'Book Resale',
+    question: 'What types of books are worth buying for resale and where to sell them?'
+  },
+  {
+    emoji: '💎',
+    label: 'Luxury Items',
+    question: 'How can I authenticate and price luxury handbags and accessories?'
+  },
+  {
+    emoji: '🏠',
+    label: 'Home Decor',
+    question: 'What home decor items have strong resale demand and good margins?'
+  },
+  {
+    emoji: '⚡',
+    label: 'Quick Flips',
+    question: 'What items can I flip quickly for profit within 1-3 days?'
+  },
+]
 
 function formatMessage(text: string): string {
   let formatted = text
@@ -95,31 +172,107 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
 
 export function ResearchScreen() {
   const [activeTab, setActiveTab] = useTabPreference<'chat' | 'research' | 'insights'>('research-screen', 'chat')
-  const [chatMessages, setChatMessages] = useKV<ChatMessage[]>('research-chat', [])
+  const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
+  const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
   const [researchTasks, setResearchTasks] = useKV<ResearchTask[]>('research-tasks', [])
   const [input, setInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [showNewSessionDialog, setShowNewSessionDialog] = useState(false)
+  const [newSessionName, setNewSessionName] = useState('')
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const handleSendMessage = useCallback(async () => {
-    if (!input.trim() || isProcessing) return
+  const activeSession = chatSessions?.find(s => s.id === activeSessionId)
+  const chatMessages = activeSession?.messages || []
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages])
+
+  const handleCreateSession = useCallback(() => {
+    const name = newSessionName.trim() || `Chat ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+    
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      name,
+      createdAt: Date.now(),
+      lastMessageAt: Date.now(),
+      messages: [],
+      isActive: true,
+    }
+
+    setChatSessions((prev) => {
+      const updated = (prev || []).map(s => ({ ...s, isActive: false }))
+      return [newSession, ...updated]
+    })
+    
+    setActiveSessionId(newSession.id)
+    setNewSessionName('')
+    setShowNewSessionDialog(false)
+    toast.success('New chat session created')
+  }, [newSessionName, setChatSessions, setActiveSessionId])
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    setChatSessions((prev) => {
+      const filtered = (prev || []).filter(s => s.id !== sessionId)
+      return filtered
+    })
+    
+    if (activeSessionId === sessionId) {
+      const remaining = (chatSessions || []).filter(s => s.id !== sessionId)
+      if (remaining.length > 0) {
+        setActiveSessionId(remaining[0].id)
+      } else {
+        setActiveSessionId(null)
+      }
+    }
+    
+    toast.success('Chat session deleted')
+  }, [chatSessions, activeSessionId, setChatSessions, setActiveSessionId])
+
+  const handleSwitchSession = useCallback((sessionId: string) => {
+    setChatSessions((prev) => 
+      (prev || []).map(s => ({ ...s, isActive: s.id === sessionId }))
+    )
+    setActiveSessionId(sessionId)
+  }, [setChatSessions, setActiveSessionId])
+
+  const handleSendMessage = useCallback(async (messageText?: string) => {
+    const text = messageText || input.trim()
+    if (!text || isProcessing) return
+
+    if (!activeSessionId) {
+      handleCreateSession()
+      setTimeout(() => {
+        setInput(text)
+      }, 100)
+      return
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: text,
       timestamp: Date.now(),
     }
 
-    setChatMessages((prev) => [...(prev || []), userMessage])
-    const messageText = input.trim()
-    setInput('')
+    setChatSessions((prev) => 
+      (prev || []).map(s => 
+        s.id === activeSessionId 
+          ? { ...s, messages: [...s.messages, userMessage], lastMessageAt: Date.now() }
+          : s
+      )
+    )
+    
+    if (!messageText) {
+      setInput('')
+    }
     setIsProcessing(true)
 
     try {
       const prompt = `You are an expert e-commerce resale advisor helping users maximize their resale profits.
 
-User Question: ${messageText}
+User Question: ${text}
 
 Please provide a clear, well-formatted response following these guidelines:
 - Use bullet points for lists (use - or • symbols)
@@ -141,14 +294,31 @@ Format your response to be easy to read and visually scannable.`
         timestamp: Date.now(),
       }
 
-      setChatMessages((prev) => [...(prev || []), assistantMessage])
+      setChatSessions((prev) => 
+        (prev || []).map(s => 
+          s.id === activeSessionId 
+            ? { ...s, messages: [...s.messages, assistantMessage], lastMessageAt: Date.now() }
+            : s
+        )
+      )
     } catch (error) {
       console.error('Chat error:', error)
       toast.error('Failed to get response')
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, setChatMessages])
+  }, [input, isProcessing, activeSessionId, setChatSessions, handleCreateSession])
+
+  const handleExampleClick = useCallback((question: string) => {
+    if (!activeSessionId) {
+      handleCreateSession()
+      setTimeout(() => {
+        handleSendMessage(question)
+      }, 100)
+    } else {
+      handleSendMessage(question)
+    }
+  }, [activeSessionId, handleCreateSession, handleSendMessage])
 
   const handleMarketResearch = useCallback(async () => {
     if (!searchQuery.trim()) {
@@ -293,19 +463,94 @@ Use bullet points, bold headings, and specific percentages where possible.`
         </TabsList>
 
         <TabsContent value="chat" className="flex-1 flex flex-col mt-0 min-h-0 data-[state=active]:flex">
+          {chatSessions && chatSessions.length > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-fg border-b border-s2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex-1 justify-between bg-bg border-s2 text-t1 hover:bg-s1">
+                    <span className="flex items-center gap-2 truncate">
+                      <ChatsCircle size={16} weight="fill" className="text-b1 flex-shrink-0" />
+                      <span className="truncate">{activeSession?.name || 'Select Session'}</span>
+                    </span>
+                    <CaretDown size={14} weight="bold" className="ml-2 flex-shrink-0" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[420px]">
+                  {chatSessions.map((session) => (
+                    <DropdownMenuItem
+                      key={session.id}
+                      onClick={() => handleSwitchSession(session.id)}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm truncate">{session.name}</div>
+                        <div className="text-xs text-t3">
+                          {session.messages.length} message{session.messages.length !== 1 ? 's' : ''}
+                          {' • '}
+                          {new Date(session.lastMessageAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 flex-shrink-0 text-red hover:text-red hover:bg-red-bg"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteSession(session.id)
+                        }}
+                      >
+                        <Trash size={14} weight="bold" />
+                      </Button>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <Button
+                size="icon"
+                onClick={() => setShowNewSessionDialog(true)}
+                className="h-9 w-9 bg-b1 hover:bg-b2 text-white flex-shrink-0"
+              >
+                <Plus size={18} weight="bold" />
+              </Button>
+            </div>
+          )}
+
           <ScrollArea className="flex-1 px-4">
             <div className="space-y-3 py-4">
-              {chatMessages && chatMessages.length === 0 && (
-                <div className="text-center py-16 px-4">
+              {chatMessages.length === 0 && (
+                <div className="text-center py-8 px-4">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-bg mb-4">
                     <Robot size={32} weight="duotone" className="text-b1" />
                   </div>
-                  <h3 className="font-bold text-t1 mb-2">AI Assistant Ready</h3>
-                  <p className="text-sm text-t2 max-w-xs mx-auto">Ask me anything about resale strategy, market trends, or pricing insights.</p>
+                  <h3 className="font-bold text-t1 mb-2 text-lg">AI Assistant Ready</h3>
+                  <p className="text-sm text-t2 max-w-xs mx-auto mb-6">Ask me anything about resale strategy, market trends, or pricing insights.</p>
+                  
+                  <div className="space-y-2 max-w-md mx-auto">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-t3 mb-3">Quick Examples</h4>
+                    {QUICK_EXAMPLES.map((example) => (
+                      <button
+                        key={example.question}
+                        onClick={() => handleExampleClick(example.question)}
+                        className="w-full text-left p-3 bg-fg border border-s2 rounded-xl hover:border-b1 hover:bg-blue-bg transition-all group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="text-2xl flex-shrink-0">{example.emoji}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-bold text-t1 mb-0.5">{example.label}</div>
+                            <div className="text-xs text-t3 line-clamp-1">{example.question}</div>
+                          </div>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                            <Sparkle size={16} weight="fill" className="text-b1" />
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               
-              {chatMessages && chatMessages.map((msg) => (
+              {chatMessages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -338,6 +583,8 @@ Use bullet points, bold headings, and specific percentages where possible.`
                   </div>
                 </div>
               )}
+              
+              <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
 
@@ -352,7 +599,7 @@ Use bullet points, bold headings, and specific percentages where possible.`
                 disabled={isProcessing}
               />
               <Button
-                onClick={handleSendMessage}
+                onClick={() => handleSendMessage()}
                 disabled={!input.trim() || isProcessing}
                 size="icon"
                 className="h-11 w-11 bg-b1 hover:bg-b2 text-white disabled:opacity-50"
@@ -518,6 +765,31 @@ Use bullet points, bold headings, and specific percentages where possible.`
           </ScrollArea>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={showNewSessionDialog} onOpenChange={setShowNewSessionDialog}>
+        <DialogContent className="bg-fg border-s2">
+          <DialogHeader>
+            <DialogTitle className="text-t1">New Chat Session</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={newSessionName}
+              onChange={(e) => setNewSessionName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateSession()}
+              placeholder="Session name (optional)"
+              className="bg-bg border-s2 text-t1"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewSessionDialog(false)} className="border-s2 text-t2">
+              Cancel
+            </Button>
+            <Button onClick={handleCreateSession} className="bg-b1 hover:bg-b2 text-white">
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
