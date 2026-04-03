@@ -1,0 +1,82 @@
+name: Wire + Deploy
+
+# Fires every time Spark publishes to main.
+# Applies all integration wiring, then pushes to deploy/production.
+# Railway watches deploy/production — never main.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # allows manual trigger from GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  wire-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Apply wiring
+        run: node scripts/apply-wiring.mjs
+        env:
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+
+      - name: Check if wiring changed anything
+        id: diff
+        run: |
+          git diff --quiet && echo "changed=false" >> $GITHUB_OUTPUT \
+            || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit wiring if changed
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name  "Loft OS Architect"
+          git config user.email "architect@vergara-inc.com"
+          git add -A
+          git commit -m "ci: apply integration wiring [skip ci]"
+
+      - name: Push to deploy/production
+        run: |
+          git config user.name  "Loft OS Architect"
+          git config user.email "architect@vergara-inc.com"
+          git push origin HEAD:deploy/production --force
+        
+      - name: Notify n8n on success
+        if: success()
+        continue-on-error: true
+        run: |
+          curl -s -X POST "${{ secrets.N8N_DEPLOY_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "status": "success",
+              "branch": "deploy/production",
+              "sha": "${{ github.sha }}",
+              "message": "${{ github.event.head_commit.message }}",
+              "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+            }'
+
+      - name: Notify n8n on failure
+        if: failure()
+        continue-on-error: true
+        run: |
+          curl -s -X POST "${{ secrets.N8N_DEPLOY_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "status": "failed",
+              "branch": "deploy/production",
+              "sha": "${{ github.sha }}",
+              "message": "${{ github.event.head_commit.message }}",
+              "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+            }'
