@@ -686,12 +686,20 @@ function App() {
       x: 0,
       scale: 1,
       filter: 'blur(0px)'
+    },
+    exit: (direction: number) => ({
+      opacity: 0,
+      x: direction > 0 ? -60 : 60,
       scale: 0.96,
       filter: 'blur(4px)'
     })
   }
 
-      filter: 'blur(4px)'
+  const screenOrder: Record<Screen, number> = {
+    'session': 0,
+    'ai': 1,
+    'research': 2,
+    'queue': 3,
     'incidents': 4,
     'settings': 5,
     'listing': 6,
@@ -701,10 +709,10 @@ function App() {
 
   const [prevScreen, setPrevScreen] = useState<Screen>(screen)
   const direction = screenOrder[screen] - screenOrder[prevScreen]
-    'settings': 5,
-    'listing': 6,
-    'chat': 7,
-    'history': 8
+
+  useEffect(() => {
+    setPrevScreen(screen)
+  }, [screen])
 
   return (
     <div 
