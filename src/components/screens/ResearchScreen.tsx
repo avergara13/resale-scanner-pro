@@ -810,8 +810,8 @@ Use bullet points, bold headings, and specific percentages where possible.`
                 <h3 className="font-bold text-t1 mb-3 text-sm">Market Intelligence</h3>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-3 bg-bg rounded-lg border border-s2">
-      </Tabs>       <span className="text-sm font-medium text-t1">Today's Hot Categories</span>
-
+                    <span className="text-sm font-medium text-t1">Today's Hot Categories</span>
+                    <span className="text-xs font-mono font-bold text-b1 bg-blue-bg px-2 py-1 rounded">Clothing</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-bg rounded-lg border border-s2">
                     <span className="text-sm font-medium text-t1">Avg. Sell-Through Rate</span>
