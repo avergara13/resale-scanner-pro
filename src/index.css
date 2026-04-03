@@ -38,6 +38,8 @@
   --analyzing-color: oklch(0.70 0.18 75);
   --success-color: oklch(0.55 0.20 145);
   --fail-color: oklch(0.55 0.22 25);
+  
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark {
@@ -70,6 +72,8 @@
   --analyzing-color: oklch(0.82 0.18 75);
   --success-color: oklch(0.68 0.20 145);
   --fail-color: oklch(0.68 0.22 25);
+  
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @theme {
@@ -109,13 +113,27 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
-  transition-property: background-color, border-color, color;
-  transition-duration: 0.3s;
-  transition-timing-function: ease;
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-duration: 0.4s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.no-theme-transition,
+.no-theme-transition * {
+  transition: none !important;
+}
+
+button,
+input,
+textarea,
+select {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow, transform, opacity;
+  transition-duration: 0.4s, 0.4s, 0.4s, 0.4s, 0.4s, 0.4s, 0.15s, 0.15s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .font-mono {
@@ -163,6 +181,8 @@ input, textarea, select {
   border-radius: 12px;
   border: 1px solid var(--s2);
   backdrop-filter: blur(8px);
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tab-btn {
@@ -173,7 +193,8 @@ input, textarea, select {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   border-radius: 10px;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   color: var(--t3);
   background: transparent;
   position: relative;
@@ -223,7 +244,9 @@ input, textarea, select {
   border-radius: 16px;
   border: 1px solid var(--s1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.01);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
+              background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
@@ -257,7 +280,9 @@ input, textarea, select {
   border: 1px solid var(--s1);
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
@@ -292,7 +317,9 @@ input, textarea, select {
   border-radius: 14px;
   border: 1px solid var(--s2);
   background: var(--fg);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -543,6 +570,9 @@ input, textarea, select {
   color: var(--t1);
   border-bottom-left-radius: 6px;
   max-width: 100%;
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes bubble-shine {
@@ -601,7 +631,8 @@ input, textarea, select {
   border-radius: 12px;
   position: relative;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
 }
 
@@ -650,6 +681,9 @@ select:focus {
   box-shadow: 0 0 0 4px rgba(85, 92, 226, 0.12), 0 2px 8px rgba(85, 92, 226, 0.08);
   transform: translateY(-1px);
   background: var(--fg);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 button:not(:disabled) {
