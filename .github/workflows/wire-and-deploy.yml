@@ -1,21 +1,22 @@
 name: Wire + Deploy
 
-# Fires every time Spark publishes to main.
-# Applies all integration wiring, then pushes to deploy/production.
-# Railway watches deploy/production — never main.
-
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # allows manual trigger from GitHub UI
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+env:
+  NOTION_VERSION: "2022-06-28"
+  LIVE_ACTIVITY_PAGE_ID: "337f99e853ab81929ebbed2fc770352b"
+  PRODUCT_HUB_PAGE_ID: "336f99e853ab8131b63ee475e3805b02"
+
 jobs:
   wire-and-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -28,10 +29,34 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Notion — mark deploy in progress
+        if: ${{ secrets.NOTION_API_KEY != '' }}
+        continue-on-error: true
+        run: |
+          TIMESTAMP=$(date -u +"%B %d, %Y at %H:%M UTC")
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          MSG=$(echo '${{ github.event.head_commit.message }}' | head -c 80)
+
+          curl -s -X PATCH \
+            "https://api.notion.com/v1/pages/${{ env.LIVE_ACTIVITY_PAGE_ID }}" \
+            -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+            -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"properties\": {
+                \"title\": {
+                  \"title\": [{
+                    \"text\": { \"content\": \"📡 Resale Scanner Pro — Live Activity\" }
+                  }]
+                }
+              }
+            }"
+
       - name: Apply wiring
         run: node scripts/apply-wiring.mjs
         env:
-          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_DATABASE_ID: ${{ vars.NOTION_DATABASE_ID }}
 
       - name: Check if wiring changed anything
         id: diff
@@ -48,35 +73,73 @@ jobs:
           git commit -m "ci: apply integration wiring [skip ci]"
 
       - name: Push to deploy/production
+        id: push
         run: |
           git config user.name  "Loft OS Architect"
           git config user.email "architect@vergara-inc.com"
           git push origin HEAD:deploy/production --force
-        
-      - name: Notify n8n on success
-        if: success()
+          echo "deployed=true" >> $GITHUB_OUTPUT
+
+      - name: Notion — update Live Activity on SUCCESS
+        if: success() && steps.push.outputs.deployed == 'true'
         continue-on-error: true
         run: |
-          curl -s -X POST "${{ secrets.N8N_DEPLOY_WEBHOOK }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "status": "success",
-              "branch": "deploy/production",
-              "sha": "${{ github.sha }}",
-              "message": "${{ github.event.head_commit.message }}",
-              "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
-            }'
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          TIMESTAMP=$(date -u +"%b %d %Y %H:%M UTC")
+          AUTHOR="${{ github.event.head_commit.author.name }}"
+          MSG=$(echo '${{ github.event.head_commit.message }}' | cut -c1-100)
 
-      - name: Notify n8n on failure
+          # Append a deploy log block to the Live Activity page
+          curl -s -X PATCH \
+            "https://api.notion.com/v1/blocks/${{ env.LIVE_ACTIVITY_PAGE_ID }}/children" \
+            -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+            -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"children\": [{
+                \"object\": \"block\",
+                \"type\": \"callout\",
+                \"callout\": {
+                  \"icon\": { \"type\": \"emoji\", \"emoji\": \"✅\" },
+                  \"color\": \"green_background\",
+                  \"rich_text\": [{
+                    \"type\": \"text\",
+                    \"text\": {
+                      \"content\": \"DEPLOYED · ${TIMESTAMP} · ${SHORT_SHA} · ${MSG}\"
+                    }
+                  }]
+                }
+              }]
+            }"
+
+      - name: Notion — update Live Activity on FAILURE
         if: failure()
         continue-on-error: true
         run: |
-          curl -s -X POST "${{ secrets.N8N_DEPLOY_WEBHOOK }}" \
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          TIMESTAMP=$(date -u +"%b %d %Y %H:%M UTC")
+          MSG=$(echo '${{ github.event.head_commit.message }}' | cut -c1-100)
+
+          curl -s -X PATCH \
+            "https://api.notion.com/v1/blocks/${{ env.LIVE_ACTIVITY_PAGE_ID }}/children" \
+            -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+            -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "status": "failed",
-              "branch": "deploy/production",
-              "sha": "${{ github.sha }}",
-              "message": "${{ github.event.head_commit.message }}",
-              "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
-            }'
+            -d "{
+              \"children\": [{
+                \"object\": \"block\",
+                \"type\": \"callout\",
+                \"callout\": {
+                  \"icon\": { \"type\": \"emoji\", \"emoji\": \"❌\" },
+                  \"color\": \"red_background\",
+                  \"rich_text\": [{
+                    \"type\": \"text\",
+                    \"text\": {
+                      \"content\": \"FAILED · ${TIMESTAMP} · ${SHORT_SHA} · ${MSG}\"
+                    }
+                  }]
+                }
+              }]
+            }"
