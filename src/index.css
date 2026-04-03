@@ -33,6 +33,11 @@
   
   --border: var(--s2);
   --radius: 0.625rem;
+  
+  --capture-color: oklch(0.55 0.15 250);
+  --analyzing-color: oklch(0.75 0.15 75);
+  --success-color: oklch(0.60 0.17 145);
+  --fail-color: oklch(0.58 0.20 25);
 }
 
 @theme {
@@ -539,4 +544,184 @@ button:disabled {
     transform: scale(1.05);
     opacity: 0.9;
   }
+}
+
+@keyframes color-pulse-capture {
+  0% {
+    box-shadow: 0 0 0 0 var(--capture-color);
+  }
+  50% {
+    box-shadow: 0 0 0 20px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes color-pulse-analyzing {
+  0%, 100% {
+    box-shadow: 0 0 20px var(--analyzing-color), 0 0 40px var(--analyzing-color);
+  }
+  50% {
+    box-shadow: 0 0 30px var(--analyzing-color), 0 0 60px var(--analyzing-color);
+  }
+}
+
+@keyframes color-pulse-success {
+  0% {
+    box-shadow: 0 0 0 0 var(--success-color);
+  }
+  50% {
+    box-shadow: 0 0 0 30px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes color-pulse-fail {
+  0% {
+    box-shadow: 0 0 0 0 var(--fail-color);
+  }
+  50% {
+    box-shadow: 0 0 0 30px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes bg-flash-capture {
+  0% {
+    background-color: var(--bg);
+  }
+  50% {
+    background-color: oklch(0.85 0.08 250);
+  }
+  100% {
+    background-color: var(--bg);
+  }
+}
+
+@keyframes bg-flash-analyzing {
+  0%, 100% {
+    background-color: var(--bg);
+  }
+  50% {
+    background-color: oklch(0.95 0.05 75);
+  }
+}
+
+@keyframes bg-flash-success {
+  0% {
+    background-color: var(--bg);
+  }
+  50% {
+    background-color: oklch(0.90 0.08 145);
+  }
+  100% {
+    background-color: var(--bg);
+  }
+}
+
+@keyframes bg-flash-fail {
+  0% {
+    background-color: var(--bg);
+  }
+  50% {
+    background-color: oklch(0.92 0.08 25);
+  }
+  100% {
+    background-color: var(--bg);
+  }
+}
+
+@keyframes border-color-capture {
+  0%, 100% {
+    border-color: var(--s2);
+  }
+  50% {
+    border-color: var(--capture-color);
+  }
+}
+
+@keyframes border-color-analyzing {
+  0%, 100% {
+    border-color: var(--analyzing-color);
+  }
+  50% {
+    border-color: oklch(0.85 0.18 75);
+  }
+}
+
+@keyframes border-color-success {
+  0% {
+    border-color: var(--s2);
+  }
+  50% {
+    border-color: var(--success-color);
+  }
+  100% {
+    border-color: var(--s2);
+  }
+}
+
+@keyframes border-color-fail {
+  0% {
+    border-color: var(--s2);
+  }
+  50% {
+    border-color: var(--fail-color);
+  }
+  100% {
+    border-color: var(--s2);
+  }
+}
+
+.capture-flash {
+  animation: bg-flash-capture 0.3s ease-out;
+}
+
+.analyzing-flash {
+  animation: bg-flash-analyzing 2s ease-in-out infinite;
+}
+
+.success-flash {
+  animation: bg-flash-success 0.6s ease-out;
+}
+
+.fail-flash {
+  animation: bg-flash-fail 0.6s ease-out;
+}
+
+.capture-pulse {
+  animation: color-pulse-capture 0.6s ease-out;
+}
+
+.analyzing-pulse {
+  animation: color-pulse-analyzing 2s ease-in-out infinite;
+}
+
+.success-pulse {
+  animation: color-pulse-success 0.8s ease-out;
+}
+
+.fail-pulse {
+  animation: color-pulse-fail 0.8s ease-out;
+}
+
+.border-capture {
+  animation: border-color-capture 0.6s ease-out;
+}
+
+.border-analyzing {
+  animation: border-color-analyzing 2s ease-in-out infinite;
+}
+
+.border-success {
+  animation: border-color-success 0.8s ease-out;
+}
+
+.border-fail {
+  animation: border-color-fail 0.8s ease-out;
 }

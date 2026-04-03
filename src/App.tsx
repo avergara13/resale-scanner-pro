@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
 import { BottomNav } from './components/BottomNav'
@@ -15,9 +15,11 @@ import { createEbayService } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createObjectDetectionService } from './lib/object-detection-service'
+import { useCaptureState } from './hooks/use-capture-state'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { Screen, ScannedItem, PipelineStep, Session, AppSettings } from './types'
+import { cn } from './lib/utils'
 
 function App() {
   const [screen, setScreen] = useState<Screen>('ai')
@@ -26,6 +28,8 @@ function App() {
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
+  
+  const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -72,6 +76,7 @@ function App() {
   }, [settings?.geminiApiKey, settings?.preferredAiModel])
 
   const handleCapture = useCallback(async (imageData: string, price: number) => {
+    triggerCapture()
     setCameraOpen(false)
     
     const newItem: ScannedItem = {
@@ -93,6 +98,8 @@ function App() {
       { id: 'decision', label: 'Decision', status: 'pending' },
     ]
     setPipeline(steps)
+    
+    startAnalyzing()
     
     try {
       let visionResult: GeminiVisionResponse | undefined
@@ -257,6 +264,12 @@ function App() {
       
       const minMargin = settings?.minProfitMargin || 30
       const decision = profitMetrics.profitMargin > minMargin ? 'GO' : 'PASS'
+      
+      if (decision === 'GO') {
+        triggerSuccess()
+      } else {
+        triggerFail()
+      }
       
       setPipeline(prev => prev.map((s, i) => 
         i === 3 ? { 
@@ -577,8 +590,23 @@ function App() {
     toast.success(`Analyzed ${processedCount} items: ${goCount} GO, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
+  useEffect(() => {
+    if (!cameraOpen) {
+      reset()
+    }
+  }, [cameraOpen, reset])
+
   return (
-    <div id="app-container" className="relative">
+    <div 
+      id="app-container" 
+      className={cn(
+        "relative transition-colors duration-300",
+        captureState === 'capturing' && "capture-flash",
+        captureState === 'analyzing' && "analyzing-flash",
+        captureState === 'success' && "success-flash",
+        captureState === 'fail' && "fail-flash"
+      )}
+    >
       <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
       
       {screen === 'session' && (
@@ -628,6 +656,7 @@ function App() {
         currentScreen={screen}
         onNavigate={setScreen}
         onCameraOpen={() => setCameraOpen(true)}
+        captureState={captureState}
       />
 
       <CameraOverlay

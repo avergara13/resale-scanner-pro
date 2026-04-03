@@ -1,14 +1,16 @@
 import { ChartBar, Robot, Stack, Gear, Eye } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import type { Screen } from '@/types'
+import type { CaptureState } from '@/hooks/use-capture-state'
 
 interface BottomNavProps {
   currentScreen: Screen
   onNavigate: (screen: Screen) => void
   onCameraOpen: () => void
+  captureState?: CaptureState
 }
 
-export function BottomNav({ currentScreen, onNavigate, onCameraOpen }: BottomNavProps) {
+export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureState = 'idle' }: BottomNavProps) {
   const items: Array<{ id: Screen; icon: any; label: string }> = [
     { id: 'session', icon: ChartBar, label: 'Session' },
     { id: 'research', icon: Robot, label: 'AI Center' },
@@ -102,12 +104,30 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen }: BottomNav
         </div>
         
         <div className="absolute left-1/2 -translate-x-1/2 -top-5 z-50">
-          <div className="absolute inset-0 w-16 h-16 rounded-full bg-b1/30 animate-[pulse-ring_2s_ease-out_infinite]" style={{ minWidth: '64px', minHeight: '64px' }} />
-          <div className="absolute inset-0 w-16 h-16 rounded-full bg-amber/20 animate-[pulse-ring_2s_ease-out_infinite_0.5s]" style={{ minWidth: '64px', minHeight: '64px' }} />
+          <div className={cn(
+            "absolute inset-0 w-16 h-16 rounded-full animate-[pulse-ring_2s_ease-out_infinite] transition-all",
+            captureState === 'capturing' && "capture-pulse",
+            captureState === 'analyzing' && "analyzing-pulse bg-amber/40",
+            captureState === 'success' && "success-pulse bg-green/40",
+            captureState === 'fail' && "fail-pulse bg-red/40",
+            captureState === 'idle' && "bg-b1/30"
+          )} style={{ minWidth: '64px', minHeight: '64px' }} />
+          <div className={cn(
+            "absolute inset-0 w-16 h-16 rounded-full animate-[pulse-ring_2s_ease-out_infinite_0.5s] transition-all",
+            captureState === 'analyzing' && "bg-amber/20",
+            captureState === 'idle' && "bg-amber/20"
+          )} style={{ minWidth: '64px', minHeight: '64px' }} />
           <button
             id="camera-fab"
             onClick={onCameraOpen}
-            className="camera-fab-animated relative w-16 h-16 text-white rounded-full shadow-[0_8px_24px_rgba(85,92,226,0.4),0_4px_8px_rgba(0,0,0,0.15)] border-[5px] border-fg flex items-center justify-center transition-all active:scale-95 hover:scale-110 hover:shadow-[0_12px_32px_rgba(85,92,226,0.5),0_6px_12px_rgba(0,0,0,0.2)] overflow-hidden"
+            className={cn(
+              "camera-fab-animated relative w-16 h-16 text-white rounded-full border-[5px] border-fg flex items-center justify-center transition-all active:scale-95 hover:scale-110 overflow-hidden",
+              captureState === 'capturing' && "capture-pulse",
+              captureState === 'analyzing' && "analyzing-pulse shadow-[0_8px_24px_rgba(193,124,95,0.4),0_4px_8px_rgba(0,0,0,0.15)]",
+              captureState === 'success' && "success-pulse shadow-[0_8px_24px_rgba(125,185,110,0.4),0_4px_8px_rgba(0,0,0,0.15)]",
+              captureState === 'fail' && "fail-pulse shadow-[0_8px_24px_rgba(220,85,75,0.4),0_4px_8px_rgba(0,0,0,0.15)]",
+              captureState === 'idle' && "shadow-[0_8px_24px_rgba(85,92,226,0.4),0_4px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_12px_32px_rgba(85,92,226,0.5),0_6px_12px_rgba(0,0,0,0.2)]"
+            )}
             style={{ minWidth: '64px', minHeight: '64px' }}
           >
             <Eye size={28} weight="bold" className="relative z-10 drop-shadow-md" />
