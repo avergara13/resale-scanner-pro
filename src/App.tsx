@@ -7,6 +7,7 @@ import { ConnectionHealthMonitor } from './components/ConnectionHealthMonitor'
 import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { ResearchScreen } from './components/screens/ResearchScreen'
+import { IncidentsScreen } from './components/screens/IncidentsScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
 import { createEbayService } from './lib/ebay-service'
@@ -359,6 +360,9 @@ function App() {
       )}
       {screen === 'research' && (
         <ResearchScreen />
+      )}
+      {screen === 'incidents' && (
+        <IncidentsScreen settings={settings} />
       )}
       {screen === 'ai' && (
         <AIScreen
