@@ -768,10 +768,27 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               </SelectContent>
             </Select>
           </div>
+          {sortBy !== 'manual' && (
+            <div className="bg-gradient-to-r from-b1/10 to-amber/10 border border-b1/30 rounded-lg px-3 py-2.5 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-b1 animate-pulse flex-shrink-0" />
+              <span className="text-xs text-t1 font-bold">
+                Active: {sortBy === 'profit-desc' && '↓ Profit (High to Low)'}
+                {sortBy === 'profit-asc' && '↑ Profit (Low to High)'}
+                {sortBy === 'date-desc' && '↓ Date (Newest First)'}
+                {sortBy === 'date-asc' && '↑ Date (Oldest First)'}
+                {sortBy === 'category-asc' && '↑ Category (A to Z)'}
+                {sortBy === 'category-desc' && '↓ Category (Z to A)'}
+                {sortBy === 'tag-count-desc' && '↓ Tag Count (Most First)'}
+                {sortBy === 'tag-count-asc' && '↑ Tag Count (Least First)'}
+                {sortBy === 'tag-name-asc' && '↑ Tag Name (A to Z)'}
+                {sortBy === 'tag-name-desc' && '↓ Tag Name (Z to A)'}
+              </span>
+            </div>
+          )}
           {sortBy !== 'manual' && onReorder && (
-            <div className="bg-blue-bg border border-b1/30 rounded-lg px-3 py-2 flex items-center gap-2">
-              <DotsSixVertical size={14} weight="bold" className="text-b1 flex-shrink-0" />
-              <span className="text-xs text-t1 font-medium">
+            <div className="bg-s1 border border-s2 rounded-lg px-3 py-2 flex items-center gap-2">
+              <DotsSixVertical size={14} weight="bold" className="text-s3 flex-shrink-0" />
+              <span className="text-xs text-t2 font-medium">
                 Drag items to switch to manual ordering
               </span>
             </div>
