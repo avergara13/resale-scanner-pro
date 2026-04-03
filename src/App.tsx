@@ -718,7 +718,7 @@ function App() {
     <div 
       id="app-container" 
       className={cn(
-        "relative transition-colors duration-300 overflow-hidden min-h-screen",
+        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-[480px] mx-auto",
         captureState === 'capturing' && "capture-flash",
         captureState === 'analyzing' && "analyzing-flash",
         captureState === 'success' && "success-flash",
@@ -727,7 +727,7 @@ function App() {
     >
       <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
       
-      <div className="relative" style={{ minHeight: 'calc(100vh - 80px)' }}>
+      <div className="flex-1 relative w-full" style={{ minHeight: 'calc(100vh - 80px)' }}>
         <AnimatePresence mode="wait" custom={direction}>
           {screen === 'session' && (
             <motion.div
@@ -738,7 +738,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute inset-0 w-full"
+              className="w-full h-full"
             >
               <SessionScreen
                 session={session}
@@ -756,7 +756,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute inset-0 w-full"
+              className="w-full h-full"
             >
               <ResearchScreen />
             </motion.div>
@@ -770,7 +770,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute inset-0 w-full"
+              className="w-full h-full"
             >
               <IncidentsScreen settings={settings} />
             </motion.div>
@@ -784,7 +784,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute inset-0 w-full"
+              className="w-full h-full"
             >
               <AIScreen
                 currentItem={currentItem}
@@ -805,7 +805,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute inset-0 w-full"
+              className="w-full h-full"
             >
               <QueueScreen
                 queueItems={queue || []}
@@ -827,7 +827,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute inset-0 w-full"
+              className="w-full h-full"
             >
               <SettingsScreen
                 settings={settings}
@@ -838,7 +838,7 @@ function App() {
         </AnimatePresence>
       </div>
 
-      <div style={{ height: '80px' }} />
+      <div className="h-[80px] flex-shrink-0" />
 
       <BottomNav
         currentScreen={screen}

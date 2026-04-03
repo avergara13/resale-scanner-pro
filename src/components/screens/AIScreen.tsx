@@ -283,9 +283,10 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
 
     try {
       const contextData = buildAIContext()
-      const fullPrompt = `You are an AI assistant specialized in resale business analysis. You have access to the following app context:\n\n${contextData}\n\nUser question: ${chatInput}\n\nProvide a helpful, concise response based on the context. If analyzing an item, reference specific data from the current analysis. Be professional but conversational.`
+      const promptText = `You are an AI assistant specialized in resale business analysis. You have access to the following app context:\n\n${contextData}\n\nUser question: ${chatInput}\n\nProvide a helpful, concise response based on the context. If analyzing an item, reference specific data from the current analysis. Be professional but conversational.`
+      const prompt = window.spark.llmPrompt([promptText] as any, contextData, chatInput)
 
-      const response = await window.spark.llm(fullPrompt, settings?.preferredAiModel || 'gpt-4o')
+      const response = await window.spark.llm(promptText, settings?.preferredAiModel || 'gpt-4o')
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -312,19 +313,19 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
   }, [chatInput, isSendingMessage, buildAIContext, settings?.preferredAiModel])
 
   return (
-    <div id="scr-ai" className="flex flex-col h-full bg-bg">
-      <div id="ai-topbar" className="p-4 border-b border-s2 bg-fg sticky top-0 z-10 shadow-sm">
+    <div className="flex flex-col w-full h-full min-h-screen bg-bg">
+      <div className="flex-shrink-0 p-3 sm:p-4 border-b border-s2 bg-fg sticky top-0 z-10 shadow-sm">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-gradient-to-br from-b1 to-amber text-white rounded-lg flex items-center justify-center shadow-md">
-              <Robot size={20} weight="fill" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-b1 to-amber text-white rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+              <Robot size={18} weight="fill" className="sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="font-bold text-base text-t1">AI Command Center</h2>
-              <p className="text-[10px] text-t3 font-medium tracking-wide">Powered by {settings?.preferredAiModel || 'Gemini'}</p>
+            <div className="min-w-0">
+              <h2 className="font-bold text-sm sm:text-base text-t1 truncate">AI Command Center</h2>
+              <p className="text-[9px] sm:text-[10px] text-t3 font-medium tracking-wide truncate">Powered by {settings?.preferredAiModel || 'Gemini'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <ThemeToggle />
             <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
           </div>
@@ -334,69 +335,71 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
             onClick={() => setTab('analysis')}
             className={cn('tab-btn', tab === 'analysis' && 'active')}
           >
-            📊 ANALYSIS
+            <span className="hidden sm:inline">📊 ANALYSIS</span>
+            <span className="sm:hidden">📊 ANALYZE</span>
           </button>
           <button
             onClick={() => setTab('chat')}
             className={cn('tab-btn', tab === 'chat' && 'active')}
           >
-            💬 AI CHAT
+            <span className="hidden sm:inline">💬 AI CHAT</span>
+            <span className="sm:hidden">💬 CHAT</span>
           </button>
         </div>
       </div>
 
-      <ScrollArea id="ai-panel" className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         {tab === 'analysis' ? (
-          <div className="p-4 space-y-4 pb-32">
+          <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-40 sm:pb-44">
             {pipeline.length === 0 ? (
-              <div className="space-y-6">
-                <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-4">
-                    <Scan size={40} strokeWidth={1.5} className="text-b1" />
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-3 sm:mb-4">
+                    <Scan size={32} strokeWidth={1.5} className="text-b1 sm:w-10 sm:h-10" />
                   </div>
-                  <h3 className="text-lg font-bold text-t1 mb-2">Ready to Analyze</h3>
-                  <p className="text-sm text-t3 max-w-xs">Tap the camera button below to scan an item and start AI analysis</p>
+                  <h3 className="text-base sm:text-lg font-bold text-t1 mb-1.5 sm:mb-2">Ready to Analyze</h3>
+                  <p className="text-xs sm:text-sm text-t3 max-w-xs">Tap the camera button below to scan an item and start AI analysis</p>
                 </div>
-                <div className="px-4">
+                <div className="px-2 sm:px-4">
                   <ApiStatusIndicator settings={settings} />
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <OverallProgress steps={pipeline} />
                 <PipelinePanel steps={pipeline} />
                 
                 {hasDecision && decision && (
-                  <div className="mt-4">
+                  <div className="mt-3 sm:mt-4">
                     <DecisionSignal decision={decision} item={currentItem} />
                   </div>
                 )}
 
                 {hasDecision && currentItem && (
-                  <div className="mt-4 p-4 bg-fg border border-s2 rounded-xl space-y-3">
-                    <h3 className="text-sm font-bold uppercase tracking-wide text-t2">QUICK SUMMARY</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-bg rounded-lg">
-                        <p className="text-xs text-t3 mb-1">Buy Price</p>
-                        <p className="text-lg font-mono font-bold text-t1">${currentItem.purchasePrice.toFixed(2)}</p>
+                  <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border border-s2 rounded-xl space-y-2.5 sm:space-y-3">
+                    <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t2">QUICK SUMMARY</h3>
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                      <div className="p-2.5 sm:p-3 bg-bg rounded-lg">
+                        <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Buy Price</p>
+                        <p className="text-base sm:text-lg font-mono font-bold text-t1">${currentItem.purchasePrice.toFixed(2)}</p>
                       </div>
-                      <div className="p-3 bg-bg rounded-lg">
-                        <p className="text-xs text-t3 mb-1">Sell Price</p>
-                        <p className="text-lg font-mono font-bold text-t1">${currentItem.estimatedSellPrice?.toFixed(2) || '--'}</p>
+                      <div className="p-2.5 sm:p-3 bg-bg rounded-lg">
+                        <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Sell Price</p>
+                        <p className="text-base sm:text-lg font-mono font-bold text-t1">${currentItem.estimatedSellPrice?.toFixed(2) || '--'}</p>
                       </div>
-                      <div className="p-3 bg-bg rounded-lg">
-                        <p className="text-xs text-t3 mb-1">Profit Margin</p>
+                      <div className="p-2.5 sm:p-3 bg-bg rounded-lg">
+                        <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
                         <p className={cn(
-                          "text-lg font-mono font-bold",
+                          "text-base sm:text-lg font-mono font-bold",
                           (currentItem.profitMargin || 0) > 50 ? "text-green" :
                           (currentItem.profitMargin || 0) > 20 ? "text-amber" : "text-red"
                         )}>
                           {currentItem.profitMargin?.toFixed(1) || '--'}%
                         </p>
                       </div>
-                      <div className="p-3 bg-bg rounded-lg">
-                        <p className="text-xs text-t3 mb-1">Net Profit</p>
-                        <p className="text-lg font-mono font-bold text-t1">
+                      <div className="p-2.5 sm:p-3 bg-bg rounded-lg">
+                        <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
+                        <p className="text-base sm:text-lg font-mono font-bold text-t1">
                           ${((currentItem.estimatedSellPrice || 0) - currentItem.purchasePrice).toFixed(2)}
                         </p>
                       </div>
@@ -413,12 +416,12 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                 )}
                 
                 {currentItem?.imageData && (
-                  <div className="mt-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wide text-t2 mb-2 px-1">SCANNED IMAGE</h3>
+                  <div className="mt-3 sm:mt-4">
+                    <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t2 mb-2 px-0.5 sm:px-1">SCANNED IMAGE</h3>
                     <img
                       src={currentItem.imageData}
                       alt="Scanned item"
-                      className="w-full rounded-xl border-2 border-s2 shadow-md"
+                      className="w-full rounded-lg sm:rounded-xl border-2 border-s2 shadow-md"
                     />
                   </div>
                 )}
@@ -426,31 +429,31 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
             )}
           </div>
         ) : (
-          <div className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatScrollRef}>
+          <div className="flex flex-col min-h-full pb-32 sm:pb-36">
+            <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4" ref={chatScrollRef}>
               {chatMessages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-4">
-                    <Sparkle size={40} weight="duotone" className="text-b1" />
+                <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-3 sm:mb-4">
+                    <Sparkle size={32} weight="duotone" className="text-b1 sm:w-10 sm:h-10" />
                   </div>
-                  <h3 className="text-lg font-bold text-t1 mb-2">AI Assistant Ready</h3>
-                  <p className="text-sm text-t3 max-w-xs mb-4">Ask questions about the current analysis, get insights, or request market advice</p>
+                  <h3 className="text-base sm:text-lg font-bold text-t1 mb-1.5 sm:mb-2">AI Assistant Ready</h3>
+                  <p className="text-xs sm:text-sm text-t3 max-w-xs mb-3 sm:mb-4">Ask questions about the current analysis, get insights, or request market advice</p>
                   <div className="space-y-2 w-full max-w-xs">
                     <button
                       onClick={() => setChatInput("What's the profit potential for this item?")}
-                      className="w-full p-3 bg-fg border border-s2 rounded-lg text-left text-xs text-t2 hover:border-b1 hover:bg-t4 transition-colors"
+                      className="w-full p-2.5 sm:p-3 bg-fg border border-s2 rounded-lg text-left text-[11px] sm:text-xs text-t2 hover:border-b1 hover:bg-t4 transition-colors"
                     >
                       💰 What's the profit potential?
                     </button>
                     <button
                       onClick={() => setChatInput("Should I negotiate the price down?")}
-                      className="w-full p-3 bg-fg border border-s2 rounded-lg text-left text-xs text-t2 hover:border-b1 hover:bg-t4 transition-colors"
+                      className="w-full p-2.5 sm:p-3 bg-fg border border-s2 rounded-lg text-left text-[11px] sm:text-xs text-t2 hover:border-b1 hover:bg-t4 transition-colors"
                     >
                       🤝 Should I negotiate?
                     </button>
                     <button
                       onClick={() => setChatInput("What are similar items selling for?")}
-                      className="w-full p-3 bg-fg border border-s2 rounded-lg text-left text-xs text-t2 hover:border-b1 hover:bg-t4 transition-colors"
+                      className="w-full p-2.5 sm:p-3 bg-fg border border-s2 rounded-lg text-left text-[11px] sm:text-xs text-t2 hover:border-b1 hover:bg-t4 transition-colors"
                     >
                       📊 What are market prices?
                     </button>
@@ -461,15 +464,15 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                   <div
                     key={msg.id}
                     className={cn(
-                      "max-w-[85%] rounded-xl p-3 shadow-sm",
+                      "max-w-[85%] rounded-xl p-2.5 sm:p-3 shadow-sm",
                       msg.role === 'user'
                         ? "ml-auto bg-gradient-to-br from-b1 to-b2 text-white"
                         : "bg-fg border border-s2 text-t1"
                     )}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                     <p className={cn(
-                      "text-xs mt-1.5",
+                      "text-[10px] sm:text-xs mt-1 sm:mt-1.5",
                       msg.role === 'user' ? "text-white/70" : "text-t3"
                     )}>
                       {new Date(msg.timestamp).toLocaleTimeString()}
@@ -478,33 +481,33 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                 ))
               )}
               {isSendingMessage && (
-                <div className="max-w-[85%] rounded-xl p-3 bg-fg border border-s2">
+                <div className="max-w-[85%] rounded-xl p-2.5 sm:p-3 bg-fg border border-s2">
                   <div className="flex items-center gap-2 text-t3">
                     <div className="loading-spinner" />
-                    <span className="text-sm">AI is thinking...</span>
+                    <span className="text-xs sm:text-sm">AI is thinking...</span>
                   </div>
                 </div>
               )}
             </div>
           </div>
         )}
-      </ScrollArea>
+      </div>
 
-      <div id="ai-input-bar" className="border-t border-s2 bg-fg/95 backdrop-blur-md z-20">
+      <div className="fixed bottom-[80px] left-0 right-0 max-w-[480px] mx-auto border-t border-s2 bg-fg/95 backdrop-blur-md z-20 safe-bottom">
         {tab === 'analysis' && hasDecision && (
-          <div className="p-3 border-b border-s2">
+          <div className="p-2.5 sm:p-3 border-b border-s2">
             <Button
               onClick={onAddToQueue}
-              className="w-full bg-gradient-to-r from-green to-green hover:opacity-90 text-white h-11 font-semibold shadow-lg"
+              className="w-full bg-gradient-to-r from-green to-green hover:opacity-90 text-white h-10 sm:h-11 font-semibold shadow-lg text-sm"
             >
-              <Plus size={20} weight="bold" className="mr-2" />
+              <Plus size={18} weight="bold" className="mr-1.5 sm:mr-2" />
               Add to Queue
             </Button>
           </div>
         )}
 
         {tab === 'chat' && (
-          <div className="p-3">
+          <div className="p-2.5 sm:p-3">
             <div className="flex gap-2">
               <Input
                 value={chatInput}
@@ -516,22 +519,22 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                   }
                 }}
                 placeholder="Ask AI anything..."
-                className="flex-1 h-11 bg-bg border-s2"
+                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-sm"
                 disabled={isSendingMessage}
               />
               <Button
                 onClick={handleSendMessage}
                 disabled={!chatInput.trim() || isSendingMessage}
-                className="bg-b1 hover:bg-b2 text-white h-11 w-11 p-0 flex-shrink-0"
+                className="bg-b1 hover:bg-b2 text-white h-10 sm:h-11 w-10 sm:w-11 p-0 flex-shrink-0"
               >
-                <PaperPlaneRight size={20} weight="bold" />
+                <PaperPlaneRight size={18} weight="bold" className="sm:w-5 sm:h-5" />
               </Button>
             </div>
           </div>
         )}
 
         {tab === 'analysis' && (
-          <div className="p-3 space-y-2.5">
+          <div className="p-2.5 sm:p-3 space-y-2">
             <div className="flex gap-2">
               <Input
                 id="ai-price"
@@ -540,7 +543,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                 placeholder="Buy $"
                 value={buyPrice}
                 onChange={(e) => setBuyPrice(e.target.value)}
-                className="w-24 h-10 font-mono bg-bg border-s2"
+                className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
               />
               <div className="flex-1 relative">
                 <Input
@@ -548,19 +551,19 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Add notes or description..."
-                  className="h-10 pr-10 bg-bg border-s2"
+                  className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
                 />
                 {isSupported && (
                   <button
                     onClick={() => startListening((text) => setDescription(text))}
                     className={cn(
-                      "absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                      "absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-colors",
                       isListening
                         ? "bg-red text-white animate-pulse"
                         : "bg-s1 hover:bg-s2 text-t3 hover:text-t1"
                     )}
                   >
-                    <Microphone size={16} weight="bold" />
+                    <Microphone size={14} weight="bold" className="sm:w-4 sm:h-4" />
                   </button>
                 )}
               </div>
@@ -572,9 +575,9 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                 onSaveDraft(price, description)
               }}
               disabled={!canSaveDraft}
-              className="w-full bg-t1 hover:bg-t2 text-white h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full bg-t1 hover:bg-t2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
             >
-              <FloppyDisk size={18} weight="bold" className="mr-2" />
+              <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
               SAVE DRAFT TO QUEUE
             </Button>
           </div>
