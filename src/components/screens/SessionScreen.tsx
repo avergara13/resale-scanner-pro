@@ -22,7 +22,7 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
     <div id="scr-session" className="flex flex-col h-full px-4 py-6">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-black tracking-tight">TODAY'S SESSION</h1>
+          <h1 className="text-xl font-black tracking-tight text-t1">TODAY'S SESSION</h1>
           <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </p>
@@ -54,7 +54,7 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
               <div className="text-[11px] text-t3 font-medium uppercase tracking-wider">Est. Profit</div>
             </div>
             <div className="stat-card flex-1">
-              <div className="text-[22px] font-bold leading-tight">{session.itemsScanned}</div>
+              <div className="text-[22px] font-bold text-t1 leading-tight">{session.itemsScanned}</div>
               <div className="text-[11px] text-t3 font-medium uppercase tracking-wider">Scans</div>
             </div>
             <div className="stat-card flex-1">

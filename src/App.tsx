@@ -718,7 +718,7 @@ function App() {
     <div 
       id="app-container" 
       className={cn(
-        "relative transition-colors duration-300 overflow-hidden",
+        "relative transition-colors duration-300 overflow-hidden min-h-screen",
         captureState === 'capturing' && "capture-flash",
         captureState === 'analyzing' && "analyzing-flash",
         captureState === 'success' && "success-flash",
@@ -727,114 +727,116 @@ function App() {
     >
       <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
       
-      <AnimatePresence mode="wait" custom={direction}>
-        {screen === 'session' && (
-          <motion.div
-            key="session"
-            custom={direction}
-            variants={screenVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute inset-0"
-          >
-            <SessionScreen
-              session={session}
-              onStartSession={handleStartSession}
-              onEndSession={handleEndSession}
-            />
-          </motion.div>
-        )}
-        {screen === 'research' && (
-          <motion.div
-            key="research"
-            custom={direction}
-            variants={screenVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute inset-0"
-          >
-            <ResearchScreen />
-          </motion.div>
-        )}
-        {screen === 'incidents' && (
-          <motion.div
-            key="incidents"
-            custom={direction}
-            variants={screenVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute inset-0"
-          >
-            <IncidentsScreen settings={settings} />
-          </motion.div>
-        )}
-        {screen === 'ai' && (
-          <motion.div
-            key="ai"
-            custom={direction}
-            variants={screenVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute inset-0"
-          >
-            <AIScreen
-              currentItem={currentItem}
-              pipeline={pipeline}
-              settings={settings}
-              onAddToQueue={handleAddToQueue}
-              onDeepSearch={() => toast.info('Deep search feature coming soon')}
-              onSaveDraft={handleSaveDraft}
-            />
-          </motion.div>
-        )}
-        {screen === 'queue' && (
-          <motion.div
-            key="queue"
-            custom={direction}
-            variants={screenVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute inset-0"
-          >
-            <QueueScreen
-              queueItems={queue || []}
-              onRemove={handleRemoveFromQueue}
-              onCreateListing={() => toast.info('Listing creation coming soon')}
-              onEdit={handleEditQueueItem}
-              onBatchAnalyze={handleBatchAnalyze}
-              isBatchAnalyzing={isBatchAnalyzing}
-              geminiService={geminiService}
-            />
-          </motion.div>
-        )}
-        {screen === 'settings' && settings && (
-          <motion.div
-            key="settings"
-            custom={direction}
-            variants={screenVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute inset-0"
-          >
-            <SettingsScreen
-              settings={settings}
-              onUpdate={handleUpdateSettings}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="relative" style={{ minHeight: 'calc(100vh - 80px)' }}>
+        <AnimatePresence mode="wait" custom={direction}>
+          {screen === 'session' && (
+            <motion.div
+              key="session"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="absolute inset-0 w-full"
+            >
+              <SessionScreen
+                session={session}
+                onStartSession={handleStartSession}
+                onEndSession={handleEndSession}
+              />
+            </motion.div>
+          )}
+          {screen === 'research' && (
+            <motion.div
+              key="research"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="absolute inset-0 w-full"
+            >
+              <ResearchScreen />
+            </motion.div>
+          )}
+          {screen === 'incidents' && (
+            <motion.div
+              key="incidents"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="absolute inset-0 w-full"
+            >
+              <IncidentsScreen settings={settings} />
+            </motion.div>
+          )}
+          {screen === 'ai' && (
+            <motion.div
+              key="ai"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="absolute inset-0 w-full"
+            >
+              <AIScreen
+                currentItem={currentItem}
+                pipeline={pipeline}
+                settings={settings}
+                onAddToQueue={handleAddToQueue}
+                onDeepSearch={() => toast.info('Deep search feature coming soon')}
+                onSaveDraft={handleSaveDraft}
+              />
+            </motion.div>
+          )}
+          {screen === 'queue' && (
+            <motion.div
+              key="queue"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="absolute inset-0 w-full"
+            >
+              <QueueScreen
+                queueItems={queue || []}
+                onRemove={handleRemoveFromQueue}
+                onCreateListing={() => toast.info('Listing creation coming soon')}
+                onEdit={handleEditQueueItem}
+                onBatchAnalyze={handleBatchAnalyze}
+                isBatchAnalyzing={isBatchAnalyzing}
+                geminiService={geminiService}
+              />
+            </motion.div>
+          )}
+          {screen === 'settings' && settings && (
+            <motion.div
+              key="settings"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="absolute inset-0 w-full"
+            >
+              <SettingsScreen
+                settings={settings}
+                onUpdate={handleUpdateSettings}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <div style={{ height: '80px' }} />
 
