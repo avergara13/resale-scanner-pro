@@ -59,7 +59,7 @@ interface QueueScreenProps {
 }
 
 type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
-type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc' | 'manual'
+type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc' | 'tag-count-desc' | 'tag-count-asc' | 'tag-name-asc' | 'tag-name-desc' | 'manual'
 
 interface SortableItemProps {
   item: ScannedItem
@@ -409,6 +409,20 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         return (a.category || 'Uncategorized').localeCompare(b.category || 'Uncategorized')
       case 'category-desc':
         return (b.category || 'Uncategorized').localeCompare(a.category || 'Uncategorized')
+      case 'tag-count-desc':
+        return (b.tags?.length || 0) - (a.tags?.length || 0)
+      case 'tag-count-asc':
+        return (a.tags?.length || 0) - (b.tags?.length || 0)
+      case 'tag-name-asc': {
+        const aFirstTag = a.tags?.[0] ? (allTags || []).find(t => t.id === a.tags![0])?.name || '' : ''
+        const bFirstTag = b.tags?.[0] ? (allTags || []).find(t => t.id === b.tags![0])?.name || '' : ''
+        return aFirstTag.localeCompare(bFirstTag)
+      }
+      case 'tag-name-desc': {
+        const aFirstTag = a.tags?.[0] ? (allTags || []).find(t => t.id === a.tags![0])?.name || '' : ''
+        const bFirstTag = b.tags?.[0] ? (allTags || []).find(t => t.id === b.tags![0])?.name || '' : ''
+        return bFirstTag.localeCompare(aFirstTag)
+      }
       default:
         return 0
     }
@@ -747,6 +761,10 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 <SelectItem value="date-asc" className="text-xs">Date (Oldest First)</SelectItem>
                 <SelectItem value="category-asc" className="text-xs">Category (A to Z)</SelectItem>
                 <SelectItem value="category-desc" className="text-xs">Category (Z to A)</SelectItem>
+                <SelectItem value="tag-count-desc" className="text-xs">Tag Count (Most First)</SelectItem>
+                <SelectItem value="tag-count-asc" className="text-xs">Tag Count (Least First)</SelectItem>
+                <SelectItem value="tag-name-asc" className="text-xs">Tag Name (A to Z)</SelectItem>
+                <SelectItem value="tag-name-desc" className="text-xs">Tag Name (Z to A)</SelectItem>
               </SelectContent>
             </Select>
           </div>
