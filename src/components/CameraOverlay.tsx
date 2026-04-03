@@ -1,18 +1,19 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { X, Lightning, Check, Scan, Crosshair } from '@phosphor-icons/react'
+import { X, Lightning, Check, Scan, Crosshair, MapPin } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useKV } from '@github/spark/hooks'
 import { ObjectDetectionService, DetectedObject, ObjectDetectionResult } from '@/lib/object-detection-service'
 import { MultiObjectSelector } from './MultiObjectSelector'
-import type { DetectedProduct, DetectionHistoryEntry } from '@/types'
+import { AddLocationDialog } from './AddLocationDialog'
+import type { DetectedProduct, DetectionHistoryEntry, ThriftStoreLocation } from '@/types'
 
 interface CameraOverlayProps {
   isOpen: boolean
   onClose: () => void
-  onCapture: (imageData: string, price: number) => void
-  onQuickDraft?: (imageData: string, price: number) => void
-  onMultiCapture?: (products: DetectedProduct[], baseImageData: string, totalPrice: number) => void
+  onCapture: (imageData: string, price: number, location?: ThriftStoreLocation) => void
+  onQuickDraft?: (imageData: string, price: number, location?: ThriftStoreLocation) => void
+  onMultiCapture?: (products: DetectedProduct[], baseImageData: string, totalPrice: number, location?: ThriftStoreLocation) => void
   objectDetectionService?: ObjectDetectionService | null
 }
 
@@ -34,6 +35,9 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onMult
   const [showMultiSelector, setShowMultiSelector] = useState(false)
   const [capturedImageForMulti, setCapturedImageForMulti] = useState<string>('')
   const [detectionHistory, setDetectionHistory] = useKV<DetectionHistoryEntry[]>('detection-history', [])
+  const [savedLocations, setSavedLocations] = useKV<ThriftStoreLocation[]>('saved-locations', [])
+  const [selectedLocation, setSelectedLocation] = useState<ThriftStoreLocation | undefined>(undefined)
+  const [showLocationDialog, setShowLocationDialog] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -46,6 +50,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onMult
       setQuickDraftMode(false)
       setDetectionEnabled(false)
       setDetectionResult(null)
+      setSelectedLocation(undefined)
     }
     return () => {
       stopCamera()
@@ -188,13 +193,13 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onMult
       }
       
       if (quickDraftMode && onQuickDraft) {
-        onQuickDraft(imageData, parseFloat(price) || 0)
+        onQuickDraft(imageData, parseFloat(price) || 0, selectedLocation)
         setDraftCount(prev => prev + 1)
         setShowCaptureFlash(true)
         setTimeout(() => setShowCaptureFlash(false), 300)
         setPrice('')
       } else {
-        onCapture(imageData, parseFloat(price) || 0)
+        onCapture(imageData, parseFloat(price) || 0, selectedLocation)
         setPrice('')
       }
     }
@@ -202,11 +207,20 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onMult
 
   const handleMultiProductsSelected = (products: DetectedProduct[]) => {
     if (onMultiCapture) {
-      onMultiCapture(products, capturedImageForMulti, parseFloat(price) || 0)
+      onMultiCapture(products, capturedImageForMulti, parseFloat(price) || 0, selectedLocation)
     }
     setShowMultiSelector(false)
     setCapturedImageForMulti('')
     setPrice('')
+  }
+
+  const handleLocationSave = (location: ThriftStoreLocation) => {
+    const exists = savedLocations?.find(loc => loc.id === location.id)
+    if (!exists) {
+      setSavedLocations((prev) => [...(prev || []), location])
+    }
+    setSelectedLocation(location)
+    setShowLocationDialog(false)
   }
 
   return (
@@ -349,15 +363,45 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onMult
 
           <div className="bg-black p-6 pb-10 flex flex-col gap-4">
             {mode === 'lens' && (
-              <input
-                id="camera-price"
-                type="number"
-                step="0.01"
-                placeholder="Enter price ($)"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="bg-white/10 text-white border border-white/20 rounded-lg h-12 px-4 text-base font-mono placeholder:text-white/40 outline-none focus:border-white/60"
-              />
+              <>
+                <input
+                  id="camera-price"
+                  type="number"
+                  step="0.01"
+                  placeholder="Enter price ($)"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="bg-white/10 text-white border border-white/20 rounded-lg h-12 px-4 text-base font-mono placeholder:text-white/40 outline-none focus:border-white/60"
+                />
+                
+                <button
+                  onClick={() => setShowLocationDialog(true)}
+                  className={cn(
+                    "flex items-center justify-between gap-2 px-4 py-3 rounded-lg border transition-all",
+                    selectedLocation
+                      ? "bg-green/20 border-green/40 text-white"
+                      : "bg-white/10 border-white/20 text-white/60"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <MapPin size={20} weight={selectedLocation ? 'fill' : 'regular'} />
+                    <span className="text-sm font-medium">
+                      {selectedLocation ? selectedLocation.name : 'Add Location (Optional)'}
+                    </span>
+                  </div>
+                  {selectedLocation && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedLocation(undefined)
+                      }}
+                      className="p-1 hover:bg-white/10 rounded-full transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </button>
+              </>
             )}
             
             {quickDraftMode && draftCount > 0 && (

@@ -22,7 +22,7 @@ import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation } from './types'
 import { cn } from './lib/utils'
 
 function App() {
@@ -116,7 +116,7 @@ function App() {
     ))
   }, [])
 
-  const handleCapture = useCallback(async (imageData: string, price: number) => {
+  const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation) => {
     triggerCapture()
     setCameraOpen(false)
     
@@ -127,6 +127,7 @@ function App() {
       purchasePrice: price,
       decision: 'PENDING',
       inQueue: false,
+      location,
     }
     setCurrentItem(newItem)
     setScreen('ai')
@@ -470,7 +471,7 @@ function App() {
     setScreen('queue')
   }, [currentItem, setQueue])
 
-  const handleQuickDraft = useCallback((imageData: string, price: number) => {
+  const handleQuickDraft = useCallback((imageData: string, price: number, location?: ThriftStoreLocation) => {
     const draftItem: ScannedItem = {
       id: Date.now().toString(),
       timestamp: Date.now(),
@@ -480,6 +481,7 @@ function App() {
       inQueue: true,
       productName: 'Quick Draft',
       description: 'Captured in quick draft mode - analyze later',
+      location,
     }
 
     setQueue((prev) => [...(prev || []), draftItem])
@@ -495,7 +497,7 @@ function App() {
     }
   }, [session, setSession, setQueue])
 
-  const handleMultiCapture = useCallback((products: import('@/types').DetectedProduct[], baseImageData: string, totalPrice: number) => {
+  const handleMultiCapture = useCallback((products: import('@/types').DetectedProduct[], baseImageData: string, totalPrice: number, location?: ThriftStoreLocation) => {
     const timestamp = Date.now()
     const parentId = `multi-${timestamp}`
     
@@ -514,6 +516,7 @@ function App() {
         isMultiProduct: true,
         parentItemId: parentId,
         detectedProducts: [product],
+        location,
       }
       
       setQueue((prev) => [...(prev || []), multiItem])
