@@ -146,18 +146,18 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="detection" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="detection" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   <ClockCounterClockwise size={18} />
                   Multi-Object Detection History
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-s4 leading-relaxed">
+                    <p className="text-xs text-t2 leading-relaxed">
                       Track multi-object detection accuracy over time. Review past scans, confirmed detections, and false positives to monitor AI performance.
                     </p>
                   </div>
@@ -167,8 +167,8 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="false-positives" className="border-2 border-b1 rounded-lg px-4 bg-gradient-to-br from-t4 to-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="false-positives" className="border-2 border-b1 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   <Target size={20} weight="duotone" className="text-b1" />
                   False Positive Analysis & Optimization
@@ -181,8 +181,8 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                       <Target size={20} weight="duotone" />
                     </div>
                     <div className="flex-1 space-y-2">
-                      <p className="text-sm font-semibold text-fg">Optimize Detection Accuracy</p>
-                      <p className="text-xs text-s4 leading-relaxed">
+                      <p className="text-sm font-semibold text-t1">Optimize Detection Accuracy</p>
+                      <p className="text-xs text-t2 leading-relaxed">
                         Review false positive patterns to improve multi-object detection. Analyze misidentifications, confidence distributions, and apply recommended thresholds to reduce errors.
                       </p>
                       <div className="flex flex-wrap gap-2 pt-1">
@@ -207,22 +207,22 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="ai" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="ai" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 AI Configuration
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-s4 leading-relaxed">
+                    <p className="text-xs text-t2 leading-relaxed">
                       Configure your preferred AI model. Gemini 2.0 Flash is recommended for cost-efficient real-time analysis.
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <Label htmlFor="ai-model" className="text-xs uppercase tracking-wide text-s4 mb-1.5">
+                  <Label htmlFor="ai-model" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
                     Preferred AI Model
                   </Label>
                   <Select 
@@ -243,12 +243,12 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="gemini-api-key" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="gemini-api-key" className="text-xs uppercase tracking-wide text-t2">
                       Google Gemini API Key
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('gemini')}
-                      className="text-s3 hover:text-fg"
+                      className="text-t2 hover:text-t1"
                     >
                       {showKeys.gemini ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -270,12 +270,12 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="anthropic-api-key" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="anthropic-api-key" className="text-xs uppercase tracking-wide text-t2">
                       Anthropic API Key (Backup)
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('anthropic')}
-                      className="text-s3 hover:text-fg"
+                      className="text-t2 hover:text-t1"
                     >
                       {showKeys.anthropic ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -292,16 +292,16 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="google" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="google" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 Google Cloud APIs
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
-                    <div className="text-xs text-s4 leading-relaxed space-y-2">
-                      <p className="font-medium text-fg">Quick Setup:</p>
+                    <div className="text-xs text-t2 leading-relaxed space-y-2">
+                      <p className="font-medium text-t1">Quick Setup:</p>
                       <ol className="list-decimal list-inside space-y-1 ml-1">
                         <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-b1 underline">console.cloud.google.com</a></li>
                         <li>Create a new project or select existing</li>
@@ -310,7 +310,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                         <li>Restrict key to enabled APIs only</li>
                         <li>Copy and paste the key below</li>
                       </ol>
-                      <p className="text-fg font-medium pt-1">
+                      <p className="text-t1 font-medium pt-1">
                         Need help? See <a href="https://github.com/yourusername/resale-scanner/blob/main/GOOGLE_CLOUD_SETUP.md" target="_blank" rel="noopener noreferrer" className="text-b1 underline">detailed setup guide</a>
                       </p>
                     </div>
@@ -319,12 +319,12 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="google-api-key" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="google-api-key" className="text-xs uppercase tracking-wide text-t2">
                       Google Cloud API Key
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('google')}
-                      className="text-s3 hover:text-fg"
+                      className="text-t2 hover:text-t1"
                     >
                       {showKeys.google ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -350,7 +350,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 </div>
 
                 <div>
-                  <Label htmlFor="google-search-engine-id" className="text-xs uppercase tracking-wide text-s4 mb-1.5">
+                  <Label htmlFor="google-search-engine-id" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
                     Custom Search Engine ID (Optional)
                   </Label>
                   <Input
@@ -361,32 +361,32 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     placeholder="Your Custom Search Engine ID"
                     className="font-mono text-sm"
                   />
-                  <p className="text-xs text-s4 mt-1">
+                  <p className="text-xs text-t2 mt-1">
                     For enhanced visual search. Get it from <a href="https://programmablesearchengine.google.com" target="_blank" rel="noopener noreferrer" className="text-b1 underline">programmablesearchengine.google.com</a>
                   </p>
                 </div>
 
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <p className="text-xs font-medium text-fg mb-2">What you get with Google Cloud APIs:</p>
-                  <ul className="text-xs text-s4 space-y-1 ml-4 list-disc">
-                    <li><span className="font-medium text-fg">Vision API:</span> Product identification from photos</li>
-                    <li><span className="font-medium text-fg">Custom Search:</span> Visual product matching across web</li>
-                    <li><span className="font-medium text-fg">Maps API:</span> Local market intelligence & store finder</li>
-                    <li><span className="font-medium text-fg">Places API:</span> Thrift store locations & ratings</li>
+                  <p className="text-xs font-medium text-t1 mb-2">What you get with Google Cloud APIs:</p>
+                  <ul className="text-xs text-t2 space-y-1 ml-4 list-disc">
+                    <li><span className="font-medium text-t1">Vision API:</span> Product identification from photos</li>
+                    <li><span className="font-medium text-t1">Custom Search:</span> Visual product matching across web</li>
+                    <li><span className="font-medium text-t1">Maps API:</span> Local market intelligence & store finder</li>
+                    <li><span className="font-medium text-t1">Places API:</span> Thrift store locations & ratings</li>
                   </ul>
                 </div>
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="ebay" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="ebay" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 eBay Integration
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-s4 leading-relaxed">
+                    <p className="text-xs text-t2 leading-relaxed">
                       Get your keys from developer.ebay.com. You'll need App ID, Dev ID, Cert ID, and OAuth token.
                     </p>
                   </div>
@@ -394,12 +394,12 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="ebay-app-id" className="text-xs uppercase tracking-wide text-s4">
+                    <Label htmlFor="ebay-app-id" className="text-xs uppercase tracking-wide text-t2">
                       eBay App ID (Client ID)
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('ebayApp')}
-                      className="text-s3 hover:text-fg"
+                      className="text-t2 hover:text-t1"
                     >
                       {showKeys.ebayApp ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
