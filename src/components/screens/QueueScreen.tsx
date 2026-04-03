@@ -220,8 +220,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               variant={filter === 'ALL' ? 'default' : 'outline'}
               className={`h-8 px-3 text-xs font-medium flex-shrink-0 ${
                 filter === 'ALL' 
-                  ? 'bg-b1 hover:bg-b2 text-bg border-0' 
-                  : 'border border-s2 bg-bg text-s4 hover:bg-s1 hover:text-fg'
+                  ? 'bg-b1 hover:bg-b2 text-white border-0' 
+                  : 'border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1'
               }`}
             >
               All ({queueItems.length})
@@ -232,8 +232,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               variant={filter === 'GO' ? 'default' : 'outline'}
               className={`h-8 px-3 text-xs font-medium flex-shrink-0 ${
                 filter === 'GO' 
-                  ? 'bg-green hover:bg-green text-bg border-0' 
-                  : 'border border-s2 bg-bg text-s4 hover:bg-green/10 hover:text-green'
+                  ? 'bg-green hover:bg-green text-white border-0' 
+                  : 'border border-s2 bg-transparent text-t2 hover:bg-green/10 hover:text-green'
               }`}
             >
               GO ({goCount})
@@ -244,8 +244,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               variant={filter === 'PASS' ? 'default' : 'outline'}
               className={`h-8 px-3 text-xs font-medium flex-shrink-0 ${
                 filter === 'PASS' 
-                  ? 'bg-red hover:bg-red text-bg border-0' 
-                  : 'border border-s2 bg-bg text-s4 hover:bg-red/10 hover:text-red'
+                  ? 'bg-red hover:bg-red text-white border-0' 
+                  : 'border border-s2 bg-transparent text-t2 hover:bg-red/10 hover:text-red'
               }`}
             >
               PASS ({passCount})
@@ -256,8 +256,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               variant={filter === 'PENDING' ? 'default' : 'outline'}
               className={`h-8 px-3 text-xs font-medium flex-shrink-0 ${
                 filter === 'PENDING' 
-                  ? 'bg-amber hover:bg-amber text-bg border-0' 
-                  : 'border border-s2 bg-bg text-s4 hover:bg-amber/10 hover:text-amber'
+                  ? 'bg-amber hover:bg-amber text-white border-0' 
+                  : 'border border-s2 bg-transparent text-t2 hover:bg-amber/10 hover:text-amber'
               }`}
             >
               Pending ({pendingCount})
@@ -289,7 +289,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               onClick={handleSelectAll}
               size="sm"
               variant="outline"
-              className="h-8 px-3 text-xs font-medium border border-s2 bg-bg text-s4 hover:bg-s1 hover:text-fg"
+              className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
             >
               {allFilteredSelected ? (
                 <>
@@ -312,7 +312,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
                   onClick={handleExportCSV}
                   size="sm"
                   variant="outline"
-                  className="h-8 px-3 text-xs font-medium border border-s2 bg-bg text-s4 hover:bg-s1 hover:text-fg"
+                  className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
                 >
                   <DownloadSimple size={14} weight="bold" className="mr-1" />
                   Export
@@ -321,7 +321,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
                   onClick={handleBulkRemove}
                   size="sm"
                   variant="outline"
-                  className="h-8 px-3 text-xs font-medium border border-red/30 bg-bg text-red hover:bg-red/10 hover:text-red"
+                  className="h-8 px-3 text-xs font-medium border border-red/30 bg-transparent text-red hover:bg-red/10 hover:text-red"
                 >
                   <Trash size={14} weight="bold" className="mr-1" />
                   Remove
@@ -347,10 +347,10 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               {filter === 'GO' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
             </p>
           </div>
-          <h2 className="text-lg font-semibold text-fg mb-2">
+          <h2 className="text-lg font-semibold text-t1 mb-2">
             {queueItems.length === 0 ? 'Queue is empty' : `No ${filter} items`}
           </h2>
-          <p className="text-sm text-s4 max-w-xs">
+          <p className="text-sm text-t2 max-w-xs">
             {queueItems.length === 0 
               ? 'Scan items and add GO decisions to your queue'
               : `Try selecting a different filter to view items`
@@ -416,7 +416,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
                           size="sm"
                           onClick={() => handleEdit(item)}
                           variant="outline"
-                          className="h-8 px-3 text-xs font-medium border border-s2 bg-bg text-s4 hover:bg-s1 hover:text-fg"
+                          className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
                         >
                           <PencilSimple size={14} weight="bold" className="mr-1" />
                           Edit
@@ -424,7 +424,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
                         <Button
                           size="sm"
                           onClick={() => onCreateListing(item.id)}
-                          className="flex-1 bg-b1 hover:bg-b2 text-bg h-8 text-xs font-medium"
+                          className="flex-1 bg-b1 hover:bg-b2 text-white h-8 text-xs font-medium"
                         >
                           <ArrowRight size={14} weight="bold" className="mr-1" />
                           List
@@ -433,7 +433,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
                           size="sm"
                           variant="ghost"
                           onClick={() => onRemove(item.id)}
-                          className="h-8 w-8 p-0 text-s4 hover:text-red hover:bg-red/10"
+                          className="h-8 w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
                         >
                           <Trash size={16} weight="bold" />
                         </Button>

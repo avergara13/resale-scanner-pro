@@ -262,9 +262,9 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
             {pipeline.length === 0 ? (
               <div className="space-y-6">
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
-                  <Scan size={64} strokeWidth={1} className="mb-4" />
-                  <h3 className="text-lg font-bold">Ready to Scan</h3>
-                  <p className="text-sm">Tap the eye below to start analysis</p>
+                  <Scan size={64} strokeWidth={1} className="mb-4 text-t2" />
+                  <h3 className="text-lg font-bold text-t1">Ready to Scan</h3>
+                  <p className="text-sm text-t2">Tap the eye below to start analysis</p>
                 </div>
                 <ApiStatusIndicator settings={settings} />
               </div>
