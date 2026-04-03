@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X } from '@phosphor-icons/react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -16,7 +16,10 @@ import {
 import { toast } from 'sonner'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { ThemeToggle } from '../ThemeToggle'
+import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
+import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
 import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
+import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-preference'
 import { cn } from '@/lib/utils'
 import type { ScannedItem } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
@@ -40,9 +43,27 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
     'profit-desc',
     'ALL'
   )
+  const { filters: advancedFilters, setFilters: setAdvancedFilters } = useAdvancedFilterPreference('queue-screen')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+
+  const availableCategories = useMemo(() => {
+    const categories = new Set<string>()
+    queueItems.forEach(item => {
+      if (item.category) categories.add(item.category)
+    })
+    return Array.from(categories).sort()
+  }, [queueItems])
+
+  const priceRange = useMemo(() => {
+    if (queueItems.length === 0) return { min: 0, max: 1000 }
+    const prices = queueItems.map(item => item.purchasePrice)
+    return {
+      min: Math.floor(Math.min(...prices)),
+      max: Math.ceil(Math.max(...prices))
+    }
+  }, [queueItems])
   
   const filteredItems = queueItems.filter(item => {
     const matchesFilter = 
@@ -52,6 +73,33 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
       (filter === 'PENDING' && item.decision === 'PENDING')
     
     if (!matchesFilter) return false
+
+    if (advancedFilters.priceRange) {
+      if (item.purchasePrice < advancedFilters.priceRange.min || 
+          item.purchasePrice > advancedFilters.priceRange.max) {
+        return false
+      }
+    }
+
+    if (advancedFilters.profitMarginRange && item.profitMargin !== undefined) {
+      if (item.profitMargin < advancedFilters.profitMarginRange.min || 
+          item.profitMargin > advancedFilters.profitMarginRange.max) {
+        return false
+      }
+    }
+
+    if (advancedFilters.dateRange) {
+      if (item.timestamp < advancedFilters.dateRange.start || 
+          item.timestamp > advancedFilters.dateRange.end) {
+        return false
+      }
+    }
+
+    if (advancedFilters.categories && advancedFilters.categories.length > 0) {
+      if (!item.category || !advancedFilters.categories.includes(item.category)) {
+        return false
+      }
+    }
     
     if (!searchQuery.trim()) return true
     
@@ -173,6 +221,22 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
   const handleSaveEdit = (itemId: string, updates: Partial<ScannedItem>) => {
     onEdit(itemId, updates)
     toast.success('Item updated successfully')
+  }
+
+  const handleRemoveFilter = (filterKey: keyof AdvancedFilterOptions, value?: string) => {
+    const newFilters = { ...advancedFilters }
+    
+    if (filterKey === 'categories' && value) {
+      const currentCategories = newFilters.categories || []
+      newFilters.categories = currentCategories.filter((c: string) => c !== value)
+      if (newFilters.categories.length === 0) {
+        delete newFilters.categories
+      }
+    } else {
+      delete newFilters[filterKey]
+    }
+    
+    setAdvancedFilters(newFilters)
   }
 
   return (
@@ -313,9 +377,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
 
         <div className="flex items-center gap-2 mb-3">
           <ArrowsDownUp size={16} weight="bold" className="text-s4" />
-          <span className="text-xs font-medium text-s4">Sort by:</span>
+          <span className="text-xs font-medium text-s4">Sort:</span>
           <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-            <SelectTrigger className="h-8 text-xs font-medium border-s2 bg-bg text-fg w-[180px]">
+            <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 w-[160px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -327,7 +391,21 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               <SelectItem value="category-desc" className="text-xs">Category (Z to A)</SelectItem>
             </SelectContent>
           </Select>
+          <AdvancedFilters
+            filters={advancedFilters}
+            onFiltersChange={setAdvancedFilters}
+            availableCategories={availableCategories}
+            priceMin={priceRange.min}
+            priceMax={priceRange.max}
+            className="ml-auto"
+          />
         </div>
+
+        <ActiveFiltersSummary
+          filters={advancedFilters}
+          onRemoveFilter={handleRemoveFilter}
+          className="mb-3"
+        />
         
         {filteredItems.length > 0 && (
           <div className="flex items-center gap-2">
