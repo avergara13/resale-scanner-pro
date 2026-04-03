@@ -53,7 +53,7 @@ export function useTheme() {
         
         return () => clearInterval(interval)
       }
-    } else {
+    } else if (themeMode) {
       setActualTheme(themeMode)
     }
   }, [themeMode, useAmbientLight, updateThemeFromAmbient])

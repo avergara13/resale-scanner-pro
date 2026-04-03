@@ -18,8 +18,8 @@ export function useConnectionHistory(
   
   const [events, setEvents] = useKV<ConnectionEvent[]>('connection-events', [])
   const [incidents, setIncidents] = useKV<DowntimeIncident[]>('downtime-incidents', [])
-  const prevHealthRef = useRef<ConnectionHealth | undefined>()
-  const activeIncidentsRef = useRef<Map<string, DowntimeIncident>>(new Map())
+  const prevHealthRef = useRef<ConnectionHealth | undefined>(undefined)
+  const activeIncidentsRef = useRef(new Map<string, DowntimeIncident>())
 
   const cleanOldData = useCallback(() => {
     const cutoffTime = Date.now() - (MAX_HISTORY_DAYS * 24 * 60 * 60 * 1000)
