@@ -515,13 +515,20 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       setPreviousItemCount(sortedItems.length)
       
       if (diff !== 0 && previousItemCount !== queueItems.length) {
-        const message = diff > 0 
-          ? `Showing ${Math.abs(diff)} more item${Math.abs(diff) !== 1 ? 's' : ''}`
-          : `Showing ${Math.abs(diff)} fewer item${Math.abs(diff) !== 1 ? 's' : ''}`
+        const diffAmount = Math.abs(diff)
+        const itemText = diffAmount !== 1 ? 's' : ''
         
-        toast.info(message, {
-          duration: 2000,
-        })
+        if (diff > 0) {
+          toast.success(`📈 Showing ${diffAmount} more item${itemText}`, {
+            duration: 2000,
+            className: 'bg-green/10 border-green/30 text-green',
+          })
+        } else {
+          toast.info(`📉 Showing ${diffAmount} fewer item${itemText}`, {
+            duration: 2000,
+            className: 'bg-amber/10 border-amber/30 text-amber',
+          })
+        }
       }
     }
 
@@ -644,15 +651,33 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           : 'same'
                       : 'same'
                     
+                    const getTrendColor = () => {
+                      if (!showTrendIndicator || trendDirection === 'same') {
+                        if (isHighVisibility) return { bg: 'bg-green/15', text: 'text-green', border: 'border-green/30' }
+                        if (isMediumVisibility) return { bg: 'bg-amber/15', text: 'text-amber', border: 'border-amber/30' }
+                        return { bg: 'bg-red/15', text: 'text-red', border: 'border-red/30' }
+                      }
+                      
+                      if (trendDirection === 'up') {
+                        return { bg: 'bg-green/20', text: 'text-green', border: 'border-green/40' }
+                      }
+                      
+                      return { bg: 'bg-red/20', text: 'text-red', border: 'border-red/40' }
+                    }
+                    
+                    const colors = getTrendColor()
+                    
                     return (
                       <Badge 
                         variant="secondary" 
                         className={cn(
                           "h-5 px-2 text-[10px] font-bold border transition-all duration-300",
-                          isHighVisibility && "bg-green/15 text-green border-green/30",
-                          isMediumVisibility && "bg-amber/15 text-amber border-amber/30",
-                          isLowVisibility && "bg-red/15 text-red border-red/30",
-                          showTrendIndicator && "animate-pulse"
+                          colors.bg,
+                          colors.text,
+                          colors.border,
+                          showTrendIndicator && "animate-pulse shadow-sm",
+                          showTrendIndicator && trendDirection === 'up' && "trend-indicator-up",
+                          showTrendIndicator && trendDirection === 'down' && "trend-indicator-down"
                         )}
                       >
                         <span className="flex items-center gap-1">
@@ -662,6 +687,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           )}
                           {showTrendIndicator && trendDirection === 'down' && (
                             <TrendDown size={12} weight="bold" className="animate-bounce" />
+                          )}
+                          {showTrendIndicator && trendDirection === 'same' && (
+                            <Minus size={12} weight="bold" className="opacity-60" />
                           )}
                         </span>
                       </Badge>

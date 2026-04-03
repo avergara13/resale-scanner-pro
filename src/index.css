@@ -1392,3 +1392,29 @@ button:disabled {
   background: linear-gradient(90deg, var(--red), var(--red));
   width: 100% !important;
 }
+
+@keyframes trend-glow-up {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--green);
+  }
+  50% {
+    box-shadow: 0 0 12px 2px oklch(0.60 0.17 145 / 0.4);
+  }
+}
+
+@keyframes trend-glow-down {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--red);
+  }
+  50% {
+    box-shadow: 0 0 12px 2px oklch(0.58 0.20 25 / 0.4);
+  }
+}
+
+.trend-indicator-up {
+  animation: trend-glow-up 1.5s ease-in-out 2;
+}
+
+.trend-indicator-down {
+  animation: trend-glow-down 1.5s ease-in-out 2;
+}
