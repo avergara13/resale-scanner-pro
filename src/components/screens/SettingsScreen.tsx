@@ -22,6 +22,7 @@ import {
 import { CheckCircle, XCircle, Info, Eye, EyeClosed } from '@phosphor-icons/react'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
+import { IncidentLogViewer } from '../IncidentLogViewer'
 import type { AppSettings } from '@/types'
 
 interface SettingsScreenProps {
@@ -115,6 +116,24 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 </div>
 
                 <ConnectionHistoryPanel settings={settings} />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="incidents" className="border border-s2 rounded-lg px-4 bg-s1">
+              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+                Incident Logs & API Issues
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2">
+                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="text-b1 mt-0.5" size={16} />
+                    <p className="text-xs text-s4 leading-relaxed">
+                      Comprehensive incident log viewer for diagnosing API connection issues. Filter by service, view detailed error messages, and track resolution times. Export logs for external analysis.
+                    </p>
+                  </div>
+                </div>
+
+                <IncidentLogViewer settings={settings} />
               </AccordionContent>
             </AccordionItem>
 
