@@ -34,34 +34,31 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
 
   return (
     <div id="scr-ai" className="flex flex-col h-full">
-      <div id="ai-topbar" className="p-4 border-b border-s2 bg-bg sticky top-0 z-10">
+      <div id="ai-topbar" className="p-4 border-b border-s1 bg-fg sticky top-0 z-10">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-fg text-bg rounded flex items-center justify-center">
-              <Robot size={18} weight="bold" />
+            <div className="w-8 h-8 bg-gradient-to-br from-b1 to-amber text-white rounded-lg flex items-center justify-center">
+              <Robot size={18} weight="fill" />
             </div>
-            <h2 className="font-black text-sm uppercase tracking-widest">AI CENTER</h2>
+            <div>
+              <h2 className="font-bold text-sm">AI COMMAND CENTER</h2>
+              <p className="text-[10px] text-t4 font-medium">Gemini 3 Flash · Grounded</p>
+            </div>
           </div>
           <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
         </div>
-        <div className="flex bg-s2 p-1 rounded-lg">
+        <div className="tab-bar">
           <button
             onClick={() => setTab('agent')}
-            className={cn(
-              'px-3 py-1 text-[10px] font-bold rounded-md transition-all',
-              tab === 'agent' ? 'bg-bg shadow-sm text-b1' : 'text-t3'
-            )}
+            className={cn('tab-btn', tab === 'agent' && 'active')}
           >
-            AGENT
+            🤖 AGENT
           </button>
           <button
             onClick={() => setTab('manual')}
-            className={cn(
-              'px-3 py-1 text-[10px] font-bold rounded-md transition-all',
-              tab === 'manual' ? 'bg-bg shadow-sm text-b1' : 'text-t3'
-            )}
+            className={cn('tab-btn', tab === 'manual' && 'active')}
           >
-            MANUAL
+            📝 MANUAL
           </button>
         </div>
       </div>

@@ -20,8 +20,10 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
   return (
     <div id="scr-session" className="flex flex-col h-full px-4 py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-fg mb-2">Session</h1>
-        <p className="text-sm text-s4">Track your sourcing performance</p>
+        <h1 className="text-xl font-black tracking-tight">TODAY'S SESSION</h1>
+        <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+        </p>
       </div>
 
       {!session?.active ? (
@@ -30,41 +32,56 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
             <Play size={40} weight="fill" className="text-b1 ml-1" />
           </div>
           <div className="text-center space-y-2">
-            <h2 className="text-xl font-semibold text-fg">No Active Session</h2>
-            <p className="text-sm text-s4 max-w-xs">Start a session to track your scans and profits</p>
+            <h2 className="text-xl font-semibold text-t1">No Active Session</h2>
+            <p className="text-sm text-t3 max-w-xs">Start a session to track your scans and profits</p>
           </div>
-          <Button onClick={onStartSession} className="bg-b1 hover:bg-b2 text-bg px-8 h-12 text-base font-medium">
+          <Button onClick={onStartSession} className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white px-8 h-12 text-base font-bold shadow-lg active:scale-95 transition-all">
             <Play size={20} weight="bold" className="mr-2" />
             Start Session
           </Button>
         </div>
       ) : (
-        <div className="flex-1 space-y-6">
-          <Card className="p-6 bg-t4 border-b1">
+        <div className="flex-1 space-y-4">
+          <div className="flex gap-2">
+            <div className="stat-card flex-1">
+              <div className="text-[22px] font-bold text-green leading-tight">
+                ${session.totalPotentialProfit.toFixed(2)}
+              </div>
+              <div className="text-[11px] text-t3 font-medium uppercase tracking-wider">Est. Profit</div>
+            </div>
+            <div className="stat-card flex-1">
+              <div className="text-[22px] font-bold leading-tight">{session.itemsScanned}</div>
+              <div className="text-[11px] text-t3 font-medium uppercase tracking-wider">Scans</div>
+            </div>
+            <div className="stat-card flex-1">
+              <div className="text-[22px] font-bold text-b1 leading-tight">
+                {session.itemsScanned > 0 ? Math.round((session.goCount / session.itemsScanned) * 100) : 0}%
+              </div>
+              <div className="text-[11px] text-t3 font-medium uppercase tracking-wider">GO Rate</div>
+            </div>
+          </div>
+
+          <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <Badge variant="secondary" className="bg-b1 text-bg px-3 py-1 uppercase text-xs font-bold">
+              <Badge variant="secondary" className="bg-green text-white px-3 py-1 uppercase text-xs font-bold">
                 Active
               </Badge>
-              <span className="text-sm font-mono text-s4">
+              <span className="text-sm mono text-t3">
                 {formatDuration(Date.now() - session.startTime)}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-s4 mb-1">Scanned</p>
-                <p className="text-2xl font-bold font-mono text-fg">{session.itemsScanned}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-s4 mb-1">GO</p>
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">GO</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold font-mono text-green">{session.goCount}</p>
+                  <p className="text-2xl font-bold mono text-green">{session.goCount}</p>
                   <CheckCircle size={20} weight="fill" className="text-green" />
                 </div>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-s4 mb-1">PASS</p>
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">PASS</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold font-mono text-red">{session.passCount}</p>
+                  <p className="text-2xl font-bold mono text-red">{session.passCount}</p>
                   <XCircle size={20} weight="fill" className="text-red" />
                 </div>
               </div>
@@ -72,14 +89,14 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
           </Card>
 
           <Card className="p-6">
-            <h3 className="text-sm font-semibold text-s4 uppercase tracking-wide mb-3">Potential Profit</h3>
-            <p className="text-4xl font-bold font-mono text-fg">
+            <h3 className="text-sm font-semibold text-t3 uppercase tracking-wide mb-3">Potential Profit</h3>
+            <p className="text-4xl font-bold mono text-t1">
               ${session.totalPotentialProfit.toFixed(2)}
             </p>
-            <p className="text-sm text-s4 mt-2">
+            <p className="text-sm text-t3 mt-2">
               From {session.goCount} items{' '}
               {session.goCount > 0 && (
-                <span className="font-mono">
+                <span className="mono">
                   (${(session.totalPotentialProfit / session.goCount).toFixed(2)} avg)
                 </span>
               )}

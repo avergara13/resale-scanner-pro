@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
+import { cn } from '@/lib/utils'
 import type { ScannedItem } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
 
@@ -159,22 +160,51 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
         onSave={handleSaveEdit}
         geminiService={geminiService}
       />
-      <div className="px-4 py-6 border-b border-s2">
-        <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="px-4 py-6 border-b border-s1">
+        <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex-1">
-            <h1 className="text-2xl font-semibold text-fg mb-2">Queue</h1>
-            <p className="text-sm text-s4">{queueItems.length} items ready to list</p>
+            <h1 className="text-xl font-black tracking-tight">LISTING QUEUE</h1>
+            <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">{queueItems.length} Items Pending</p>
           </div>
           {unanalyzedItems.length > 0 && onBatchAnalyze && (
             <Button
               onClick={onBatchAnalyze}
               disabled={isBatchAnalyzing}
-              className="bg-b1 hover:bg-b2 text-bg font-medium text-sm h-10 px-4"
+              className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-sm h-10 px-4 shadow-lg active:scale-95 transition-all"
             >
               <Lightning size={18} weight="fill" className="mr-2" />
               {isBatchAnalyzing ? 'Analyzing...' : `Analyze ${unanalyzedItems.length}`}
             </Button>
           )}
+        </div>
+        
+        <div className="px-0 pt-2 mb-4">
+          <div className="tab-bar">
+            <button 
+              onClick={() => setFilter('ALL')}
+              className={cn('tab-btn', filter === 'ALL' && 'active')}
+            >
+              ALL
+            </button>
+            <button 
+              onClick={() => setFilter('GO')}
+              className={cn('tab-btn', filter === 'GO' && 'active')}
+            >
+              GO {goCount > 0 && `(${goCount})`}
+            </button>
+            <button 
+              onClick={() => setFilter('PASS')}
+              className={cn('tab-btn', filter === 'PASS' && 'active')}
+            >
+              PASS {passCount > 0 && `(${passCount})`}
+            </button>
+            <button 
+              onClick={() => setFilter('PENDING')}
+              className={cn('tab-btn', filter === 'PENDING' && 'active')}
+            >
+              PENDING {pendingCount > 0 && `(${pendingCount})`}
+            </button>
+          </div>
         </div>
         
         <div className="flex items-center gap-2 mb-3">
