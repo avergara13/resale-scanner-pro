@@ -21,6 +21,30 @@ interface ResearchTask {
   result?: string
 }
 
+function formatMessage(text: string): string {
+  let formatted = text
+
+  formatted = formatted.replace(/^#{1,3}\s+(.+)$/gm, '<h3 class="font-bold text-t1 mt-4 mb-2 first:mt-0">$1</h3>')
+  
+  formatted = formatted.replace(/^\*\*(.+?)\*\*:?\s*(.*)$/gm, '<div class="mb-2"><span class="font-bold text-t1">$1:</span> <span class="text-t2">$2</span></div>')
+  
+  formatted = formatted.replace(/^[-•]\s+(.+)$/gm, '<li class="ml-4 mb-1.5 text-t1 leading-relaxed">$1</li>')
+  
+  formatted = formatted.replace(/(<li.*<\/li>\s*)+/g, (match) => `<ul class="space-y-1 my-3">${match}</ul>`)
+  
+  formatted = formatted.replace(/^\d+\.\s+(.+)$/gm, '<li class="ml-4 mb-1.5 text-t1 leading-relaxed">$1</li>')
+  
+  formatted = formatted.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 bg-s1 text-t1 rounded text-xs font-mono">$1</code>')
+  
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-t1">$1</strong>')
+  
+  formatted = formatted.replace(/\$(\d+(?:\.\d{2})?)/g, '<span class="font-bold text-green">$$$1</span>')
+  
+  formatted = formatted.replace(/(\d+)%/g, '<span class="font-semibold text-b1">$1%</span>')
+
+  return formatted
+}
+
 function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLines?: number }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [needsCollapse, setNeedsCollapse] = useState(false)
@@ -35,21 +59,22 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
     }
   }, [message, maxLines])
 
+  const formattedHTML = formatMessage(message)
+
   return (
     <div>
       <div
         ref={contentRef}
         className={cn(
-          "text-sm whitespace-pre-wrap overflow-hidden transition-all duration-300",
-          !isExpanded && needsCollapse && "line-clamp-4"
+          "text-sm overflow-hidden transition-all duration-300 prose prose-sm max-w-none",
+          !isExpanded && needsCollapse && "line-clamp-6"
         )}
-      >
-        {message}
-      </div>
+        dangerouslySetInnerHTML={{ __html: formattedHTML }}
+      />
       {needsCollapse && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="mt-2 text-xs font-semibold text-b1 hover:text-b2 flex items-center gap-1 transition-colors"
+          className="mt-3 text-xs font-bold text-b1 hover:text-b2 flex items-center gap-1 transition-colors px-2 py-1.5 bg-blue-bg rounded-lg"
         >
           {isExpanded ? (
             <>
@@ -92,9 +117,22 @@ export function ResearchScreen() {
     setIsProcessing(true)
 
     try {
-      const promptText = `You are an expert e-commerce resale advisor. The user asked: "${messageText}". Provide helpful, actionable insights for their resale business. Be concise and practical.`
+      const prompt = `You are an expert e-commerce resale advisor helping users maximize their resale profits.
+
+User Question: ${messageText}
+
+Please provide a clear, well-formatted response following these guidelines:
+- Use bullet points for lists (use - or • symbols)
+- Bold key terms using **bold text**
+- Include specific numbers, percentages, and dollar amounts when relevant
+- Break information into short, scannable sections
+- Use headings with ### for major sections
+- Keep explanations concise and actionable
+- Prioritize the most important information first
+
+Format your response to be easy to read and visually scannable.`
       
-      const response = await window.spark.llm(promptText, 'gpt-4o-mini')
+      const response = await window.spark.llm(prompt, 'gpt-4o-mini')
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -130,9 +168,34 @@ export function ResearchScreen() {
     const query = searchQuery.trim()
     
     try {
-      const promptText = `Analyze the resale market for: "${query}". Provide insights on: 1) Average resale prices, 2) Demand trends, 3) Best platforms to sell, 4) Profit potential. Be specific and data-focused.`
+      const prompt = `Analyze the resale market for: "${query}". 
+
+Provide a comprehensive but concise market analysis with the following structure:
+
+### Market Overview
+Brief summary of market conditions
+
+### Pricing Analysis
+- **Average resale price range**: $X-$Y
+- **Sweet spot pricing**: Recommended listing price
+- **Price trends**: Rising, stable, or declining
+
+### Demand & Competition
+- **Current demand**: High/Medium/Low with explanation
+- **Competition level**: How saturated is this market
+- **Sell-through rate**: Estimated percentage
+
+### Best Selling Platforms
+- Platform recommendations with reasoning
+- Fee considerations
+
+### Profit Potential
+- Expected profit margin percentage
+- **Final Verdict**: GO or PASS with brief justification
+
+Use bullet points, bold key terms, and include specific numbers when possible.`
       
-      const response = await window.spark.llm(promptText, 'gpt-4o')
+      const response = await window.spark.llm(prompt, 'gpt-4o')
       
       setResearchTasks((prev) =>
         (prev || []).map((t) =>
@@ -164,9 +227,24 @@ export function ResearchScreen() {
     setResearchTasks((prev) => [task, ...(prev || [])])
     
     try {
-      const promptText = `What are the top 5 trending product categories for resale in ${new Date().getFullYear()}? Include seasonality factors and profit potential for each category.`
+      const prompt = `Identify the top 5 trending product categories for resale in ${new Date().getFullYear()}.
+
+For each category, provide:
+
+**Category Name**
+- **Current Demand**: High/Medium/Low with brief explanation
+- **Seasonality**: Best months to sell
+- **Average Profit Margin**: Estimated percentage
+- **Key Considerations**: 1-2 important tips for this category
+
+End with:
+### Quick Action Items
+- Top 2 categories to focus on now
+- 1 category to avoid this month
+
+Use bullet points, bold headings, and specific percentages where possible.`
       
-      const response = await window.spark.llm(promptText, 'gpt-4o')
+      const response = await window.spark.llm(prompt, 'gpt-4o')
       
       setResearchTasks((prev) =>
         (prev || []).map((t) =>
