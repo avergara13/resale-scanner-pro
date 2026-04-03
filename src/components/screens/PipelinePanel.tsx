@@ -20,9 +20,21 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
     return null
   }
 
+  const activeStepIndex = steps.findIndex(s => s.status === 'processing')
+  const completedSteps = steps.filter(s => s.status === 'complete').length
+  const progressPercentage = (completedSteps / steps.length) * 100
+
   return (
-    <div id="ai-pipeline" className="space-y-2">
-      {steps.map((step) => {
+    <div id="ai-pipeline" className="space-y-2 relative">
+      <div className="absolute left-[19px] top-6 bottom-6 w-[2px] bg-s2 overflow-hidden">
+        <motion.div
+          className="absolute top-0 left-0 w-full bg-gradient-to-b from-b1 via-amber to-green"
+          initial={{ height: '0%' }}
+          animate={{ height: `${progressPercentage}%` }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        />
+      </div>
+      {steps.map((step, index) => {
         const config = phaseConfig[step.id]
         const Icon = config.icon
         const isProcessing = step.status === 'processing'
@@ -35,30 +47,31 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
             key={step.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
             id={`phase-${step.id}`}
             className={cn(
-              'p-3 rounded-xl border transition-all duration-300',
-              isComplete && 'bg-s1 border-b1',
-              isProcessing && 'bg-bg border-b1 shadow-sm ring-1 ring-b1',
-              isPending && 'bg-bg border-s2 opacity-50',
-              isError && 'bg-red/5 border-red'
+              'pipeline-card relative pipeline-step-transition',
+              isComplete && 'done',
+              isProcessing && 'running',
+              isPending && 'pending',
+              isError && 'error'
             )}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-3">
                 <div
                   className={cn(
-                    'w-6 h-6 rounded-full flex items-center justify-center',
-                    isComplete && 'bg-green text-bg',
-                    isProcessing && 'bg-b1 text-bg animate-pulse',
+                    'w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 relative z-10',
+                    isComplete && 'bg-green text-bg shadow-[0_0_12px_oklch(0.60_0.17_145_/_0.4)]',
+                    isProcessing && 'bg-b1 text-bg shadow-[0_0_12px_oklch(0.55_0.15_250_/_0.4)]',
                     isPending && 'bg-s2 text-t4',
-                    isError && 'bg-red text-bg'
+                    isError && 'bg-red text-bg shadow-[0_0_12px_oklch(0.58_0.20_25_/_0.4)]'
                   )}
                 >
                   {isComplete ? (
                     <CheckCircle size={12} weight="bold" />
                   ) : isProcessing ? (
-                    <Lightning size={12} weight="bold" />
+                    <Lightning size={12} weight="bold" className="animate-pulse" />
                   ) : (
                     <Clock size={12} weight="bold" />
                   )}
@@ -75,9 +88,9 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
               </div>
               {isProcessing && (
                 <div className="flex gap-1">
-                  <div className="w-1 h-1 bg-b1 rounded-full animate-bounce" />
-                  <div className="w-1 h-1 bg-b1 rounded-full animate-bounce [animation-delay:0.2s]" />
-                  <div className="w-1 h-1 bg-b1 rounded-full animate-bounce [animation-delay:0.4s]" />
+                  <div className="w-1.5 h-1.5 bg-b1 rounded-full animate-bounce" />
+                  <div className="w-1.5 h-1.5 bg-b1 rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <div className="w-1.5 h-1.5 bg-b1 rounded-full animate-bounce [animation-delay:0.4s]" />
                 </div>
               )}
             </div>
