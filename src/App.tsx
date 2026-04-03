@@ -12,6 +12,7 @@ import { ResearchScreen } from './components/screens/ResearchScreen'
 import { IncidentsScreen } from './components/screens/IncidentsScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
+import { TagAnalyticsScreen } from './components/screens/TagAnalyticsScreen'
 import { createEbayService } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
@@ -713,7 +714,8 @@ function App() {
     'settings': 5,
     'listing': 6,
     'chat': 7,
-    'history': 8
+    'history': 8,
+    'tag-analytics': 9
   }
 
   const [prevScreen, setPrevScreen] = useState<Screen>(screen)
@@ -824,6 +826,7 @@ function App() {
                 onBatchAnalyze={handleBatchAnalyze}
                 isBatchAnalyzing={isBatchAnalyzing}
                 geminiService={geminiService}
+                onNavigateToTagAnalytics={() => setScreen('tag-analytics')}
               />
             </motion.div>
           )}
@@ -841,6 +844,24 @@ function App() {
               <SettingsScreen
                 settings={settings}
                 onUpdate={handleUpdateSettings}
+              />
+            </motion.div>
+          )}
+          {screen === 'tag-analytics' && (
+            <motion.div
+              key="tag-analytics"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="w-full h-full"
+            >
+              <TagAnalyticsScreen
+                items={queue || []}
+                tags={allTags || []}
+                onBack={() => setScreen('queue')}
               />
             </motion.div>
           )}

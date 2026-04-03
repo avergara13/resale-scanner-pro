@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -35,12 +35,13 @@ interface QueueScreenProps {
   onBatchAnalyze?: () => void
   isBatchAnalyzing?: boolean
   geminiService?: GeminiService | null
+  onNavigateToTagAnalytics?: () => void
 }
 
 type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
 type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc'
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onBatchAnalyze, isBatchAnalyzing, geminiService }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onBatchAnalyze, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'profit-desc',
@@ -323,6 +324,16 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
             <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">{queueItems.length} Items Pending</p>
           </div>
           <div className="flex items-center gap-2">
+            {onNavigateToTagAnalytics && (allTags || []).length > 0 && (
+              <Button
+                onClick={onNavigateToTagAnalytics}
+                variant="outline"
+                className="h-10 px-3 border-s2 hover:bg-s1 text-t2 font-bold text-xs transition-all"
+              >
+                <ChartBar size={16} weight="bold" className="mr-2" />
+                Tag ROI
+              </Button>
+            )}
             <ThemeToggle />
             {unanalyzedItems.length > 0 && onBatchAnalyze && (
               <Button
