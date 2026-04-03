@@ -1210,6 +1210,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🏪</span>
                     <span className="uppercase tracking-wide">Best Performing Stores</span>
+                    <Badge 
+                      variant="secondary" 
+                      className="h-5 px-2 text-[10px] font-bold bg-b1/15 text-b1 border border-b1/30"
+                    >
+                      {availableLocations.length}
+                    </Badge>
                   </div>
                   <CaretDown 
                     size={20} 
