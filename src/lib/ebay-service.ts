@@ -150,10 +150,19 @@ export class EbayService {
 
     const url = `${baseUrl}?${params.toString()}`
 
-    const response = await fetch(url)
-    
+    let response: Response
+    try {
+      response = await fetch(url)
+    } catch (corsError) {
+      // eBay CORS block — Finding API occasionally rejects browser requests
+      // Return empty array — caller falls back to Gemini grounded data
+      console.warn('eBay Finding API blocked (CORS). Using Gemini market data instead.')
+      return []
+    }
+
     if (!response.ok) {
-      throw new Error(`eBay API error: ${response.status}`)
+      console.warn(`eBay API returned ${response.status} — using Gemini market data`)
+      return []
     }
 
     const data: EbayFindingApiResponse = await response.json()
@@ -195,10 +204,19 @@ export class EbayService {
 
     const url = `${baseUrl}?${params.toString()}`
 
-    const response = await fetch(url)
-    
+    let response: Response
+    try {
+      response = await fetch(url)
+    } catch (corsError) {
+      // eBay CORS block — Finding API occasionally rejects browser requests
+      // Return empty array — caller falls back to Gemini grounded data
+      console.warn('eBay Finding API blocked (CORS). Using Gemini market data instead.')
+      return []
+    }
+
     if (!response.ok) {
-      throw new Error(`eBay API error: ${response.status}`)
+      console.warn(`eBay API returned ${response.status} — using Gemini market data`)
+      return []
     }
 
     const data: EbayFindingApiResponse = await response.json()

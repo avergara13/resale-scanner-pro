@@ -78,7 +78,11 @@ const WIRING_CHECKS = [
     )
   },
 
-  // ── 4. Notion DB ID default ────────────────────────────────────────────────
+  // ── 4. eBay Finding API — only needs appId, certId not required ──────────
+  // The Finding API is designed for browser use. App ID is a public key.
+  // certId is only needed for OAuth (Browse/Sell APIs) — not used yet.
+
+  // ── 5. Notion DB ID default ────────────────────────────────────────────────
   {
     name: 'Default: notionDatabaseId pre-filled',
     detect: src => src.includes('notionDatabaseId:'),
