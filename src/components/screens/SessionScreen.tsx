@@ -1,4 +1,4 @@
-import { Play, Stop, CheckCircle, XCircle, ChartLine } from '@phosphor-icons/react'
+import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '../ThemeToggle'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
+import { GoalAchievementTracker } from '../GoalAchievementTracker'
 import { useKV } from '@github/spark/hooks'
-import type { Session, ScannedItem } from '@/types'
+import type { Session, ScannedItem, ProfitGoal } from '@/types'
 
 interface SessionScreenProps {
   session?: Session
@@ -17,8 +18,10 @@ interface SessionScreenProps {
 
 export function SessionScreen({ session, onStartSession, onEndSession }: SessionScreenProps) {
   const [showTrends, setShowTrends] = useState(false)
+  const [showGoalTracking, setShowGoalTracking] = useState(false)
   const [queue] = useKV<ScannedItem[]>('queue', [])
   const [allSessions] = useKV<Session[]>('all-sessions', [])
+  const [goals] = useKV<ProfitGoal[]>('profit-goals', [])
   
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
@@ -31,7 +34,7 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-xl font-black tracking-tight text-t1">
-            {showTrends ? 'PERFORMANCE TRENDS' : 'TODAY\'S SESSION'}
+            {showGoalTracking ? 'GOAL ACHIEVEMENT' : showTrends ? 'PERFORMANCE TRENDS' : 'TODAY\'S SESSION'}
           </h1>
           <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
@@ -41,16 +44,36 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setShowTrends(!showTrends)}
+            onClick={() => {
+              if (showGoalTracking) {
+                setShowGoalTracking(false)
+              } else if (showTrends) {
+                setShowTrends(false)
+                setShowGoalTracking(true)
+              } else {
+                setShowTrends(true)
+              }
+            }}
             className="h-9 w-9"
           >
-            <ChartLine size={20} weight={showTrends ? 'fill' : 'regular'} className="text-b1" />
+            {showGoalTracking ? (
+              <Trophy size={20} weight="fill" className="text-amber" />
+            ) : (
+              <ChartLine size={20} weight={showTrends ? 'fill' : 'regular'} className="text-b1" />
+            )}
           </Button>
           <ThemeToggle />
         </div>
       </div>
 
-      {showTrends ? (
+      {showGoalTracking ? (
+        <div className="flex-1 overflow-y-auto">
+          <GoalAchievementTracker 
+            goals={goals || []} 
+            items={queue || []}
+          />
+        </div>
+      ) : showTrends ? (
         <div className="flex-1 overflow-y-auto">
           <TrendVisualization 
             items={queue || []} 
