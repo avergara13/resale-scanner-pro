@@ -1295,11 +1295,6 @@ button:disabled {
   }
 }
 
-.pipeline-progress-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
   height: 2px;
   background: var(--s1);
   overflow: hidden;
