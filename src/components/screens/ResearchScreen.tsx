@@ -14,7 +14,8 @@ import {
   Plus,
   Trash,
   ChatsCircle,
-  DotsThreeVertical
+  DotsThreeVertical,
+  PencilSimple
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -29,6 +30,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -180,6 +182,9 @@ export function ResearchScreen() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [showNewSessionDialog, setShowNewSessionDialog] = useState(false)
   const [newSessionName, setNewSessionName] = useState('')
+  const [showRenameDialog, setShowRenameDialog] = useState(false)
+  const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const activeSession = chatSessions?.find(s => s.id === activeSessionId)
@@ -229,6 +234,33 @@ export function ResearchScreen() {
     
     toast.success('Chat session deleted')
   }, [chatSessions, activeSessionId, setChatSessions, setActiveSessionId])
+
+  const handleRenameSession = useCallback(() => {
+    if (!renameSessionId || !renameValue.trim()) {
+      toast.error('Session name cannot be empty')
+      return
+    }
+
+    setChatSessions((prev) =>
+      (prev || []).map((s) =>
+        s.id === renameSessionId ? { ...s, name: renameValue.trim() } : s
+      )
+    )
+
+    setShowRenameDialog(false)
+    setRenameSessionId(null)
+    setRenameValue('')
+    toast.success('Session renamed')
+  }, [renameSessionId, renameValue, setChatSessions])
+
+  const handleOpenRenameDialog = useCallback((sessionId: string) => {
+    const session = chatSessions?.find(s => s.id === sessionId)
+    if (session) {
+      setRenameSessionId(sessionId)
+      setRenameValue(session.name)
+      setShowRenameDialog(true)
+    }
+  }, [chatSessions])
 
   const handleSwitchSession = useCallback((sessionId: string) => {
     setChatSessions((prev) => 
@@ -480,7 +512,7 @@ Use bullet points, bold headings, and specific percentages where possible.`
                     <DropdownMenuItem
                       key={session.id}
                       onClick={() => handleSwitchSession(session.id)}
-                      className="flex items-center justify-between gap-3"
+                      className="flex items-center justify-between gap-2"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm truncate">{session.name}</div>
@@ -490,17 +522,30 @@ Use bullet points, bold headings, and specific percentages where possible.`
                           {new Date(session.lastMessageAt).toLocaleDateString()}
                         </div>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 flex-shrink-0 text-red hover:text-red hover:bg-red-bg"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteSession(session.id)
-                        }}
-                      >
-                        <Trash size={14} weight="bold" />
-                      </Button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-b1 hover:text-b2 hover:bg-blue-bg"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenRenameDialog(session.id)
+                          }}
+                        >
+                          <PencilSimple size={14} weight="bold" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-red hover:text-red hover:bg-red-bg"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteSession(session.id)
+                          }}
+                        >
+                          <Trash size={14} weight="bold" />
+                        </Button>
+                      </div>
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -786,6 +831,47 @@ Use bullet points, bold headings, and specific percentages where possible.`
             </Button>
             <Button onClick={handleCreateSession} className="bg-b1 hover:bg-b2 text-white">
               Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent className="bg-fg border-s2">
+          <DialogHeader>
+            <DialogTitle className="text-t1 flex items-center gap-2">
+              <PencilSimple size={20} weight="bold" className="text-b1" />
+              Rename Chat Session
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleRenameSession()}
+              placeholder="Enter new session name"
+              className="bg-bg border-s2 text-t1"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowRenameDialog(false)
+                setRenameSessionId(null)
+                setRenameValue('')
+              }} 
+              className="border-s2 text-t2"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRenameSession} 
+              className="bg-b1 hover:bg-b2 text-white"
+              disabled={!renameValue.trim()}
+            >
+              Rename
             </Button>
           </DialogFooter>
         </DialogContent>
