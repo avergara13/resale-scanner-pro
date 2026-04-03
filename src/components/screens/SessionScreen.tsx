@@ -122,21 +122,21 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
           <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
           
           <div className="flex gap-2">
-            <div className="stat-card flex-1">
-              <div className="text-[22px] font-bold text-green leading-tight">
+            <div className="stat-card flex-1 p-3">
+              <div className="text-base font-bold text-green leading-tight">
                 ${session.totalPotentialProfit.toFixed(2)}
               </div>
-              <div className="text-[11px] text-t3 font-medium uppercase tracking-wider">Est. Profit</div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Est. Profit</div>
             </div>
-            <div className="stat-card flex-1">
-              <div className="text-[22px] font-bold text-t1 leading-tight">{session.itemsScanned}</div>
-              <div className="text-[11px] text-t3 font-medium uppercase tracking-wider">Scans</div>
+            <div className="stat-card flex-1 p-3">
+              <div className="text-base font-bold text-t1 leading-tight">{session.itemsScanned}</div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
-            <div className="stat-card flex-1">
-              <div className="text-[22px] font-bold text-b1 leading-tight">
+            <div className="stat-card flex-1 p-3">
+              <div className="text-base font-bold text-b1 leading-tight">
                 {session.itemsScanned > 0 ? Math.round((session.goCount / session.itemsScanned) * 100) : 0}%
               </div>
-              <div className="text-[11px] text-t3 font-medium uppercase tracking-wider">GO Rate</div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">GO Rate</div>
             </div>
           </div>
 

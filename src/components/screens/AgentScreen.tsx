@@ -588,29 +588,29 @@ Be proactive and actionable - suggest specific next steps the user can take.`
         </div>
       )}
 
-      <div className="px-4 py-3 bg-s1/30 border-b border-s1">
-        <div className="grid grid-cols-4 gap-2">
-          <Card className="p-3 flex flex-col items-center justify-center">
-            <div className="text-xs text-t3 font-semibold uppercase tracking-wide mb-1">Queue</div>
-            <div className="text-lg font-black text-t1">{queueStats.total}</div>
+      <div className="px-4 py-2 bg-s1/30 border-b border-s1">
+        <div className="grid grid-cols-4 gap-1.5">
+          <Card className="p-2 flex flex-col items-center justify-center">
+            <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>
+            <div className="text-base font-black text-t1">{queueStats.total}</div>
           </Card>
-          <Card className="p-3 flex flex-col items-center justify-center">
-            <div className="text-xs text-green font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
-              <CheckCircle size={12} weight="fill" />
+          <Card className="p-2 flex flex-col items-center justify-center">
+            <div className="text-[9px] text-green font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
+              <CheckCircle size={10} weight="fill" />
               GO
             </div>
-            <div className="text-lg font-black text-green">{queueStats.go}</div>
+            <div className="text-base font-black text-green">{queueStats.go}</div>
           </Card>
-          <Card className="p-3 flex flex-col items-center justify-center">
-            <div className="text-xs text-red font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
-              <Warning size={12} weight="fill" />
+          <Card className="p-2 flex flex-col items-center justify-center">
+            <div className="text-[9px] text-red font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
+              <Warning size={10} weight="fill" />
               PASS
             </div>
-            <div className="text-lg font-black text-red">{queueStats.pass}</div>
+            <div className="text-base font-black text-red">{queueStats.pass}</div>
           </Card>
-          <Card className="p-3 flex flex-col items-center justify-center">
-            <div className="text-xs text-t3 font-semibold uppercase tracking-wide mb-1">Profit</div>
-            <div className="text-sm font-black text-green">${queueStats.totalProfit.toFixed(0)}</div>
+          <Card className="p-2 flex flex-col items-center justify-center">
+            <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Profit</div>
+            <div className="text-xs font-black text-green">${queueStats.totalProfit.toFixed(0)}</div>
           </Card>
         </div>
       </div>
