@@ -20,6 +20,7 @@ import { ThemeToggle } from '../ThemeToggle'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
 import { FilterPresetsManager } from '@/components/FilterPresetsManager'
+import { BulkTagOperations } from '@/components/BulkTagOperations'
 import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-preference'
 import { cn } from '@/lib/utils'
@@ -50,7 +51,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [presetsOpen, setPresetsOpen] = useState(false)
-  const [allTags] = useKV<ItemTag[]>('all-tags', [])
+  const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
+  const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
 
   const handleApplyPreset = (preset: CategoryPreset) => {
     if (preset.filters) {
@@ -270,6 +272,32 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
     setAdvancedFilters(newFilters)
   }
 
+  const handleBulkApplyTags = (tagIds: string[]) => {
+    selectedIds.forEach((itemId) => {
+      const item = queueItems.find((i) => i.id === itemId)
+      if (!item) return
+
+      const currentTags = item.tags || []
+      const newTags = Array.from(new Set([...currentTags, ...tagIds]))
+      onEdit(itemId, { tags: newTags })
+    })
+  }
+
+  const handleBulkRemoveTags = (tagIds: string[]) => {
+    selectedIds.forEach((itemId) => {
+      const item = queueItems.find((i) => i.id === itemId)
+      if (!item) return
+
+      const currentTags = item.tags || []
+      const newTags = currentTags.filter((tagId) => !tagIds.includes(tagId))
+      onEdit(itemId, { tags: newTags })
+    })
+  }
+
+  const handleCreateTag = (newTag: ItemTag) => {
+    setAllTags((prev) => [...(prev || []), newTag])
+  }
+
   return (
     <div id="scr-queue" className="flex flex-col h-full">
       <ItemEditDialog
@@ -278,6 +306,15 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
         onClose={() => setEditingItem(null)}
         onSave={handleSaveEdit}
         geminiService={geminiService}
+      />
+      <BulkTagOperations
+        isOpen={bulkTagDialogOpen}
+        onClose={() => setBulkTagDialogOpen(false)}
+        selectedCount={selectedIds.size}
+        availableTags={allTags || []}
+        onApplyTags={handleBulkApplyTags}
+        onRemoveTags={handleBulkRemoveTags}
+        onCreateTag={handleCreateTag}
       />
       <div className="px-4 py-6 border-b border-s1">
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -477,6 +514,15 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
                 <span className="text-xs font-medium text-b1">
                   {selectedIds.size} selected
                 </span>
+                <Button
+                  onClick={() => setBulkTagDialogOpen(true)}
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+                >
+                  <Tag size={14} weight="bold" className="mr-1" />
+                  Tags
+                </Button>
                 <Button
                   onClick={handleExportCSV}
                   size="sm"
