@@ -94,10 +94,6 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
         </div>
       ) : !session?.active ? (
         <div className="flex-1 overflow-y-auto space-y-6">
-          <div className="w-full">
-            <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
-          </div>
-          
           <TimeBasedRecommendations 
             sessions={allSessions || []} 
             items={queue || []}
@@ -111,16 +107,19 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
               <h2 className="text-xl font-semibold text-t1">No Active Session</h2>
               <p className="text-sm text-t3 max-w-xs">Start a session to track your scans and profits</p>
             </div>
-            <Button onClick={onStartSession} className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white px-8 h-12 text-base font-bold shadow-lg active:scale-95 transition-all">
-              <Play size={20} weight="bold" className="mr-2" />
-              Start Session
-            </Button>
           </div>
+
+          <div className="w-full">
+            <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
+          </div>
+
+          <Button onClick={onStartSession} className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white px-8 h-12 text-base font-bold shadow-lg active:scale-95 transition-all">
+            <Play size={20} weight="bold" className="mr-2" />
+            Start Session
+          </Button>
         </div>
       ) : (
         <div className="flex-1 space-y-4">
-          <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
-          
           <div className="flex gap-2">
             <div className="stat-card flex-1 p-3">
               <div className="text-base font-bold text-green leading-tight">
@@ -181,6 +180,8 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
               )}
             </p>
           </Card>
+
+          <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
 
           <Button
             onClick={onEndSession}
