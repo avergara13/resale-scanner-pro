@@ -72,11 +72,11 @@ function AnimatedPercentage({ targetValue, isActive }: { targetValue: number; is
   }, [count, targetValue, isActive])
 
   if (!isActive) {
-    return <span className="text-sm font-mono font-bold text-t3">{targetValue}%</span>
+    return <span className="text-xs sm:text-sm font-mono font-bold text-t3">{targetValue}%</span>
   }
 
   return (
-    <motion.span className="text-sm font-mono font-black text-b1 tabular-nums">
+    <motion.span className="text-xs sm:text-sm font-mono font-black text-b1 tabular-nums">
       {displayValue}
     </motion.span>
   )
@@ -92,8 +92,8 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
   const progressPercentage = (completedSteps / steps.length) * 100
 
   return (
-    <div id="ai-pipeline" className="space-y-2 relative">
-      <div className="absolute left-[19px] top-6 bottom-6 w-[2px] bg-s2 overflow-hidden rounded-full">
+    <div id="ai-pipeline" className="space-y-1.5 sm:space-y-2 relative">
+      <div className="absolute left-[15px] sm:left-[17px] md:left-[19px] top-4 sm:top-5 md:top-6 bottom-4 sm:bottom-5 md:bottom-6 w-[2px] bg-s2 overflow-hidden rounded-full">
         <motion.div
           className="absolute top-0 left-0 w-full bg-gradient-to-b from-violet-500 via-cyan-500 to-green rounded-full shadow-[0_0_12px_oklch(0.55_0.20_180_/_0.4)]"
           initial={{ height: '0%' }}
@@ -202,10 +202,10 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
               />
             )}
             <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                 <div
                   className={cn(
-                    'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 relative z-10 flex-shrink-0 border-2',
+                    'w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-300 relative z-10 flex-shrink-0 border-2',
                     isComplete && 'bg-green text-white border-green shadow-[0_0_16px_oklch(0.55_0.20_145_/_0.5)]',
                     isProcessing && 'bg-b1 text-white border-b1 shadow-[0_0_20px_oklch(0.50_0.18_250_/_0.6)]',
                     isPending && 'bg-s1 text-t3 border-s2',
@@ -232,24 +232,24 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                       animate={{ scale: 1, rotate: 0 }}
                       transition={{ duration: 0.5, type: 'spring', bounce: 0.5 }}
                     >
-                      <CheckCircle size={16} weight="fill" />
+                      <CheckCircle className="w-[14px] h-[14px] sm:w-[15px] sm:h-[15px] md:w-4 md:h-4" weight="fill" />
                     </motion.div>
                   ) : isProcessing ? (
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                     >
-                      <Lightning size={16} weight="fill" />
+                      <Lightning className="w-[14px] h-[14px] sm:w-[15px] sm:h-[15px] md:w-4 md:h-4" weight="fill" />
                     </motion.div>
                   ) : (
-                    <Clock size={14} weight="bold" />
+                    <Clock className="w-[12px] h-[12px] sm:w-[13px] sm:h-[13px] md:w-[14px] md:h-[14px]" weight="bold" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-bold text-t1 uppercase tracking-wide">{config.label}</h4>
+                  <h4 className="text-[11px] sm:text-xs md:text-sm font-bold text-t1 uppercase tracking-wide">{config.label}</h4>
                   {(isProcessing || step.data) && (
                     <motion.p 
-                      className="text-xs text-t2 mt-1 font-medium"
+                      className="text-[10px] sm:text-[11px] md:text-xs text-t2 mt-0.5 sm:mt-1 font-medium line-clamp-2"
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3 }}
@@ -259,7 +259,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   )}
                   {step.error && (
                     <motion.p 
-                      className="text-xs text-red mt-1 font-semibold"
+                      className="text-[10px] sm:text-[11px] md:text-xs text-red mt-0.5 sm:mt-1 font-semibold line-clamp-1"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3 }}
@@ -269,7 +269,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-1 sm:ml-2">
                 {isProcessing && (
                   <AnimatedPercentage 
                     targetValue={step.progress ?? 0} 
@@ -278,7 +278,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                 )}
                 {isComplete && (
                   <motion.span 
-                    className="text-sm font-mono font-black text-green tabular-nums"
+                    className="text-xs sm:text-sm font-mono font-black text-green tabular-nums"
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ duration: 0.3, type: 'spring' }}
@@ -287,11 +287,11 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   </motion.span>
                 )}
                 {isPending && (
-                  <span className="text-sm font-mono font-bold text-t3 tabular-nums">0%</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-t3 tabular-nums">0%</span>
                 )}
                 {isError && (
                   <motion.span 
-                    className="text-sm font-mono font-black text-red tabular-nums"
+                    className="text-xs sm:text-sm font-mono font-black text-red tabular-nums"
                     animate={{ x: [-2, 2, -2, 2, 0] }}
                     transition={{ duration: 0.4 }}
                   >
