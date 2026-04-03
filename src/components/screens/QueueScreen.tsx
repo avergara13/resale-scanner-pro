@@ -606,14 +606,26 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
                               <Badge
                                 key={tagId}
                                 variant="outline"
-                                className="text-[10px] h-5 px-2 font-medium border"
+                                className="text-[10px] h-5 pl-2 pr-1 font-medium border flex items-center gap-1 group hover:opacity-80 transition-opacity"
                                 style={{
                                   borderColor: tag.color,
                                   backgroundColor: `${tag.color}15`,
                                   color: tag.color
                                 }}
                               >
-                                {tag.name}
+                                <span>{tag.name}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    const updatedTags = item.tags?.filter(t => t !== tagId) || []
+                                    onEdit(item.id, { tags: updatedTags })
+                                    toast.success(`Removed tag: ${tag.name}`)
+                                  }}
+                                  className="flex items-center justify-center hover:opacity-70 transition-opacity"
+                                  aria-label={`Remove ${tag.name} tag`}
+                                >
+                                  <X size={10} weight="bold" />
+                                </button>
                               </Badge>
                             )
                           })}
