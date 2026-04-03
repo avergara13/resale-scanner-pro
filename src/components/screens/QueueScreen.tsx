@@ -619,7 +619,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                     variant="secondary" 
                     className="h-5 px-2 text-[10px] font-bold bg-b1/15 text-b1 border-b1/30"
                   >
-                    {sortedItems.length} visible
+                    {sortedItems.length} visible ({Math.round((sortedItems.length / queueItems.length) * 100)}%)
                   </Badge>
                 )}
               </div>
