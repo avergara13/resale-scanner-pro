@@ -6,7 +6,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
-import { FloppyDisk, X } from '@phosphor-icons/react'
+import { FloppyDisk, X, PencilSimple } from '@phosphor-icons/react'
+import { PhotoEditor } from '@/components/PhotoEditor'
 import type { ScannedItem } from '@/types'
 
 interface ItemEditDialogProps {
@@ -25,6 +26,8 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave }: ItemEditDialog
     estimatedSellPrice: item?.estimatedSellPrice?.toString() || '',
     notes: item?.notes || '',
   })
+  const [editedImage, setEditedImage] = useState<string | null>(null)
+  const [isEditingPhoto, setIsEditingPhoto] = useState(false)
 
   useEffect(() => {
     if (item) {
@@ -36,11 +39,17 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave }: ItemEditDialog
         estimatedSellPrice: item.estimatedSellPrice?.toString() || '',
         notes: item.notes || '',
       })
+      setEditedImage(null)
     }
   }, [item])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handlePhotoSave = (newImage: string) => {
+    setEditedImage(newImage)
+    setIsEditingPhoto(false)
   }
 
   const handleSave = () => {
@@ -53,6 +62,10 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave }: ItemEditDialog
       purchasePrice: parseFloat(formData.purchasePrice) || 0,
       estimatedSellPrice: formData.estimatedSellPrice ? parseFloat(formData.estimatedSellPrice) : undefined,
       notes: formData.notes || undefined,
+    }
+
+    if (editedImage) {
+      updates.imageData = editedImage
     }
 
     if (updates.purchasePrice !== undefined && updates.estimatedSellPrice !== undefined) {
@@ -71,27 +84,51 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave }: ItemEditDialog
 
   if (!item) return null
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-bg border-s2">
-        <DialogHeader>
-          <DialogTitle className="text-lg font-semibold text-fg">Edit Item Details</DialogTitle>
-          <DialogDescription className="text-sm text-s4">
-            Update product information before creating a listing
-          </DialogDescription>
-        </DialogHeader>
+  const displayImage = editedImage || item.imageData
 
-        <ScrollArea className="max-h-[60vh]">
-          <div className="space-y-4 pr-4">
-            {item.imageData && (
-              <div className="flex justify-center">
-                <img
-                  src={item.imageData}
-                  alt={item.productName || 'Item'}
-                  className="w-full h-48 object-cover rounded-md border border-s2"
-                />
-              </div>
-            )}
+  return (
+    <>
+      {isEditingPhoto && displayImage && (
+        <PhotoEditor
+          imageData={displayImage}
+          onSave={handlePhotoSave}
+          onCancel={() => setIsEditingPhoto(false)}
+        />
+      )}
+      
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-md bg-bg border-s2">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-fg">Edit Item Details</DialogTitle>
+            <DialogDescription className="text-sm text-s4">
+              Update product information before creating a listing
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-4 pr-4">
+              {displayImage && (
+                <div className="relative">
+                  <img
+                    src={displayImage}
+                    alt={item.productName || 'Item'}
+                    className="w-full h-48 object-cover rounded-md border border-s2"
+                  />
+                  <Button
+                    onClick={() => setIsEditingPhoto(true)}
+                    className="absolute bottom-2 right-2 bg-b1 hover:bg-b2 text-bg shadow-lg"
+                    size="sm"
+                  >
+                    <PencilSimple size={16} weight="bold" className="mr-1.5" />
+                    Edit Photo
+                  </Button>
+                  {editedImage && (
+                    <Badge className="absolute top-2 left-2 bg-green text-bg">
+                      Edited
+                    </Badge>
+                  )}
+                </div>
+              )}
 
             <div className="space-y-2">
               <Label htmlFor="edit-product-name" className="text-sm font-medium text-fg">
@@ -227,5 +264,6 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave }: ItemEditDialog
         </div>
       </DialogContent>
     </Dialog>
+    </>
   )
 }
