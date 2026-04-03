@@ -699,7 +699,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="business" className="border border-s2 rounded-lg px-4 bg-s1">
+              <AccordionContent className="space-y-4 pt-2">
               <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
                 Business Rules
               </AccordionTrigger>
