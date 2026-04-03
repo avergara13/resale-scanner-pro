@@ -151,6 +151,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
   transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 * {
@@ -187,6 +189,24 @@ select {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--s2);
+  border-radius: 2px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--s3);
 }
 
 .safe-bottom {

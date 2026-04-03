@@ -347,17 +347,20 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
         onCreateTag={handleCreateTag}
       />
       <div className="px-4 py-6 border-b border-s1">
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex-1">
-            <h1 className="text-xl font-black tracking-tight">LISTING QUEUE</h1>
-            <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">{queueItems.length} Items Pending</p>
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-black tracking-tight">LISTING QUEUE</h1>
+              <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">{queueItems.length} Items Pending</p>
+            </div>
+            <ThemeToggle />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {onNavigateToLocationInsights && queueItems.some(item => item.location) && (
               <Button
                 onClick={onNavigateToLocationInsights}
                 variant="outline"
-                className="h-10 px-3 border-s2 hover:bg-s1 text-t2 font-bold text-xs transition-all"
+                className="h-10 px-3 border-s2 hover:bg-s1 text-t2 font-bold text-xs transition-all flex-shrink-0"
               >
                 <MapPin size={16} weight="bold" className="mr-2" />
                 Locations
@@ -367,18 +370,17 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               <Button
                 onClick={onNavigateToTagAnalytics}
                 variant="outline"
-                className="h-10 px-3 border-s2 hover:bg-s1 text-t2 font-bold text-xs transition-all"
+                className="h-10 px-3 border-s2 hover:bg-s1 text-t2 font-bold text-xs transition-all flex-shrink-0"
               >
                 <ChartBar size={16} weight="bold" className="mr-2" />
                 Tag ROI
               </Button>
             )}
-            <ThemeToggle />
             {unanalyzedItems.length > 0 && onBatchAnalyze && (
               <Button
                 onClick={onBatchAnalyze}
                 disabled={isBatchAnalyzing}
-                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-sm h-10 px-4 shadow-lg active:scale-95 transition-all"
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-sm h-10 px-4 shadow-lg active:scale-95 transition-all flex-shrink-0"
               >
                 <Lightning size={18} weight="fill" className="mr-2" />
                 {isBatchAnalyzing ? 'Analyzing...' : `Analyze ${unanalyzedItems.length}`}
@@ -439,14 +441,14 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
           )}
         </div>
         
-        <div className="flex items-center gap-2 mb-3">
-          <Funnel size={16} weight="bold" className="text-s4" />
-          <div className="flex gap-2 flex-1 overflow-x-auto">
+        <div className="flex items-center gap-2 mb-3 min-w-0">
+          <Funnel size={16} weight="bold" className="text-s4 flex-shrink-0" />
+          <div className="flex gap-2 flex-1 overflow-x-auto pb-1 -mb-1 scrollbar-thin">
             <Button
               onClick={() => setFilter('ALL')}
               size="sm"
               variant={filter === 'ALL' ? 'default' : 'outline'}
-              className={`h-8 px-3 text-xs font-medium flex-shrink-0 ${
+              className={`h-8 px-3 text-xs font-medium flex-shrink-0 whitespace-nowrap ${
                 filter === 'ALL' 
                   ? 'bg-b1 hover:bg-b2 text-white border-0' 
                   : 'border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1'
@@ -458,7 +460,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               onClick={() => setFilter('GO')}
               size="sm"
               variant={filter === 'GO' ? 'default' : 'outline'}
-              className={`h-8 px-3 text-xs font-medium flex-shrink-0 ${
+              className={`h-8 px-3 text-xs font-medium flex-shrink-0 whitespace-nowrap ${
                 filter === 'GO' 
                   ? 'bg-green hover:bg-green text-white border-0' 
                   : 'border border-s2 bg-transparent text-t2 hover:bg-green/10 hover:text-green'
@@ -470,7 +472,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               onClick={() => setFilter('PASS')}
               size="sm"
               variant={filter === 'PASS' ? 'default' : 'outline'}
-              className={`h-8 px-3 text-xs font-medium flex-shrink-0 ${
+              className={`h-8 px-3 text-xs font-medium flex-shrink-0 whitespace-nowrap ${
                 filter === 'PASS' 
                   ? 'bg-red hover:bg-red text-white border-0' 
                   : 'border border-s2 bg-transparent text-t2 hover:bg-red/10 hover:text-red'
@@ -482,7 +484,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               onClick={() => setFilter('PENDING')}
               size="sm"
               variant={filter === 'PENDING' ? 'default' : 'outline'}
-              className={`h-8 px-3 text-xs font-medium flex-shrink-0 ${
+              className={`h-8 px-3 text-xs font-medium flex-shrink-0 whitespace-nowrap ${
                 filter === 'PENDING' 
                   ? 'bg-amber hover:bg-amber text-white border-0' 
                   : 'border border-s2 bg-transparent text-t2 hover:bg-amber/10 hover:text-amber'

@@ -737,7 +737,7 @@ function App() {
     <div 
       id="app-container" 
       className={cn(
-        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-[480px] mx-auto",
+        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-[480px] mx-auto overflow-x-hidden",
         captureState === 'capturing' && "capture-flash",
         captureState === 'analyzing' && "analyzing-flash",
         captureState === 'success' && "success-flash",
