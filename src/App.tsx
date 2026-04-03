@@ -20,7 +20,7 @@ import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag } from './types'
 import { cn } from './lib/utils'
 
 function App() {
@@ -36,6 +36,7 @@ function App() {
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
+  const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
   const [settings, setSettings] = useKV<AppSettings>('settings', {
     voiceEnabled: true,
     autoCapture: true,

@@ -8,6 +8,7 @@ export interface GeminiVisionResponse {
   keyFeatures: string[]
   searchTerms: string[]
   confidence: number
+  suggestedTags?: string[]
 }
 
 export interface GeminiAnalysisOptions {
@@ -96,6 +97,7 @@ export class GeminiService {
         keyFeatures: result.keyFeatures || [],
         searchTerms: result.searchTerms || [result.productName],
         confidence: result.confidence || 0.5,
+        suggestedTags: result.suggestedTags || [],
       }
     } catch (error) {
       console.error('Gemini vision analysis failed:', error)
@@ -126,7 +128,8 @@ Provide your response as a JSON object with the following structure:
   "model": "Model number/name if applicable, otherwise null",
   "keyFeatures": ["List of 3-5 notable features or selling points"],
   "searchTerms": ["Array of 5-10 keywords for searching eBay/Google, including brand, category, key descriptors"],
-  "confidence": 0.0-1.0 confidence score in identification accuracy
+  "confidence": 0.0-1.0 confidence score in identification accuracy,
+  "suggestedTags": ["Array of 3-6 descriptive tags like 'Vintage', 'Designer', 'Rare', 'High Value', 'Quick Flip', 'Electronics', 'Collectible', 'Brand New', etc."]
 }
 
 Focus on:
