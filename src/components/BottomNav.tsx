@@ -19,8 +19,12 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen }: BottomNav
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 bg-fg border-t border-s1 safe-bottom z-40"
-      style={{ maxWidth: '480px', margin: '0 auto' }}
+      className="fixed bottom-0 left-0 right-0 bg-fg border-t border-s1 safe-bottom z-40 backdrop-blur-sm"
+      style={{ 
+        maxWidth: '480px', 
+        margin: '0 auto',
+        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)'
+      }}
     >
       <div className="relative h-16 flex items-center px-4">
         <div className="flex-1 flex items-center justify-around">
@@ -33,13 +37,27 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen }: BottomNav
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1 px-2 py-1 rounded-lg transition-all relative',
-                  isActive ? 'text-b1' : 'text-t4'
+                  'flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded-xl transition-all relative',
+                  isActive 
+                    ? 'text-b1 bg-blue-bg' 
+                    : 'text-t4 hover:text-t2 hover:bg-s1/50 active:scale-95'
                 )}
-                style={{ minWidth: '64px', minHeight: '44px' }}
+                style={{ minWidth: '68px', minHeight: '48px' }}
               >
-                <Icon size={20} weight={isActive ? 'fill' : 'regular'} className="relative z-10" />
-                <span className="text-[10px] font-medium relative z-10">{item.label}</span>
+                <Icon 
+                  size={22} 
+                  weight={isActive ? 'fill' : 'regular'} 
+                  className={cn(
+                    "relative z-10 transition-transform",
+                    isActive && "scale-110"
+                  )} 
+                />
+                <span className={cn(
+                  "text-[10px] font-bold relative z-10 uppercase tracking-wider",
+                  isActive && "font-extrabold"
+                )}>
+                  {item.label}
+                </span>
               </button>
             )
           })}
@@ -57,13 +75,27 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen }: BottomNav
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-1 px-2 py-1 rounded-lg transition-all relative',
-                  isActive ? 'text-b1' : 'text-t4'
+                  'flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded-xl transition-all relative',
+                  isActive 
+                    ? 'text-b1 bg-blue-bg' 
+                    : 'text-t4 hover:text-t2 hover:bg-s1/50 active:scale-95'
                 )}
-                style={{ minWidth: '64px', minHeight: '44px' }}
+                style={{ minWidth: '68px', minHeight: '48px' }}
               >
-                <Icon size={20} weight={isActive ? 'fill' : 'regular'} className="relative z-10" />
-                <span className="text-[10px] font-medium relative z-10">{item.label}</span>
+                <Icon 
+                  size={22} 
+                  weight={isActive ? 'fill' : 'regular'} 
+                  className={cn(
+                    "relative z-10 transition-transform",
+                    isActive && "scale-110"
+                  )} 
+                />
+                <span className={cn(
+                  "text-[10px] font-bold relative z-10 uppercase tracking-wider",
+                  isActive && "font-extrabold"
+                )}>
+                  {item.label}
+                </span>
               </button>
             )
           })}
@@ -72,10 +104,11 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen }: BottomNav
         <button
           id="camera-fab"
           onClick={onCameraOpen}
-          className="absolute left-1/2 -translate-x-1/2 -top-4 w-14 h-14 bg-gradient-to-br from-b1 to-amber text-white rounded-full shadow-[0_4px_20px_rgba(193,124,95,0.35)] border-4 border-fg flex items-center justify-center transition-all active:scale-95 hover:scale-105 z-50"
-          style={{ minWidth: '56px', minHeight: '56px' }}
+          className="absolute left-1/2 -translate-x-1/2 -top-5 w-16 h-16 bg-gradient-to-br from-b1 via-b1 to-amber text-white rounded-full shadow-[0_8px_24px_rgba(85,92,226,0.4),0_4px_8px_rgba(0,0,0,0.15)] border-[5px] border-fg flex items-center justify-center transition-all active:scale-95 hover:scale-110 hover:shadow-[0_12px_32px_rgba(85,92,226,0.5),0_6px_12px_rgba(0,0,0,0.2)] z-50 relative overflow-hidden"
+          style={{ minWidth: '64px', minHeight: '64px' }}
         >
-          <Eye size={24} weight="bold" />
+          <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/20 to-transparent opacity-50 animate-pulse" />
+          <Eye size={28} weight="bold" className="relative z-10 drop-shadow-md" />
         </button>
       </div>
     </nav>
