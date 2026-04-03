@@ -37,12 +37,13 @@ interface QueueScreenProps {
   isBatchAnalyzing?: boolean
   geminiService?: GeminiService | null
   onNavigateToTagAnalytics?: () => void
+  onNavigateToLocationInsights?: () => void
 }
 
 type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
 type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc'
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onBatchAnalyze, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onBatchAnalyze, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'profit-desc',
@@ -352,6 +353,16 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
             <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">{queueItems.length} Items Pending</p>
           </div>
           <div className="flex items-center gap-2">
+            {onNavigateToLocationInsights && queueItems.some(item => item.location) && (
+              <Button
+                onClick={onNavigateToLocationInsights}
+                variant="outline"
+                className="h-10 px-3 border-s2 hover:bg-s1 text-t2 font-bold text-xs transition-all"
+              >
+                <MapPin size={16} weight="bold" className="mr-2" />
+                Locations
+              </Button>
+            )}
             {onNavigateToTagAnalytics && (allTags || []).length > 0 && (
               <Button
                 onClick={onNavigateToTagAnalytics}
