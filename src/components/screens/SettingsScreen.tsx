@@ -91,7 +91,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="space-y-6 max-w-md pb-20">
-          <Accordion type="multiple" defaultValue={['health', 'detection', 'false-positives']} className="space-y-4">
+          <Accordion type="multiple" defaultValue={[]} className="space-y-4">
             <AccordionItem value="health" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 Connection Health
