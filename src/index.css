@@ -1295,14 +1295,6 @@ button:disabled {
   }
 }
 
-@keyframes border-pulse-glow {
-  0%, 100% {
-    border-color: var(--b1);
-    box-shadow: 0 0 0 0 oklch(0.55 0.15 250 / 0.4),
-                0 4px 12px oklch(0.55 0.15 250 / 0.15);
-  }
-  50% {
-    border-color: oklch(0.68 0.18 75);
     box-shadow: 0 0 0 4px oklch(0.68 0.18 75 / 0.2),
                 0 6px 20px oklch(0.68 0.18 75 / 0.25);
   }
