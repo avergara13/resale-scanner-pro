@@ -56,11 +56,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
   return (
     <div id="scr-settings" className="flex flex-col h-full">
-      <div className="px-4 py-6 border-b border-s2 bg-s1">
+      <div className="px-4 py-6 border-b border-s2 bg-fg">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-semibold text-fg mb-2">Settings</h1>
-            <p className="text-sm text-s4">Configure AI models, APIs, and business rules</p>
+            <h1 className="text-2xl font-semibold text-t1 mb-2">Settings</h1>
+            <p className="text-sm text-t2">Configure AI models, APIs, and business rules</p>
           </div>
           <ThemeToggle />
         </div>
@@ -92,15 +92,15 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="space-y-6 max-w-md pb-20">
           <Accordion type="multiple" defaultValue={['health', 'detection', 'false-positives']} className="space-y-4">
-            <AccordionItem value="health" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="health" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 Connection Health
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-s4 leading-relaxed">
+                    <p className="text-xs text-t2 leading-relaxed">
                       Real-time monitoring of API connections. Health checks run every 30 seconds to ensure reliable service.
                     </p>
                   </div>
@@ -110,15 +110,15 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="history" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="history" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 Connection History & Downtime Tracking
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-s4 leading-relaxed">
+                    <p className="text-xs text-t2 leading-relaxed">
                       Track connection events and identify downtime patterns over the last 30 days. Analyze service reliability and incident history.
                     </p>
                   </div>
@@ -128,15 +128,15 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="incidents" className="border border-s2 rounded-lg px-4 bg-s1">
-              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+            <AccordionItem value="incidents" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 Incident Logs & API Issues
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-s4 leading-relaxed">
+                    <p className="text-xs text-t2 leading-relaxed">
                       Comprehensive incident log viewer for diagnosing API connection issues. Filter by service, view detailed error messages, and track resolution times. Export logs for external analysis.
                     </p>
                   </div>
