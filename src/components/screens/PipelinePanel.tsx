@@ -212,3 +212,5 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
     </div>
   )
 }
+        )
+      })}
