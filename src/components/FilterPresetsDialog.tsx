@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookmarkSimple, Pencil, Trash, Plus, Check, X } from '@phosphor-icons/react'
+import { BookmarkSimple, Pencil, Trash, Plus, Check, X, CopySimple, Sliders } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -22,8 +22,9 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
   const [newPresetName, setNewPresetName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [customizingId, setCustomizingId] = useState<string | null>(null)
   
-  const { presets, savePreset, deletePreset, applyPreset, renamePreset } = useFilterPresets()
+  const { presets, savePreset, deletePreset, applyPreset, renamePreset, duplicatePreset } = useFilterPresets()
 
   const handleSavePreset = () => {
     if (!newPresetName.trim()) {
@@ -73,6 +74,20 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
   const handleCancelEdit = () => {
     setEditingId(null)
     setEditingName('')
+  }
+
+  const handleDuplicatePreset = (preset: FilterPreset) => {
+    const newPreset = duplicatePreset(preset.id)
+    if (newPreset) {
+      toast.success(`Preset "${preset.name}" duplicated`)
+    }
+  }
+
+  const handleCustomizePreset = (preset: FilterPreset) => {
+    setCustomizingId(preset.id)
+    onApplyPreset(preset.filters)
+    setIsOpen(false)
+    toast.info(`Customize "${preset.name}" and save as new preset`)
   }
 
   const getFilterSummary = (filters: AdvancedFilterOptions): string[] => {
@@ -219,8 +234,27 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                onClick={() => handleDuplicatePreset(preset)}
+                                className="h-7 w-7 p-0 hover:bg-blue-bg text-t3 hover:text-b1"
+                                title="Duplicate preset"
+                              >
+                                <CopySimple size={14} weight="bold" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleCustomizePreset(preset)}
+                                className="h-7 w-7 p-0 hover:bg-amber/10 text-t3 hover:text-amber"
+                                title="Customize preset"
+                              >
+                                <Sliders size={14} weight="bold" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
                                 onClick={() => handleStartEdit(preset)}
                                 className="h-7 w-7 p-0 hover:bg-s2 text-t3 hover:text-t1"
+                                title="Rename preset"
                               >
                                 <Pencil size={14} weight="bold" />
                               </Button>
@@ -229,6 +263,7 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
                                 variant="ghost"
                                 onClick={() => handleDeletePreset(preset.id, preset.name)}
                                 className="h-7 w-7 p-0 hover:bg-red-bg text-t3 hover:text-red"
+                                title="Delete preset"
                               >
                                 <Trash size={14} weight="bold" />
                               </Button>
@@ -251,13 +286,24 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
                       )}
 
                       {!isEditing && (
-                        <Button
-                          onClick={() => handleApplyPreset(preset.id)}
-                          size="sm"
-                          className="w-full h-8 text-xs font-bold bg-b1 hover:bg-b2 text-white"
-                        >
-                          Apply Preset
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleApplyPreset(preset.id)}
+                            size="sm"
+                            className="flex-1 h-8 text-xs font-bold bg-b1 hover:bg-b2 text-white"
+                          >
+                            Apply
+                          </Button>
+                          <Button
+                            onClick={() => handleCustomizePreset(preset)}
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3 text-xs font-bold border-s2 text-t2 hover:bg-amber/10 hover:text-amber hover:border-amber/30"
+                          >
+                            <Sliders size={14} weight="bold" className="mr-1.5" />
+                            Customize
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )

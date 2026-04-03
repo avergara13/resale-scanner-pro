@@ -59,12 +59,34 @@ export function useFilterPresets() {
     updatePreset(id, { name: newName })
   }, [updatePreset])
 
+  const duplicatePreset = useCallback((id: string, customName?: string) => {
+    const preset = (presets || []).find(p => p.id === id)
+    if (preset) {
+      const newPreset: FilterPreset = {
+        id: Date.now().toString(),
+        name: customName || `${preset.name} (Copy)`,
+        filters: { ...preset.filters },
+        timestamp: Date.now(),
+        usageCount: 0,
+      }
+      setPresets((current) => [...(current || []), newPreset])
+      return newPreset
+    }
+    return null
+  }, [presets, setPresets])
+
+  const customizePreset = useCallback((id: string, newFilters: AdvancedFilterOptions) => {
+    updatePreset(id, { filters: newFilters })
+  }, [updatePreset])
+
   return {
     presets: presets || [],
     savePreset,
     updatePreset,
     deletePreset,
     applyPreset,
-    renamePreset
+    renamePreset,
+    duplicatePreset,
+    customizePreset
   }
 }
