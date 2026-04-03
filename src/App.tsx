@@ -19,6 +19,8 @@ import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createObjectDetectionService } from './lib/object-detection-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
+import { createListingOptimizationService } from './lib/listing-optimization-service'
+import { createNotionService } from './lib/notion-service'
 import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
 import type { GeminiVisionResponse } from './lib/gemini-service'
@@ -52,6 +54,7 @@ function App() {
     ebayFeePercent: 12.9,
     paypalFeePercent: 3.49,
     preferredAiModel: 'gemini-2.0-flash-exp',
+    notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7', // Hobbyst Resale Inventory DB
   })
 
   const ebayService = useMemo(() => {
@@ -85,6 +88,16 @@ function App() {
   }, [settings?.geminiApiKey, settings?.preferredAiModel])
 
   const tagSuggestionService = useMemo(() => createTagSuggestionService(), [])
+
+  const listingOptimizationService = useMemo(() => 
+    createListingOptimizationService(settings?.geminiApiKey, settings?.preferredAiModel),
+    [settings?.geminiApiKey, settings?.preferredAiModel]
+  )
+
+  const notionService = useMemo(() =>
+    createNotionService(settings?.notionApiKey, settings?.notionDatabaseId),
+    [settings?.notionApiKey, settings?.notionDatabaseId]
+  )
 
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
     const updateInterval = 80
@@ -454,6 +467,63 @@ function App() {
     })
   }, [setSettings, setTheme, toggleAmbientLight])
 
+  const handleOptimizeItem = useCallback(async (itemId: string) => {
+    const item = (queue || []).find(i => i.id === itemId)
+    if (!item) return
+    const optimized = await listingOptimizationService.generateOptimizedListing({
+      item,
+      marketData: item.marketData,
+    })
+    setQueue((prev) => (prev || []).map(i =>
+      i.id === itemId
+        ? { ...i, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
+        : i
+    ))
+  }, [queue, setQueue, listingOptimizationService])
+
+  const handlePushToNotion = useCallback(async (itemId: string) => {
+    if (!notionService) {
+      toast.error('Configure Notion API key and Database ID in Settings')
+      return
+    }
+    const item = (queue || []).find(i => i.id === itemId)
+    if (!item) return
+
+    const listing = item.optimizedListing
+    const profit = listing
+      ? listing.price - item.purchasePrice
+      : (item.estimatedSellPrice || 0) - item.purchasePrice
+
+    const result = await notionService.pushListing({
+      title: listing?.title || item.productName || 'Unknown Item',
+      description: listing?.description || item.description || '',
+      price: listing?.price || item.estimatedSellPrice || 0,
+      purchasePrice: item.purchasePrice,
+      category: listing?.category || item.category || 'General',
+      condition: listing?.condition || 'Good',
+      tags: listing?.suggestedTags || [],
+      images: item.imageData ? [item.imageData] : [],
+      profit,
+      profitMargin: item.profitMargin || 0,
+      status: 'ready',
+      itemId: item.id,
+      timestamp: item.timestamp,
+      location: item.location?.name,
+      notes: item.notes,
+    })
+
+    if (result.success) {
+      setQueue((prev) => (prev || []).map(i =>
+        i.id === itemId
+          ? { ...i, notionPageId: result.pageId, notionUrl: result.url, listingStatus: 'published' }
+          : i
+      ))
+      toast.success('Pushed to Notion ✓')
+    } else {
+      toast.error(`Notion error: ${result.error}`)
+    }
+  }, [queue, setQueue, notionService])
+
   const handleSaveDraft = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData) {
       toast.error('No image to save')
@@ -784,6 +854,8 @@ function App() {
               <AgentScreen
                 queueItems={queue || []}
                 settings={settings}
+                onOptimizeItem={handleOptimizeItem}
+                onPushToNotion={handlePushToNotion}
                 onNavigateToQueue={() => setScreen('queue')}
               />
             </motion.div>
