@@ -136,6 +136,28 @@ export interface Session {
   passCount: number
   totalPotentialProfit: number
   active: boolean
+  profitGoal?: number
+}
+
+export interface ProfitGoal {
+  id: string
+  type: 'daily' | 'weekly' | 'monthly' | 'custom'
+  targetAmount: number
+  startDate: number
+  endDate: number
+  createdAt: number
+  active: boolean
+}
+
+export interface ProfitGoalProgress {
+  goal: ProfitGoal
+  currentAmount: number
+  percentageComplete: number
+  remainingAmount: number
+  daysRemaining: number
+  onTrack: boolean
+  projectedTotal: number
+  dailyAverageNeeded: number
 }
 
 export interface AppSettings {

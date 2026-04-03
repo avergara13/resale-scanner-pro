@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '../ThemeToggle'
 import { TrendVisualization } from '../TrendVisualization'
+import { ProfitGoalManager } from '../ProfitGoalManager'
 import { useKV } from '@github/spark/hooks'
 import type { Session, ScannedItem } from '@/types'
 
@@ -58,6 +59,9 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
         </div>
       ) : !session?.active ? (
         <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+          <div className="w-full mb-4">
+            <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
+          </div>
           <div className="w-24 h-24 rounded-full bg-s1 flex items-center justify-center">
             <Play size={40} weight="fill" className="text-b1 ml-1" />
           </div>
@@ -72,6 +76,8 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
         </div>
       ) : (
         <div className="flex-1 space-y-4">
+          <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
+          
           <div className="flex gap-2">
             <div className="stat-card flex-1">
               <div className="text-[22px] font-bold text-green leading-tight">
