@@ -256,11 +256,17 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       return
     }
 
-    const oldIndex = queueItems.findIndex((item) => item.id === active.id)
-    const newIndex = queueItems.findIndex((item) => item.id === over.id)
+    const oldIndex = sortedItems.findIndex((item) => item.id === active.id)
+    const newIndex = sortedItems.findIndex((item) => item.id === over.id)
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const reorderedItems = arrayMove(queueItems, oldIndex, newIndex)
+      const reorderedItems = arrayMove(sortedItems, oldIndex, newIndex)
+      
+      if (sortBy !== 'manual') {
+        setSortBy('manual')
+        toast.success('Switched to manual ordering')
+      }
+      
       onReorder(reorderedItems)
       toast.success('Queue reordered')
     }
@@ -686,7 +692,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="manual" className="text-xs">Manual Order (Drag & Drop)</SelectItem>
+                <SelectItem value="manual" className="text-xs">Manual Order</SelectItem>
                 <SelectItem value="profit-desc" className="text-xs">Profit (High to Low)</SelectItem>
                 <SelectItem value="profit-asc" className="text-xs">Profit (Low to High)</SelectItem>
                 <SelectItem value="date-desc" className="text-xs">Date (Newest First)</SelectItem>
@@ -696,6 +702,14 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               </SelectContent>
             </Select>
           </div>
+          {sortBy !== 'manual' && onReorder && (
+            <div className="bg-blue-bg border border-b1/30 rounded-lg px-3 py-2 flex items-center gap-2">
+              <DotsSixVertical size={14} weight="bold" className="text-b1 flex-shrink-0" />
+              <span className="text-xs text-t1 font-medium">
+                Drag items to switch to manual ordering
+              </span>
+            </div>
+          )}
           
           <div className="flex items-center gap-2">
             <AdvancedFilters
@@ -836,7 +850,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <LocationInsights items={queueItems} />
             </div>
           )}
-          {sortBy === 'manual' && onReorder ? (
+          {onReorder ? (
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
