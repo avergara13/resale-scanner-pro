@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X } from '@phosphor-icons/react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -41,13 +42,31 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
   )
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   
   const filteredItems = queueItems.filter(item => {
-    if (filter === 'ALL') return true
-    if (filter === 'GO') return item.decision === 'GO'
-    if (filter === 'PASS') return item.decision === 'PASS'
-    if (filter === 'PENDING') return item.decision === 'PENDING'
-    return true
+    const matchesFilter = 
+      filter === 'ALL' ||
+      (filter === 'GO' && item.decision === 'GO') ||
+      (filter === 'PASS' && item.decision === 'PASS') ||
+      (filter === 'PENDING' && item.decision === 'PENDING')
+    
+    if (!matchesFilter) return false
+    
+    if (!searchQuery.trim()) return true
+    
+    const query = searchQuery.toLowerCase().trim()
+    const productName = (item.productName || '').toLowerCase()
+    const description = (item.description || '').toLowerCase()
+    const category = (item.category || '').toLowerCase()
+    const notes = (item.notes || '').toLowerCase()
+    
+    return (
+      productName.includes(query) ||
+      description.includes(query) ||
+      category.includes(query) ||
+      notes.includes(query)
+    )
   })
   
   const sortedItems = [...filteredItems].sort((a, b) => {
@@ -215,6 +234,29 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
           </div>
         </div>
         
+        <div className="mb-3 relative">
+          <MagnifyingGlass 
+            size={18} 
+            weight="bold" 
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-s3 pointer-events-none" 
+          />
+          <Input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, description, category..."
+            className="h-10 pl-10 pr-10 bg-bg border-s2 text-t1 placeholder:text-t3 text-sm"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-t3 hover:text-t1 transition-colors"
+            >
+              <X size={16} weight="bold" />
+            </button>
+          )}
+        </div>
+        
         <div className="flex items-center gap-2 mb-3">
           <Funnel size={16} weight="bold" className="text-s4" />
           <div className="flex gap-2 flex-1 overflow-x-auto">
@@ -348,18 +390,34 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
         <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
           <div className="w-20 h-20 rounded-full bg-s1 flex items-center justify-center mb-4">
             <p className="text-3xl">
-              {filter === 'GO' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
+              {searchQuery ? '🔍' : filter === 'GO' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
             </p>
           </div>
           <h2 className="text-lg font-semibold text-t1 mb-2">
-            {queueItems.length === 0 ? 'Queue is empty' : `No ${filter} items`}
+            {searchQuery 
+              ? 'No items found' 
+              : queueItems.length === 0 
+                ? 'Queue is empty' 
+                : `No ${filter} items`
+            }
           </h2>
           <p className="text-sm text-t2 max-w-xs">
-            {queueItems.length === 0 
-              ? 'Scan items and add GO decisions to your queue'
-              : `Try selecting a different filter to view items`
+            {searchQuery 
+              ? `No items match "${searchQuery}". Try a different search term.`
+              : queueItems.length === 0 
+                ? 'Scan items and add GO decisions to your queue'
+                : `Try selecting a different filter to view items`
             }
           </p>
+          {searchQuery && (
+            <Button
+              onClick={() => setSearchQuery('')}
+              variant="outline"
+              className="mt-4 border-s2 text-t2 hover:bg-s1 hover:text-t1"
+            >
+              Clear Search
+            </Button>
+          )}
         </div>
       ) : (
         <ScrollArea className="flex-1 px-4 py-4">
