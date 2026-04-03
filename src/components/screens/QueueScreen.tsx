@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { toast } from 'sonner'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { ThemeToggle } from '../ThemeToggle'
@@ -240,6 +241,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [previousItemCount, setPreviousItemCount] = useState<number>(queueItems.length)
   const [previousFilteredCount, setPreviousFilteredCount] = useState<number | null>(null)
   const [showTrendIndicator, setShowTrendIndicator] = useState(false)
+  const [locationInsightsOpen, setLocationInsightsOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1044,11 +1046,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         </div>
       ) : (
         <ScrollArea className="flex-1 px-4 py-4">
-          {availableLocations.length > 0 && (
-            <div className="mb-6">
-              <LocationInsights items={queueItems} />
-            </div>
-          )}
           {onReorder ? (
             <DndContext
               sensors={sensors}
@@ -1197,6 +1194,37 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 )
               })}
             </div>
+          )}
+
+          {availableLocations.length > 0 && (
+            <Collapsible 
+              open={locationInsightsOpen} 
+              onOpenChange={setLocationInsightsOpen}
+              className="mt-6"
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full h-12 px-4 border-s2 hover:bg-s1 text-t1 font-bold text-sm transition-all flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🏪</span>
+                    <span className="uppercase tracking-wide">Best Performing Stores</span>
+                  </div>
+                  <CaretDown 
+                    size={20} 
+                    weight="bold" 
+                    className={cn(
+                      "transition-transform duration-200",
+                      locationInsightsOpen && "rotate-180"
+                    )}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                <LocationInsights items={queueItems} />
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </ScrollArea>
       )}
