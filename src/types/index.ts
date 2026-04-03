@@ -62,13 +62,26 @@ export interface Session {
 
 export interface AppSettings {
   geminiApiKey?: string
+  anthropicApiKey?: string
   ebayApiKey?: string
+  ebayAppId?: string
+  ebayDevId?: string
+  ebayCertId?: string
   googleApiKey?: string
+  supabaseUrl?: string
+  supabaseKey?: string
+  n8nWebhookUrl?: string
+  notionApiKey?: string
+  notionDatabaseId?: string
+  preferredAiModel?: 'gemini-2.0-flash-exp' | 'gemini-1.5-pro' | 'gemini-1.5-flash' | 'claude-3-5-sonnet'
   voiceEnabled: boolean
   autoCapture: boolean
+  agenticMode: boolean
+  liveSearchEnabled: boolean
   minProfitMargin: number
   defaultShippingCost: number
   ebayFeePercent: number
+  paypalFeePercent: number
 }
 
 export interface ChatMessage {

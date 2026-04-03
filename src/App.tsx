@@ -20,9 +20,13 @@ function App() {
   const [settings, setSettings] = useKV<AppSettings>('settings', {
     voiceEnabled: true,
     autoCapture: true,
+    agenticMode: true,
+    liveSearchEnabled: true,
     minProfitMargin: 30,
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
+    paypalFeePercent: 3.49,
+    preferredAiModel: 'gemini-2.0-flash-exp',
   })
 
   const handleCapture = useCallback(async (imageData: string, price: number) => {
@@ -165,9 +169,13 @@ function App() {
       const defaults: AppSettings = {
         voiceEnabled: true,
         autoCapture: true,
+        agenticMode: true,
+        liveSearchEnabled: true,
         minProfitMargin: 30,
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
+        paypalFeePercent: 3.49,
+        preferredAiModel: 'gemini-2.0-flash-exp',
       }
       return { ...(prev || defaults), ...updates }
     })
