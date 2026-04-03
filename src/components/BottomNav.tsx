@@ -13,7 +13,7 @@ interface BottomNavProps {
 export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureState = 'idle' }: BottomNavProps) {
   const items: Array<{ id: Screen; icon: any; label: string }> = [
     { id: 'session', icon: ChartBar, label: 'Session' },
-    { id: 'research', icon: Robot, label: 'AI Center' },
+    { id: 'agent', icon: Robot, label: 'Agent' },
     { id: 'queue', icon: Stack, label: 'Queue' },
     { id: 'settings', icon: Gear, label: 'Settings' },
   ]

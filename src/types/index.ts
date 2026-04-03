@@ -1,4 +1,4 @@
-export type Screen = 'session' | 'research' | 'ai' | 'queue' | 'settings' | 'listing' | 'chat' | 'history' | 'incidents' | 'tag-analytics' | 'location-insights'
+export type Screen = 'session' | 'agent' | 'ai' | 'queue' | 'settings' | 'listing' | 'chat' | 'history' | 'incidents' | 'tag-analytics' | 'location-insights'
 
 export type PipelinePhase = 'vision' | 'lens' | 'market' | 'profit' | 'decision'
 

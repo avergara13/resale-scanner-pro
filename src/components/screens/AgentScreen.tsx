@@ -1,0 +1,640 @@
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useKV } from '@github/spark/hooks'
+import { 
+  Robot, 
+  Sparkle, 
+  Plus,
+  Trash,
+  DotsThreeVertical,
+  PencilSimple,
+  PaperPlaneRight,
+  CaretDown,
+  CaretUp,
+  Package,
+  TrendUp,
+  ChartLine,
+  Lightbulb,
+  MagnifyingGlass,
+  Globe,
+  Stack,
+  CheckCircle,
+  Warning
+} from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { ThemeToggle } from '../ThemeToggle'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings } from '@/types'
+
+interface QuickAction {
+  emoji: string
+  label: string
+  prompt: string
+}
+
+const QUICK_ACTIONS: QuickAction[] = [
+  {
+    emoji: '🔍',
+    label: 'Market Research',
+    prompt: 'What are the most profitable items to resell right now?'
+  },
+  {
+    emoji: '💰',
+    label: 'Pricing Strategy',
+    prompt: 'How should I price items for maximum profit?'
+  },
+  {
+    emoji: '📦',
+    label: 'Create Listing',
+    prompt: 'Help me create an optimized listing for my current items in queue'
+  },
+  {
+    emoji: '📊',
+    label: 'Analyze Trends',
+    prompt: 'What trends should I watch in the resale market?'
+  },
+  {
+    emoji: '✨',
+    label: 'Optimize Queue',
+    prompt: 'Review my queue and suggest which items to prioritize'
+  },
+  {
+    emoji: '🎯',
+    label: 'Profit Tips',
+    prompt: 'Give me 3 quick tips to increase my profit margins'
+  },
+]
+
+function formatMessage(text: string): string {
+  let formatted = text
+
+  formatted = formatted.replace(/^#{1,3}\s+(.+)$/gm, '<h3 class="font-bold text-t1 mt-4 mb-2 first:mt-0">$1</h3>')
+  formatted = formatted.replace(/^\*\*(.+?)\*\*:?\s*(.*)$/gm, '<div class="mb-2"><span class="font-bold text-t1">$1:</span> <span class="text-t2">$2</span></div>')
+  formatted = formatted.replace(/^[-•]\s+(.+)$/gm, '<li class="ml-4 mb-1.5 text-t1 leading-relaxed">$1</li>')
+  formatted = formatted.replace(/(<li.*<\/li>\s*)+/g, (match) => `<ul class="space-y-1 my-3">${match}</ul>`)
+  formatted = formatted.replace(/^\d+\.\s+(.+)$/gm, '<li class="ml-4 mb-1.5 text-t1 leading-relaxed">$1</li>')
+  formatted = formatted.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 bg-s1 text-t1 rounded text-xs font-mono">$1</code>')
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-t1">$1</strong>')
+  formatted = formatted.replace(/\$(\d+(?:\.\d{2})?)/g, '<span class="font-bold text-green">$$$1</span>')
+  formatted = formatted.replace(/(\d+)%/g, '<span class="font-semibold text-b1">$1%</span>')
+
+  return formatted
+}
+
+function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLines?: number }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [needsCollapse, setNeedsCollapse] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (contentRef.current) {
+      const lineHeight = parseInt(window.getComputedStyle(contentRef.current).lineHeight)
+      const height = contentRef.current.scrollHeight
+      const lines = Math.round(height / lineHeight)
+      setNeedsCollapse(lines > maxLines)
+    }
+  }, [message, maxLines])
+
+  const formattedHTML = formatMessage(message)
+
+  return (
+    <div>
+      <div
+        ref={contentRef}
+        className={cn(
+          "text-sm overflow-hidden transition-all duration-300 prose prose-sm max-w-none",
+          !isExpanded && needsCollapse && "line-clamp-6"
+        )}
+        dangerouslySetInnerHTML={{ __html: formattedHTML }}
+      />
+      {needsCollapse && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="mt-3 text-xs font-bold text-b1 hover:text-b2 flex items-center gap-1 transition-colors px-2 py-1.5 bg-blue-bg rounded-lg"
+        >
+          {isExpanded ? (
+            <>
+              <CaretUp size={14} weight="bold" />
+              Show Less
+            </>
+          ) : (
+            <>
+              <CaretDown size={14} weight="bold" />
+              Read More
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
+
+interface AgentScreenProps {
+  queueItems?: ScannedItem[]
+  settings?: AppSettings
+  onCreateListing?: (item: ScannedItem) => void
+  onNavigateToQueue?: () => void
+}
+
+export function AgentScreen({ queueItems = [], settings, onCreateListing, onNavigateToQueue }: AgentScreenProps) {
+  const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
+  const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
+  const [input, setInput] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [showNewSessionDialog, setShowNewSessionDialog] = useState(false)
+  const [newSessionName, setNewSessionName] = useState('')
+  const [showRenameDialog, setShowRenameDialog] = useState(false)
+  const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const activeSession = chatSessions?.find(s => s.id === activeSessionId)
+  const chatMessages = activeSession?.messages || []
+
+  const queueStats = useMemo(() => {
+    const total = queueItems.length
+    const go = queueItems.filter(item => item.decision === 'GO').length
+    const pass = queueItems.filter(item => item.decision === 'PASS').length
+    const pending = queueItems.filter(item => item.decision === 'PENDING').length
+    const totalProfit = queueItems
+      .filter(item => item.decision === 'GO' && item.profitMargin)
+      .reduce((sum, item) => {
+        const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
+        return sum + profit
+      }, 0)
+    
+    return { total, go, pass, pending, totalProfit }
+  }, [queueItems])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages])
+
+  useEffect(() => {
+    if (!activeSessionId && chatSessions && chatSessions.length > 0) {
+      setActiveSessionId(chatSessions[0].id)
+    }
+  }, [activeSessionId, chatSessions, setActiveSessionId])
+
+  const handleCreateSession = useCallback(() => {
+    const name = newSessionName.trim() || `Session ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+    
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      name,
+      createdAt: Date.now(),
+      lastMessageAt: Date.now(),
+      messages: [],
+      isActive: true,
+    }
+
+    setChatSessions((prev) => {
+      const updated = (prev || []).map(s => ({ ...s, isActive: false }))
+      return [newSession, ...updated]
+    })
+    
+    setActiveSessionId(newSession.id)
+    setNewSessionName('')
+    setShowNewSessionDialog(false)
+    toast.success('New session created')
+  }, [newSessionName, setChatSessions, setActiveSessionId])
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    setChatSessions((prev) => {
+      const filtered = (prev || []).filter(s => s.id !== sessionId)
+      return filtered
+    })
+    
+    if (activeSessionId === sessionId) {
+      const remaining = (chatSessions || []).filter(s => s.id !== sessionId)
+      if (remaining.length > 0) {
+        setActiveSessionId(remaining[0].id)
+      } else {
+        setActiveSessionId(null)
+      }
+    }
+    
+    toast.success('Session deleted')
+  }, [chatSessions, activeSessionId, setChatSessions, setActiveSessionId])
+
+  const handleRenameSession = useCallback(() => {
+    if (!renameSessionId || !renameValue.trim()) {
+      toast.error('Session name cannot be empty')
+      return
+    }
+
+    setChatSessions((prev) =>
+      (prev || []).map((s) =>
+        s.id === renameSessionId ? { ...s, name: renameValue.trim() } : s
+      )
+    )
+
+    setShowRenameDialog(false)
+    setRenameSessionId(null)
+    setRenameValue('')
+    toast.success('Session renamed')
+  }, [renameSessionId, renameValue, setChatSessions])
+
+  const handleOpenRenameDialog = useCallback((sessionId: string) => {
+    const session = chatSessions?.find(s => s.id === sessionId)
+    if (session) {
+      setRenameSessionId(sessionId)
+      setRenameValue(session.name)
+      setShowRenameDialog(true)
+    }
+  }, [chatSessions])
+
+  const handleSwitchSession = useCallback((sessionId: string) => {
+    setChatSessions((prev) => 
+      (prev || []).map(s => ({ ...s, isActive: s.id === sessionId }))
+    )
+    setActiveSessionId(sessionId)
+  }, [setChatSessions, setActiveSessionId])
+
+  const buildContext = useCallback(() => {
+    const queueSummary = queueItems.slice(0, 10).map(item => ({
+      name: item.productName || 'Unknown',
+      price: item.purchasePrice,
+      estimatedSell: item.estimatedSellPrice,
+      decision: item.decision,
+      profitMargin: item.profitMargin
+    }))
+
+    return {
+      queueStats,
+      recentItems: queueSummary,
+      settings: {
+        minProfitMargin: settings?.minProfitMargin,
+        defaultShipping: settings?.defaultShippingCost,
+        ebayFeePercent: settings?.ebayFeePercent
+      }
+    }
+  }, [queueItems, queueStats, settings])
+
+  const handleSendMessage = useCallback(async (messageText?: string) => {
+    const text = messageText || input.trim()
+    if (!text || isProcessing) return
+
+    if (!activeSessionId) {
+      handleCreateSession()
+      setTimeout(() => {
+        setInput(text)
+      }, 100)
+      return
+    }
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
+    }
+
+    setChatSessions((prev) => 
+      (prev || []).map(s => 
+        s.id === activeSessionId 
+          ? { ...s, messages: [...s.messages, userMessage], lastMessageAt: Date.now() }
+          : s
+      )
+    )
+
+    setInput('')
+    setIsProcessing(true)
+
+    try {
+      const context = buildContext()
+      const systemPrompt = `You are an expert AI agent for resale business optimization. You help users research products, analyze profitability, create optimized listings, and make data-driven decisions.
+
+Current Context:
+- Queue has ${queueStats.total} items (${queueStats.go} GO, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
+- Potential profit: $${queueStats.totalProfit.toFixed(2)}
+- Settings: ${settings?.minProfitMargin}% min margin, ${settings?.ebayFeePercent}% eBay fees
+
+When asked to create listings, provide detailed, optimized titles, descriptions, and pricing strategies.
+When analyzing trends, reference real market data and best practices.
+Be proactive and actionable - suggest specific next steps the user can take.`
+
+      const fullPrompt = `${systemPrompt}\n\nUser: ${text}`
+      const response = await window.spark.llm(fullPrompt, settings?.preferredAiModel || 'gpt-4o')
+
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: response,
+        timestamp: Date.now(),
+      }
+
+      setChatSessions((prev) =>
+        (prev || []).map(s =>
+          s.id === activeSessionId
+            ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
+            : s
+        )
+      )
+    } catch (error) {
+      console.error('Error sending message:', error)
+      toast.error('Failed to get response from AI')
+    } finally {
+      setIsProcessing(false)
+    }
+  }, [input, isProcessing, activeSessionId, handleCreateSession, setChatSessions, buildContext, queueStats, settings])
+
+  const handleQuickAction = useCallback((prompt: string) => {
+    setInput(prompt)
+    inputRef.current?.focus()
+  }, [])
+
+  const hasMessages = chatMessages.length > 0
+
+  return (
+    <div className="flex flex-col h-full bg-bg">
+      <div className="flex items-center justify-between px-4 py-4 bg-fg border-b border-s1">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-br from-b1 to-b2 rounded-xl">
+            <Robot size={24} weight="bold" className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-t1">Agent</h1>
+            <p className="text-xs text-t3">AI Research & Automation</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowNewSessionDialog(true)}
+            className="h-9 px-3"
+          >
+            <Plus size={18} weight="bold" />
+          </Button>
+          <ThemeToggle />
+        </div>
+      </div>
+
+      {chatSessions && chatSessions.length > 0 && (
+        <div className="px-4 py-3 bg-fg border-b border-s1">
+          <ScrollArea className="w-full">
+            <div className="flex gap-2 pb-2">
+              {chatSessions.map((session) => (
+                <div key={session.id} className="relative group">
+                  <button
+                    onClick={() => handleSwitchSession(session.id)}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-2",
+                      session.id === activeSessionId
+                        ? "bg-b1 text-white"
+                        : "bg-s1 text-t2 hover:bg-s2 hover:text-t1"
+                    )}
+                  >
+                    {session.name}
+                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className={cn(
+                          "absolute -top-1 -right-1 p-1 bg-s2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity",
+                          session.id === activeSessionId && "bg-b2"
+                        )}
+                      >
+                        <DotsThreeVertical size={12} weight="bold" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleOpenRenameDialog(session.id)}>
+                        <PencilSimple size={16} className="mr-2" />
+                        Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => handleDeleteSession(session.id)}
+                        className="text-red"
+                      >
+                        <Trash size={16} className="mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      <div className="px-4 py-3 bg-s1/30 border-b border-s1">
+        <div className="grid grid-cols-4 gap-2">
+          <Card className="p-3 flex flex-col items-center justify-center">
+            <div className="text-xs text-t3 font-semibold uppercase tracking-wide mb-1">Queue</div>
+            <div className="text-lg font-black text-t1">{queueStats.total}</div>
+          </Card>
+          <Card className="p-3 flex flex-col items-center justify-center">
+            <div className="text-xs text-green font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
+              <CheckCircle size={12} weight="fill" />
+              GO
+            </div>
+            <div className="text-lg font-black text-green">{queueStats.go}</div>
+          </Card>
+          <Card className="p-3 flex flex-col items-center justify-center">
+            <div className="text-xs text-red font-semibold uppercase tracking-wide mb-1 flex items-center gap-1">
+              <Warning size={12} weight="fill" />
+              PASS
+            </div>
+            <div className="text-lg font-black text-red">{queueStats.pass}</div>
+          </Card>
+          <Card className="p-3 flex flex-col items-center justify-center">
+            <div className="text-xs text-t3 font-semibold uppercase tracking-wide mb-1">Profit</div>
+            <div className="text-sm font-black text-green">${queueStats.totalProfit.toFixed(0)}</div>
+          </Card>
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1 px-4">
+        <div className="py-4 space-y-4">
+          {!hasMessages && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <div className="text-center py-8">
+                <div className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4">
+                  <Sparkle size={32} weight="fill" className="text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
+                <p className="text-sm text-t3 max-w-xs mx-auto">
+                  Your AI assistant for research, insights, and automated listing creation
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-xs font-bold uppercase tracking-wider text-t2 px-1">
+                  Quick Actions
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {QUICK_ACTIONS.map((action, index) => (
+                    <motion.button
+                      key={action.label}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => handleQuickAction(action.prompt)}
+                      className="p-3 bg-fg border border-s1 rounded-xl hover:border-b1 hover:bg-blue-bg transition-all text-left group"
+                    >
+                      <div className="text-2xl mb-2">{action.emoji}</div>
+                      <div className="text-xs font-bold text-t1 group-hover:text-b1 transition-colors">
+                        {action.label}
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {hasMessages && (
+            <>
+              {chatMessages.map((msg, index) => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.02 }}
+                  className={cn(
+                    "flex gap-3",
+                    msg.role === 'user' ? "justify-end" : "justify-start"
+                  )}
+                >
+                  {msg.role === 'assistant' && (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
+                      <Robot size={18} weight="bold" className="text-white" />
+                    </div>
+                  )}
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-2xl px-4 py-3",
+                      msg.role === 'user'
+                        ? "bg-gradient-to-br from-b1 to-b2 text-white"
+                        : "bg-fg border border-s1"
+                    )}
+                  >
+                    {msg.role === 'user' ? (
+                      <p className="text-sm leading-relaxed">{msg.content}</p>
+                    ) : (
+                      <CollapsibleMessage message={msg.content} />
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </>
+          )}
+
+          {isProcessing && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-3 justify-start"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
+                <Robot size={18} weight="bold" className="text-white" />
+              </div>
+              <div className="bg-fg border border-s1 rounded-2xl px-4 py-3">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
+
+      <div className="p-4 bg-fg border-t border-s1 safe-bottom">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSendMessage()
+          }}
+          className="flex gap-2"
+        >
+          <Input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask me anything about your resale business..."
+            disabled={isProcessing}
+            className="flex-1"
+          />
+          <Button
+            type="submit"
+            disabled={!input.trim() || isProcessing}
+            className="px-4"
+          >
+            <PaperPlaneRight size={20} weight="bold" />
+          </Button>
+        </form>
+      </div>
+
+      <Dialog open={showNewSessionDialog} onOpenChange={setShowNewSessionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Chat Session</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newSessionName}
+            onChange={(e) => setNewSessionName(e.target.value)}
+            placeholder="Session name (optional)"
+            onKeyDown={(e) => e.key === 'Enter' && handleCreateSession()}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowNewSessionDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateSession}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Session</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            placeholder="New session name"
+            onKeyDown={(e) => e.key === 'Enter' && handleRenameSession()}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowRenameDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameSession}>Rename</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

@@ -8,7 +8,7 @@ import { ConnectionHealthMonitor } from './components/ConnectionHealthMonitor'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
-import { ResearchScreen } from './components/screens/ResearchScreen'
+import { AgentScreen } from './components/screens/AgentScreen'
 import { IncidentsScreen } from './components/screens/IncidentsScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -27,7 +27,7 @@ import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, 
 import { cn } from './lib/utils'
 
 function App() {
-  const [screen, setScreen] = useState<Screen>('ai')
+  const [screen, setScreen] = useState<Screen>('agent')
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
@@ -714,8 +714,8 @@ function App() {
 
   const screenOrder: Record<Screen, number> = {
     'session': 0,
-    'ai': 1,
-    'research': 2,
+    'agent': 1,
+    'ai': 2,
     'queue': 3,
     'incidents': 4,
     'settings': 5,
@@ -766,9 +766,9 @@ function App() {
               />
             </motion.div>
           )}
-          {screen === 'research' && (
+          {screen === 'agent' && (
             <motion.div
-              key="research"
+              key="agent"
               custom={direction}
               variants={screenVariants}
               initial="initial"
@@ -777,7 +777,11 @@ function App() {
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
               className="w-full h-full"
             >
-              <ResearchScreen />
+              <AgentScreen
+                queueItems={queue || []}
+                settings={settings}
+                onNavigateToQueue={() => setScreen('queue')}
+              />
             </motion.div>
           )}
           {screen === 'incidents' && (
