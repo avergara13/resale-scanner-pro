@@ -641,19 +641,56 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <Separator className="bg-s2" />
 
-                <div className="flex items-center justify-between py-2">
+                <div className="space-y-3">
                   <div>
-                    <Label htmlFor="dark-mode" className="text-sm text-fg font-medium">
-                      Dark Mode
+                    <Label htmlFor="theme-mode" className="text-sm text-fg font-medium">
+                      Theme Mode
                     </Label>
                     <p className="text-xs text-s4 mt-0.5">Optimized for low-light scanning</p>
                   </div>
-                  <Switch
-                    id="dark-mode"
-                    checked={settings.darkMode}
-                    onCheckedChange={(checked) => onUpdate({ darkMode: checked })}
-                  />
+                  <Select 
+                    value={settings.themeMode || 'auto'}
+                    onValueChange={(value) => onUpdate({ themeMode: value as 'light' | 'dark' | 'auto' })}
+                  >
+                    <SelectTrigger id="theme-mode" className="text-sm">
+                      <SelectValue placeholder="Select theme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="light">☀️ Light</SelectItem>
+                      <SelectItem value="dark">🌙 Dark</SelectItem>
+                      <SelectItem value="auto">🔄 Auto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {settings.themeMode === 'auto' && (
+                    <div className="p-3 bg-blue-bg border border-b1/20 rounded-md">
+                      <p className="text-xs text-t2">
+                        <span className="font-semibold text-b1">🕐 Time-based mode:</span> Automatically switches to light theme from 6 AM to 6 PM, and dark theme from 6 PM to 6 AM.
+                      </p>
+                    </div>
+                  )}
+                  {settings.themeMode === 'dark' && (
+                    <p className="text-xs text-s4">Always use dark theme for scanning</p>
+                  )}
+                  {settings.themeMode === 'light' && (
+                    <p className="text-xs text-s4">Always use light theme</p>
+                  )}
                 </div>
+
+                {settings.themeMode === 'auto' && (
+                  <div className="flex items-center justify-between py-2 pl-4 border-l-2 border-b1">
+                    <div>
+                      <Label htmlFor="use-ambient-light" className="text-sm text-fg font-medium">
+                        Use Ambient Light Sensor
+                      </Label>
+                      <p className="text-xs text-s4 mt-0.5">Switch theme based on room lighting (experimental)</p>
+                    </div>
+                    <Switch
+                      id="use-ambient-light"
+                      checked={settings.useAmbientLight || false}
+                      onCheckedChange={(checked) => onUpdate({ useAmbientLight: checked })}
+                    />
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
 

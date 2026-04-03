@@ -31,7 +31,7 @@ function App() {
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   
   const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
-  const { theme, setTheme } = useTheme()
+  const { theme, themeMode, setTheme, useAmbientLight, toggleAmbientLight } = useTheme()
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -394,13 +394,21 @@ function App() {
       }
       const newSettings = { ...(prev || defaults), ...updates }
       
-      if ('darkMode' in updates && updates.darkMode !== undefined) {
+      if ('themeMode' in updates && updates.themeMode !== undefined) {
+        setTheme(updates.themeMode)
+      }
+      
+      if ('useAmbientLight' in updates && updates.useAmbientLight !== undefined) {
+        toggleAmbientLight()
+      }
+      
+      if ('darkMode' in updates && updates.darkMode !== undefined && !('themeMode' in updates)) {
         setTheme(updates.darkMode ? 'dark' : 'light')
       }
       
       return newSettings
     })
-  }, [setSettings, setTheme])
+  }, [setSettings, setTheme, toggleAmbientLight])
 
   const handleSaveDraft = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData) {
@@ -628,10 +636,14 @@ function App() {
   }, [cameraOpen, reset])
 
   useEffect(() => {
-    if (settings && settings.darkMode !== undefined) {
-      setTheme(settings.darkMode ? 'dark' : 'light')
+    if (settings) {
+      if (settings.themeMode) {
+        setTheme(settings.themeMode)
+      } else if (settings.darkMode !== undefined) {
+        setTheme(settings.darkMode ? 'dark' : 'light')
+      }
     }
-  }, [settings?.darkMode, setTheme])
+  }, [settings?.themeMode, settings?.darkMode, setTheme])
 
   return (
     <div 

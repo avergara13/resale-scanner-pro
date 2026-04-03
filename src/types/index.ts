@@ -127,6 +127,8 @@ export interface AppSettings {
   agenticMode: boolean
   liveSearchEnabled: boolean
   darkMode: boolean
+  themeMode?: 'light' | 'dark' | 'auto'
+  useAmbientLight?: boolean
   minProfitMargin: number
   defaultShippingCost: number
   ebayFeePercent: number
