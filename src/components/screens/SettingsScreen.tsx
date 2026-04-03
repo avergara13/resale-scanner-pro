@@ -94,7 +94,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
           <Accordion type="multiple" defaultValue={[]} className="space-y-4">
             <AccordionItem value="health" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                Connection Health
+                💚 Connection Health
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
@@ -112,7 +112,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
             <AccordionItem value="history" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                Connection History & Downtime Tracking
+                📊 Connection History & Downtime Tracking
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
@@ -130,7 +130,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
             <AccordionItem value="incidents" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                Incident Logs & API Issues
+                🚨 Incident Logs & API Issues
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
@@ -149,8 +149,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             <AccordionItem value="detection" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
-                  <ClockCounterClockwise size={18} />
-                  Multi-Object Detection History
+                  📸 Multi-Object Detection History
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
@@ -170,8 +169,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             <AccordionItem value="false-positives" className="border-2 border-b1 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
-                  <Target size={20} weight="duotone" className="text-b1" />
-                  False Positive Analysis & Optimization
+                  🎯 False Positive Analysis & Optimization
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
@@ -209,7 +207,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
             <AccordionItem value="ai" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                AI Configuration
+                🤖 AI Configuration
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
@@ -294,7 +292,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
             <AccordionItem value="google" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                Google Cloud APIs
+                🔍 Google Cloud APIs
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
@@ -380,7 +378,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
             <AccordionItem value="ebay" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                eBay Integration
+                🛒 eBay Integration
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
@@ -489,7 +487,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
             <AccordionItem value="database" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                Database & Automation
+                🗄️ Database & Automation
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div>
@@ -587,7 +585,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
             <AccordionItem value="features" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                Feature Toggles
+                🎛️ Feature Toggles
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div className="flex items-center justify-between py-2">
@@ -703,7 +701,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
             <AccordionItem value="tag-presets" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                Tag Presets
+                🏷️ Tag Presets
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
@@ -725,7 +723,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
             <AccordionItem value="business" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                Business Rules
+                💰 Business Rules
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
                 <div>
