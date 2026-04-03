@@ -347,6 +347,24 @@ function App() {
     })
   }, [setSettings])
 
+  const handleSaveDraft = useCallback((price: number, notes: string) => {
+    if (!currentItem?.imageData) {
+      toast.error('No image to save')
+      return
+    }
+
+    const draftItem: ScannedItem = {
+      ...currentItem,
+      purchasePrice: price > 0 ? price : currentItem.purchasePrice,
+      notes: notes || currentItem.notes,
+      inQueue: true,
+    }
+
+    setQueue((prev) => [...(prev || []), draftItem])
+    toast.success('Draft saved to queue')
+    setScreen('queue')
+  }, [currentItem, setQueue])
+
   return (
     <div id="app-container" className="relative">
       <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
@@ -371,6 +389,7 @@ function App() {
           settings={settings}
           onAddToQueue={handleAddToQueue}
           onDeepSearch={() => toast.info('Deep search feature coming soon')}
+          onSaveDraft={handleSaveDraft}
         />
       )}
       {screen === 'queue' && (

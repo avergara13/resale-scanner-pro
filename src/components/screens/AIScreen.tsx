@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Robot, PencilSimple, Plus, Microphone, Scan } from '@phosphor-icons/react'
+import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
@@ -19,15 +19,18 @@ interface AIScreenProps {
   settings?: AppSettings
   onAddToQueue: () => void
   onDeepSearch: () => void
+  onSaveDraft: (price: number, notes: string) => void
 }
 
-export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeepSearch }: AIScreenProps) {
+export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeepSearch, onSaveDraft }: AIScreenProps) {
   const [tab, setTab] = useState<'agent' | 'manual'>('agent')
   const [description, setDescription] = useState('')
+  const [buyPrice, setBuyPrice] = useState('')
   const { isListening, startListening, isSupported } = useVoiceInput()
 
   const hasDecision = pipeline.some(p => p.id === 'decision' && p.status === 'complete')
   const decision = currentItem?.decision
+  const canSaveDraft = currentItem?.imageData || description.trim().length > 0
 
   return (
     <div id="scr-ai" className="flex flex-col h-full">
@@ -140,11 +143,11 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
         )}
       </ScrollArea>
 
-      <div id="ai-input-bar" className="absolute bottom-0 left-0 right-0 p-4 bg-bg/90 backdrop-blur-md border-t border-s2 z-20">
+      <div id="ai-input-bar" className="absolute bottom-0 left-0 right-0 p-4 bg-bg/90 backdrop-blur-md border-t border-s2 z-20 space-y-3">
         {tab === 'agent' && hasDecision && (
           <Button
             onClick={onAddToQueue}
-            className="w-full bg-b1 hover:bg-b2 text-bg h-12 font-medium mb-3"
+            className="w-full bg-b1 hover:bg-b2 text-bg h-12 font-medium"
           >
             <Plus size={20} weight="bold" className="mr-2" />
             Add to Queue
@@ -152,6 +155,15 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
         )}
         
         <div className="flex gap-2">
+          <Input
+            id="ai-price"
+            type="number"
+            step="0.01"
+            placeholder="Buy $"
+            value={buyPrice}
+            onChange={(e) => setBuyPrice(e.target.value)}
+            className="w-24 h-12 font-mono"
+          />
           <div className="flex-1 relative">
             <Textarea
               id="ai-describe"
@@ -176,6 +188,18 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
             )}
           </div>
         </div>
+
+        <Button
+          onClick={() => {
+            const price = parseFloat(buyPrice) || 0
+            onSaveDraft(price, description)
+          }}
+          disabled={!canSaveDraft}
+          className="w-full bg-t1 hover:bg-t2 text-bg h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <FloppyDisk size={18} weight="bold" className="mr-2" />
+          SAVE DRAFT TO QUEUE
+        </Button>
       </div>
     </div>
   )
