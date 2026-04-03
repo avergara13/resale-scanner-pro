@@ -8,6 +8,7 @@ export interface PipelineStep {
   id: PipelinePhase
   label: string
   status: 'pending' | 'processing' | 'complete' | 'error'
+  progress?: number
   data?: any
   error?: string
 }

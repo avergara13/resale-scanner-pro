@@ -75,6 +75,19 @@ function App() {
     )
   }, [settings?.geminiApiKey, settings?.preferredAiModel])
 
+  const simulateProgress = useCallback((stepIndex: number, duration: number) => {
+    const steps = [25, 50, 75, 95]
+    const interval = duration / steps.length
+    
+    steps.forEach((progress, i) => {
+      setTimeout(() => {
+        setPipeline(prev => prev.map((s, idx) => 
+          idx === stepIndex ? { ...s, progress } : s
+        ))
+      }, interval * (i + 1))
+    })
+  }, [])
+
   const handleCapture = useCallback(async (imageData: string, price: number) => {
     triggerCapture()
     setCameraOpen(false)
@@ -91,11 +104,11 @@ function App() {
     setScreen('ai')
     
     const steps: PipelineStep[] = [
-      { id: 'vision', label: 'Vision Analysis', status: 'processing' },
-      { id: 'lens', label: 'Google Lens', status: 'pending' },
-      { id: 'market', label: 'Market Research', status: 'pending' },
-      { id: 'profit', label: 'Profit Calculation', status: 'pending' },
-      { id: 'decision', label: 'Decision', status: 'pending' },
+      { id: 'vision', label: 'Vision Analysis', status: 'processing', progress: 0 },
+      { id: 'lens', label: 'Google Lens', status: 'pending', progress: 0 },
+      { id: 'market', label: 'Market Research', status: 'pending', progress: 0 },
+      { id: 'profit', label: 'Profit Calculation', status: 'pending', progress: 0 },
+      { id: 'decision', label: 'Decision', status: 'pending', progress: 0 },
     ]
     setPipeline(steps)
     
@@ -104,6 +117,8 @@ function App() {
     try {
       let visionResult: GeminiVisionResponse | undefined
       let mockProductName = 'Unknown Product'
+      
+      simulateProgress(0, 3000)
       
       if (geminiService) {
         try {
@@ -140,10 +155,12 @@ function App() {
       
       await new Promise(resolve => setTimeout(resolve, 500))
       setPipeline(prev => prev.map((s, i) => 
-        i === 0 ? s : i === 1 ? { ...s, status: 'processing' } : s
+        i === 0 ? s : i === 1 ? { ...s, status: 'processing', progress: 0 } : s
       ))
       
       let lensAnalysis: GoogleLensAnalysis | undefined
+      
+      simulateProgress(1, 2500)
       
       if (googleLensService) {
         try {
@@ -189,11 +206,13 @@ function App() {
       
       await new Promise(resolve => setTimeout(resolve, 500))
       setPipeline(prev => prev.map((s, i) => 
-        i <= 1 ? s : i === 2 ? { ...s, status: 'processing' } : s
+        i <= 1 ? s : i === 2 ? { ...s, status: 'processing', progress: 0 } : s
       ))
       
       let marketData: typeof newItem.marketData = undefined
       let ebayAvgPrice = price * 4.5
+      
+      simulateProgress(2, 3800)
       
       if (ebayService) {
         try {
@@ -244,8 +263,10 @@ function App() {
       
       await new Promise(resolve => setTimeout(resolve, 500))
       setPipeline(prev => prev.map((s, i) => 
-        i <= 2 ? s : i === 3 ? { ...s, status: 'processing' } : s
+        i <= 2 ? s : i === 3 ? { ...s, status: 'processing', progress: 0 } : s
       ))
+      
+      simulateProgress(3, 1600)
       
       await new Promise(resolve => setTimeout(resolve, 1000))
       

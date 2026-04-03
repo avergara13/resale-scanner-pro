@@ -1,5 +1,6 @@
 import { Eye, MagnifyingGlass, TrendUp, Calculator, CheckCircle, Lightning, Clock } from '@phosphor-icons/react'
-import { motion } from 'framer-motion'
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
+import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import type { PipelineStep } from '@/types'
 
@@ -50,6 +51,32 @@ const phaseConfig = {
   },
 }
 
+function AnimatedPercentage({ targetValue, isActive }: { targetValue: number; isActive: boolean }) {
+  const count = useMotionValue(0)
+  const rounded = useTransform(count, Math.round)
+  const displayValue = useTransform(rounded, (latest) => `${latest}%`)
+
+  useEffect(() => {
+    if (isActive) {
+      const controls = animate(count, targetValue, {
+        duration: 0.5,
+        ease: 'easeOut'
+      })
+      return controls.stop
+    }
+  }, [count, targetValue, isActive])
+
+  if (!isActive) {
+    return <span className="text-xs font-mono font-bold text-t3">{targetValue}%</span>
+  }
+
+  return (
+    <motion.span className="text-xs font-mono font-bold text-b1 tabular-nums">
+      {displayValue}
+    </motion.span>
+  )
+}
+
 export function PipelinePanel({ steps }: PipelinePanelProps) {
   if (steps.length === 0) {
     return null
@@ -93,10 +120,10 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
             )}
           >
             <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div
                   className={cn(
-                    'w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 relative z-10',
+                    'w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 relative z-10 flex-shrink-0',
                     isComplete && 'bg-green text-bg shadow-[0_0_12px_oklch(0.60_0.17_145_/_0.4)]',
                     isProcessing && 'bg-b1 text-bg shadow-[0_0_12px_oklch(0.55_0.15_250_/_0.4)]',
                     isPending && 'bg-s2 text-t4',
@@ -121,13 +148,23 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   {step.error && <p className="text-[10px] text-red mt-0.5">{step.error}</p>}
                 </div>
               </div>
-              {isProcessing && (
-                <div className="flex gap-1 flex-shrink-0 ml-2">
-                  <div className="w-1.5 h-1.5 bg-b1 rounded-full animate-bounce" />
-                  <div className="w-1.5 h-1.5 bg-b1 rounded-full animate-bounce [animation-delay:0.2s]" />
-                  <div className="w-1.5 h-1.5 bg-b1 rounded-full animate-bounce [animation-delay:0.4s]" />
-                </div>
-              )}
+              <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                {isProcessing && (
+                  <AnimatedPercentage 
+                    targetValue={step.progress ?? 0} 
+                    isActive={true}
+                  />
+                )}
+                {isComplete && (
+                  <span className="text-xs font-mono font-bold text-green tabular-nums">100%</span>
+                )}
+                {isPending && (
+                  <span className="text-xs font-mono font-bold text-t4 tabular-nums">0%</span>
+                )}
+                {isError && (
+                  <span className="text-xs font-mono font-bold text-red tabular-nums">ERR</span>
+                )}
+              </div>
             </div>
 
             {isProcessing && (
