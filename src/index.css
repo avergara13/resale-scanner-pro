@@ -1,1 +1,85 @@
-/* This is where custom CSS goes */
+@import 'tailwindcss';
+@import "tw-animate-css";
+
+@layer base {
+  * {
+    @apply border-border
+  }
+}
+
+:root {
+  --bg: oklch(0.99 0 0);
+  --fg: oklch(0.25 0 0);
+  
+  --s1: oklch(0.96 0 0);
+  --s2: oklch(0.88 0 0);
+  --s3: oklch(0.65 0 0);
+  --s4: oklch(0.45 0 0);
+  
+  --b1: oklch(0.55 0.15 250);
+  --b2: oklch(0.42 0.12 250);
+  
+  --t1: oklch(0.35 0.08 250);
+  --t2: oklch(0.85 0.05 250);
+  --t3: oklch(0.92 0.03 250);
+  --t4: oklch(0.97 0.01 250);
+  
+  --green: oklch(0.60 0.17 145);
+  --amber: oklch(0.75 0.15 75);
+  --red: oklch(0.58 0.20 25);
+  
+  --border: var(--s2);
+  --radius: 0.5rem;
+}
+
+@theme {
+  --font-family-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-family-mono: 'IBM Plex Mono', monospace;
+  
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-s1: var(--s1);
+  --color-s2: var(--s2);
+  --color-s3: var(--s3);
+  --color-s4: var(--s4);
+  --color-b1: var(--b1);
+  --color-b2: var(--b2);
+  --color-t1: var(--t1);
+  --color-t2: var(--t2);
+  --color-t3: var(--t3);
+  --color-t4: var(--t4);
+  --color-green: var(--green);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
+  --color-border: var(--border);
+  
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.5);
+  --radius-xl: calc(var(--radius) * 2);
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background-color: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: var(--font-family-mono);
+}
+
+#app-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
