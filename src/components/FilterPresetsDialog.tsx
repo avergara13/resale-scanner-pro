@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { BookmarkSimple, Pencil, Trash, Plus, Check, X, CopySimple, Sliders } from '@phosphor-icons/react'
+import { BookmarkSimple, Pencil, Trash, Plus, Check, X, CopySimple, Sliders, DotsThreeVertical } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
@@ -230,44 +231,49 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
                                 </p>
                               )}
                             </div>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDuplicatePreset(preset)}
-                                className="h-7 w-7 p-0 hover:bg-blue-bg text-t3 hover:text-b1"
-                                title="Duplicate preset"
-                              >
-                                <CopySimple size={14} weight="bold" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleCustomizePreset(preset)}
-                                className="h-7 w-7 p-0 hover:bg-amber/10 text-t3 hover:text-amber"
-                                title="Customize preset"
-                              >
-                                <Sliders size={14} weight="bold" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleStartEdit(preset)}
-                                className="h-7 w-7 p-0 hover:bg-s2 text-t3 hover:text-t1"
-                                title="Rename preset"
-                              >
-                                <Pencil size={14} weight="bold" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDeletePreset(preset.id, preset.name)}
-                                className="h-7 w-7 p-0 hover:bg-red-bg text-t3 hover:text-red"
-                                title="Delete preset"
-                              >
-                                <Trash size={14} weight="bold" />
-                              </Button>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-t3 hover:text-t1 hover:bg-s2"
+                                  title="Quick actions"
+                                >
+                                  <DotsThreeVertical size={18} weight="bold" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-52 bg-fg border-s2 shadow-xl">
+                                <DropdownMenuItem
+                                  onClick={() => handleDuplicatePreset(preset)}
+                                  className="gap-2 cursor-pointer text-t2 hover:text-t1 hover:bg-blue-bg focus:bg-blue-bg focus:text-b1"
+                                >
+                                  <CopySimple size={16} weight="bold" className="text-b1" />
+                                  <span className="font-semibold">Duplicate</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleCustomizePreset(preset)}
+                                  className="gap-2 cursor-pointer text-t2 hover:text-t1 hover:bg-amber/10 focus:bg-amber/10 focus:text-amber"
+                                >
+                                  <Sliders size={16} weight="bold" className="text-amber" />
+                                  <span className="font-semibold">Customize</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-s2" />
+                                <DropdownMenuItem
+                                  onClick={() => handleStartEdit(preset)}
+                                  className="gap-2 cursor-pointer text-t2 hover:text-t1 hover:bg-s1 focus:bg-s1"
+                                >
+                                  <Pencil size={16} weight="bold" />
+                                  <span className="font-semibold">Rename</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDeletePreset(preset.id, preset.name)}
+                                  className="gap-2 cursor-pointer text-t2 hover:text-red hover:bg-red-bg focus:bg-red-bg focus:text-red"
+                                >
+                                  <Trash size={16} weight="bold" className="text-red" />
+                                  <span className="font-semibold">Delete</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </>
                         )}
                       </div>
@@ -286,24 +292,13 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
                       )}
 
                       {!isEditing && (
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleApplyPreset(preset.id)}
-                            size="sm"
-                            className="flex-1 h-8 text-xs font-bold bg-b1 hover:bg-b2 text-white"
-                          >
-                            Apply
-                          </Button>
-                          <Button
-                            onClick={() => handleCustomizePreset(preset)}
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3 text-xs font-bold border-s2 text-t2 hover:bg-amber/10 hover:text-amber hover:border-amber/30"
-                          >
-                            <Sliders size={14} weight="bold" className="mr-1.5" />
-                            Customize
-                          </Button>
-                        </div>
+                        <Button
+                          onClick={() => handleApplyPreset(preset.id)}
+                          size="sm"
+                          className="w-full h-8 text-xs font-bold bg-b1 hover:bg-b2 text-white"
+                        >
+                          Apply Preset
+                        </Button>
                       )}
                     </div>
                   )
