@@ -187,11 +187,9 @@ select {
 #app-container {
   width: 100%;
   min-height: 100vh;
-  display: flex;
+  overflow-x: hidden;
   flex-direction: column;
   overflow-x: hidden;
-}
-
 .scrollbar-thin::-webkit-scrollbar {
   height: 4px;
 }
@@ -207,6 +205,8 @@ select {
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: var(--s3);
+}
+
 }
 
 .safe-bottom {
