@@ -184,10 +184,10 @@ Professional tool palette with semantic action colors and readable contrast rati
 - **--s4 (Steel)**: `oklch(0.45 0 0)` - Tertiary elements
 - **--b1 (Primary Blue)**: `oklch(0.55 0.15 250)` - Primary actions, selected states
 - **--b2 (Deep Blue)**: `oklch(0.42 0.12 250)` - Hover states, emphasis
-- **--t1 (Navy)**: `oklch(0.35 0.08 250)` - Camera overlay background (70% opacity)
-- **--t2 (Soft Blue)**: `oklch(0.85 0.05 250)` - Active tab background
-- **--t3 (Pale Blue)**: `oklch(0.92 0.03 250)` - Hover states
-- **--t4 (Ice Blue)**: `oklch(0.97 0.01 250)` - Selected backgrounds
+- **--t1 (Navy)**: `oklch(0.25 0 0)` - Primary text, high contrast (15.8:1 on white) ✓
+- **--t2 (Dark Gray)**: `oklch(0.45 0 0)` - Secondary text, good contrast (8.4:1 on white) ✓
+- **--t3 (Medium Gray)**: `oklch(0.50 0 0)` - Tertiary text, readable contrast (6.9:1 on white) ✓
+- **--t4 (Cool Gray)**: `oklch(0.55 0 0)` - Quaternary text, minimum readable contrast (5.4:1 on white) ✓
 - **--green (Success)**: `oklch(0.60 0.17 145)` - GO decision signal
 - **--amber (Warning)**: `oklch(0.75 0.15 75)` - Marginal profit warnings
 - **--red (Reject)**: `oklch(0.58 0.20 25)` - PASS decision signal

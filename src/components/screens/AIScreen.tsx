@@ -41,8 +41,8 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
               <Robot size={18} weight="fill" />
             </div>
             <div>
-              <h2 className="font-bold text-sm">AI COMMAND CENTER</h2>
-              <p className="text-[10px] text-t4 font-medium">Gemini 3 Flash · Grounded</p>
+              <h2 className="font-bold text-sm text-t1">AI COMMAND CENTER</h2>
+              <p className="text-[10px] text-t2 font-medium">Gemini 3 Flash · Grounded</p>
             </div>
           </div>
           <ApiStatusIndicator settings={settings} compact liveUpdates={true} />

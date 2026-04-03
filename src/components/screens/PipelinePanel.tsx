@@ -67,7 +67,7 @@ function AnimatedPercentage({ targetValue, isActive }: { targetValue: number; is
   }, [count, targetValue, isActive])
 
   if (!isActive) {
-    return <span className="text-xs font-mono font-bold text-t3">{targetValue}%</span>
+    return <span className="text-xs font-mono font-bold text-t2">{targetValue}%</span>
   }
 
   return (
@@ -126,7 +126,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                     'w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 relative z-10 flex-shrink-0',
                     isComplete && 'bg-green text-bg shadow-[0_0_12px_oklch(0.60_0.17_145_/_0.4)]',
                     isProcessing && 'bg-b1 text-bg shadow-[0_0_12px_oklch(0.55_0.15_250_/_0.4)]',
-                    isPending && 'bg-s2 text-t4',
+                    isPending && 'bg-s2 text-t2',
                     isError && 'bg-red text-bg shadow-[0_0_12px_oklch(0.58_0.20_25_/_0.4)]'
                   )}
                 >
@@ -141,7 +141,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                 <div className="flex-1 min-w-0">
                   <h4 className="text-xs font-bold text-t1 uppercase tracking-wider">{config.label}</h4>
                   {(isProcessing || step.data) && (
-                    <p className="text-[10px] text-t3 mt-0.5">
+                    <p className="text-[10px] text-t2 mt-0.5">
                       {step.data && typeof step.data === 'string' ? step.data : config.detail}
                     </p>
                   )}
@@ -159,7 +159,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   <span className="text-xs font-mono font-bold text-green tabular-nums">100%</span>
                 )}
                 {isPending && (
-                  <span className="text-xs font-mono font-bold text-t4 tabular-nums">0%</span>
+                  <span className="text-xs font-mono font-bold text-t2 tabular-nums">0%</span>
                 )}
                 {isError && (
                   <span className="text-xs font-mono font-bold text-red tabular-nums">ERR</span>

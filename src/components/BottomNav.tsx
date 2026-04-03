@@ -42,7 +42,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
                   'flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded-xl transition-all relative',
                   isActive 
                     ? 'text-b1 bg-blue-bg' 
-                    : 'text-t4 hover:text-t2 hover:bg-s1/50 active:scale-95'
+                    : 'text-t2 hover:text-t1 hover:bg-s1/50 active:scale-95'
                 )}
                 style={{ minWidth: '68px', minHeight: '48px' }}
               >
@@ -80,7 +80,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
                   'flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded-xl transition-all relative',
                   isActive 
                     ? 'text-b1 bg-blue-bg' 
-                    : 'text-t4 hover:text-t2 hover:bg-s1/50 active:scale-95'
+                    : 'text-t2 hover:text-t1 hover:bg-s1/50 active:scale-95'
                 )}
                 style={{ minWidth: '68px', minHeight: '48px' }}
               >
