@@ -370,6 +370,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         return false
       }
     }
+
+    if (advancedFilters.tags && advancedFilters.tags.length > 0) {
+      if (!item.tags || !advancedFilters.tags.some(tagId => item.tags?.includes(tagId))) {
+        return false
+      }
+    }
     
     if (!searchQuery.trim()) return true
     
@@ -509,6 +515,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       newFilters.locations = currentLocations.filter((l: string) => l !== value)
       if (newFilters.locations.length === 0) {
         delete newFilters.locations
+      }
+    } else if (filterKey === 'tags' && value) {
+      const currentTags = newFilters.tags || []
+      newFilters.tags = currentTags.filter((t: string) => t !== value)
+      if (newFilters.tags.length === 0) {
+        delete newFilters.tags
       }
     } else {
       delete newFilters[filterKey]
@@ -656,33 +668,69 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           )}
         </div>
         
-        {availableLocations.length > 0 && (
-          <div className="flex items-center gap-2 mb-3">
-            <MapPin size={16} weight="bold" className="text-s4 flex-shrink-0" />
-            <Select
-              value={advancedFilters.locations?.[0] || 'all'}
-              onValueChange={(value) => {
-                if (value === 'all') {
-                  setAdvancedFilters({ ...advancedFilters, locations: undefined })
-                } else {
-                  setAdvancedFilters({ ...advancedFilters, locations: [value] })
-                }
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                <SelectValue placeholder="All Locations" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs">All Locations</SelectItem>
-                {availableLocations.map(loc => (
-                  <SelectItem key={loc.id} value={loc.id} className="text-xs">
-                    {loc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="flex flex-col gap-2 mb-3">
+          {availableLocations.length > 0 && (
+            <div className="flex items-center gap-2">
+              <MapPin size={16} weight="bold" className="text-s4 flex-shrink-0" />
+              <Select
+                value={advancedFilters.locations?.[0] || 'all'}
+                onValueChange={(value) => {
+                  if (value === 'all') {
+                    setAdvancedFilters({ ...advancedFilters, locations: undefined })
+                  } else {
+                    setAdvancedFilters({ ...advancedFilters, locations: [value] })
+                  }
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
+                  <SelectValue placeholder="All Locations" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">All Locations</SelectItem>
+                  {availableLocations.map(loc => (
+                    <SelectItem key={loc.id} value={loc.id} className="text-xs">
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {(allTags || []).length > 0 && (
+            <div className="flex items-center gap-2">
+              <Tag size={16} weight="bold" className="text-s4 flex-shrink-0" />
+              <Select
+                value={advancedFilters.tags?.[0] || 'all'}
+                onValueChange={(value) => {
+                  if (value === 'all') {
+                    setAdvancedFilters({ ...advancedFilters, tags: undefined })
+                  } else {
+                    setAdvancedFilters({ ...advancedFilters, tags: [value] })
+                  }
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
+                  <SelectValue placeholder="All Tags" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">All Tags</SelectItem>
+                  {(allTags || []).map(tag => (
+                    <SelectItem key={tag.id} value={tag.id} className="text-xs">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        <span>{tag.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
 
         <div className="flex flex-col gap-2.5 mb-3">
           <div className="flex items-center gap-2">

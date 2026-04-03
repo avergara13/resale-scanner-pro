@@ -1,7 +1,9 @@
 import { X } from '@phosphor-icons/react'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
+import { useKV } from '@github/spark/hooks'
 import type { AdvancedFilterOptions } from './AdvancedFilters'
+import type { ItemTag } from '@/types'
 import { cn } from '@/lib/utils'
 
 interface ActiveFiltersSummaryProps {
@@ -11,11 +13,14 @@ interface ActiveFiltersSummaryProps {
 }
 
 export function ActiveFiltersSummary({ filters, onRemoveFilter, className }: ActiveFiltersSummaryProps) {
+  const [allTags] = useKV<ItemTag[]>('all-tags', [])
+
   const hasActiveFilters = 
     filters.priceRange || 
     filters.profitMarginRange || 
     filters.dateRange || 
-    (filters.categories && filters.categories.length > 0)
+    (filters.categories && filters.categories.length > 0) ||
+    (filters.tags && filters.tags.length > 0)
 
   if (!hasActiveFilters) return null
 
@@ -63,6 +68,31 @@ export function ActiveFiltersSummary({ filters, onRemoveFilter, className }: Act
           <X size={12} weight="bold" className="group-hover:scale-110 transition-transform" />
         </Badge>
       ))}
+
+      {filters.tags && filters.tags.map((tagId) => {
+        const tag = (allTags || []).find(t => t.id === tagId)
+        if (!tag) return null
+        return (
+          <Badge
+            key={tagId}
+            className="text-xs font-semibold px-2 py-1 flex items-center gap-1.5 cursor-pointer transition-all group"
+            style={{
+              backgroundColor: `${tag.color}15`,
+              borderColor: tag.color,
+              color: tag.color,
+              border: '1px solid'
+            }}
+            onClick={() => onRemoveFilter('tags', tagId)}
+          >
+            <div 
+              className="w-2 h-2 rounded-full flex-shrink-0" 
+              style={{ backgroundColor: tag.color }}
+            />
+            <span>{tag.name}</span>
+            <X size={12} weight="bold" className="group-hover:scale-110 transition-transform" />
+          </Badge>
+        )
+      })}
     </div>
   )
 }

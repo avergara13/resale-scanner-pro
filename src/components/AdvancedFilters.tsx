@@ -25,6 +25,7 @@ export interface AdvancedFilterOptions {
   }
   categories?: string[]
   locations?: string[]
+  tags?: string[]
 }
 
 interface AdvancedFiltersProps {
