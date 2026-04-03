@@ -38,6 +38,7 @@ function App() {
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
+  const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
   const [settings, setSettings] = useKV<AppSettings>('settings', {
     voiceEnabled: true,
@@ -412,10 +413,12 @@ function App() {
 
   const handleEndSession = useCallback(() => {
     if (session) {
-      setSession({ ...session, endTime: Date.now(), active: false })
+      const endedSession = { ...session, endTime: Date.now(), active: false }
+      setSession(endedSession)
+      setAllSessions((prev) => [...(prev || []), endedSession])
       toast.success('Session ended')
     }
-  }, [session, setSession])
+  }, [session, setSession, setAllSessions])
 
   const handleUpdateSettings = useCallback((updates: Partial<AppSettings>) => {
     setSettings((prev) => {

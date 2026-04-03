@@ -388,6 +388,263 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
           </div>
         </div>
       </Card>
+
+      <Card className="p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-b1/10 flex items-center justify-center">
+            <TrendUp size={16} weight="bold" className="text-b1" />
+          </div>
+          <h3 className="text-sm font-bold text-t1 uppercase tracking-wide">Growth Metrics</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 bg-s1 rounded-lg">
+            <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">Profit Growth</p>
+            <div className="flex items-baseline gap-1">
+              <p className={cn(
+                'text-lg font-bold mono',
+                profitTrend.trend === 'up' ? 'text-green' : profitTrend.trend === 'down' ? 'text-red' : 'text-t3'
+              )}>
+                {profitTrend.changePercent >= 0 ? '+' : ''}{profitTrend.changePercent.toFixed(1)}%
+              </p>
+            </div>
+            <p className="text-[9px] text-t4 mt-0.5">
+              vs previous period
+            </p>
+          </div>
+          
+          <div className="p-3 bg-s1 rounded-lg">
+            <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">Volume Growth</p>
+            <div className="flex items-baseline gap-1">
+              <p className={cn(
+                'text-lg font-bold mono',
+                volumeTrend.trend === 'up' ? 'text-green' : volumeTrend.trend === 'down' ? 'text-red' : 'text-t3'
+              )}>
+                {volumeTrend.changePercent >= 0 ? '+' : ''}{volumeTrend.changePercent.toFixed(1)}%
+              </p>
+            </div>
+            <p className="text-[9px] text-t4 mt-0.5">
+              scans per day
+            </p>
+          </div>
+          
+          <div className="p-3 bg-s1 rounded-lg">
+            <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">GO Rate Change</p>
+            <div className="flex items-baseline gap-1">
+              <p className={cn(
+                'text-lg font-bold mono',
+                goRateTrend.trend === 'up' ? 'text-green' : goRateTrend.trend === 'down' ? 'text-red' : 'text-t3'
+              )}>
+                {goRateTrend.changePercent >= 0 ? '+' : ''}{goRateTrend.changePercent.toFixed(1)}%
+              </p>
+            </div>
+            <p className="text-[9px] text-t4 mt-0.5">
+              success rate change
+            </p>
+          </div>
+          
+          <div className="p-3 bg-s1 rounded-lg">
+            <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">Avg Profit/Item</p>
+            <div className="flex items-baseline gap-1">
+              <p className={cn(
+                'text-lg font-bold mono',
+                avgProfitTrend.trend === 'up' ? 'text-green' : avgProfitTrend.trend === 'down' ? 'text-red' : 'text-t3'
+              )}>
+                {avgProfitTrend.changePercent >= 0 ? '+' : ''}{avgProfitTrend.changePercent.toFixed(1)}%
+              </p>
+            </div>
+            <p className="text-[9px] text-t4 mt-0.5">
+              per item growth
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-green/10 flex items-center justify-center">
+            <CurrencyDollar size={16} weight="bold" className="text-green" />
+          </div>
+          <h3 className="text-sm font-bold text-t1 uppercase tracking-wide">Profit Breakdown</h3>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-2 bg-s1 rounded-lg">
+            <span className="text-xs text-t2">Current Period Total</span>
+            <span className="text-sm font-bold mono text-green">
+              ${(profitTrend.current * Math.ceil(dailyMetrics.length / 2)).toFixed(2)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between p-2 bg-s1 rounded-lg">
+            <span className="text-xs text-t2">Previous Period Total</span>
+            <span className="text-sm font-bold mono text-t3">
+              ${(profitTrend.previous * Math.floor(dailyMetrics.length / 2)).toFixed(2)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between p-2 bg-gradient-to-r from-green/10 to-transparent rounded-lg border border-green/20">
+            <span className="text-xs font-bold text-t1">Net Change</span>
+            <span className={cn(
+              'text-base font-bold mono',
+              profitTrend.change >= 0 ? 'text-green' : 'text-red'
+            )}>
+              {profitTrend.change >= 0 ? '+' : ''}${((profitTrend.current - profitTrend.previous) * Math.ceil(dailyMetrics.length / 2)).toFixed(2)}
+            </span>
+          </div>
+        </div>
+      </Card>
+
+      {sessions && sessions.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-amber/10 flex items-center justify-center">
+              <Calendar size={16} weight="bold" className="text-amber" />
+            </div>
+            <h3 className="text-sm font-bold text-t1 uppercase tracking-wide">Recent Sessions</h3>
+          </div>
+          <div className="space-y-2">
+            {sessions.slice(-5).reverse().map((session, idx) => {
+              const duration = session.endTime 
+                ? session.endTime - session.startTime 
+                : Date.now() - session.startTime
+              const profitPerHour = (session.totalPotentialProfit / (duration / 3600000)).toFixed(2)
+              
+              return (
+                <div key={session.id} className="p-3 bg-s1 rounded-lg hover:bg-s2 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={session.active ? "default" : "secondary"} className={cn(
+                        "text-[9px] uppercase px-2 py-0.5",
+                        session.active ? "bg-green text-white" : ""
+                      )}>
+                        {session.active ? 'Active' : 'Ended'}
+                      </Badge>
+                      <span className="text-[10px] text-t3">
+                        {new Date(session.startTime).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    <span className="text-sm font-bold mono text-green">
+                      ${session.totalPotentialProfit.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px]">
+                    <div className="flex items-center gap-3 text-t3">
+                      <span>{session.itemsScanned} scans</span>
+                      <span className="text-green">{session.goCount} GO</span>
+                      <span className="text-red">{session.passCount} PASS</span>
+                    </div>
+                    <span className="text-t4 mono">${profitPerHour}/hr</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+
+      {sessions && sessions.length >= 2 && (
+        <Card className="p-4 bg-gradient-to-br from-b1/5 to-transparent border-b1/20">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-b1/10 flex items-center justify-center">
+              <TrendUp size={16} weight="bold" className="text-b1" />
+            </div>
+            <h3 className="text-sm font-bold text-t1 uppercase tracking-wide">Session Comparison</h3>
+          </div>
+          <div className="space-y-4">
+            {(() => {
+              const completedSessions = sessions.filter(s => !s.active && s.endTime)
+              if (completedSessions.length < 2) return null
+              
+              const lastSession = completedSessions[completedSessions.length - 1]
+              const previousSession = completedSessions[completedSessions.length - 2]
+              
+              const profitChange = lastSession.totalPotentialProfit - previousSession.totalPotentialProfit
+              const profitChangePercent = previousSession.totalPotentialProfit > 0 
+                ? (profitChange / previousSession.totalPotentialProfit) * 100 
+                : 0
+              
+              const volumeChange = lastSession.itemsScanned - previousSession.itemsScanned
+              const volumeChangePercent = previousSession.itemsScanned > 0 
+                ? (volumeChange / previousSession.itemsScanned) * 100 
+                : 0
+              
+              const goRateChange = (
+                (lastSession.itemsScanned > 0 ? (lastSession.goCount / lastSession.itemsScanned) * 100 : 0) -
+                (previousSession.itemsScanned > 0 ? (previousSession.goCount / previousSession.itemsScanned) * 100 : 0)
+              )
+              
+              return (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 bg-fg rounded-lg">
+                      <p className="text-[9px] uppercase tracking-wide text-t4 mb-1">Last Session</p>
+                      <p className="text-base font-bold mono text-green">${lastSession.totalPotentialProfit.toFixed(2)}</p>
+                      <p className="text-[9px] text-t3 mt-0.5">{lastSession.itemsScanned} scans</p>
+                    </div>
+                    <div className="p-3 bg-fg rounded-lg">
+                      <p className="text-[9px] uppercase tracking-wide text-t4 mb-1">Previous Session</p>
+                      <p className="text-base font-bold mono text-t3">${previousSession.totalPotentialProfit.toFixed(2)}</p>
+                      <p className="text-[9px] text-t3 mt-0.5">{previousSession.itemsScanned} scans</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 bg-fg rounded-lg">
+                      <span className="text-xs text-t2">Profit Change</span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'text-sm font-bold mono',
+                          profitChange >= 0 ? 'text-green' : 'text-red'
+                        )}>
+                          {profitChange >= 0 ? '+' : ''}${profitChange.toFixed(2)}
+                        </span>
+                        <Badge variant="secondary" className={cn(
+                          'text-[9px] font-bold',
+                          profitChange >= 0 ? 'bg-green/10 text-green' : 'bg-red/10 text-red'
+                        )}>
+                          {profitChangePercent >= 0 ? '+' : ''}{profitChangePercent.toFixed(1)}%
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-2 bg-fg rounded-lg">
+                      <span className="text-xs text-t2">Volume Change</span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'text-sm font-bold mono',
+                          volumeChange >= 0 ? 'text-green' : 'text-red'
+                        )}>
+                          {volumeChange >= 0 ? '+' : ''}{volumeChange}
+                        </span>
+                        <Badge variant="secondary" className={cn(
+                          'text-[9px] font-bold',
+                          volumeChange >= 0 ? 'bg-green/10 text-green' : 'bg-red/10 text-red'
+                        )}>
+                          {volumeChangePercent >= 0 ? '+' : ''}{volumeChangePercent.toFixed(1)}%
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-2 bg-fg rounded-lg">
+                      <span className="text-xs text-t2">GO Rate Change</span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'text-sm font-bold mono',
+                          goRateChange >= 0 ? 'text-green' : 'text-red'
+                        )}>
+                          {goRateChange >= 0 ? '+' : ''}{goRateChange.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        </Card>
+      )}
     </div>
   )
 }
