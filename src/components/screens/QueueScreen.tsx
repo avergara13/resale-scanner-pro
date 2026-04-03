@@ -615,12 +615,26 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                   {queueItems.length} Items Total
                 </p>
                 {sortedItems.length !== queueItems.length && (
-                  <Badge 
-                    variant="secondary" 
-                    className="h-5 px-2 text-[10px] font-bold bg-b1/15 text-b1 border-b1/30"
-                  >
-                    {sortedItems.length} visible ({Math.round((sortedItems.length / queueItems.length) * 100)}%)
-                  </Badge>
+                  (() => {
+                    const percentage = Math.round((sortedItems.length / queueItems.length) * 100)
+                    const isHighVisibility = percentage >= 80
+                    const isMediumVisibility = percentage >= 50 && percentage < 80
+                    const isLowVisibility = percentage < 50
+                    
+                    return (
+                      <Badge 
+                        variant="secondary" 
+                        className={cn(
+                          "h-5 px-2 text-[10px] font-bold border",
+                          isHighVisibility && "bg-green/15 text-green border-green/30",
+                          isMediumVisibility && "bg-amber/15 text-amber border-amber/30",
+                          isLowVisibility && "bg-red/15 text-red border-red/30"
+                        )}
+                      >
+                        {sortedItems.length} visible ({percentage}%)
+                      </Badge>
+                    )
+                  })()
                 )}
               </div>
             </div>
