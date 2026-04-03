@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
-import { TrendUp, TrendDown, Tag, CurrencyDollar, ChartBar, Package, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { useMemo, useState } from 'react'
+import { TrendUp, TrendDown, Tag, CurrencyDollar, ChartBar, Package, CheckCircle, XCircle, Percent, Target, Lightning, Calendar, Sparkle, ArrowsClockwise } from '@phosphor-icons/react'
 import { Card } from './ui/card'
 import { Badge } from './ui/badge'
 import { Progress } from './ui/progress'
+import { Button } from './ui/button'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs'
 import type { ScannedItem, ItemTag } from '@/types'
 
 interface TagAnalytics {
@@ -19,10 +21,20 @@ interface TagAnalytics {
   avgMargin: number
   avgPurchasePrice: number
   avgSellPrice: number
+  avgROI: number
+  medianProfit: number
+  profitPerItem: number
+  successRate: number
+  velocityScore: number
   bestItem?: ScannedItem
   worstItem?: ScannedItem
   trend: 'up' | 'down' | 'stable'
   trendPercentage: number
+  last7DaysCount: number
+  last30DaysCount: number
+  last7DaysProfit: number
+  last30DaysProfit: number
+  profitByWeek: number[]
 }
 
 interface TagAnalyticsProps {
@@ -31,11 +43,22 @@ interface TagAnalyticsProps {
 }
 
 export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
+  const [sortBy, setSortBy] = useState<'profit' | 'roi' | 'velocity' | 'success'>('profit')
+  const [timeRange, setTimeRange] = useState<'7days' | '30days' | 'all'>('all')
+
   const analytics = useMemo(() => {
     const tagMap = new Map<string, TagAnalytics>()
+    const now = Date.now()
 
     tags.forEach(tag => {
-      const taggedItems = items.filter(item => item.tags?.includes(tag.id))
+      const allTaggedItems = items.filter(item => item.tags?.includes(tag.id))
+      
+      let taggedItems = allTaggedItems
+      if (timeRange === '7days') {
+        taggedItems = allTaggedItems.filter(item => item.timestamp > now - 7 * 24 * 60 * 60 * 1000)
+      } else if (timeRange === '30days') {
+        taggedItems = allTaggedItems.filter(item => item.timestamp > now - 30 * 24 * 60 * 60 * 1000)
+      }
       
       if (taggedItems.length === 0) {
         tagMap.set(tag.id, {
@@ -52,8 +75,18 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
           avgMargin: 0,
           avgPurchasePrice: 0,
           avgSellPrice: 0,
+          avgROI: 0,
+          medianProfit: 0,
+          profitPerItem: 0,
+          successRate: 0,
+          velocityScore: 0,
           trend: 'stable',
           trendPercentage: 0,
+          last7DaysCount: 0,
+          last30DaysCount: 0,
+          last7DaysProfit: 0,
+          last30DaysProfit: 0,
+          profitByWeek: [0, 0, 0, 0],
         })
         return
       }
@@ -66,13 +99,25 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
         (item.estimatedSellPrice || 0) - item.purchasePrice
       )
       const margins = goItems.map(item => item.profitMargin || 0).filter(m => m > 0)
+      const rois = goItems.map(item => {
+        const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
+        return item.purchasePrice > 0 ? (profit / item.purchasePrice) * 100 : 0
+      }).filter(r => r > 0)
       
       const totalProfit = profits.reduce((sum, p) => sum + p, 0)
       const avgProfit = profits.length > 0 ? totalProfit / profits.length : 0
       const avgMargin = margins.length > 0 ? margins.reduce((sum, m) => sum + m, 0) / margins.length : 0
+      const avgROI = rois.length > 0 ? rois.reduce((sum, r) => sum + r, 0) / rois.length : 0
+      
+      const sortedProfits = [...profits].sort((a, b) => a - b)
+      const medianProfit = sortedProfits.length > 0 
+        ? sortedProfits[Math.floor(sortedProfits.length / 2)] 
+        : 0
       
       const avgPurchasePrice = taggedItems.reduce((sum, item) => sum + item.purchasePrice, 0) / taggedItems.length
       const avgSellPrice = goItems.reduce((sum, item) => sum + (item.estimatedSellPrice || 0), 0) / (goItems.length || 1)
+      const profitPerItem = totalProfit / taggedItems.length
+      const successRate = taggedItems.length > 0 ? (goItems.length / taggedItems.length) * 100 : 0
 
       const sortedByProfit = [...goItems].sort((a, b) => {
         const profitA = (a.estimatedSellPrice || 0) - a.purchasePrice
@@ -80,9 +125,30 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
         return profitB - profitA
       })
 
-      const now = Date.now()
-      const last7Days = taggedItems.filter(item => item.timestamp > now - 7 * 24 * 60 * 60 * 1000)
-      const prev7Days = taggedItems.filter(item => 
+      const last7Days = allTaggedItems.filter(item => item.timestamp > now - 7 * 24 * 60 * 60 * 1000)
+      const last30Days = allTaggedItems.filter(item => item.timestamp > now - 30 * 24 * 60 * 60 * 1000)
+      const last7DaysGo = last7Days.filter(item => item.decision === 'GO')
+      const last30DaysGo = last30Days.filter(item => item.decision === 'GO')
+      
+      const last7DaysProfit = last7DaysGo.reduce((sum, item) => 
+        sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0
+      )
+      const last30DaysProfit = last30DaysGo.reduce((sum, item) => 
+        sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0
+      )
+
+      const profitByWeek = [0, 1, 2, 3].map(weekOffset => {
+        const weekStart = now - ((weekOffset + 1) * 7 * 24 * 60 * 60 * 1000)
+        const weekEnd = now - (weekOffset * 7 * 24 * 60 * 60 * 1000)
+        const weekItems = allTaggedItems.filter(item => 
+          item.timestamp >= weekStart && item.timestamp < weekEnd && item.decision === 'GO'
+        )
+        return weekItems.reduce((sum, item) => 
+          sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0
+        )
+      }).reverse()
+
+      const prev7Days = allTaggedItems.filter(item => 
         item.timestamp > now - 14 * 24 * 60 * 60 * 1000 && 
         item.timestamp <= now - 7 * 24 * 60 * 60 * 1000
       )
@@ -90,8 +156,8 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
       let trend: 'up' | 'down' | 'stable' = 'stable'
       let trendPercentage = 0
       
-      if (prev7Days.length > 0) {
-        const lastGoRate = last7Days.filter(i => i.decision === 'GO').length / last7Days.length
+      if (prev7Days.length > 0 && last7Days.length > 0) {
+        const lastGoRate = last7DaysGo.length / last7Days.length
         const prevGoRate = prev7Days.filter(i => i.decision === 'GO').length / prev7Days.length
         
         if (lastGoRate > prevGoRate * 1.05) {
@@ -102,6 +168,10 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
           trendPercentage = ((prevGoRate - lastGoRate) / prevGoRate) * 100
         }
       }
+
+      const velocityScore = last7Days.length > 0 
+        ? (last7DaysGo.length / last7Days.length) * (last7DaysProfit / (last7Days.length || 1))
+        : 0
 
       tagMap.set(tag.id, {
         tagId: tag.id,
@@ -117,18 +187,54 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
         avgMargin,
         avgPurchasePrice,
         avgSellPrice,
+        avgROI,
+        medianProfit,
+        profitPerItem,
+        successRate,
+        velocityScore,
         bestItem: sortedByProfit[0],
         worstItem: sortedByProfit[sortedByProfit.length - 1],
         trend,
         trendPercentage,
+        last7DaysCount: last7Days.length,
+        last30DaysCount: last30Days.length,
+        last7DaysProfit,
+        last30DaysProfit,
+        profitByWeek,
       })
     })
 
-    return Array.from(tagMap.values()).sort((a, b) => b.totalProfit - a.totalProfit)
-  }, [items, tags])
+    const analyticsArray = Array.from(tagMap.values())
+    
+    return analyticsArray.sort((a, b) => {
+      if (sortBy === 'profit') return b.totalProfit - a.totalProfit
+      if (sortBy === 'roi') return b.avgROI - a.avgROI
+      if (sortBy === 'velocity') return b.velocityScore - a.velocityScore
+      if (sortBy === 'success') return b.successRate - a.successRate
+      return b.totalProfit - a.totalProfit
+    })
+  }, [items, tags, timeRange, sortBy])
 
   const topPerformers = analytics.slice(0, 3).filter(a => a.totalItems > 0)
   const needsAttention = analytics.filter(a => a.totalItems > 0 && a.goRate < 50).slice(0, 3)
+
+  const overallStats = useMemo(() => {
+    const activeAnalytics = analytics.filter(a => a.totalItems > 0)
+    if (activeAnalytics.length === 0) return null
+
+    const totalProfit = activeAnalytics.reduce((sum, a) => sum + a.totalProfit, 0)
+    const totalItems = activeAnalytics.reduce((sum, a) => sum + a.totalItems, 0)
+    const totalGoItems = activeAnalytics.reduce((sum, a) => sum + a.goItems, 0)
+    const avgROI = activeAnalytics.reduce((sum, a) => sum + a.avgROI, 0) / activeAnalytics.length
+
+    return {
+      totalProfit,
+      totalItems,
+      totalGoItems,
+      avgROI,
+      overallGoRate: (totalGoItems / totalItems) * 100,
+    }
+  }, [analytics])
 
   if (tags.length === 0) {
     return (
@@ -142,6 +248,104 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
 
   return (
     <div className="space-y-6">
+      {/* Controls */}
+      <div className="flex items-center gap-2">
+        <Tabs value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)} className="flex-1">
+          <TabsList className="grid w-full grid-cols-3 bg-[var(--s1)]">
+            <TabsTrigger value="7days" className="text-[10px] font-bold">
+              <Calendar size={12} className="mr-1" />
+              7D
+            </TabsTrigger>
+            <TabsTrigger value="30days" className="text-[10px] font-bold">
+              <Calendar size={12} className="mr-1" />
+              30D
+            </TabsTrigger>
+            <TabsTrigger value="all" className="text-[10px] font-bold">
+              <Calendar size={12} className="mr-1" />
+              ALL
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Sort Controls */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        <Button
+          size="sm"
+          variant={sortBy === 'profit' ? 'default' : 'outline'}
+          onClick={() => setSortBy('profit')}
+          className="text-[10px] font-bold whitespace-nowrap"
+        >
+          <CurrencyDollar size={12} className="mr-1" />
+          Profit
+        </Button>
+        <Button
+          size="sm"
+          variant={sortBy === 'roi' ? 'default' : 'outline'}
+          onClick={() => setSortBy('roi')}
+          className="text-[10px] font-bold whitespace-nowrap"
+        >
+          <Percent size={12} className="mr-1" />
+          ROI
+        </Button>
+        <Button
+          size="sm"
+          variant={sortBy === 'velocity' ? 'default' : 'outline'}
+          onClick={() => setSortBy('velocity')}
+          className="text-[10px] font-bold whitespace-nowrap"
+        >
+          <Lightning size={12} className="mr-1" />
+          Velocity
+        </Button>
+        <Button
+          size="sm"
+          variant={sortBy === 'success' ? 'default' : 'outline'}
+          onClick={() => setSortBy('success')}
+          className="text-[10px] font-bold whitespace-nowrap"
+        >
+          <Target size={12} className="mr-1" />
+          Success
+        </Button>
+      </div>
+
+      {/* Overall Stats Summary */}
+      {overallStats && (
+        <Card className="p-4 border-[var(--b1)]/20 bg-gradient-to-br from-[var(--blue-bg)] to-[var(--fg)]">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkle size={16} weight="fill" className="text-[var(--b1)]" />
+            <h3 className="text-xs font-bold text-[var(--t1)] uppercase tracking-wider">
+              Overall Performance
+            </h3>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            <div className="text-center p-2 bg-[var(--fg)] rounded-lg border border-[var(--s1)]">
+              <div className="text-sm font-bold text-[var(--green)] mono">
+                ${overallStats.totalProfit.toFixed(0)}
+              </div>
+              <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">Total</div>
+            </div>
+            <div className="text-center p-2 bg-[var(--fg)] rounded-lg border border-[var(--s1)]">
+              <div className="text-sm font-bold text-[var(--t1)]">
+                {overallStats.overallGoRate.toFixed(0)}%
+              </div>
+              <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">GO Rate</div>
+            </div>
+            <div className="text-center p-2 bg-[var(--fg)] rounded-lg border border-[var(--s1)]">
+              <div className="text-sm font-bold text-[var(--b1)]">
+                {overallStats.avgROI.toFixed(0)}%
+              </div>
+              <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">Avg ROI</div>
+            </div>
+            <div className="text-center p-2 bg-[var(--fg)] rounded-lg border border-[var(--s1)]">
+              <div className="text-sm font-bold text-[var(--t1)]">
+                {overallStats.totalItems}
+              </div>
+              <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">Items</div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {topPerformers.length > 0 && (
         <div>
           <h3 className="text-[11px] font-bold text-[var(--t2)] uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -176,7 +380,8 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 mb-3">
+                {/* Enhanced Metrics Grid */}
+                <div className="grid grid-cols-5 gap-2 mb-3">
                   <div className="text-center p-2 bg-[var(--s1)] rounded-lg">
                     <div className="text-xs font-bold text-[var(--t1)]">{tag.goRate.toFixed(0)}%</div>
                     <div className="text-[8px] text-[var(--t4)] font-medium uppercase">GO Rate</div>
@@ -185,15 +390,73 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                     <div className="text-xs font-bold text-[var(--green)] mono">
                       ${tag.avgProfit.toFixed(2)}
                     </div>
-                    <div className="text-[8px] text-[var(--t4)] font-medium uppercase">Avg Profit</div>
+                    <div className="text-[8px] text-[var(--t4)] font-medium uppercase">Avg</div>
                   </div>
                   <div className="text-center p-2 bg-[var(--s1)] rounded-lg">
-                    <div className="text-xs font-bold text-[var(--t1)]">{tag.avgMargin.toFixed(1)}%</div>
+                    <div className="text-xs font-bold text-[var(--b1)]">{tag.avgROI.toFixed(0)}%</div>
+                    <div className="text-[8px] text-[var(--t4)] font-medium uppercase">ROI</div>
+                  </div>
+                  <div className="text-center p-2 bg-[var(--s1)] rounded-lg">
+                    <div className="text-xs font-bold text-[var(--t1)]">{tag.avgMargin.toFixed(0)}%</div>
                     <div className="text-[8px] text-[var(--t4)] font-medium uppercase">Margin</div>
                   </div>
                   <div className="text-center p-2 bg-[var(--s1)] rounded-lg">
-                    <div className="text-xs font-bold text-[var(--t1)]">{tag.goItems}</div>
-                    <div className="text-[8px] text-[var(--t4)] font-medium uppercase">GO Items</div>
+                    <div className="text-xs font-bold text-[var(--t1)] mono">
+                      ${tag.profitPerItem.toFixed(2)}
+                    </div>
+                    <div className="text-[8px] text-[var(--t4)] font-medium uppercase">/Item</div>
+                  </div>
+                </div>
+
+                {/* Profit Trend Mini Chart */}
+                {tag.profitByWeek.length > 0 && tag.profitByWeek.some(v => v > 0) && (
+                  <div className="mb-3">
+                    <div className="text-[9px] font-bold text-[var(--t3)] uppercase tracking-wider mb-1.5">
+                      4-Week Profit Trend
+                    </div>
+                    <div className="h-12 flex items-end justify-between gap-1">
+                      {tag.profitByWeek.map((profit, idx) => {
+                        const maxProfit = Math.max(...tag.profitByWeek, 1)
+                        const height = (profit / maxProfit) * 100
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center justify-end">
+                            <div 
+                              className="w-full rounded-t-sm transition-all"
+                              style={{ 
+                                height: `${height}%`,
+                                backgroundColor: tag.tagColor,
+                                minHeight: profit > 0 ? '4px' : '0px'
+                              }}
+                            />
+                            <div className="text-[7px] text-[var(--t4)] font-bold mt-1">
+                              W{idx + 1}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Time-based Stats */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="p-2 bg-[var(--bg)] rounded-lg border border-[var(--s2)]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] text-[var(--t3)] font-bold uppercase">Last 7D</span>
+                      <span className="text-xs font-bold text-[var(--t1)]">{tag.last7DaysCount} items</span>
+                    </div>
+                    <div className="text-sm font-bold text-[var(--green)] mono mt-1">
+                      ${tag.last7DaysProfit.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="p-2 bg-[var(--bg)] rounded-lg border border-[var(--s2)]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] text-[var(--t3)] font-bold uppercase">Last 30D</span>
+                      <span className="text-xs font-bold text-[var(--t1)]">{tag.last30DaysCount} items</span>
+                    </div>
+                    <div className="text-sm font-bold text-[var(--green)] mono mt-1">
+                      ${tag.last30DaysProfit.toFixed(2)}
+                    </div>
                   </div>
                 </div>
 
@@ -284,7 +547,8 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
       )}
 
       <div>
-        <h3 className="text-[11px] font-bold text-[var(--t2)] uppercase tracking-wider mb-3">
+        <h3 className="text-[11px] font-bold text-[var(--t2)] uppercase tracking-wider mb-3 flex items-center gap-2">
+          <ArrowsClockwise size={14} weight="bold" />
           All Tags Performance
         </h3>
         <div className="space-y-2">
@@ -335,10 +599,16 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                       <div className="text-[8px] text-[var(--t4)]">Total</div>
                     </div>
                     <div className="text-right">
+                      <div className="text-xs font-bold text-[var(--b1)]">
+                        {tag.avgROI.toFixed(0)}%
+                      </div>
+                      <div className="text-[8px] text-[var(--t4)]">ROI</div>
+                    </div>
+                    <div className="text-right">
                       <div className="text-xs font-bold text-[var(--t1)]">
                         {tag.goRate.toFixed(0)}%
                       </div>
-                      <div className="text-[8px] text-[var(--t4)]">GO Rate</div>
+                      <div className="text-[8px] text-[var(--t4)]">GO</div>
                     </div>
                   </div>
                 </div>
