@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
 import type { ScannedItem } from '@/types'
+import type { GeminiService } from '@/lib/gemini-service'
 
 interface QueueScreenProps {
   queueItems: ScannedItem[]
@@ -23,12 +24,13 @@ interface QueueScreenProps {
   onEdit: (itemId: string, updates: Partial<ScannedItem>) => void
   onBatchAnalyze?: () => void
   isBatchAnalyzing?: boolean
+  geminiService?: GeminiService | null
 }
 
 type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
 type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc'
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onBatchAnalyze, isBatchAnalyzing }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onBatchAnalyze, isBatchAnalyzing, geminiService }: QueueScreenProps) {
   const [filter, setFilter] = useState<FilterOption>('ALL')
   const [sortBy, setSortBy] = useState<SortOption>('profit-desc')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -155,6 +157,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
         isOpen={editingItem !== null}
         onClose={() => setEditingItem(null)}
         onSave={handleSaveEdit}
+        geminiService={geminiService}
       />
       <div className="px-4 py-6 border-b border-s2">
         <div className="flex items-start justify-between gap-3 mb-3">

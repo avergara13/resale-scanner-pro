@@ -139,6 +139,187 @@ Focus on:
 Be specific and searchable. Prioritize information that helps determine resale value.`
   }
 
+  async removeBackground(
+    imageData: string,
+    backgroundColor: 'white' | 'transparent' = 'white'
+  ): Promise<string> {
+    const base64Data = imageData.includes('base64,') 
+      ? imageData.split('base64,')[1] 
+      : imageData
+
+    const prompt = `Analyze this product image and identify the main subject (product). Provide a pixel-by-pixel segmentation mask where the product is marked as foreground and everything else is background. Return as JSON with:
+{
+  "maskDescription": "Brief description of what was identified as the product",
+  "confidence": 0.0-1.0 confidence in segmentation,
+  "boundingBox": {"x": number, "y": number, "width": number, "height": number}
+}
+
+Focus on clearly identifying the product boundaries to create a clean cutout.`
+
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inline_data: {
+                mime_type: 'image/jpeg',
+                data: base64Data,
+              },
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        topK: 32,
+        topP: 1,
+        maxOutputTokens: 512,
+        responseMimeType: 'application/json',
+      },
+    }
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`
+    const url = `${endpoint}?key=${this.apiKey}`
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const textContent = data.candidates[0].content.parts[0].text
+      const result = JSON.parse(textContent)
+
+      return this.applyBackgroundRemoval(imageData, result.boundingBox, backgroundColor)
+    } catch (error) {
+      console.error('Gemini background removal failed:', error)
+      throw error
+    }
+  }
+
+  private applyBackgroundRemoval(
+    imageData: string,
+    boundingBox: { x: number; y: number; width: number; height: number },
+    backgroundColor: 'white' | 'transparent'
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        
+        if (!ctx) {
+          reject(new Error('Canvas context not available'))
+          return
+        }
+
+        canvas.width = img.width
+        canvas.height = img.height
+
+        if (backgroundColor === 'white') {
+          ctx.fillStyle = 'white'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+        }
+
+        ctx.drawImage(img, 0, 0)
+
+        const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const data = imageDataObj.data
+
+        const centerX = img.width / 2
+        const centerY = img.height / 2
+        const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY)
+
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const idx = (y * canvas.width + x) * 4
+
+            const inBoundingBox = 
+              x >= boundingBox.x && 
+              x <= boundingBox.x + boundingBox.width &&
+              y >= boundingBox.y && 
+              y <= boundingBox.y + boundingBox.height
+
+            if (!inBoundingBox) {
+              const dx = x - centerX
+              const dy = y - centerY
+              const distance = Math.sqrt(dx * dx + dy * dy)
+              const alpha = Math.max(0, 1 - (distance / maxDistance) * 2)
+
+              const r = data[idx]
+              const g = data[idx + 1]
+              const b = data[idx + 2]
+              
+              const edges = this.detectEdges(data, x, y, canvas.width, canvas.height)
+              
+              if (edges > 30 && inBoundingBox) {
+                data[idx + 3] = 255
+              } else if (backgroundColor === 'white') {
+                data[idx] = 255
+                data[idx + 1] = 255
+                data[idx + 2] = 255
+                data[idx + 3] = 255
+              } else {
+                data[idx + 3] = Math.floor(alpha * 255)
+              }
+            }
+          }
+        }
+
+        ctx.putImageData(imageDataObj, 0, 0)
+        resolve(canvas.toDataURL('image/png'))
+      }
+      img.onerror = () => reject(new Error('Failed to load image'))
+      img.src = imageData
+    })
+  }
+
+  private detectEdges(
+    data: Uint8ClampedArray,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): number {
+    if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
+      return 0
+    }
+
+    const idx = (y * width + x) * 4
+    const r = data[idx]
+    const g = data[idx + 1]
+    const b = data[idx + 2]
+
+    let totalDiff = 0
+    const neighbors = [
+      [-1, -1], [0, -1], [1, -1],
+      [-1, 0],           [1, 0],
+      [-1, 1],  [0, 1],  [1, 1]
+    ]
+
+    for (const [dx, dy] of neighbors) {
+      const nx = x + dx
+      const ny = y + dy
+      const nIdx = (ny * width + nx) * 4
+      const nR = data[nIdx]
+      const nG = data[nIdx + 1]
+      const nB = data[nIdx + 2]
+
+      totalDiff += Math.abs(r - nR) + Math.abs(g - nG) + Math.abs(b - nB)
+    }
+
+    return totalDiff / 8
+  }
+
   async chat(
     message: string,
     context?: {

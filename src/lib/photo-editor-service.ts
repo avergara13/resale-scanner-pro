@@ -220,11 +220,116 @@ export class PhotoEditorService {
     return Math.max(0, Math.min(255, value))
   }
 
-  async removeBackground(imageData: string, apiKey?: string): Promise<string> {
-    if (!apiKey) {
-      throw new Error('Gemini API key required for background removal')
+  async removeBackground(
+    imageData: string,
+    geminiService: { removeBackground: (imageData: string, backgroundColor: 'white' | 'transparent') => Promise<string> } | null,
+    backgroundColor: 'white' | 'transparent' = 'white'
+  ): Promise<string> {
+    if (!geminiService) {
+      return this.simpleBackgroundRemoval(imageData, backgroundColor)
     }
-    return imageData
+    
+    try {
+      return await geminiService.removeBackground(imageData, backgroundColor)
+    } catch (error) {
+      console.error('Gemini background removal failed, falling back to simple removal:', error)
+      return this.simpleBackgroundRemoval(imageData, backgroundColor)
+    }
+  }
+
+  private async simpleBackgroundRemoval(
+    imageData: string,
+    backgroundColor: 'white' | 'transparent'
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        
+        if (!ctx) {
+          reject(new Error('Canvas context not available'))
+          return
+        }
+
+        canvas.width = img.width
+        canvas.height = img.height
+
+        if (backgroundColor === 'white') {
+          ctx.fillStyle = 'white'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+        }
+
+        ctx.drawImage(img, 0, 0)
+
+        const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const data = imageDataObj.data
+
+        const centerX = img.width / 2
+        const centerY = img.height / 2
+
+        const cornerSamples = [
+          this.getPixelColor(data, 0, 0, canvas.width),
+          this.getPixelColor(data, canvas.width - 1, 0, canvas.width),
+          this.getPixelColor(data, 0, canvas.height - 1, canvas.width),
+          this.getPixelColor(data, canvas.width - 1, canvas.height - 1, canvas.width),
+        ]
+
+        const avgBgColor = {
+          r: cornerSamples.reduce((sum, c) => sum + c.r, 0) / 4,
+          g: cornerSamples.reduce((sum, c) => sum + c.g, 0) / 4,
+          b: cornerSamples.reduce((sum, c) => sum + c.b, 0) / 4,
+        }
+
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const idx = (y * canvas.width + x) * 4
+            const r = data[idx]
+            const g = data[idx + 1]
+            const b = data[idx + 2]
+
+            const colorDiff = Math.sqrt(
+              Math.pow(r - avgBgColor.r, 2) +
+              Math.pow(g - avgBgColor.g, 2) +
+              Math.pow(b - avgBgColor.b, 2)
+            )
+
+            const dx = x - centerX
+            const dy = y - centerY
+            const distanceFromCenter = Math.sqrt(dx * dx + dy * dy)
+            const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY)
+            const centerProximity = 1 - (distanceFromCenter / maxDistance)
+
+            const threshold = 40 - (centerProximity * 20)
+
+            if (colorDiff < threshold) {
+              if (backgroundColor === 'white') {
+                data[idx] = 255
+                data[idx + 1] = 255
+                data[idx + 2] = 255
+                data[idx + 3] = 255
+              } else {
+                data[idx + 3] = 0
+              }
+            }
+          }
+        }
+
+        ctx.putImageData(imageDataObj, 0, 0)
+        resolve(canvas.toDataURL(backgroundColor === 'transparent' ? 'image/png' : 'image/jpeg', 0.95))
+      }
+      img.onerror = () => reject(new Error('Failed to load image'))
+      img.src = imageData
+    })
+  }
+
+  private getPixelColor(data: Uint8ClampedArray, x: number, y: number, width: number): { r: number, g: number, b: number } {
+    const idx = (y * width + x) * 4
+    return {
+      r: data[idx],
+      g: data[idx + 1],
+      b: data[idx + 2],
+    }
   }
 
   async resize(imageData: string, maxWidth: number, maxHeight: number): Promise<string> {

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { 
   X, Check, ArrowsOut, Sun, CircleHalf, Drop, Sparkle, 
   Scissors, ArrowClockwise, ArrowsDownUp, ArrowsLeftRight, 
-  Palette, CornersOut, TextT
+  Palette, CornersOut, TextT, MagicWand
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -11,11 +11,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { photoEditorService } from '@/lib/photo-editor-service'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import type { GeminiService } from '@/lib/gemini-service'
 
 interface PhotoEditorProps {
   imageData: string
   onSave: (editedImage: string) => void
   onCancel: () => void
+  geminiService?: GeminiService | null
 }
 
 const FILTER_PRESETS = [
@@ -27,7 +29,7 @@ const FILTER_PRESETS = [
   { name: 'B&W', value: 'bw' as const, preview: 'Black & white' },
 ]
 
-export function PhotoEditor({ imageData, onSave, onCancel }: PhotoEditorProps) {
+export function PhotoEditor({ imageData, onSave, onCancel, geminiService }: PhotoEditorProps) {
   const [brightness, setBrightness] = useState(0)
   const [contrast, setContrast] = useState(0)
   const [saturation, setSaturation] = useState(1)
@@ -39,6 +41,7 @@ export function PhotoEditor({ imageData, onSave, onCancel }: PhotoEditorProps) {
   const [preview, setPreview] = useState(imageData)
   const [isProcessing, setIsProcessing] = useState(false)
   const [activeTab, setActiveTab] = useState('adjust')
+  const [bgRemovalMode, setBgRemovalMode] = useState<'white' | 'transparent'>('white')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -114,6 +117,23 @@ export function PhotoEditor({ imageData, onSave, onCancel }: PhotoEditorProps) {
     } catch (error) {
       console.error('Crop error:', error)
       toast.error('Crop failed')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleRemoveBackground = async () => {
+    setIsProcessing(true)
+    try {
+      if (!geminiService) {
+        toast.info('Using basic background removal. Configure Gemini API for AI-powered removal.')
+      }
+      const removed = await photoEditorService.removeBackground(preview, geminiService || null, bgRemovalMode)
+      setPreview(removed)
+      toast.success('Background removed')
+    } catch (error) {
+      console.error('Background removal error:', error)
+      toast.error('Background removal failed')
     } finally {
       setIsProcessing(false)
     }
@@ -322,6 +342,47 @@ export function PhotoEditor({ imageData, onSave, onCancel }: PhotoEditorProps) {
                 </TabsContent>
 
                 <TabsContent value="transform" className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Remove Background</label>
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <button
+                          onClick={() => setBgRemovalMode('white')}
+                          className={`p-2 rounded-lg border-2 transition-all text-sm ${
+                            bgRemovalMode === 'white'
+                              ? 'border-b1 bg-t4'
+                              : 'border-s2 bg-s1 hover:border-s3'
+                          }`}
+                        >
+                          White Background
+                        </button>
+                        <button
+                          onClick={() => setBgRemovalMode('transparent')}
+                          className={`p-2 rounded-lg border-2 transition-all text-sm ${
+                            bgRemovalMode === 'transparent'
+                              ? 'border-b1 bg-t4'
+                              : 'border-s2 bg-s1 hover:border-s3'
+                          }`}
+                        >
+                          Transparent
+                        </button>
+                      </div>
+                      <Button
+                        onClick={handleRemoveBackground}
+                        disabled={isProcessing}
+                        className="w-full bg-b1 hover:bg-b2"
+                      >
+                        <MagicWand size={18} className="mr-2" />
+                        {geminiService ? 'AI Remove Background' : 'Remove Background'}
+                      </Button>
+                      {!geminiService && (
+                        <p className="text-xs text-s3 text-center">
+                          Configure Gemini API in Settings for AI-powered removal
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
                   <div>
                     <label className="text-sm font-medium mb-2 block">Rotate</label>
                     <div className="grid grid-cols-4 gap-2">

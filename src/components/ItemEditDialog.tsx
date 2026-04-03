@@ -9,15 +9,17 @@ import { Badge } from '@/components/ui/badge'
 import { FloppyDisk, X, PencilSimple } from '@phosphor-icons/react'
 import { PhotoEditor } from '@/components/PhotoEditor'
 import type { ScannedItem } from '@/types'
+import type { GeminiService } from '@/lib/gemini-service'
 
 interface ItemEditDialogProps {
   item: ScannedItem | null
   isOpen: boolean
   onClose: () => void
   onSave: (itemId: string, updates: Partial<ScannedItem>) => void
+  geminiService?: GeminiService | null
 }
 
-export function ItemEditDialog({ item, isOpen, onClose, onSave }: ItemEditDialogProps) {
+export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }: ItemEditDialogProps) {
   const [formData, setFormData] = useState({
     productName: item?.productName || '',
     description: item?.description || '',
@@ -93,6 +95,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave }: ItemEditDialog
           imageData={displayImage}
           onSave={handlePhotoSave}
           onCancel={() => setIsEditingPhoto(false)}
+          geminiService={geminiService}
         />
       )}
       

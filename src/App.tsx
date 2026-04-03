@@ -566,6 +566,7 @@ function App() {
           onEdit={handleEditQueueItem}
           onBatchAnalyze={handleBatchAnalyze}
           isBatchAnalyzing={isBatchAnalyzing}
+          geminiService={geminiService}
         />
       )}
       {screen === 'settings' && settings && (
