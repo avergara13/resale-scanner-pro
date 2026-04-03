@@ -103,19 +103,19 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-4 border transition-colors",
+        "p-3 border transition-colors",
         isSelected ? 'border-b1 bg-t4' : 'border-s2'
       )}
     >
-      <div className="flex gap-3">
-        <div className="flex flex-col gap-2 items-center justify-start pt-1">
+      <div className="flex gap-2.5">
+        <div className="flex flex-col gap-1.5 items-center justify-start pt-0.5">
           <div 
             {...attributes} 
             {...listeners}
             className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-s1 rounded transition-colors"
             aria-label="Drag to reorder"
           >
-            <DotsSixVertical size={20} weight="bold" className="text-s3" />
+            <DotsSixVertical size={18} weight="bold" className="text-s3" />
           </div>
           <Checkbox
             id={`select-${item.id}`}
@@ -127,39 +127,40 @@ function SortableItem({
             <img
               src={item.imageData}
               alt={item.productName || 'Item'}
-              className="w-20 h-20 object-cover rounded-md border border-s2 flex-shrink-0"
+              className="w-16 h-16 object-cover rounded-md border border-s2 flex-shrink-0"
             />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="font-semibold text-fg text-sm line-clamp-2">
+          <div className="flex items-start justify-between gap-1.5 mb-1.5">
+            <h3 className="font-semibold text-t1 text-sm line-clamp-2 leading-tight">
               {item.productName || 'Unknown Item'}
             </h3>
             {item.profitMargin !== undefined && (
               <Badge
                 variant="secondary"
-                className={`flex-shrink-0 font-mono font-medium ${
+                className={cn(
+                  "flex-shrink-0 font-mono font-bold text-[10px] h-5 px-1.5",
                   item.profitMargin > 50
                     ? 'bg-green/20 text-green'
                     : item.profitMargin > 20
                     ? 'bg-amber/20 text-amber'
                     : 'bg-red/20 text-red'
-                }`}
+                )}
               >
                 +{item.profitMargin.toFixed(0)}%
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-2">
+          <div className="flex items-center gap-3 text-[11px] font-mono text-t3 mb-2">
             <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
             {item.estimatedSellPrice && (
               <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
             )}
           </div>
           {item.tags && item.tags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1 mb-3">
-              <Tag size={12} weight="bold" className="text-s4 flex-shrink-0" />
+            <div className="flex flex-wrap items-center gap-1 mb-2.5">
+              <Tag size={11} weight="bold" className="text-s4 flex-shrink-0" />
               {item.tags.map((tagId) => {
                 const tag = allTags.find(t => t.id === tagId)
                 if (!tag) return null
@@ -167,7 +168,7 @@ function SortableItem({
                   <Badge
                     key={tagId}
                     variant="outline"
-                    className="text-[10px] h-5 pl-2 pr-1 font-medium border flex items-center gap-1 group hover:opacity-80 transition-opacity"
+                    className="text-[9px] h-[18px] pl-1.5 pr-0.5 font-medium border flex items-center gap-0.5 group hover:opacity-80 transition-opacity"
                     style={{
                       borderColor: tag.color,
                       backgroundColor: `${tag.color}15`,
@@ -182,41 +183,41 @@ function SortableItem({
                         onEditTags(item.id, updatedTags)
                         toast.success(`Removed tag: ${tag.name}`)
                       }}
-                      className="flex items-center justify-center hover:opacity-70 transition-opacity"
+                      className="flex items-center justify-center hover:opacity-70 transition-opacity p-0.5"
                       aria-label={`Remove ${tag.name} tag`}
                     >
-                      <X size={10} weight="bold" />
+                      <X size={9} weight="bold" />
                     </button>
                   </Badge>
                 )
               })}
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <Button
               size="sm"
               onClick={() => onEdit(item)}
               variant="outline"
-              className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+              className="h-7 px-2.5 text-[11px] font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
             >
-              <PencilSimple size={14} weight="bold" className="mr-1" />
+              <PencilSimple size={13} weight="bold" className="mr-1" />
               Edit
             </Button>
             <Button
               size="sm"
               onClick={() => onCreateListing(item.id)}
-              className="flex-1 bg-b1 hover:bg-b2 text-white h-8 text-xs font-medium"
+              className="flex-1 bg-b1 hover:bg-b2 text-white h-7 text-[11px] font-medium"
             >
-              <ArrowRight size={14} weight="bold" className="mr-1" />
+              <ArrowRight size={13} weight="bold" className="mr-1" />
               List
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => onRemove(item.id)}
-              className="h-8 w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
+              className="h-7 w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
             >
-              <Trash size={16} weight="bold" />
+              <Trash size={15} weight="bold" />
             </Button>
           </div>
         </div>

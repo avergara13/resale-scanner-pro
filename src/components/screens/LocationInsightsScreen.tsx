@@ -215,27 +215,27 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <div className="stat-card p-3">
-            <div className="text-lg font-bold text-green leading-tight">
+          <div className="stat-card p-2.5">
+            <div className="text-base font-bold text-green leading-tight">
               ${totalProfitAllLocations.toFixed(0)}
             </div>
-            <div className="text-[10px] text-t3 font-medium uppercase tracking-wider mt-1">
+            <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">
               Total Profit
             </div>
           </div>
-          <div className="stat-card p-3">
-            <div className="text-lg font-bold leading-tight">
+          <div className="stat-card p-2.5">
+            <div className="text-base font-bold leading-tight">
               {totalScansAllLocations}
             </div>
-            <div className="text-[10px] text-t3 font-medium uppercase tracking-wider mt-1">
+            <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">
               Total Scans
             </div>
           </div>
-          <div className="stat-card p-3">
-            <div className="text-lg font-bold text-b1 leading-tight">
+          <div className="stat-card p-2.5">
+            <div className="text-base font-bold text-b1 leading-tight">
               {avgGoRateAllLocations.toFixed(0)}%
             </div>
-            <div className="text-[10px] text-t3 font-medium uppercase tracking-wider mt-1">
+            <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">
               Avg GO Rate
             </div>
           </div>
@@ -358,22 +358,22 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative p-4 bg-gradient-to-br from-b1/10 to-amber/10 border-2 border-b1/30 rounded-2xl overflow-hidden"
+            className="relative p-3 bg-gradient-to-br from-b1/10 to-amber/10 border-2 border-b1/30 rounded-xl overflow-hidden"
           >
-            <div className="absolute top-3 right-3">
-              <Trophy size={24} weight="fill" className="text-amber" />
+            <div className="absolute top-2 right-2">
+              <Trophy size={20} weight="fill" className="text-amber" />
             </div>
             
-            <div className="flex items-start gap-3 mb-3">
+            <div className="flex items-start gap-2.5 mb-2.5">
               <div 
-                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                className="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0"
                 style={{ backgroundColor: `${LOCATION_TYPE_COLORS[topLocation.location.type || 'other']}20` }}
               >
                 {LOCATION_TYPE_ICONS[topLocation.location.type || 'other']}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-t1 mb-1">{topLocation.location.name}</h3>
-                <p className="text-xs text-t3 font-medium">
+                <h3 className="text-sm font-bold text-t1 mb-0.5 leading-tight">{topLocation.location.name}</h3>
+                <p className="text-[10px] text-t3 font-medium leading-tight">
                   {topLocation.location.city && topLocation.location.state 
                     ? `${topLocation.location.city}, ${topLocation.location.state}`
                     : 'Top Performing Location'}
@@ -381,36 +381,36 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-fg p-2.5 rounded-xl border border-s1">
-                <div className="text-sm font-bold text-green">
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="bg-fg p-2 rounded-lg border border-s1">
+                <div className="text-xs font-bold text-green leading-tight">
                   ${topLocation.totalProfit.toFixed(0)}
                 </div>
-                <div className="text-[9px] text-t4 font-bold uppercase mt-0.5">Profit</div>
+                <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Profit</div>
               </div>
-              <div className="bg-fg p-2.5 rounded-xl border border-s1">
-                <div className="text-sm font-bold">{topLocation.totalScans}</div>
-                <div className="text-[9px] text-t4 font-bold uppercase mt-0.5">Scans</div>
+              <div className="bg-fg p-2 rounded-lg border border-s1">
+                <div className="text-xs font-bold leading-tight">{topLocation.totalScans}</div>
+                <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Scans</div>
               </div>
-              <div className="bg-fg p-2.5 rounded-xl border border-s1">
-                <div className="text-sm font-bold text-b1">{topLocation.goRate.toFixed(0)}%</div>
-                <div className="text-[9px] text-t4 font-bold uppercase mt-0.5">GO Rate</div>
+              <div className="bg-fg p-2 rounded-lg border border-s1">
+                <div className="text-xs font-bold text-b1 leading-tight">{topLocation.goRate.toFixed(0)}%</div>
+                <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">GO Rate</div>
               </div>
             </div>
 
             {topLocation.bestCategories.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-s2">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Tag size={12} weight="bold" className="text-t3" />
-                  <span className="text-[9px] font-bold text-t3 uppercase tracking-wider">
+              <div className="mt-2.5 pt-2.5 border-t border-s2">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Tag size={11} weight="bold" className="text-t3" />
+                  <span className="text-[8px] font-bold text-t3 uppercase tracking-wider">
                     Best Categories
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1">
                   {topLocation.bestCategories.map((cat, idx) => (
                     <div
                       key={idx}
-                      className="px-2 py-1 bg-fg border border-s2 rounded-lg text-[10px] font-bold"
+                      className="px-1.5 py-0.5 bg-fg border border-s2 rounded text-[9px] font-bold"
                     >
                       {cat.category} <span className="text-green">${cat.avgProfit.toFixed(0)}</span>
                     </div>
@@ -479,43 +479,43 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
                 className={cn(
-                  "p-3.5 rounded-xl border transition-all",
+                  "p-3 rounded-lg border transition-all",
                   isTop 
                     ? "bg-fg border-b1/20" 
                     : "bg-fg border-s2 hover:border-b1/20"
                 )}
               >
-                <div className="flex items-start gap-3 mb-3">
+                <div className="flex items-start gap-2.5 mb-2.5">
                   <div 
-                    className="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0"
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
                     style={{ backgroundColor: `${LOCATION_TYPE_COLORS[loc.location.type || 'other']}20` }}
                   >
                     {LOCATION_TYPE_ICONS[loc.location.type || 'other']}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <h4 className="text-sm font-bold text-t1 truncate">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <h4 className="text-xs font-bold text-t1 truncate">
                         {loc.location.name}
                       </h4>
                       {profitDiffPercent > 10 && (
                         <div 
                           className={cn(
-                            "px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-0.5",
+                            "px-1.5 py-0.5 rounded text-[8px] font-bold flex items-center gap-0.5",
                             profitTrend 
                               ? "bg-green-bg text-green" 
                               : "bg-red-bg text-red"
                           )}
                         >
                           {profitTrend ? (
-                            <TrendUp size={10} weight="bold" />
+                            <TrendUp size={9} weight="bold" />
                           ) : (
-                            <TrendDown size={10} weight="bold" />
+                            <TrendDown size={9} weight="bold" />
                           )}
                           {profitDiffPercent.toFixed(0)}%
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-t3 font-medium">
+                    <div className="flex items-center gap-1.5 text-[9px] text-t3 font-medium">
                       {loc.location.city && (
                         <span>{loc.location.city}</span>
                       )}
@@ -531,26 +531,26 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="text-center p-2 bg-bg rounded-lg border border-s1">
-                    <div className="text-sm font-bold text-green">
+                <div className="grid grid-cols-4 gap-1.5">
+                  <div className="text-center p-1.5 bg-bg rounded-lg border border-s1">
+                    <div className="text-xs font-bold text-green leading-tight">
                       ${loc.totalProfit.toFixed(0)}
                     </div>
-                    <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Profit</div>
+                    <div className="text-[7px] text-t4 font-bold uppercase mt-0.5">Profit</div>
                   </div>
-                  <div className="text-center p-2 bg-bg rounded-lg border border-s1">
-                    <div className="text-sm font-bold">
+                  <div className="text-center p-1.5 bg-bg rounded-lg border border-s1">
+                    <div className="text-xs font-bold leading-tight">
                       ${loc.averageProfit.toFixed(0)}
                     </div>
-                    <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Avg</div>
+                    <div className="text-[7px] text-t4 font-bold uppercase mt-0.5">Avg</div>
                   </div>
-                  <div className="text-center p-2 bg-bg rounded-lg border border-s1">
-                    <div className="text-sm font-bold">{loc.totalScans}</div>
-                    <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Scans</div>
+                  <div className="text-center p-1.5 bg-bg rounded-lg border border-s1">
+                    <div className="text-xs font-bold leading-tight">{loc.totalScans}</div>
+                    <div className="text-[7px] text-t4 font-bold uppercase mt-0.5">Scans</div>
                   </div>
-                  <div className="text-center p-2 bg-bg rounded-lg border border-s1 relative">
+                  <div className="text-center p-1.5 bg-bg rounded-lg border border-s1 relative">
                     <div className="flex items-center justify-center gap-0.5">
-                      <div className="text-sm font-bold text-b1">
+                      <div className="text-xs font-bold text-b1 leading-tight">
                         {loc.goRate.toFixed(0)}%
                       </div>
                       {Math.abs(goRateDiff) > 5 && (
@@ -559,30 +559,30 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                           goRateTrend ? "text-green" : "text-red"
                         )}>
                           {goRateTrend ? (
-                            <TrendUp size={12} weight="bold" />
+                            <TrendUp size={10} weight="bold" />
                           ) : (
-                            <TrendDown size={12} weight="bold" />
+                            <TrendDown size={10} weight="bold" />
                           )}
                         </div>
                       )}
                     </div>
-                    <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">GO</div>
+                    <div className="text-[7px] text-t4 font-bold uppercase mt-0.5">GO</div>
                   </div>
                 </div>
 
                 {loc.bestCategories.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-s1">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Tag size={11} weight="bold" className="text-t3" />
-                      <span className="text-[9px] font-bold text-t3 uppercase tracking-wider">
+                  <div className="mt-2.5 pt-2.5 border-t border-s1">
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <Tag size={10} weight="bold" className="text-t3" />
+                      <span className="text-[8px] font-bold text-t3 uppercase tracking-wider">
                         Top Categories
                       </span>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1">
                       {loc.bestCategories.map((cat, idx) => (
                         <div
                           key={idx}
-                          className="px-2 py-1 bg-bg border border-s1 rounded text-[9px] font-medium"
+                          className="px-1.5 py-0.5 bg-bg border border-s1 rounded text-[8px] font-medium"
                         >
                           <span className="text-t2">{cat.category}</span>
                           {' '}
@@ -594,31 +594,31 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                 )}
 
                 {loc.recentFinds.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-s1">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Package size={11} weight="bold" className="text-t3" />
-                      <span className="text-[9px] font-bold text-t3 uppercase tracking-wider">
+                  <div className="mt-2.5 pt-2.5 border-t border-s1">
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <Package size={10} weight="bold" className="text-t3" />
+                      <span className="text-[8px] font-bold text-t3 uppercase tracking-wider">
                         Recent Finds
                       </span>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       {loc.recentFinds.slice(0, 3).map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between p-2 bg-bg rounded-lg border border-s1"
+                          className="flex items-center justify-between p-1.5 bg-bg rounded-lg border border-s1"
                         >
-                          <div className="flex-1 min-w-0 mr-2">
-                            <p className="text-[10px] font-medium text-t2 truncate">
+                          <div className="flex-1 min-w-0 mr-1.5">
+                            <p className="text-[9px] font-medium text-t2 truncate">
                               {item.productName || 'Unnamed Item'}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-[9px] text-t4 font-medium">
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className="text-[8px] text-t4 font-medium">
                               ${item.purchasePrice.toFixed(2)}
                             </span>
                             <span 
                               className={cn(
-                                "text-[9px] font-bold px-1.5 py-0.5 rounded",
+                                "text-[8px] font-bold px-1 py-0.5 rounded",
                                 item.decision === 'GO' 
                                   ? "bg-green-bg text-green" 
                                   : "bg-red-bg text-red"
