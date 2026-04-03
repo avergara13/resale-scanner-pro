@@ -308,7 +308,14 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
         <div className="space-y-2">
           {sortedLocations.map((loc, index) => {
             const isTop = index === 0
-            const profitTrend = loc.totalProfit > (totalProfitAllLocations / locationPerformance.length)
+            const avgProfit = totalProfitAllLocations / locationPerformance.length
+            const profitTrend = loc.totalProfit > avgProfit
+            const profitDiff = loc.totalProfit - avgProfit
+            const profitDiffPercent = avgProfit > 0 ? (Math.abs(profitDiff) / avgProfit) * 100 : 0
+            
+            const avgGoRate = locationPerformance.reduce((sum, l) => sum + l.goRate, 0) / locationPerformance.length
+            const goRateTrend = loc.goRate > avgGoRate
+            const goRateDiff = loc.goRate - avgGoRate
             
             return (
               <motion.div
@@ -331,9 +338,28 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                     {LOCATION_TYPE_ICONS[loc.location.type || 'other']}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-t1 mb-0.5 truncate">
-                      {loc.location.name}
-                    </h4>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <h4 className="text-sm font-bold text-t1 truncate">
+                        {loc.location.name}
+                      </h4>
+                      {profitDiffPercent > 10 && (
+                        <div 
+                          className={cn(
+                            "px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-0.5",
+                            profitTrend 
+                              ? "bg-green-bg text-green" 
+                              : "bg-red-bg text-red"
+                          )}
+                        >
+                          {profitTrend ? (
+                            <TrendUp size={10} weight="bold" />
+                          ) : (
+                            <TrendDown size={10} weight="bold" />
+                          )}
+                          {profitDiffPercent.toFixed(0)}%
+                        </div>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-[10px] text-t3 font-medium">
                       {loc.location.city && (
                         <span>{loc.location.city}</span>
@@ -347,13 +373,6 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                         </>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {profitTrend ? (
-                      <TrendUp size={16} weight="bold" className="text-green" />
-                    ) : (
-                      <TrendDown size={16} weight="bold" className="text-t4" />
-                    )}
                   </div>
                 </div>
 
@@ -374,9 +393,23 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                     <div className="text-sm font-bold">{loc.totalScans}</div>
                     <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Scans</div>
                   </div>
-                  <div className="text-center p-2 bg-bg rounded-lg border border-s1">
-                    <div className="text-sm font-bold text-b1">
-                      {loc.goRate.toFixed(0)}%
+                  <div className="text-center p-2 bg-bg rounded-lg border border-s1 relative">
+                    <div className="flex items-center justify-center gap-0.5">
+                      <div className="text-sm font-bold text-b1">
+                        {loc.goRate.toFixed(0)}%
+                      </div>
+                      {Math.abs(goRateDiff) > 5 && (
+                        <div className={cn(
+                          "flex items-center",
+                          goRateTrend ? "text-green" : "text-red"
+                        )}>
+                          {goRateTrend ? (
+                            <TrendUp size={12} weight="bold" />
+                          ) : (
+                            <TrendDown size={12} weight="bold" />
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">GO</div>
                   </div>

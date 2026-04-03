@@ -858,7 +858,7 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
             {needsAttention.map(tag => (
               <Card key={tag.tagId} className="p-3 border-[var(--amber)]/20 bg-[var(--fg)]">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
                     <Badge 
                       style={{ 
                         backgroundColor: tag.tagColor,
@@ -871,6 +871,15 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                     <span className="text-xs text-[var(--t3)]">
                       {tag.totalItems} items · {tag.goRate.toFixed(0)}% GO rate
                     </span>
+                    {tag.trend === 'down' && (
+                      <Badge 
+                        variant="outline" 
+                        className="text-[9px] font-bold px-1.5 py-0.5 h-5 border-0 bg-[var(--red-bg)] text-[var(--red)]"
+                      >
+                        <TrendDown size={10} weight="bold" className="mr-0.5" />
+                        {tag.trendPercentage.toFixed(0)}%
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-xs font-bold text-[var(--red)]">
                     Low conversion
@@ -926,6 +935,23 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                     <span className="text-[10px] text-[var(--t3)]">
                       {tag.totalItems} items
                     </span>
+                    {tag.trend !== 'stable' && (
+                      <Badge 
+                        variant="outline" 
+                        className={`text-[9px] font-bold px-1.5 py-0.5 h-5 border-0 ${
+                          tag.trend === 'up' 
+                            ? 'bg-[var(--green-bg)] text-[var(--green)]' 
+                            : 'bg-[var(--red-bg)] text-[var(--red)]'
+                        }`}
+                      >
+                        {tag.trend === 'up' ? (
+                          <TrendUp size={10} weight="bold" className="mr-0.5" />
+                        ) : (
+                          <TrendDown size={10} weight="bold" className="mr-0.5" />
+                        )}
+                        {tag.trendPercentage.toFixed(0)}%
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
