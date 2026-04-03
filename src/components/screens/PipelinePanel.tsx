@@ -1,4 +1,4 @@
-import { Eye, MagnifyingGlass, TrendUp, Calculator, CheckCircle, Lightning, Clock } from '@phosphor-icons/react'
+import { Eye, MagnifyingGlass, TrendUp, Calculator, CheckCircle, Lightning, Clock, Sparkle } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
@@ -15,7 +15,8 @@ const phaseConfig = {
     detail: 'Visual matching & OCR...',
     duration: 3.5,
     progressSteps: [0, 0.25, 0.5, 0.75, 0.95],
-    progressTiming: [0, 0.25, 0.5, 0.75, 1]
+    progressTiming: [0, 0.25, 0.5, 0.75, 1],
+    gradient: 'from-violet-500/20 via-blue-500/20 to-cyan-500/20'
   },
   lens: { 
     icon: MagnifyingGlass, 
@@ -23,7 +24,8 @@ const phaseConfig = {
     detail: 'Finding similar items...',
     duration: 2.8,
     progressSteps: [0, 0.35, 0.65, 0.85, 0.95],
-    progressTiming: [0, 0.3, 0.6, 0.85, 1]
+    progressTiming: [0, 0.3, 0.6, 0.85, 1],
+    gradient: 'from-blue-500/20 via-cyan-500/20 to-teal-500/20'
   },
   market: { 
     icon: TrendUp, 
@@ -31,7 +33,8 @@ const phaseConfig = {
     detail: 'Sell-through rate calculation...',
     duration: 4.2,
     progressSteps: [0, 0.20, 0.45, 0.70, 0.90],
-    progressTiming: [0, 0.2, 0.5, 0.8, 1]
+    progressTiming: [0, 0.2, 0.5, 0.8, 1],
+    gradient: 'from-cyan-500/20 via-teal-500/20 to-emerald-500/20'
   },
   profit: { 
     icon: Calculator, 
@@ -39,7 +42,8 @@ const phaseConfig = {
     detail: 'Fees, shipping & net profit...',
     duration: 1.8,
     progressSteps: [0, 0.40, 0.70, 0.90, 0.95],
-    progressTiming: [0, 0.35, 0.65, 0.9, 1]
+    progressTiming: [0, 0.35, 0.65, 0.9, 1],
+    gradient: 'from-teal-500/20 via-emerald-500/20 to-green-500/20'
   },
   decision: { 
     icon: CheckCircle, 
@@ -47,7 +51,8 @@ const phaseConfig = {
     detail: 'Agentic recommendation...',
     duration: 2.2,
     progressSteps: [0, 0.30, 0.60, 0.85, 0.95],
-    progressTiming: [0, 0.3, 0.6, 0.85, 1]
+    progressTiming: [0, 0.3, 0.6, 0.85, 1],
+    gradient: 'from-emerald-500/20 via-green-500/20 to-lime-500/20'
   },
 }
 
@@ -88,9 +93,9 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
 
   return (
     <div id="ai-pipeline" className="space-y-2 relative">
-      <div className="absolute left-[19px] top-6 bottom-6 w-[2px] bg-s2 overflow-hidden">
+      <div className="absolute left-[19px] top-6 bottom-6 w-[2px] bg-s2 overflow-hidden rounded-full">
         <motion.div
-          className="absolute top-0 left-0 w-full bg-gradient-to-b from-b1 via-amber to-green"
+          className="absolute top-0 left-0 w-full bg-gradient-to-b from-violet-500 via-cyan-500 to-green rounded-full shadow-[0_0_12px_oklch(0.55_0.20_180_/_0.4)]"
           initial={{ height: '0%' }}
           animate={{ height: `${progressPercentage}%` }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -119,21 +124,123 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
               isError && 'error'
             )}
           >
+            {isProcessing && (
+              <>
+                <motion.div
+                  className={cn(
+                    'absolute inset-0 bg-gradient-to-br opacity-30 blur-sm',
+                    config.gradient
+                  )}
+                  animate={{
+                    opacity: [0.2, 0.4, 0.2],
+                    scale: [1, 1.02, 1]
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: 'easeInOut'
+                  }}
+                />
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                  animate={{
+                    x: ['-100%', '200%']
+                  }}
+                  transition={{
+                    duration: 2.5,
+                    repeat: Infinity,
+                    ease: 'linear'
+                  }}
+                />
+                {[...Array(3)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-1 h-1 bg-b1 rounded-full shadow-[0_0_8px_oklch(0.50_0.18_250)]"
+                    initial={{
+                      x: `${20 + i * 30}%`,
+                      y: '100%',
+                      opacity: 0
+                    }}
+                    animate={{
+                      y: ['-10%'],
+                      opacity: [0, 1, 0]
+                    }}
+                    transition={{
+                      duration: 2 + i * 0.5,
+                      repeat: Infinity,
+                      delay: i * 0.4,
+                      ease: 'easeOut'
+                    }}
+                  />
+                ))}
+              </>
+            )}
+            
+            {isComplete && (
+              <>
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-br from-green/10 via-emerald-500/5 to-transparent"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5 }}
+                />
+                <motion.div
+                  className="absolute top-0 right-0 w-20 h-20 bg-green/20 rounded-full blur-2xl"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.6 }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                />
+              </>
+            )}
+
+            {isError && (
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-red/10 via-red/5 to-transparent"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+            )}
             <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div
                   className={cn(
                     'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 relative z-10 flex-shrink-0 border-2',
                     isComplete && 'bg-green text-white border-green shadow-[0_0_16px_oklch(0.55_0.20_145_/_0.5)]',
-                    isProcessing && 'bg-b1 text-white border-b1 shadow-[0_0_16px_oklch(0.50_0.18_250_/_0.5)] animate-pulse',
+                    isProcessing && 'bg-b1 text-white border-b1 shadow-[0_0_20px_oklch(0.50_0.18_250_/_0.6)]',
                     isPending && 'bg-s1 text-t3 border-s2',
                     isError && 'bg-red text-white border-red shadow-[0_0_16px_oklch(0.55_0.22_25_/_0.5)]'
                   )}
                 >
+                  {isProcessing && (
+                    <motion.div
+                      className="absolute inset-0 rounded-full bg-b1/20"
+                      animate={{
+                        scale: [1, 1.5, 1],
+                        opacity: [0.5, 0, 0.5]
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: 'easeOut'
+                      }}
+                    />
+                  )}
                   {isComplete ? (
-                    <CheckCircle size={16} weight="fill" />
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ duration: 0.5, type: 'spring', bounce: 0.5 }}
+                    >
+                      <CheckCircle size={16} weight="fill" />
+                    </motion.div>
                   ) : isProcessing ? (
-                    <Lightning size={16} weight="fill" />
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                    >
+                      <Lightning size={16} weight="fill" />
+                    </motion.div>
                   ) : (
                     <Clock size={14} weight="bold" />
                   )}
@@ -141,11 +248,25 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-bold text-t1 uppercase tracking-wide">{config.label}</h4>
                   {(isProcessing || step.data) && (
-                    <p className="text-xs text-t2 mt-1 font-medium">
+                    <motion.p 
+                      className="text-xs text-t2 mt-1 font-medium"
+                      initial={{ opacity: 0, y: -5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
                       {step.data && typeof step.data === 'string' ? step.data : config.detail}
-                    </p>
+                    </motion.p>
                   )}
-                  {step.error && <p className="text-xs text-red mt-1 font-semibold">{step.error}</p>}
+                  {step.error && (
+                    <motion.p 
+                      className="text-xs text-red mt-1 font-semibold"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {step.error}
+                    </motion.p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0 ml-2">
@@ -156,30 +277,47 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   />
                 )}
                 {isComplete && (
-                  <span className="text-sm font-mono font-black text-green tabular-nums">100%</span>
+                  <motion.span 
+                    className="text-sm font-mono font-black text-green tabular-nums"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3, type: 'spring' }}
+                  >
+                    100%
+                  </motion.span>
                 )}
                 {isPending && (
                   <span className="text-sm font-mono font-bold text-t3 tabular-nums">0%</span>
                 )}
                 {isError && (
-                  <span className="text-sm font-mono font-black text-red tabular-nums">ERR</span>
+                  <motion.span 
+                    className="text-sm font-mono font-black text-red tabular-nums"
+                    animate={{ x: [-2, 2, -2, 2, 0] }}
+                    transition={{ duration: 0.4 }}
+                  >
+                    ERR
+                  </motion.span>
                 )}
               </div>
             </div>
 
             {isProcessing && (
               <motion.div 
-                className="absolute bottom-0 left-0 right-0 h-1 bg-s1 overflow-hidden"
+                className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-s1 via-s2 to-s1 overflow-hidden rounded-b-lg"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.2 }}
               >
                 <motion.div
-                  className="h-full bg-gradient-to-r from-b1 via-amber to-b1 relative"
+                  className="h-full relative"
+                  style={{
+                    background: 'linear-gradient(90deg, oklch(0.50 0.18 250), oklch(0.68 0.18 75), oklch(0.52 0.20 145), oklch(0.50 0.18 250))',
+                    backgroundSize: '300% 100%'
+                  }}
                   initial={{ width: '0%' }}
                   animate={{ 
                     width: config.progressSteps.map(val => `${val * 100}%`),
-                    backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
+                    backgroundPosition: ['0% 50%', '100% 50%', '200% 50%']
                   }}
                   transition={{
                     width: {
@@ -188,17 +326,36 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                       times: config.progressTiming
                     },
                     backgroundPosition: {
-                      duration: config.duration * 0.8,
+                      duration: config.duration * 1.2,
                       ease: 'linear',
                       repeat: Infinity
                     }
                   }}
-                  style={{ backgroundSize: '200% 100%' }}
                 >
-                  <div 
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-                    style={{
-                      animation: `shimmer-sweep ${config.duration * 0.7}s ease-in-out infinite`
+                  <motion.div 
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                    animate={{
+                      x: ['-100%', '200%']
+                    }}
+                    transition={{
+                      duration: config.duration * 0.6,
+                      ease: 'easeInOut',
+                      repeat: Infinity
+                    }}
+                  />
+                  <motion.div
+                    className="absolute inset-0"
+                    animate={{
+                      boxShadow: [
+                        '0 0 8px oklch(0.50 0.18 250 / 0.4)',
+                        '0 0 16px oklch(0.68 0.18 75 / 0.6)',
+                        '0 0 8px oklch(0.50 0.18 250 / 0.4)'
+                      ]
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      ease: 'easeInOut',
+                      repeat: Infinity
                     }}
                   />
                 </motion.div>
@@ -207,22 +364,28 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
 
             {isComplete && (
               <motion.div 
-                className="absolute bottom-0 left-0 right-0 h-1 bg-s1 overflow-hidden"
+                className="absolute bottom-0 left-0 right-0 h-1 bg-s1 overflow-hidden rounded-b-lg"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.15 }}
               >
                 <motion.div
-                  className="h-full bg-gradient-to-r from-green via-green to-green"
+                  className="h-full bg-gradient-to-r from-green via-emerald-400 to-green relative"
                   initial={{ width: '0%' }}
                   animate={{ width: '100%' }}
-                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                  transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
                 >
                   <motion.div 
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent"
                     initial={{ x: '-100%' }}
                     animate={{ x: '200%' }}
-                    transition={{ duration: 0.6, ease: 'easeInOut' }}
+                    transition={{ duration: 0.8, ease: 'easeInOut' }}
+                  />
+                  <motion.div
+                    className="absolute inset-0"
+                    initial={{ boxShadow: '0 0 0px oklch(0.55 0.20 145 / 0)' }}
+                    animate={{ boxShadow: '0 0 12px oklch(0.55 0.20 145 / 0.6)' }}
+                    transition={{ duration: 0.5 }}
                   />
                 </motion.div>
               </motion.div>
@@ -230,13 +393,13 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
 
             {isError && (
               <motion.div 
-                className="absolute bottom-0 left-0 right-0 h-1 bg-s1 overflow-hidden"
+                className="absolute bottom-0 left-0 right-0 h-1 bg-s1 overflow-hidden rounded-b-lg"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.15 }}
               >
                 <motion.div
-                  className="h-full bg-gradient-to-r from-red via-red to-red"
+                  className="h-full bg-gradient-to-r from-red via-orange-500 to-red"
                   initial={{ width: '0%' }}
                   animate={{ width: '100%' }}
                   transition={{ duration: 0.3, ease: 'easeOut' }}
