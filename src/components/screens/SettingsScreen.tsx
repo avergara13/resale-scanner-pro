@@ -26,7 +26,8 @@ import { IncidentLogViewer } from '../IncidentLogViewer'
 import { DetectionHistoryViewer } from '../DetectionHistoryViewer'
 import { FalsePositiveAnalyzerPanel } from '../FalsePositiveAnalyzer'
 import { ThemeToggle } from '../ThemeToggle'
-import type { AppSettings } from '@/types'
+import { TagPresetsManager } from '../TagPresetsManager'
+import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
   settings: AppSettings
@@ -697,6 +698,28 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     />
                   </div>
                 )}
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="tag-presets" className="border border-s2 rounded-lg px-4 bg-s1">
+              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+                Tag Presets
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2">
+                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="text-b1 mt-0.5" size={16} />
+                    <p className="text-xs text-s4 leading-relaxed">
+                      Create and manage preset collections of tags for common product categories. Apply presets quickly when editing items in the queue.
+                    </p>
+                  </div>
+                </div>
+                
+                <TagPresetsManager 
+                  onApplyPreset={(tags: ItemTag[]) => {
+                    console.log('Applied preset tags:', tags)
+                  }} 
+                />
               </AccordionContent>
             </AccordionItem>
 
