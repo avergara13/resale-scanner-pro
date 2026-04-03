@@ -25,6 +25,7 @@ This is a multi-modal AI platform integrating camera vision, voice interfaces, r
 - **Google Gemini Integration**: Product identification, listing generation, and chat capabilities
 - **AI Research Center**: Chatbot, market research tools, trend analysis, and insights dashboard
 - **Photo Editing**: Brightness, contrast, saturation adjustments, and eBay optimization
+- **Dark Mode**: Toggle for low-light scanning conditions with persistent theme preference
 - **Settings Configuration**: Comprehensive API key management for all services
 
 ### 🚧 Ready for API Connection

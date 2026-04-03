@@ -16,6 +16,7 @@ import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createObjectDetectionService } from './lib/object-detection-service'
 import { useCaptureState } from './hooks/use-capture-state'
+import { useTheme } from './hooks/use-theme'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { Screen, ScannedItem, PipelineStep, Session, AppSettings } from './types'
@@ -30,6 +31,7 @@ function App() {
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   
   const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
+  const { theme, setTheme } = useTheme()
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -38,6 +40,7 @@ function App() {
     autoCapture: true,
     agenticMode: true,
     liveSearchEnabled: true,
+    darkMode: false,
     minProfitMargin: 30,
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
@@ -382,15 +385,22 @@ function App() {
         autoCapture: true,
         agenticMode: true,
         liveSearchEnabled: true,
+        darkMode: false,
         minProfitMargin: 30,
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
         paypalFeePercent: 3.49,
         preferredAiModel: 'gemini-2.0-flash-exp',
       }
-      return { ...(prev || defaults), ...updates }
+      const newSettings = { ...(prev || defaults), ...updates }
+      
+      if ('darkMode' in updates && updates.darkMode !== undefined) {
+        setTheme(updates.darkMode ? 'dark' : 'light')
+      }
+      
+      return newSettings
     })
-  }, [setSettings])
+  }, [setSettings, setTheme])
 
   const handleSaveDraft = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData) {
@@ -616,6 +626,12 @@ function App() {
       reset()
     }
   }, [cameraOpen, reset])
+
+  useEffect(() => {
+    if (settings && settings.darkMode !== undefined) {
+      setTheme(settings.darkMode ? 'dark' : 'light')
+    }
+  }, [settings?.darkMode, setTheme])
 
   return (
     <div 

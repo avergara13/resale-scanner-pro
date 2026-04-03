@@ -638,6 +638,22 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     onCheckedChange={(checked) => onUpdate({ autoCapture: checked })}
                   />
                 </div>
+
+                <Separator className="bg-s2" />
+
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <Label htmlFor="dark-mode" className="text-sm text-fg font-medium">
+                      Dark Mode
+                    </Label>
+                    <p className="text-xs text-s4 mt-0.5">Optimized for low-light scanning</p>
+                  </div>
+                  <Switch
+                    id="dark-mode"
+                    checked={settings.darkMode}
+                    onCheckedChange={(checked) => onUpdate({ darkMode: checked })}
+                  />
+                </div>
               </AccordionContent>
             </AccordionItem>
 

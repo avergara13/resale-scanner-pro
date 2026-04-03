@@ -126,6 +126,7 @@ export interface AppSettings {
   autoCapture: boolean
   agenticMode: boolean
   liveSearchEnabled: boolean
+  darkMode: boolean
   minProfitMargin: number
   defaultShippingCost: number
   ebayFeePercent: number
