@@ -1,9 +1,12 @@
-import { Play, Stop, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { Play, Stop, CheckCircle, XCircle, ChartLine } from '@phosphor-icons/react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '../ThemeToggle'
-import type { Session } from '@/types'
+import { TrendVisualization } from '../TrendVisualization'
+import { useKV } from '@github/spark/hooks'
+import type { Session, ScannedItem } from '@/types'
 
 interface SessionScreenProps {
   session?: Session
@@ -12,6 +15,10 @@ interface SessionScreenProps {
 }
 
 export function SessionScreen({ session, onStartSession, onEndSession }: SessionScreenProps) {
+  const [showTrends, setShowTrends] = useState(false)
+  const [queue] = useKV<ScannedItem[]>('queue', [])
+  const [allSessions] = useKV<Session[]>('all-sessions', [])
+  
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
     const hours = Math.floor(minutes / 60)
@@ -22,15 +29,34 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
     <div id="scr-session" className="flex flex-col h-full px-4 py-6">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-black tracking-tight text-t1">TODAY'S SESSION</h1>
+          <h1 className="text-xl font-black tracking-tight text-t1">
+            {showTrends ? 'PERFORMANCE TRENDS' : 'TODAY\'S SESSION'}
+          </h1>
           <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </p>
         </div>
-        <ThemeToggle />
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowTrends(!showTrends)}
+            className="h-9 w-9"
+          >
+            <ChartLine size={20} weight={showTrends ? 'fill' : 'regular'} className="text-b1" />
+          </Button>
+          <ThemeToggle />
+        </div>
       </div>
 
-      {!session?.active ? (
+      {showTrends ? (
+        <div className="flex-1 overflow-y-auto">
+          <TrendVisualization 
+            items={queue || []} 
+            sessions={allSessions || []}
+          />
+        </div>
+      ) : !session?.active ? (
         <div className="flex-1 flex flex-col items-center justify-center space-y-6">
           <div className="w-24 h-24 rounded-full bg-s1 flex items-center justify-center">
             <Play size={40} weight="fill" className="text-b1 ml-1" />
