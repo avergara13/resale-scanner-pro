@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple } from '@phosphor-icons/react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,12 +13,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { ItemEditDialog } from '@/components/ItemEditDialog'
 import type { ScannedItem } from '@/types'
 
 interface QueueScreenProps {
   queueItems: ScannedItem[]
   onRemove: (id: string) => void
   onCreateListing: (id: string) => void
+  onEdit: (itemId: string, updates: Partial<ScannedItem>) => void
   onBatchAnalyze?: () => void
   isBatchAnalyzing?: boolean
 }
@@ -26,10 +28,11 @@ interface QueueScreenProps {
 type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
 type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc'
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnalyze, isBatchAnalyzing }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onBatchAnalyze, isBatchAnalyzing }: QueueScreenProps) {
   const [filter, setFilter] = useState<FilterOption>('ALL')
   const [sortBy, setSortBy] = useState<SortOption>('profit-desc')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
   
   const filteredItems = queueItems.filter(item => {
     if (filter === 'ALL') return true
@@ -136,8 +139,23 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnal
   const allFilteredSelected = filteredItems.length > 0 && selectedIds.size === filteredItems.length
   const someFilteredSelected = selectedIds.size > 0 && selectedIds.size < filteredItems.length
 
+  const handleEdit = (item: ScannedItem) => {
+    setEditingItem(item)
+  }
+
+  const handleSaveEdit = (itemId: string, updates: Partial<ScannedItem>) => {
+    onEdit(itemId, updates)
+    toast.success('Item updated successfully')
+  }
+
   return (
     <div id="scr-queue" className="flex flex-col h-full">
+      <ItemEditDialog
+        item={editingItem}
+        isOpen={editingItem !== null}
+        onClose={() => setEditingItem(null)}
+        onSave={handleSaveEdit}
+      />
       <div className="px-4 py-6 border-b border-s2">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex-1">
@@ -359,11 +377,20 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnal
                       <div className="flex gap-2">
                         <Button
                           size="sm"
+                          onClick={() => handleEdit(item)}
+                          variant="outline"
+                          className="h-8 px-3 text-xs font-medium border border-s2 bg-bg text-s4 hover:bg-s1 hover:text-fg"
+                        >
+                          <PencilSimple size={14} weight="bold" className="mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
                           onClick={() => onCreateListing(item.id)}
                           className="flex-1 bg-b1 hover:bg-b2 text-bg h-8 text-xs font-medium"
                         >
                           <ArrowRight size={14} weight="bold" className="mr-1" />
-                          Create Listing
+                          List
                         </Button>
                         <Button
                           size="sm"

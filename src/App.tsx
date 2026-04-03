@@ -393,6 +393,13 @@ function App() {
     }
   }, [session, setSession, setQueue])
 
+  const handleEditQueueItem = useCallback((itemId: string, updates: Partial<ScannedItem>) => {
+    setQueue((prev) => {
+      const currentQueue = prev || []
+      return currentQueue.map(item => item.id === itemId ? { ...item, ...updates } : item)
+    })
+  }, [setQueue])
+
   const handleBatchAnalyze = useCallback(async () => {
     const unanalyzedItems = (queue || []).filter(item => !item.productName || item.productName === 'Quick Draft')
     
@@ -556,6 +563,7 @@ function App() {
           queueItems={queue || []}
           onRemove={handleRemoveFromQueue}
           onCreateListing={() => toast.info('Listing creation coming soon')}
+          onEdit={handleEditQueueItem}
           onBatchAnalyze={handleBatchAnalyze}
           isBatchAnalyzing={isBatchAnalyzing}
         />
