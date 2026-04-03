@@ -79,16 +79,34 @@ function App() {
   }, [settings?.geminiApiKey, settings?.preferredAiModel])
 
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
-    const steps = [25, 50, 75, 95]
-    const interval = duration / steps.length
+    const updateInterval = 80
+    const totalUpdates = Math.floor(duration / updateInterval)
+    let currentUpdate = 0
     
-    steps.forEach((progress, i) => {
-      setTimeout(() => {
-        setPipeline(prev => prev.map((s, idx) => 
-          idx === stepIndex ? { ...s, progress } : s
-        ))
-      }, interval * (i + 1))
-    })
+    const progressCurve = (t: number) => {
+      return Math.floor(t * t * 95)
+    }
+    
+    const intervalId = setInterval(() => {
+      currentUpdate++
+      const progress = progressCurve(currentUpdate / totalUpdates)
+      
+      setPipeline(prev => prev.map((s, idx) => 
+        idx === stepIndex ? { ...s, progress: Math.min(progress, 95) } : s
+      ))
+      
+      if (currentUpdate >= totalUpdates) {
+        clearInterval(intervalId)
+      }
+    }, updateInterval)
+    
+    return () => clearInterval(intervalId)
+  }, [])
+  
+  const completeStep = useCallback((stepIndex: number) => {
+    setPipeline(prev => prev.map((s, idx) => 
+      idx === stepIndex ? { ...s, progress: 100, status: 'complete' } : s
+    ))
   }, [])
 
   const handleCapture = useCallback(async (imageData: string, price: number) => {
@@ -128,29 +146,32 @@ function App() {
           visionResult = await geminiService.analyzeProductImage(imageData, {}, price)
           mockProductName = visionResult.productName
           
+          completeStep(0)
+          await new Promise(resolve => setTimeout(resolve, 100))
           setPipeline(prev => prev.map((s, i) => 
             i === 0 ? { 
               ...s, 
-              status: 'complete', 
               data: `${visionResult?.productName || mockProductName} - ${visionResult?.brand || 'Generic'} (${visionResult ? Math.round(visionResult.confidence * 100) : 0}% confident)` 
             } : s
           ))
         } catch (error) {
           console.error('Gemini vision failed:', error)
+          completeStep(0)
+          await new Promise(resolve => setTimeout(resolve, 100))
           setPipeline(prev => prev.map((s, i) => 
             i === 0 ? { 
               ...s, 
-              status: 'complete', 
               data: 'Vision analysis unavailable - configure Gemini API key in Settings' 
             } : s
           ))
         }
       } else {
         await new Promise(resolve => setTimeout(resolve, 1000))
+        completeStep(0)
+        await new Promise(resolve => setTimeout(resolve, 100))
         setPipeline(prev => prev.map((s, i) => 
           i === 0 ? { 
             ...s, 
-            status: 'complete', 
             data: 'Configure Gemini API key in Settings for real vision analysis' 
           } : s
         ))
@@ -174,29 +195,32 @@ function App() {
             ? `$${lensAnalysis.priceRange.min.toFixed(2)}-$${lensAnalysis.priceRange.max.toFixed(2)}` 
             : 'No prices'
           
+          completeStep(1)
+          await new Promise(resolve => setTimeout(resolve, 100))
           setPipeline(prev => prev.map((s, i) => 
             i === 1 ? { 
               ...s, 
-              status: 'complete',
               data: `Found ${resultCount} matches. Range: ${priceInfo}`
             } : s
           ))
         } catch (error) {
           console.error('Google Lens failed:', error)
+          completeStep(1)
+          await new Promise(resolve => setTimeout(resolve, 100))
           setPipeline(prev => prev.map((s, i) => 
             i === 1 ? { 
               ...s, 
-              status: 'complete',
               data: 'Configure Google API key in Settings for real Lens search'
             } : s
           ))
         }
       } else {
         await new Promise(resolve => setTimeout(resolve, 1000))
+        completeStep(1)
+        await new Promise(resolve => setTimeout(resolve, 100))
         setPipeline(prev => prev.map((s, i) => 
           i === 1 ? { 
             ...s, 
-            status: 'complete',
             data: 'Configure Google API key in Settings for Lens visual search'
           } : s
         ))
@@ -237,28 +261,31 @@ function App() {
           
           ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : ebayAvgPrice
           
+          completeStep(2)
+          await new Promise(resolve => setTimeout(resolve, 100))
           setPipeline(prev => prev.map((s, i) => 
             i === 2 ? { 
               ...s, 
-              status: 'complete', 
               data: `Found ${searchResults.soldCount} sold, ${searchResults.activeCount} active. Avg: $${searchResults.averageSoldPrice.toFixed(2)}` 
             } : s
           ))
         } catch (error) {
           console.error('eBay API error:', error)
+          completeStep(2)
+          await new Promise(resolve => setTimeout(resolve, 100))
           setPipeline(prev => prev.map((s, i) => 
             i === 2 ? { 
               ...s, 
-              status: 'complete', 
               data: 'Using estimated pricing (eBay API unavailable)' 
             } : s
           ))
         }
       } else {
+        completeStep(2)
+        await new Promise(resolve => setTimeout(resolve, 100))
         setPipeline(prev => prev.map((s, i) => 
           i === 2 ? { 
             ...s, 
-            status: 'complete', 
             data: 'Configure eBay API in Settings for real market data' 
           } : s
         ))
@@ -295,16 +322,17 @@ function App() {
         triggerFail()
       }
       
+      completeStep(3)
+      await new Promise(resolve => setTimeout(resolve, 100))
       setPipeline(prev => prev.map((s, i) => 
         i === 3 ? { 
           ...s, 
-          status: 'complete',
           data: `Margin: ${profitMetrics.profitMargin.toFixed(1)}%, ROI: ${profitMetrics.roi.toFixed(0)}%`
         } : s
       ))
       
       await new Promise(resolve => setTimeout(resolve, 500))
-      setPipeline(prev => prev.map(s => ({ ...s, status: 'complete' })))
+      completeStep(4)
       
       const updatedItem: ScannedItem = {
         ...newItem,
