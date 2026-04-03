@@ -181,3 +181,29 @@ export interface ConnectionHistoryStats {
   lastIncident?: DowntimeIncident
   uptimePercentage: Record<string, number>
 }
+
+export interface DetectionHistoryEntry {
+  id: string
+  timestamp: number
+  imageData: string
+  detectedCount: number
+  detectedProducts: DetectedProduct[]
+  userConfirmedCount?: number
+  acceptedProducts?: string[]
+  rejectedProducts?: string[]
+  accuracy?: number
+  processingTimeMs: number
+  modelUsed: string
+}
+
+export interface DetectionHistoryStats {
+  totalScans: number
+  totalDetections: number
+  averageDetectionsPerScan: number
+  averageAccuracy: number
+  averageProcessingTime: number
+  mostCommonProductCount: number
+  fastestScan: number
+  slowestScan: number
+  totalUserCorrections: number
+}

@@ -2,9 +2,10 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import { X, Lightning, Check, Scan, Crosshair } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useKV } from '@github/spark/hooks'
 import { ObjectDetectionService, DetectedObject, ObjectDetectionResult } from '@/lib/object-detection-service'
 import { MultiObjectSelector } from './MultiObjectSelector'
-import type { DetectedProduct } from '@/types'
+import type { DetectedProduct, DetectionHistoryEntry } from '@/types'
 
 interface CameraOverlayProps {
   isOpen: boolean
@@ -20,6 +21,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onMult
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
   const detectionIntervalRef = useRef<number | null>(null)
+  const detectionStartTimeRef = useRef<number>(0)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [mode, setMode] = useState<'lens' | 'listing'>('lens')
   const [price, setPrice] = useState('')
@@ -31,6 +33,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onMult
   const [isDetecting, setIsDetecting] = useState(false)
   const [showMultiSelector, setShowMultiSelector] = useState(false)
   const [capturedImageForMulti, setCapturedImageForMulti] = useState<string>('')
+  const [detectionHistory, setDetectionHistory] = useKV<DetectionHistoryEntry[]>('detection-history', [])
 
   useEffect(() => {
     if (isOpen) {
@@ -156,6 +159,27 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onMult
       const imageData = canvas.toDataURL('image/jpeg', 0.9)
       
       if (detectionEnabled && detectionResult && detectionResult.objects.length > 1 && onMultiCapture && !quickDraftMode) {
+        detectionStartTimeRef.current = Date.now()
+        
+        const detectedProducts: DetectedProduct[] = detectionResult.objects.map((obj, idx) => ({
+          id: `obj-${idx}-${Date.now()}`,
+          name: obj.name,
+          confidence: obj.confidence,
+          boundingBox: obj.boundingBox,
+        }))
+        
+        const historyEntry: DetectionHistoryEntry = {
+          id: `detection-${Date.now()}`,
+          timestamp: Date.now(),
+          imageData,
+          detectedCount: detectionResult.objects.length,
+          detectedProducts,
+          processingTimeMs: Date.now() - detectionStartTimeRef.current,
+          modelUsed: objectDetectionService ? 'gemini-2.0-flash-exp' : 'unknown',
+        }
+        
+        setDetectionHistory((prev) => [...(prev || []), historyEntry])
+        
         setCapturedImageForMulti(imageData)
         setShowMultiSelector(true)
         setShowCaptureFlash(true)
