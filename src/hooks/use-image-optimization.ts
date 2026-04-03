@@ -1,21 +1,56 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { createImageOptimizationService, type OptimizedImage, type ImageQualityPreset } from '@/lib/image-optimization-service'
 
 interface ImageCache {
-  [key: string]: OptimizedImage
+  [key: string]: OptimizedImage & { lastAccessed: number }
 }
+
+const MAX_CACHE_SIZE = 100
+const MAX_CACHE_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanced') {
   const [cache, setCache] = useKV<ImageCache>('image-optimization-cache', {})
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
+  const optimizationQueueRef = useRef<Map<string, Promise<OptimizedImage>>>(new Map())
 
   const service = useMemo(() => createImageOptimizationService(qualityPreset), [qualityPreset])
 
   const getCacheKey = useCallback((imageData: string): string => {
-    return imageData.substring(0, 100)
-  }, [])
+    const hashString = (str: string): string => {
+      let hash = 0
+      for (let i = 0; i < Math.min(str.length, 200); i++) {
+        const char = str.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash = hash & hash
+      }
+      return hash.toString(36)
+    }
+    return `${hashString(imageData)}-${qualityPreset}`
+  }, [qualityPreset])
+
+  const cleanOldCache = useCallback(() => {
+    const now = Date.now()
+    setCache((prev) => {
+      if (!prev) return {}
+      
+      const entries = Object.entries(prev)
+      if (entries.length <= MAX_CACHE_SIZE) return prev
+      
+      const validEntries = entries
+        .filter(([_, img]) => now - img.lastAccessed < MAX_CACHE_AGE_MS)
+        .sort((a, b) => b[1].lastAccessed - a[1].lastAccessed)
+        .slice(0, MAX_CACHE_SIZE)
+      
+      return Object.fromEntries(validEntries)
+    })
+  }, [setCache])
+
+  useEffect(() => {
+    const interval = setInterval(cleanOldCache, 60000)
+    return () => clearInterval(interval)
+  }, [cleanOldCache])
 
   const optimizeAndCache = useCallback(async (
     imageData: string,
@@ -24,22 +59,40 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
     const cacheKey = getCacheKey(imageData)
     
     if (!forceRefresh && cache && cache[cacheKey]) {
-      return cache[cacheKey]
+      const cached = cache[cacheKey]
+      setCache((prev) => {
+        if (!prev) return {}
+        return {
+          ...prev,
+          [cacheKey]: { ...prev[cacheKey], lastAccessed: Date.now() }
+        }
+      })
+      return cached
     }
 
-    setIsOptimizing(true)
-    try {
-      const optimized = await service.optimizeImage(imageData, true)
-      
-      setCache((prev) => ({
-        ...(prev || {}),
-        [cacheKey]: optimized
-      }))
-      
-      return optimized
-    } finally {
-      setIsOptimizing(false)
+    if (optimizationQueueRef.current.has(cacheKey)) {
+      return optimizationQueueRef.current.get(cacheKey)!
     }
+
+    const optimizationPromise = (async () => {
+      setIsOptimizing(true)
+      try {
+        const optimized = await service.optimizeImage(imageData, true)
+        
+        setCache((prev) => ({
+          ...(prev || {}),
+          [cacheKey]: { ...optimized, lastAccessed: Date.now() }
+        }))
+        
+        return optimized
+      } finally {
+        setIsOptimizing(false)
+        optimizationQueueRef.current.delete(cacheKey)
+      }
+    })()
+
+    optimizationQueueRef.current.set(cacheKey, optimizationPromise)
+    return optimizationPromise
   }, [cache, getCacheKey, service, setCache])
 
   const batchOptimize = useCallback(async (
@@ -62,7 +115,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
         } else {
           const optimized = await service.optimizeImage(imageData, true)
           results.set(id, optimized)
-          newCacheEntries[cacheKey] = optimized
+          newCacheEntries[cacheKey] = { ...optimized, lastAccessed: Date.now() }
         }
         
         setProgress({ current: i + 1, total: images.length })
@@ -90,9 +143,9 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
     }
 
     const thumbnail = await service.generateThumbnail(imageData, {
-      width: 200,
-      height: 200,
-      quality: 0.6,
+      width: 150,
+      height: 150,
+      quality: 0.65,
       format: 'jpeg'
     })
 

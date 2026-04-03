@@ -37,37 +37,37 @@ export interface QualityPresetConfig {
 
 export const QUALITY_PRESETS: Record<ImageQualityPreset, QualityPresetConfig> = {
   fast: {
-    thumbnailSize: 120,
-    thumbnailQuality: 0.5,
-    previewMaxSize: 600,
-    previewQuality: 0.65,
+    thumbnailSize: 80,
+    thumbnailQuality: 0.45,
+    previewMaxSize: 480,
+    previewQuality: 0.60,
     format: 'jpeg',
     smoothingQuality: 'low',
     description: '⚡ Fastest loading, lower quality - perfect for quick scanning sessions'
   },
   balanced: {
-    thumbnailSize: 200,
-    thumbnailQuality: 0.7,
-    previewMaxSize: 800,
-    previewQuality: 0.8,
+    thumbnailSize: 150,
+    thumbnailQuality: 0.65,
+    previewMaxSize: 720,
+    previewQuality: 0.75,
     format: 'jpeg',
     smoothingQuality: 'medium',
     description: '⚖️ Good balance of speed and quality - recommended for most users'
   },
   quality: {
-    thumbnailSize: 300,
-    thumbnailQuality: 0.82,
-    previewMaxSize: 1200,
-    previewQuality: 0.9,
+    thumbnailSize: 240,
+    thumbnailQuality: 0.78,
+    previewMaxSize: 1080,
+    previewQuality: 0.85,
     format: 'webp',
     smoothingQuality: 'high',
     description: '✨ Higher quality images, slightly slower - great for detailed analysis'
   },
   maximum: {
-    thumbnailSize: 400,
-    thumbnailQuality: 0.92,
-    previewMaxSize: 1600,
-    previewQuality: 0.95,
+    thumbnailSize: 320,
+    thumbnailQuality: 0.88,
+    previewMaxSize: 1440,
+    previewQuality: 0.92,
     format: 'webp',
     smoothingQuality: 'high',
     description: '🎯 Maximum quality, slower loading - best for professional listings'

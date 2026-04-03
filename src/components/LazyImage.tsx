@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -13,6 +13,8 @@ interface LazyImageProps {
   onError?: () => void
   priority?: boolean
   objectFit?: 'cover' | 'contain' | 'fill' | 'none'
+  fadeInDuration?: number
+  rootMargin?: string
 }
 
 export function LazyImage({
@@ -25,14 +27,18 @@ export function LazyImage({
   onLoad,
   onError,
   priority = false,
-  objectFit = 'cover'
+  objectFit = 'cover',
+  fadeInDuration = 300,
+  rootMargin = '100px'
 }: LazyImageProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [isInView, setIsInView] = useState(priority)
   const [error, setError] = useState(false)
   const [currentSrc, setCurrentSrc] = useState(thumbnail || src)
+  const [thumbnailLoaded, setThumbnailLoaded] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const fullImageRef = useRef<HTMLImageElement | null>(null)
 
   useEffect(() => {
     if (priority) {
@@ -48,7 +54,7 @@ export function LazyImage({
         }
       },
       {
-        rootMargin: '50px',
+        rootMargin,
         threshold: 0.01
       }
     )
@@ -60,33 +66,52 @@ export function LazyImage({
     return () => {
       observer.disconnect()
     }
-  }, [priority])
+  }, [priority, rootMargin])
 
   useEffect(() => {
     if (!isInView) return
+    if (!thumbnail) return
+    if (currentSrc !== thumbnail) return
 
-    if (thumbnail && currentSrc === thumbnail) {
-      const fullImg = new Image()
-      fullImg.src = src
-      fullImg.onload = () => {
+    const fullImg = new Image()
+    fullImageRef.current = fullImg
+    
+    fullImg.decoding = 'async'
+    fullImg.src = src
+    
+    fullImg.onload = () => {
+      requestAnimationFrame(() => {
         setCurrentSrc(src)
-      }
-      fullImg.onerror = () => {
-        setError(true)
-        onError?.()
+        setIsLoaded(true)
+      })
+    }
+    
+    fullImg.onerror = () => {
+      setError(true)
+      onError?.()
+    }
+
+    return () => {
+      if (fullImageRef.current) {
+        fullImageRef.current.onload = null
+        fullImageRef.current.onerror = null
       }
     }
   }, [isInView, src, thumbnail, currentSrc, onError])
 
-  const handleLoad = () => {
-    setIsLoaded(true)
+  const handleLoad = useCallback(() => {
+    if (currentSrc === thumbnail) {
+      setThumbnailLoaded(true)
+    } else {
+      setIsLoaded(true)
+    }
     onLoad?.()
-  }
+  }, [currentSrc, thumbnail, onLoad])
 
-  const handleError = () => {
+  const handleError = useCallback(() => {
     setError(true)
     onError?.()
-  }
+  }, [onError])
 
   const aspectRatioClasses = {
     square: 'aspect-square',
@@ -102,6 +127,8 @@ export function LazyImage({
     none: 'object-none'
   }
 
+  const showThumbnailBlur = thumbnail && currentSrc === thumbnail && thumbnailLoaded && !isLoaded
+
   return (
     <div
       ref={containerRef}
@@ -111,7 +138,7 @@ export function LazyImage({
         containerClassName
       )}
     >
-      {!isLoaded && !error && (
+      {!thumbnailLoaded && !isLoaded && !error && (
         <Skeleton className="absolute inset-0 w-full h-full" />
       )}
       
@@ -119,7 +146,7 @@ export function LazyImage({
         <div className="absolute inset-0 flex items-center justify-center bg-s1 text-t3">
           <div className="text-center p-4">
             <svg
-              className="w-12 h-12 mx-auto mb-2 opacity-50"
+              className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 opacity-40"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -131,7 +158,7 @@ export function LazyImage({
                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            <p className="text-xs">Failed to load</p>
+            <p className="text-xs opacity-60">Failed to load</p>
           </div>
         </div>
       )}
@@ -143,13 +170,17 @@ export function LazyImage({
           alt={alt}
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"
+          fetchPriority={priority ? 'high' : 'auto'}
           onLoad={handleLoad}
           onError={handleError}
+          style={{
+            transitionDuration: `${fadeInDuration}ms`
+          }}
           className={cn(
-            'w-full h-full transition-opacity duration-300',
+            'w-full h-full transition-all ease-out',
             objectFitClasses[objectFit],
-            isLoaded ? 'opacity-100' : 'opacity-0',
-            currentSrc === thumbnail && isLoaded ? 'blur-sm scale-105' : '',
+            (thumbnailLoaded || isLoaded) ? 'opacity-100' : 'opacity-0',
+            showThumbnailBlur ? 'blur-[2px] scale-[1.02]' : 'blur-0 scale-100',
             className
           )}
         />
