@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
+import { AnimatePresence, motion } from 'framer-motion'
 import { BottomNav } from './components/BottomNav'
 import { CameraOverlay } from './components/CameraOverlay'
 import { ConnectionHealthMonitor } from './components/ConnectionHealthMonitor'
@@ -673,11 +674,51 @@ function App() {
     }
   }, [settings?.themeMode, settings?.darkMode, setTheme])
 
+  const screenVariants = {
+    initial: (direction: number) => ({
+      opacity: 0,
+      x: direction > 0 ? 60 : -60,
+      scale: 0.96,
+      filter: 'blur(4px)'
+    }),
+    animate: {
+      opacity: 1,
+      x: 0,
+      scale: 1,
+      filter: 'blur(0px)'
+    },
+    exit: (direction: number) => ({
+      opacity: 0,
+      x: direction > 0 ? -60 : 60,
+      scale: 0.96,
+      filter: 'blur(4px)'
+    })
+  }
+
+  const screenOrder: Record<Screen, number> = {
+    'session': 0,
+    'ai': 1,
+    'research': 2,
+    'queue': 3,
+    'incidents': 4,
+    'settings': 5,
+    'listing': 6,
+    'chat': 7,
+    'history': 8
+  }
+
+  const [prevScreen, setPrevScreen] = useState<Screen>(screen)
+  const direction = screenOrder[screen] - screenOrder[prevScreen]
+
+  useEffect(() => {
+    setPrevScreen(screen)
+  }, [screen])
+
   return (
     <div 
       id="app-container" 
       className={cn(
-        "relative transition-colors duration-300",
+        "relative transition-colors duration-300 overflow-hidden",
         captureState === 'capturing' && "capture-flash",
         captureState === 'analyzing' && "analyzing-flash",
         captureState === 'success' && "success-flash",
@@ -686,46 +727,114 @@ function App() {
     >
       <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
       
-      {screen === 'session' && (
-        <SessionScreen
-          session={session}
-          onStartSession={handleStartSession}
-          onEndSession={handleEndSession}
-        />
-      )}
-      {screen === 'research' && (
-        <ResearchScreen />
-      )}
-      {screen === 'incidents' && (
-        <IncidentsScreen settings={settings} />
-      )}
-      {screen === 'ai' && (
-        <AIScreen
-          currentItem={currentItem}
-          pipeline={pipeline}
-          settings={settings}
-          onAddToQueue={handleAddToQueue}
-          onDeepSearch={() => toast.info('Deep search feature coming soon')}
-          onSaveDraft={handleSaveDraft}
-        />
-      )}
-      {screen === 'queue' && (
-        <QueueScreen
-          queueItems={queue || []}
-          onRemove={handleRemoveFromQueue}
-          onCreateListing={() => toast.info('Listing creation coming soon')}
-          onEdit={handleEditQueueItem}
-          onBatchAnalyze={handleBatchAnalyze}
-          isBatchAnalyzing={isBatchAnalyzing}
-          geminiService={geminiService}
-        />
-      )}
-      {screen === 'settings' && settings && (
-        <SettingsScreen
-          settings={settings}
-          onUpdate={handleUpdateSettings}
-        />
-      )}
+      <AnimatePresence mode="wait" custom={direction}>
+        {screen === 'session' && (
+          <motion.div
+            key="session"
+            custom={direction}
+            variants={screenVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute inset-0"
+          >
+            <SessionScreen
+              session={session}
+              onStartSession={handleStartSession}
+              onEndSession={handleEndSession}
+            />
+          </motion.div>
+        )}
+        {screen === 'research' && (
+          <motion.div
+            key="research"
+            custom={direction}
+            variants={screenVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute inset-0"
+          >
+            <ResearchScreen />
+          </motion.div>
+        )}
+        {screen === 'incidents' && (
+          <motion.div
+            key="incidents"
+            custom={direction}
+            variants={screenVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute inset-0"
+          >
+            <IncidentsScreen settings={settings} />
+          </motion.div>
+        )}
+        {screen === 'ai' && (
+          <motion.div
+            key="ai"
+            custom={direction}
+            variants={screenVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute inset-0"
+          >
+            <AIScreen
+              currentItem={currentItem}
+              pipeline={pipeline}
+              settings={settings}
+              onAddToQueue={handleAddToQueue}
+              onDeepSearch={() => toast.info('Deep search feature coming soon')}
+              onSaveDraft={handleSaveDraft}
+            />
+          </motion.div>
+        )}
+        {screen === 'queue' && (
+          <motion.div
+            key="queue"
+            custom={direction}
+            variants={screenVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute inset-0"
+          >
+            <QueueScreen
+              queueItems={queue || []}
+              onRemove={handleRemoveFromQueue}
+              onCreateListing={() => toast.info('Listing creation coming soon')}
+              onEdit={handleEditQueueItem}
+              onBatchAnalyze={handleBatchAnalyze}
+              isBatchAnalyzing={isBatchAnalyzing}
+              geminiService={geminiService}
+            />
+          </motion.div>
+        )}
+        {screen === 'settings' && settings && (
+          <motion.div
+            key="settings"
+            custom={direction}
+            variants={screenVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute inset-0"
+          >
+            <SettingsScreen
+              settings={settings}
+              onUpdate={handleUpdateSettings}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div style={{ height: '80px' }} />
 
