@@ -50,7 +50,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
             transition={{ delay: index * 0.05 }}
             id={`phase-${step.id}`}
             className={cn(
-              'pipeline-card relative pipeline-step-transition',
+              'pipeline-card relative pipeline-step-transition overflow-hidden',
               isComplete && 'done',
               isProcessing && 'running',
               isPending && 'pending',
@@ -76,7 +76,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                     <Clock size={12} weight="bold" />
                   )}
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <h4 className="text-xs font-bold text-t1 uppercase tracking-wider">{config.label}</h4>
                   {(isProcessing || step.data) && (
                     <p className="text-[10px] text-t3 mt-0.5">
@@ -87,13 +87,85 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                 </div>
               </div>
               {isProcessing && (
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-shrink-0 ml-2">
                   <div className="w-1.5 h-1.5 bg-b1 rounded-full animate-bounce" />
                   <div className="w-1.5 h-1.5 bg-b1 rounded-full animate-bounce [animation-delay:0.2s]" />
                   <div className="w-1.5 h-1.5 bg-b1 rounded-full animate-bounce [animation-delay:0.4s]" />
                 </div>
               )}
             </div>
+
+            {isProcessing && (
+              <motion.div 
+                className="absolute bottom-0 left-0 right-0 h-1 bg-s1 overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                <motion.div
+                  className="h-full bg-gradient-to-r from-b1 via-amber to-b1 relative"
+                  initial={{ width: '0%' }}
+                  animate={{ 
+                    width: ['0%', '30%', '60%', '85%', '95%'],
+                    backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
+                  }}
+                  transition={{
+                    width: {
+                      duration: 2.5,
+                      ease: 'easeOut',
+                      times: [0, 0.3, 0.6, 0.85, 1]
+                    },
+                    backgroundPosition: {
+                      duration: 3,
+                      ease: 'linear',
+                      repeat: Infinity
+                    }
+                  }}
+                  style={{ backgroundSize: '200% 100%' }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer-sweep_2s_ease-in-out_infinite]" />
+                </motion.div>
+              </motion.div>
+            )}
+
+            {isComplete && (
+              <motion.div 
+                className="absolute bottom-0 left-0 right-0 h-1 bg-s1 overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15 }}
+              >
+                <motion.div
+                  className="h-full bg-gradient-to-r from-green via-green to-green"
+                  initial={{ width: '0%' }}
+                  animate={{ width: '100%' }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                >
+                  <motion.div 
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '200%' }}
+                    transition={{ duration: 0.6, ease: 'easeInOut' }}
+                  />
+                </motion.div>
+              </motion.div>
+            )}
+
+            {isError && (
+              <motion.div 
+                className="absolute bottom-0 left-0 right-0 h-1 bg-s1 overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15 }}
+              >
+                <motion.div
+                  className="h-full bg-gradient-to-r from-red via-red to-red"
+                  initial={{ width: '0%' }}
+                  animate={{ width: '100%' }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                />
+              </motion.div>
+            )}
           </motion.div>
         )
       })}
