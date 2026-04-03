@@ -211,10 +211,15 @@ function App() {
       ))
       
       let lensAnalysis: GoogleLensAnalysis | undefined
-      
-      simulateProgress(1, 2500)
-      
-      if (googleLensService) {
+
+      // Cost optimization: skip Google Lens if Gemini is already highly confident
+      // Saves a Custom Search API call (~100/day free tier) on clear identifications
+      const geminiConfidence = visionResult ? visionResult.confidence : 0
+      const skipLens = geminiConfidence >= 0.92
+
+      simulateProgress(1, skipLens ? 800 : 2500)
+
+      if (googleLensService && !skipLens) {
         try {
           lensAnalysis = await googleLensService.searchByImage(imageData, visionResult?.productName || mockProductName)
           
@@ -225,33 +230,39 @@ function App() {
           
           completeStep(1)
           await new Promise(resolve => setTimeout(resolve, 100))
-          setPipeline(prev => prev.map((s, i) => 
-            i === 1 ? { 
-              ...s, 
-              data: `Found ${resultCount} matches. Range: ${priceInfo}`
+          setPipeline(prev => prev.map((s, i) =>
+            i === 1 ? {
+              ...s,
+              data: skipLens
+                ? `Skipped — Gemini ${Math.round(geminiConfidence * 100)}% confident (saves API call)`
+                : `Found ${lensAnalysis?.results.length || 0} matches. Range: ${lensAnalysis?.priceRange ? `$${lensAnalysis.priceRange.min.toFixed(2)}-$${lensAnalysis.priceRange.max.toFixed(2)}` : 'No prices'}`
             } : s
           ))
         } catch (error) {
           console.error('Google Lens failed:', error)
           completeStep(1)
           await new Promise(resolve => setTimeout(resolve, 100))
-          setPipeline(prev => prev.map((s, i) => 
-            i === 1 ? { 
-              ...s, 
-              data: 'Configure Google API key in Settings for real Lens search'
+          setPipeline(prev => prev.map((s, i) =>
+            i === 1 ? {
+              ...s,
+              data: 'Google Lens unavailable — using Gemini only'
             } : s
           ))
         }
-      } else {
-        await new Promise(resolve => setTimeout(resolve, 1000))
+      } else if (!googleLensService) {
+        await new Promise(resolve => setTimeout(resolve, 400))
         completeStep(1)
         await new Promise(resolve => setTimeout(resolve, 100))
-        setPipeline(prev => prev.map((s, i) => 
-          i === 1 ? { 
-            ...s, 
-            data: 'Configure Google API key in Settings for Lens visual search'
+        setPipeline(prev => prev.map((s, i) =>
+          i === 1 ? {
+            ...s,
+            data: 'Configure Google API key in Settings for visual search'
           } : s
         ))
+      } else {
+        // skipLens = true (high confidence) — fast path
+        await new Promise(resolve => setTimeout(resolve, 400))
+        completeStep(1)
       }
       
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -665,8 +676,10 @@ function App() {
         }
 
         let lensAnalysis: GoogleLensAnalysis | undefined
-        
-        if (googleLensService && visionResult) {
+
+        // Cost optimization: batch mode skips Google Lens entirely
+        // Saves Custom Search API quota — eBay data is sufficient for batch decisions
+        if (googleLensService && visionResult && false) { // disabled in batch
           try {
             lensAnalysis = await googleLensService.searchByImage(item.imageData!, visionResult.productName)
           } catch (error) {
