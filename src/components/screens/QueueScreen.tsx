@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple } from '@phosphor-icons/react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -18,10 +18,11 @@ import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { ThemeToggle } from '../ThemeToggle'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
+import { FilterPresetsManager } from '@/components/FilterPresetsManager'
 import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-preference'
 import { cn } from '@/lib/utils'
-import type { ScannedItem } from '@/types'
+import type { ScannedItem, CategoryPreset } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
 
 interface QueueScreenProps {
@@ -47,6 +48,34 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [presetsOpen, setPresetsOpen] = useState(false)
+
+  const handleApplyPreset = (preset: CategoryPreset) => {
+    if (preset.filters) {
+      const newFilters: AdvancedFilterOptions = {}
+      
+      if (preset.filters.minProfit || preset.filters.maxProfit) {
+        newFilters.profitMarginRange = {
+          min: preset.filters.minProfit || 0,
+          max: preset.filters.maxProfit || 100
+        }
+      }
+      
+      setAdvancedFilters(newFilters)
+    }
+    
+    if (preset.filters?.decision && preset.filters.decision.length === 1) {
+      setFilter(preset.filters.decision[0] as FilterOption)
+    } else {
+      setFilter('ALL')
+    }
+    
+    if (preset.sortBy && preset.sortOrder) {
+      setSortBy(`${preset.sortBy}-${preset.sortOrder}` as SortOption)
+    }
+    
+    setPresetsOpen(false)
+  }
 
   const availableCategories = useMemo(() => {
     const categories = new Set<string>()
@@ -391,15 +420,29 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onB
               <SelectItem value="category-desc" className="text-xs">Category (Z to A)</SelectItem>
             </SelectContent>
           </Select>
+          <Button
+            onClick={() => setPresetsOpen(true)}
+            size="sm"
+            variant="outline"
+            className="h-9 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1 ml-auto"
+          >
+            <BookmarkSimple size={14} weight="bold" className="mr-1" />
+            Presets
+          </Button>
           <AdvancedFilters
             filters={advancedFilters}
             onFiltersChange={setAdvancedFilters}
             availableCategories={availableCategories}
             priceMin={priceRange.min}
             priceMax={priceRange.max}
-            className="ml-auto"
           />
         </div>
+
+        <FilterPresetsManager
+          isOpen={presetsOpen}
+          onClose={() => setPresetsOpen(false)}
+          onApplyPreset={handleApplyPreset}
+        />
 
         <ActiveFiltersSummary
           filters={advancedFilters}

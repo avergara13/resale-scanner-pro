@@ -26,6 +26,36 @@ export interface DetectedProduct {
   croppedImageData?: string
 }
 
+export interface ItemTag {
+  id: string
+  name: string
+  color: string
+  icon?: string
+}
+
+export interface CategoryPreset {
+  id: string
+  name: string
+  description?: string
+  tags: string[]
+  filters?: {
+    minProfit?: number
+    maxProfit?: number
+    decision?: Decision[]
+    dateRange?: {
+      start?: number
+      end?: number
+    }
+  }
+  sortBy?: 'profit' | 'date' | 'price' | 'name'
+  sortOrder?: 'asc' | 'desc'
+  color?: string
+  icon?: string
+  createdAt: number
+  updatedAt: number
+  isDefault?: boolean
+}
+
 export interface ScannedItem {
   id: string
   timestamp: number
@@ -35,6 +65,7 @@ export interface ScannedItem {
   productName?: string
   description?: string
   category?: string
+  tags?: string[]
   estimatedSellPrice?: number
   profitMargin?: number
   decision: Decision
