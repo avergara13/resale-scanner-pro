@@ -61,6 +61,8 @@ export interface ScannedItem {
   timestamp: number
   imageUrl?: string
   imageData?: string
+  imageThumbnail?: string
+  imageOptimized?: string
   purchasePrice: number
   productName?: string
   description?: string

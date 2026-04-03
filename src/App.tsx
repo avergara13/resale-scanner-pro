@@ -23,6 +23,7 @@ import { createListingOptimizationService } from './lib/listing-optimization-ser
 import { createNotionService } from './lib/notion-service'
 import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
+import { useImageOptimization } from './hooks/use-image-optimization'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation } from './types'
@@ -38,6 +39,7 @@ function App() {
   
   const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
   const { theme, themeMode, setTheme, useAmbientLight, toggleAmbientLight } = useTheme()
+  const { optimizeAndCache, isOptimizing: isOptimizingImage } = useImageOptimization()
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -134,10 +136,14 @@ function App() {
     triggerCapture()
     setCameraOpen(false)
     
+    const optimized = await optimizeAndCache(imageData)
+    
     const newItem: ScannedItem = {
       id: Date.now().toString(),
       timestamp: Date.now(),
-      imageData,
+      imageData: optimized.original,
+      imageThumbnail: optimized.thumbnail,
+      imageOptimized: optimized.original,
       purchasePrice: price,
       decision: 'PENDING',
       inQueue: false,
@@ -542,11 +548,15 @@ function App() {
     setScreen('queue')
   }, [currentItem, setQueue])
 
-  const handleQuickDraft = useCallback((imageData: string, price: number, location?: ThriftStoreLocation) => {
+  const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation) => {
+    const optimized = await optimizeAndCache(imageData)
+    
     const draftItem: ScannedItem = {
       id: Date.now().toString(),
       timestamp: Date.now(),
-      imageData,
+      imageData: optimized.original,
+      imageThumbnail: optimized.thumbnail,
+      imageOptimized: optimized.original,
       purchasePrice: price,
       decision: 'PENDING',
       inQueue: true,
@@ -566,19 +576,22 @@ function App() {
         }
       })
     }
-  }, [session, setSession, setQueue])
+  }, [session, setSession, setQueue, optimizeAndCache])
 
-  const handleMultiCapture = useCallback((products: import('@/types').DetectedProduct[], baseImageData: string, totalPrice: number, location?: ThriftStoreLocation) => {
+  const handleMultiCapture = useCallback(async (products: import('@/types').DetectedProduct[], baseImageData: string, totalPrice: number, location?: ThriftStoreLocation) => {
     const timestamp = Date.now()
     const parentId = `multi-${timestamp}`
     
-    products.forEach((product, index) => {
+    for (const [index, product] of products.entries()) {
       const itemPrice = totalPrice / products.length
+      const optimized = await optimizeAndCache(product.croppedImageData || baseImageData)
       
       const multiItem: ScannedItem = {
         id: `${parentId}-${index}`,
         timestamp: timestamp + index,
-        imageData: product.croppedImageData,
+        imageData: optimized.original,
+        imageThumbnail: optimized.thumbnail,
+        imageOptimized: optimized.original,
         purchasePrice: itemPrice,
         productName: product.name,
         description: `Part of multi-item capture (${index + 1} of ${products.length})`,
@@ -591,7 +604,7 @@ function App() {
       }
       
       setQueue((prev) => [...(prev || []), multiItem])
-    })
+    }
 
     if (session?.active) {
       setSession((prev) => {
