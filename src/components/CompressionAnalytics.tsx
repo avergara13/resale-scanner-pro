@@ -156,3 +156,4 @@ export function CompressionAnalytics() {
       </Button>
     </div>
   )
+}
