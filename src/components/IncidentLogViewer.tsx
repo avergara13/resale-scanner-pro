@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { format } from 'date-fns'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +26,7 @@ import {
 } from '@phosphor-icons/react'
 import { useConnectionHealth } from '@/hooks/use-connection-health'
 import { useConnectionHistory } from '@/hooks/use-connection-history'
+import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import type { AppSettings, DowntimeIncident, ConnectionEvent } from '@/types'
 import type { ConnectionStatus } from '@/hooks/use-connection-health'
 
@@ -115,9 +116,16 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
   const { health } = useConnectionHealth({ settings, enabled: true })
   const { events, incidents, stats } = useConnectionHistory(health)
   
-  const [filterService, setFilterService] = useState<FilterService>('all')
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
-  const [viewMode, setViewMode] = useState<ViewMode>('incidents')
+  const { sortBy: viewMode, filter: filterService, setSortBy: setViewMode, setFilter: setFilterService } = useSortFilterPreference<ViewMode, FilterService>(
+    'incident-log-viewer',
+    'incidents',
+    'all'
+  )
+  const { filter: filterStatus, setFilter: setFilterStatus } = useSortFilterPreference<never, FilterStatus>(
+    'incident-status-filter',
+    '' as never,
+    'all'
+  )
 
   const filteredIncidents = useMemo(() => {
     let filtered = incidents

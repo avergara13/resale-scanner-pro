@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { ThemeToggle } from '../ThemeToggle'
+import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import { cn } from '@/lib/utils'
 import type { ScannedItem } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
@@ -33,8 +34,11 @@ type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
 type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc'
 
 export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onBatchAnalyze, isBatchAnalyzing, geminiService }: QueueScreenProps) {
-  const [filter, setFilter] = useState<FilterOption>('ALL')
-  const [sortBy, setSortBy] = useState<SortOption>('profit-desc')
+  const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
+    'queue-screen',
+    'profit-desc',
+    'ALL'
+  )
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
   
