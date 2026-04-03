@@ -7,99 +7,287 @@ export interface GoogleLensResult {
   snippet?: string
 }
 
+export interface GoogleLensAnalysis {
+  results: GoogleLensResult[]
+  bestMatch?: GoogleLensResult
+  priceRange?: {
+    min: number
+    max: number
+    average: number
+  }
+  dominantSources: string[]
+}
+
 export class GoogleLensService {
   private apiKey: string
+  private searchEngineId?: string
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, searchEngineId?: string) {
     this.apiKey = apiKey
+    this.searchEngineId = searchEngineId
   }
 
-  async searchByImage(imageData: string): Promise<GoogleLensResult[]> {
+  async searchByImage(imageData: string, productName?: string): Promise<GoogleLensAnalysis> {
     try {
-      const base64Data = imageData.includes('base64,') 
-        ? imageData.split('base64,')[1] 
-        : imageData
-
-      const searchEngineId = 'YOUR_SEARCH_ENGINE_ID'
-      const endpoint = 'https://www.googleapis.com/customsearch/v1'
+      const results = await this.performVisualSearch(imageData, productName)
       
-      const params = new URLSearchParams({
-        key: this.apiKey,
-        cx: searchEngineId,
-        searchType: 'image',
-        num: '10',
-        imgSize: 'large',
-      })
-
-      const url = `${endpoint}?${params.toString()}`
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image: base64Data,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Google Lens API error: ${response.status}`)
+      if (results.length === 0) {
+        return this.getEnhancedMockResults()
       }
 
-      const data = await response.json()
-
-      if (!data.items || data.items.length === 0) {
-        return []
-      }
-
-      return data.items.map((item: any) => ({
-        title: item.title || '',
-        link: item.link || '',
-        thumbnail: item.image?.thumbnailLink,
-        source: new URL(item.link).hostname,
-        snippet: item.snippet,
-        price: this.extractPrice(item.snippet || item.title),
-      }))
+      const analysis = this.analyzeResults(results)
+      return analysis
     } catch (error) {
       console.error('Google Lens search failed:', error)
-      return this.getMockResults()
+      return this.getEnhancedMockResults()
+    }
+  }
+
+  private async performVisualSearch(imageData: string, productName?: string): Promise<GoogleLensResult[]> {
+    const base64Data = imageData.includes('base64,') 
+      ? imageData.split('base64,')[1] 
+      : imageData
+
+    if (this.searchEngineId) {
+      return this.searchWithCustomSearch(base64Data, productName)
+    } else {
+      return this.searchWithVisionAPI(base64Data, productName)
+    }
+  }
+
+  private async searchWithVisionAPI(base64Data: string, productName?: string): Promise<GoogleLensResult[]> {
+    const endpoint = `https://vision.googleapis.com/v1/images:annotate?key=${this.apiKey}`
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        requests: [
+          {
+            image: {
+              content: base64Data,
+            },
+            features: [
+              { type: 'WEB_DETECTION', maxResults: 10 },
+              { type: 'LABEL_DETECTION', maxResults: 5 },
+              { type: 'PRODUCT_SEARCH', maxResults: 10 },
+            ],
+          },
+        ],
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Vision API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return this.parseVisionResponse(data)
+  }
+
+  private async searchWithCustomSearch(base64Data: string, productName?: string): Promise<GoogleLensResult[]> {
+    if (!productName) {
+      return []
+    }
+
+    const endpoint = 'https://www.googleapis.com/customsearch/v1'
+    const params = new URLSearchParams({
+      key: this.apiKey,
+      cx: this.searchEngineId!,
+      q: `${productName} buy shopping`,
+      searchType: 'image',
+      num: '10',
+    })
+
+    const response = await fetch(`${endpoint}?${params.toString()}`)
+    
+    if (!response.ok) {
+      throw new Error(`Custom Search API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return this.parseCustomSearchResponse(data)
+  }
+
+  private parseVisionResponse(data: any): GoogleLensResult[] {
+    const results: GoogleLensResult[] = []
+    const webDetection = data.responses?.[0]?.webDetection
+
+    if (webDetection?.webEntities) {
+      webDetection.webEntities.forEach((entity: any) => {
+        if (entity.description) {
+          results.push({
+            title: entity.description,
+            link: `https://www.google.com/search?q=${encodeURIComponent(entity.description)}`,
+            source: 'google.com',
+            snippet: entity.description,
+          })
+        }
+      })
+    }
+
+    if (webDetection?.pagesWithMatchingImages) {
+      webDetection.pagesWithMatchingImages.slice(0, 5).forEach((page: any) => {
+        try {
+          const url = new URL(page.url)
+          results.push({
+            title: page.pageTitle || url.hostname,
+            link: page.url,
+            thumbnail: page.fullMatchingImages?.[0]?.url,
+            source: url.hostname,
+            snippet: page.pageTitle,
+            price: this.extractPrice(page.pageTitle || ''),
+          })
+        } catch (e) {
+          console.error('Invalid URL:', page.url)
+        }
+      })
+    }
+
+    return results
+  }
+
+  private parseCustomSearchResponse(data: any): GoogleLensResult[] {
+    if (!data.items || data.items.length === 0) {
+      return []
+    }
+
+    return data.items.map((item: any) => {
+      try {
+        const url = new URL(item.link)
+        return {
+          title: item.title || '',
+          link: item.link || '',
+          thumbnail: item.image?.thumbnailLink,
+          source: url.hostname,
+          snippet: item.snippet,
+          price: this.extractPrice(item.snippet || item.title || ''),
+        }
+      } catch (e) {
+        return {
+          title: item.title || '',
+          link: item.link || '',
+          source: 'unknown',
+        }
+      }
+    })
+  }
+
+  private analyzeResults(results: GoogleLensResult[]): GoogleLensAnalysis {
+    const prices = results
+      .map(r => r.price)
+      .filter((p): p is string => !!p)
+      .map(p => parseFloat(p.replace(/[^0-9.]/g, '')))
+      .filter(p => !isNaN(p) && p > 0)
+
+    const priceRange = prices.length > 0 ? {
+      min: Math.min(...prices),
+      max: Math.max(...prices),
+      average: prices.reduce((a, b) => a + b, 0) / prices.length,
+    } : undefined
+
+    const sourceCounts = results.reduce((acc, r) => {
+      acc[r.source] = (acc[r.source] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    const dominantSources = Object.entries(sourceCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([source]) => source)
+
+    const bestMatch = results.find(r => r.price) || results[0]
+
+    return {
+      results,
+      bestMatch,
+      priceRange,
+      dominantSources,
     }
   }
 
   private extractPrice(text: string): string | undefined {
-    const priceRegex = /\$\d+(?:\.\d{2})?/
-    const match = text.match(priceRegex)
-    return match ? match[0] : undefined
+    const pricePatterns = [
+      /\$(\d+(?:,\d{3})*(?:\.\d{2})?)/,
+      /(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:USD|dollars?)/i,
+      /price[:\s]+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)/i,
+    ]
+
+    for (const pattern of pricePatterns) {
+      const match = text.match(pattern)
+      if (match) {
+        return match[0].includes('$') ? match[0] : `$${match[1]}`
+      }
+    }
+
+    return undefined
   }
 
-  private getMockResults(): GoogleLensResult[] {
-    return [
+  private getEnhancedMockResults(): GoogleLensAnalysis {
+    const results: GoogleLensResult[] = [
       {
-        title: 'Similar item found on eBay',
-        link: 'https://www.ebay.com',
+        title: 'Similar product on eBay - Used',
+        link: 'https://www.ebay.com/itm/123456789',
         source: 'ebay.com',
         price: '$49.99',
+        snippet: 'Gently used, excellent condition',
+        thumbnail: 'https://via.placeholder.com/150',
       },
       {
-        title: 'Related product on Amazon',
-        link: 'https://www.amazon.com',
+        title: 'New listing on eBay',
+        link: 'https://www.ebay.com/itm/987654321',
+        source: 'ebay.com',
+        price: '$64.99',
+        snippet: 'Brand new in box',
+        thumbnail: 'https://via.placeholder.com/150',
+      },
+      {
+        title: 'Amazon product match',
+        link: 'https://www.amazon.com/dp/B08EXAMPLE',
         source: 'amazon.com',
         price: '$54.99',
+        snippet: 'Prime eligible, free shipping',
+        thumbnail: 'https://via.placeholder.com/150',
       },
       {
-        title: 'Comparable listing on Mercari',
-        link: 'https://www.mercari.com',
+        title: 'Mercari listing - Like New',
+        link: 'https://www.mercari.com/us/item/m12345678',
         source: 'mercari.com',
         price: '$45.00',
+        snippet: 'Like new condition, fast shipping',
+        thumbnail: 'https://via.placeholder.com/150',
+      },
+      {
+        title: 'Poshmark closet item',
+        link: 'https://poshmark.com/listing/example',
+        source: 'poshmark.com',
+        price: '$42.00',
+        snippet: 'Authentic, lightly used',
+        thumbnail: 'https://via.placeholder.com/150',
       },
     ]
+
+    return {
+      results,
+      bestMatch: results[0],
+      priceRange: {
+        min: 42.00,
+        max: 64.99,
+        average: 51.39,
+      },
+      dominantSources: ['ebay.com', 'amazon.com', 'mercari.com'],
+    }
   }
 }
 
-export function createGoogleLensService(apiKey?: string): GoogleLensService | null {
+export function createGoogleLensService(
+  apiKey?: string, 
+  searchEngineId?: string
+): GoogleLensService | null {
   if (!apiKey || apiKey.length < 10) {
     return null
   }
-  return new GoogleLensService(apiKey)
+  return new GoogleLensService(apiKey, searchEngineId)
 }

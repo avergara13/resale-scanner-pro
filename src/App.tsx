@@ -10,7 +10,9 @@ import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
 import { createEbayService } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
+import { createGoogleLensService } from './lib/google-lens-service'
 import type { GeminiVisionResponse } from './lib/gemini-service'
+import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { Screen, ScannedItem, PipelineStep, Session, AppSettings } from './types'
 
 function App() {
@@ -48,6 +50,13 @@ function App() {
       settings?.preferredAiModel
     )
   }, [settings?.geminiApiKey, settings?.preferredAiModel])
+
+  const googleLensService = useMemo(() => {
+    return createGoogleLensService(
+      settings?.googleApiKey,
+      settings?.googleSearchEngineId
+    )
+  }, [settings?.googleApiKey, settings?.googleSearchEngineId])
 
   const handleCapture = useCallback(async (imageData: string, price: number) => {
     setCameraOpen(false)
@@ -113,6 +122,45 @@ function App() {
       setPipeline(prev => prev.map((s, i) => 
         i === 0 ? s : i === 1 ? { ...s, status: 'processing' } : s
       ))
+      
+      let lensAnalysis: GoogleLensAnalysis | undefined
+      
+      if (googleLensService) {
+        try {
+          lensAnalysis = await googleLensService.searchByImage(imageData, visionResult?.productName || mockProductName)
+          
+          const resultCount = lensAnalysis.results.length
+          const priceInfo = lensAnalysis.priceRange 
+            ? `$${lensAnalysis.priceRange.min.toFixed(2)}-$${lensAnalysis.priceRange.max.toFixed(2)}` 
+            : 'No prices'
+          
+          setPipeline(prev => prev.map((s, i) => 
+            i === 1 ? { 
+              ...s, 
+              status: 'complete',
+              data: `Found ${resultCount} matches. Range: ${priceInfo}`
+            } : s
+          ))
+        } catch (error) {
+          console.error('Google Lens failed:', error)
+          setPipeline(prev => prev.map((s, i) => 
+            i === 1 ? { 
+              ...s, 
+              status: 'complete',
+              data: 'Configure Google API key in Settings for real Lens search'
+            } : s
+          ))
+        }
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        setPipeline(prev => prev.map((s, i) => 
+          i === 1 ? { 
+            ...s, 
+            status: 'complete',
+            data: 'Configure Google API key in Settings for Lens visual search'
+          } : s
+        ))
+      }
       
       await new Promise(resolve => setTimeout(resolve, 1000))
       setPipeline(prev => prev.map((s, i) => 
@@ -216,6 +264,8 @@ function App() {
         estimatedSellPrice: sellPrice,
         profitMargin: profitMetrics.profitMargin,
         decision,
+        lensAnalysis,
+        lensResults: lensAnalysis?.results,
         marketData,
       }
       setCurrentItem(updatedItem)
@@ -243,7 +293,7 @@ function App() {
       })))
       toast.error('Analysis failed. Please try again.')
     }
-  }, [settings, session, setSession, ebayService, geminiService])
+  }, [settings, session, setSession, ebayService, geminiService, googleLensService])
 
   const handleAddToQueue = useCallback(() => {
     if (currentItem && currentItem.decision === 'GO') {

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { PipelinePanel } from './PipelinePanel'
 import { DecisionSignal } from './DecisionSignal'
 import { MarketDataPanel } from '../MarketDataPanel'
+import { GoogleLensResults } from '../GoogleLensResults'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import type { ScannedItem, PipelineStep } from '@/types'
 
@@ -72,6 +73,10 @@ export function AIScreen({ currentItem, pipeline, onAddToQueue, onDeepSearch }: 
                 
                 {hasDecision && decision && (
                   <DecisionSignal decision={decision} item={currentItem} />
+                )}
+                
+                {currentItem?.lensAnalysis && (
+                  <GoogleLensResults lensAnalysis={currentItem.lensAnalysis} />
                 )}
                 
                 {currentItem?.marketData && (

@@ -205,6 +205,23 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     </p>
                   )}
                 </div>
+
+                <div>
+                  <Label htmlFor="google-search-engine-id" className="text-xs uppercase tracking-wide text-s4 mb-1.5">
+                    Custom Search Engine ID (Optional)
+                  </Label>
+                  <Input
+                    id="google-search-engine-id"
+                    type="text"
+                    value={settings.googleSearchEngineId || ''}
+                    onChange={(e) => onUpdate({ googleSearchEngineId: e.target.value })}
+                    placeholder="Your Custom Search Engine ID"
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-s4 mt-1">
+                    For enhanced visual search results. Get it from Google Custom Search Engine.
+                  </p>
+                </div>
               </AccordionContent>
             </AccordionItem>
 

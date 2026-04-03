@@ -25,6 +25,7 @@ export interface ScannedItem {
   profitMargin?: number
   decision: Decision
   lensResults?: GoogleLensResult[]
+  lensAnalysis?: GoogleLensAnalysis
   marketData?: MarketData
   notes?: string
   inQueue: boolean
@@ -36,6 +37,18 @@ export interface GoogleLensResult {
   thumbnail?: string
   price?: string
   source: string
+  snippet?: string
+}
+
+export interface GoogleLensAnalysis {
+  results: GoogleLensResult[]
+  bestMatch?: GoogleLensResult
+  priceRange?: {
+    min: number
+    max: number
+    average: number
+  }
+  dominantSources: string[]
 }
 
 export interface MarketData {
@@ -85,6 +98,7 @@ export interface AppSettings {
   ebayDevId?: string
   ebayCertId?: string
   googleApiKey?: string
+  googleSearchEngineId?: string
   supabaseUrl?: string
   supabaseKey?: string
   n8nWebhookUrl?: string
