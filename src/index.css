@@ -461,3 +461,82 @@ button:disabled {
     transform: translateY(0);
   }
 }
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes gradient-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(200%) translateY(200%) rotate(45deg);
+  }
+}
+
+.camera-fab-animated {
+  background: linear-gradient(135deg, var(--b1) 0%, var(--b2) 50%, var(--amber) 100%);
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+  position: relative;
+}
+
+.camera-fab-animated::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, var(--b1), var(--amber), var(--b1));
+  background-size: 200% 200%;
+  animation: gradient-rotate 4s linear infinite;
+  opacity: 0.6;
+  filter: blur(8px);
+  z-index: -1;
+}
+
+.camera-fab-animated::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%);
+  animation: shimmer-sweep 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes gentle-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}

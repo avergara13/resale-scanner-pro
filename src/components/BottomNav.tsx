@@ -101,15 +101,18 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen }: BottomNav
           })}
         </div>
         
-        <button
-          id="camera-fab"
-          onClick={onCameraOpen}
-          className="absolute left-1/2 -translate-x-1/2 -top-5 w-16 h-16 bg-gradient-to-br from-b1 via-b1 to-amber text-white rounded-full shadow-[0_8px_24px_rgba(85,92,226,0.4),0_4px_8px_rgba(0,0,0,0.15)] border-[5px] border-fg flex items-center justify-center transition-all active:scale-95 hover:scale-110 hover:shadow-[0_12px_32px_rgba(85,92,226,0.5),0_6px_12px_rgba(0,0,0,0.2)] z-50 relative overflow-hidden"
-          style={{ minWidth: '64px', minHeight: '64px' }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/20 to-transparent opacity-50 animate-pulse" />
-          <Eye size={28} weight="bold" className="relative z-10 drop-shadow-md" />
-        </button>
+        <div className="absolute left-1/2 -translate-x-1/2 -top-5 z-50">
+          <div className="absolute inset-0 w-16 h-16 rounded-full bg-b1/30 animate-[pulse-ring_2s_ease-out_infinite]" style={{ minWidth: '64px', minHeight: '64px' }} />
+          <div className="absolute inset-0 w-16 h-16 rounded-full bg-amber/20 animate-[pulse-ring_2s_ease-out_infinite_0.5s]" style={{ minWidth: '64px', minHeight: '64px' }} />
+          <button
+            id="camera-fab"
+            onClick={onCameraOpen}
+            className="camera-fab-animated relative w-16 h-16 text-white rounded-full shadow-[0_8px_24px_rgba(85,92,226,0.4),0_4px_8px_rgba(0,0,0,0.15)] border-[5px] border-fg flex items-center justify-center transition-all active:scale-95 hover:scale-110 hover:shadow-[0_12px_32px_rgba(85,92,226,0.5),0_6px_12px_rgba(0,0,0,0.2)] overflow-hidden"
+            style={{ minWidth: '64px', minHeight: '64px' }}
+          >
+            <Eye size={28} weight="bold" className="relative z-10 drop-shadow-md" />
+          </button>
+        </div>
       </div>
     </nav>
   )
