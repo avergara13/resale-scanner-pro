@@ -70,10 +70,10 @@ This is a multi-modal AI platform integrating camera vision, voice interfaces, r
 
 ### Live Market Research
 - **Functionality**: Real-time eBay sold listings, Google Shopping results, local market data via Google Maps
-- **Purpose**: Reduce AI hallucinations with live data, provide confidence in buy decisions
+- **Purpose**: Reduce AI hallucinations with live data, provide confidence in buy decisions based on actual sold prices
 - **Trigger**: Automatic in AI pipeline phase 3
-- **Progression**: Product identified → Query eBay API (sold listings, 90 days) → Query Google Shopping → Check local competition via Maps API → Aggregate pricing → Calculate sell-through rate
-- **Success criteria**: Fresh data (<5min cache), sold vs. active listing ratio, profit margin accounting for eBay fees
+- **Progression**: Product identified → Query eBay Finding API (completed items, last 90 days) → Query eBay Shopping API (active listings) → Calculate avg/median prices, sell-through rate, price range → Display market data panel with recent sales and active listings → Factor into profit calculation
+- **Success criteria**: Fresh data (<5min cache), sold vs. active listing ratio with sell-through rate, recommended pricing based on median sold prices, profit margin accounting for eBay fees, display of 10 recent sales with dates and conditions
 
 ### Gemini Chatbot Assistant
 - **Functionality**: Context-aware AI assistant for questions about items, market trends, pricing strategy

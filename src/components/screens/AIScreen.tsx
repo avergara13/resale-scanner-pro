@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { PipelinePanel } from './PipelinePanel'
 import { DecisionSignal } from './DecisionSignal'
+import { MarketDataPanel } from '../MarketDataPanel'
 import type { ScannedItem, PipelineStep } from '@/types'
 
 interface AIScreenProps {
@@ -64,6 +65,10 @@ export function AIScreen({ currentItem, pipeline, onAddToQueue, onDeepSearch }: 
               )}
               
               <PipelinePanel steps={pipeline} />
+              
+              {currentItem?.marketData && (
+                <MarketDataPanel marketData={currentItem.marketData} />
+              )}
               
               {currentItem && (
                 <div className="space-y-3 pt-2">

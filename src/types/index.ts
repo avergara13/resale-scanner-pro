@@ -40,8 +40,25 @@ export interface GoogleLensResult {
 
 export interface MarketData {
   ebayAvgSold?: number
+  ebayMedianSold?: number
   ebayActiveListings?: number
   ebaySoldCount?: number
+  ebayPriceRange?: {
+    min: number
+    max: number
+  }
+  ebaySellThroughRate?: number
+  ebayRecentSales?: Array<{
+    title: string
+    price: number
+    soldDate: string
+    condition: string
+  }>
+  ebayActiveItems?: Array<{
+    title: string
+    price: number
+    quantity: number
+  }>
   googleShoppingMin?: number
   googleShoppingMax?: number
   competitorCount?: number
