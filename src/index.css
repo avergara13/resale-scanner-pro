@@ -1240,7 +1240,7 @@ button:disabled {
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--b1), transparent);
   transform: translateX(-100%);
-  animation: pipeline-sweep 2s ease-in-out infinite;
+@keyframes pipeline-sweep {
 }
 
 @keyframes pipeline-sweep {
