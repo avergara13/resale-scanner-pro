@@ -220,6 +220,19 @@ export interface ProfitGoalProgress {
   dailyAverageNeeded: number
 }
 
+export type ImageQualityPreset = 'fast' | 'balanced' | 'quality' | 'maximum'
+
+export interface ImageQualitySettings {
+  preset: ImageQualityPreset
+  customSettings?: {
+    thumbnailQuality: number
+    thumbnailSize: number
+    previewQuality: number
+    previewMaxSize: number
+    format: 'jpeg' | 'webp'
+  }
+}
+
 export interface AppSettings {
   geminiApiKey?: string
   anthropicApiKey?: string
@@ -246,6 +259,7 @@ export interface AppSettings {
   defaultShippingCost: number
   ebayFeePercent: number
   paypalFeePercent: number
+  imageQuality?: ImageQualitySettings
 }
 
 export interface ChatMessage {

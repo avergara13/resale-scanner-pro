@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { createImageOptimizationService, type OptimizedImage } from '@/lib/image-optimization-service'
+import { createImageOptimizationService, type OptimizedImage, type ImageQualityPreset } from '@/lib/image-optimization-service'
 
 interface ImageCache {
   [key: string]: OptimizedImage
 }
 
-export function useImageOptimization() {
+export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanced') {
   const [cache, setCache] = useKV<ImageCache>('image-optimization-cache', {})
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
 
-  const service = useMemo(() => createImageOptimizationService(), [])
+  const service = useMemo(() => createImageOptimizationService(qualityPreset), [qualityPreset])
 
   const getCacheKey = useCallback((imageData: string): string => {
     return imageData.substring(0, 100)

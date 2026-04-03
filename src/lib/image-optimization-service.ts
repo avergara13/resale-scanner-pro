@@ -19,6 +19,59 @@ export interface OptimizedImage {
   height: number
   size: number
   thumbnailSize: number
+  compressionRatio?: number
+  preset?: string
+}
+
+export type ImageQualityPreset = 'fast' | 'balanced' | 'quality' | 'maximum'
+
+export interface QualityPresetConfig {
+  thumbnailSize: number
+  thumbnailQuality: number
+  previewMaxSize: number
+  previewQuality: number
+  format: 'jpeg' | 'webp'
+  smoothingQuality: 'low' | 'medium' | 'high'
+  description: string
+}
+
+export const QUALITY_PRESETS: Record<ImageQualityPreset, QualityPresetConfig> = {
+  fast: {
+    thumbnailSize: 120,
+    thumbnailQuality: 0.5,
+    previewMaxSize: 600,
+    previewQuality: 0.65,
+    format: 'jpeg',
+    smoothingQuality: 'low',
+    description: '⚡ Fastest loading, lower quality - perfect for quick scanning sessions'
+  },
+  balanced: {
+    thumbnailSize: 200,
+    thumbnailQuality: 0.7,
+    previewMaxSize: 800,
+    previewQuality: 0.8,
+    format: 'jpeg',
+    smoothingQuality: 'medium',
+    description: '⚖️ Good balance of speed and quality - recommended for most users'
+  },
+  quality: {
+    thumbnailSize: 300,
+    thumbnailQuality: 0.82,
+    previewMaxSize: 1200,
+    previewQuality: 0.9,
+    format: 'webp',
+    smoothingQuality: 'high',
+    description: '✨ Higher quality images, slightly slower - great for detailed analysis'
+  },
+  maximum: {
+    thumbnailSize: 400,
+    thumbnailQuality: 0.92,
+    previewMaxSize: 1600,
+    previewQuality: 0.95,
+    format: 'webp',
+    smoothingQuality: 'high',
+    description: '🎯 Maximum quality, slower loading - best for professional listings'
+  }
 }
 
 const DEFAULT_THUMBNAIL_SIZE = 200
@@ -26,16 +79,21 @@ const DEFAULT_PREVIEW_SIZE = 800
 const DEFAULT_QUALITY = 0.8
 const THUMBNAIL_QUALITY = 0.6
 
-export function createImageOptimizationService() {
+export function createImageOptimizationService(preset: ImageQualityPreset = 'balanced') {
+  const getPresetConfig = (): QualityPresetConfig => {
+    return QUALITY_PRESETS[preset]
+  }
+
   const compressImage = async (
     imageData: string,
     options: ImageOptimizationOptions = {}
   ): Promise<string> => {
+    const presetConfig = getPresetConfig()
     const {
-      maxWidth = DEFAULT_PREVIEW_SIZE,
-      maxHeight = DEFAULT_PREVIEW_SIZE,
-      quality = DEFAULT_QUALITY,
-      format = 'jpeg'
+      maxWidth = presetConfig.previewMaxSize,
+      maxHeight = presetConfig.previewMaxSize,
+      quality = presetConfig.previewQuality,
+      format = presetConfig.format
     } = options
 
     return new Promise((resolve, reject) => {
@@ -68,7 +126,7 @@ export function createImageOptimizationService() {
           }
           
           ctx.imageSmoothingEnabled = true
-          ctx.imageSmoothingQuality = 'high'
+          ctx.imageSmoothingQuality = presetConfig.smoothingQuality
           ctx.drawImage(img, 0, 0, width, height)
           
           const mimeType = format === 'webp' ? 'image/webp' : 
@@ -93,11 +151,12 @@ export function createImageOptimizationService() {
     imageData: string,
     options: ThumbnailOptions = { width: DEFAULT_THUMBNAIL_SIZE, height: DEFAULT_THUMBNAIL_SIZE }
   ): Promise<string> => {
+    const presetConfig = getPresetConfig()
     const {
-      width = DEFAULT_THUMBNAIL_SIZE,
-      height = DEFAULT_THUMBNAIL_SIZE,
-      quality = THUMBNAIL_QUALITY,
-      format = 'jpeg'
+      width = presetConfig.thumbnailSize,
+      height = presetConfig.thumbnailSize,
+      quality = presetConfig.thumbnailQuality,
+      format = presetConfig.format
     } = options
 
     return new Promise((resolve, reject) => {
@@ -127,7 +186,7 @@ export function createImageOptimizationService() {
           }
           
           ctx.imageSmoothingEnabled = true
-          ctx.imageSmoothingQuality = 'medium'
+          ctx.imageSmoothingQuality = presetConfig.smoothingQuality === 'high' ? 'high' : 'medium'
           ctx.drawImage(img, 0, 0, thumbWidth, thumbHeight)
           
           const mimeType = format === 'webp' ? 'image/webp' : 'image/jpeg'
@@ -150,18 +209,20 @@ export function createImageOptimizationService() {
     imageData: string,
     generateThumb: boolean = true
   ): Promise<OptimizedImage> => {
+    const presetConfig = getPresetConfig()
+    
     const [compressed, thumbnail] = await Promise.all([
       compressImage(imageData, {
-        maxWidth: DEFAULT_PREVIEW_SIZE,
-        maxHeight: DEFAULT_PREVIEW_SIZE,
-        quality: DEFAULT_QUALITY,
-        format: 'jpeg'
+        maxWidth: presetConfig.previewMaxSize,
+        maxHeight: presetConfig.previewMaxSize,
+        quality: presetConfig.previewQuality,
+        format: presetConfig.format
       }),
       generateThumb ? generateThumbnail(imageData, {
-        width: DEFAULT_THUMBNAIL_SIZE,
-        height: DEFAULT_THUMBNAIL_SIZE,
-        quality: THUMBNAIL_QUALITY,
-        format: 'jpeg'
+        width: presetConfig.thumbnailSize,
+        height: presetConfig.thumbnailSize,
+        quality: presetConfig.thumbnailQuality,
+        format: presetConfig.format
       }) : Promise.resolve('')
     ])
 
@@ -182,7 +243,9 @@ export function createImageOptimizationService() {
       width: img.width,
       height: img.height,
       size: compressedSize,
-      thumbnailSize: thumbnailSize || compressedSize
+      thumbnailSize: thumbnailSize || compressedSize,
+      compressionRatio: originalSize > 0 ? compressedSize / originalSize : 1,
+      preset
     }
   }
 
@@ -242,7 +305,9 @@ export function createImageOptimizationService() {
     optimizeImage,
     getImageDimensions,
     estimateImageSize,
-    batchOptimize
+    batchOptimize,
+    getPresetConfig,
+    preset
   }
 }
 

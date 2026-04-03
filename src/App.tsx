@@ -37,10 +37,6 @@ function App() {
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   
-  const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
-  const { theme, themeMode, setTheme, useAmbientLight, toggleAmbientLight } = useTheme()
-  const { optimizeAndCache, isOptimizing: isOptimizingImage } = useImageOptimization()
-  
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
@@ -56,8 +52,14 @@ function App() {
     ebayFeePercent: 12.9,
     paypalFeePercent: 3.49,
     preferredAiModel: 'gemini-2.0-flash-exp',
-    notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7', // Hobbyst Resale Inventory DB
+    notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
+    imageQuality: { preset: 'balanced' },
   })
+  
+  const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
+  const { theme, themeMode, setTheme, useAmbientLight, toggleAmbientLight } = useTheme()
+  const imageQualityPreset = settings?.imageQuality?.preset || 'balanced'
+  const { optimizeAndCache, isOptimizing: isOptimizingImage } = useImageOptimization(imageQualityPreset)
 
   const ebayService = useMemo(() => {
     return createEbayService(

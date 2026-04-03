@@ -699,6 +699,87 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
+            <AccordionItem value="image-quality" className="border border-s2 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
+                📸 Image Quality
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="text-b1 mt-0.5" size={16} />
+                    <p className="text-xs text-t2 leading-relaxed">
+                      Choose a quality preset that balances loading speed and image detail. Higher quality takes longer to process but provides better visuals for listings.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="image-quality-preset" className="text-xs uppercase tracking-wide text-t2">
+                    Quality Preset
+                  </Label>
+                  <Select
+                    value={settings.imageQuality?.preset || 'balanced'}
+                    onValueChange={(value) => onUpdate({ imageQuality: { preset: value as any } })}
+                  >
+                    <SelectTrigger id="image-quality-preset" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fast">
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="font-medium">⚡ Fast</span>
+                          <span className="text-xs text-t3">Fastest loading, lower quality</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="balanced">
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="font-medium">⚖️ Balanced</span>
+                          <span className="text-xs text-t3">Recommended - good balance</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="quality">
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="font-medium">✨ Quality</span>
+                          <span className="text-xs text-t3">Higher quality, slower loading</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="maximum">
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="font-medium">🎯 Maximum</span>
+                          <span className="text-xs text-t3">Best quality for pro listings</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <div className="p-3 bg-s1 border border-s2 rounded-md text-xs space-y-2">
+                    <div className="flex justify-between text-t2">
+                      <span>Thumbnail Size:</span>
+                      <span className="font-mono text-t1">
+                        {settings.imageQuality?.preset === 'fast' ? '120px' :
+                         settings.imageQuality?.preset === 'quality' ? '300px' :
+                         settings.imageQuality?.preset === 'maximum' ? '400px' : '200px'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-t2">
+                      <span>Max Image Size:</span>
+                      <span className="font-mono text-t1">
+                        {settings.imageQuality?.preset === 'fast' ? '600px' :
+                         settings.imageQuality?.preset === 'quality' ? '1200px' :
+                         settings.imageQuality?.preset === 'maximum' ? '1600px' : '800px'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-t2">
+                      <span>Format:</span>
+                      <span className="font-mono text-t1">
+                        {settings.imageQuality?.preset === 'quality' || settings.imageQuality?.preset === 'maximum' ? 'WebP' : 'JPEG'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             <AccordionItem value="tag-presets" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🏷️ Tag Presets
