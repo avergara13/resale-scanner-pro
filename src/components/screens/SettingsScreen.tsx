@@ -173,9 +173,20 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 <div className="p-3 bg-t4 border border-t3 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-s4 leading-relaxed">
-                      Enable Lens API, Custom Search API, Maps API, and Places API in your Google Cloud Console.
-                    </p>
+                    <div className="text-xs text-s4 leading-relaxed space-y-2">
+                      <p className="font-medium text-fg">Quick Setup:</p>
+                      <ol className="list-decimal list-inside space-y-1 ml-1">
+                        <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-b1 underline">console.cloud.google.com</a></li>
+                        <li>Create a new project or select existing</li>
+                        <li>Enable these APIs: Vision API, Custom Search API, Maps API, Places API</li>
+                        <li>Go to Credentials → Create API Key</li>
+                        <li>Restrict key to enabled APIs only</li>
+                        <li>Copy and paste the key below</li>
+                      </ol>
+                      <p className="text-fg font-medium pt-1">
+                        Need help? See <a href="https://github.com/yourusername/resale-scanner/blob/main/GOOGLE_CLOUD_SETUP.md" target="_blank" rel="noopener noreferrer" className="text-b1 underline">detailed setup guide</a>
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -196,12 +207,17 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     type={showKeys.google ? 'text' : 'password'}
                     value={settings.googleApiKey || ''}
                     onChange={(e) => onUpdate({ googleApiKey: e.target.value })}
-                    placeholder="For Lens, Maps, Search APIs"
+                    placeholder="AIzaSy... (for Vision, Maps, Places)"
                     className="font-mono text-sm"
                   />
                   {hasKey(settings.googleApiKey) && (
                     <p className="text-xs text-green mt-1 flex items-center gap-1">
-                      <CheckCircle size={12} weight="fill" /> Key configured
+                      <CheckCircle size={12} weight="fill" /> Key configured - Google Lens enabled
+                    </p>
+                  )}
+                  {!hasKey(settings.googleApiKey) && (
+                    <p className="text-xs text-amber mt-1">
+                      Required for real-time product matching
                     </p>
                   )}
                 </div>
@@ -219,8 +235,18 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     className="font-mono text-sm"
                   />
                   <p className="text-xs text-s4 mt-1">
-                    For enhanced visual search results. Get it from Google Custom Search Engine.
+                    For enhanced visual search. Get it from <a href="https://programmablesearchengine.google.com" target="_blank" rel="noopener noreferrer" className="text-b1 underline">programmablesearchengine.google.com</a>
                   </p>
+                </div>
+
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
+                  <p className="text-xs font-medium text-fg mb-2">What you get with Google Cloud APIs:</p>
+                  <ul className="text-xs text-s4 space-y-1 ml-4 list-disc">
+                    <li><span className="font-medium text-fg">Vision API:</span> Product identification from photos</li>
+                    <li><span className="font-medium text-fg">Custom Search:</span> Visual product matching across web</li>
+                    <li><span className="font-medium text-fg">Maps API:</span> Local market intelligence & store finder</li>
+                    <li><span className="font-medium text-fg">Places API:</span> Thrift store locations & ratings</li>
+                  </ul>
                 </div>
               </AccordionContent>
             </AccordionItem>

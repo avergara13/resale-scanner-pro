@@ -27,9 +27,10 @@ This is a multi-modal AI platform integrating camera vision, voice interfaces, r
 
 ### 🚧 Ready for API Connection
 The following features are built and ready - just add API keys in Settings:
-- **Google Lens Search**: Service layer complete, awaiting Google API key and Custom Search Engine ID
-- **Google Maps Local Markets**: Infrastructure ready for location-based market intelligence
-- **Google Search Integration**: Framework in place to reduce AI hallucinations with live data
+- **Google Lens Search**: ✅ Service layer complete with detailed setup instructions in Settings
+- **Google Cloud Vision API**: ✅ Product identification from photos configured and ready
+- **Google Custom Search**: ✅ Enhanced visual search results integration complete
+- **Google Maps & Places**: Infrastructure ready for location-based market intelligence
 - **Anthropic Claude**: Configured as fallback AI provider
 - **Supabase**: Database persistence architecture ready
 - **n8n Workflows**: Webhook endpoints prepared for automation
@@ -37,12 +38,43 @@ The following features are built and ready - just add API keys in Settings:
 
 ### 📋 Integration Checklist
 To make this app fully operational:
-1. **Add Gemini API Key** in Settings → AI Configuration (for product vision analysis)
-2. **Add eBay Credentials** in Settings → eBay API (App ID required minimum)
-3. **Optional: Add Google API Key** for Lens, Maps, and Search features
-4. **Optional: Add Supabase** credentials for cloud persistence
-5. **Optional: Configure n8n webhooks** for automated listing workflows
-6. **Optional: Add Notion** integration for inventory tracking
+
+#### Required APIs (Core Functionality)
+1. **Google Gemini API Key** → Settings → AI Configuration
+   - For real-time product vision analysis
+   - Get at: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+
+2. **Google Cloud API Key** → Settings → Google Cloud APIs
+   - For Google Lens visual product matching
+   - **Setup Instructions (now in Settings):**
+     1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+     2. Create new project or select existing
+     3. Enable: Vision API, Custom Search API, Maps API, Places API
+     4. Go to Credentials → Create API Key
+     5. Restrict key to enabled APIs only
+     6. Copy key to Settings
+
+3. **eBay Developer Credentials** → Settings → eBay Integration
+   - For real market data and pricing
+   - Get at: [developer.ebay.com](https://developer.ebay.com)
+   - Need: App ID, Dev ID, Cert ID, OAuth Token
+
+#### Optional APIs (Enhanced Features)
+4. **Google Custom Search Engine ID** → Settings → Google Cloud APIs (Optional field)
+   - For enhanced visual search results
+   - Get at: [programmablesearchengine.google.com](https://programmablesearchengine.google.com)
+
+5. **Supabase Credentials** → Settings → Database & Automation
+   - For cloud data persistence
+   - Get at: [supabase.com](https://supabase.com)
+
+6. **n8n Webhook URL** → Settings → Database & Automation
+   - For automated workflows
+   - Configure in your n8n instance
+
+7. **Notion Integration** → Settings → Database & Automation
+   - For inventory tracking workspace
+   - Get at: [notion.so/my-integrations](https://www.notion.so/my-integrations)
 
 ## Next Development Phase
 

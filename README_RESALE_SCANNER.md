@@ -20,7 +20,12 @@ A professional mobile-first Progressive Web App for resellers to scan and analyz
 - **AI Research Center**: Market research, trend analysis, competitor scanning, and insights
 
 ### Ready for Connection 🔌
-- Google Lens API for visual product search
+
+**Quick Setup Guide Available**: See [GOOGLE_CLOUD_SETUP.md](./GOOGLE_CLOUD_SETUP.md) for step-by-step instructions
+
+- ✅ **Google Lens API** - Visual product search with detailed setup instructions in Settings
+- ✅ **Google Vision API** - Product identification from photos (configured and ready)
+- ✅ **Google Custom Search** - Enhanced visual search results integration
 - Google Maps API for local market intelligence  
 - Google Search API to reduce AI hallucinations
 - Anthropic Claude as fallback AI provider
@@ -98,10 +103,34 @@ Uses Spark's `useKV` hook for persistent data:
 ## Next Steps
 
 ### To Start Using the App
-1. **Configure Gemini API** in Settings for AI product analysis
-2. **Add eBay credentials** for real market data (minimum: App ID)
-3. **Optional**: Add Google API key for Lens/Maps/Search features
+
+1. **Configure Google Cloud APIs** → Settings → Google Cloud APIs
+   - Follow the step-by-step setup in Settings
+   - Or see [GOOGLE_CLOUD_SETUP.md](./GOOGLE_CLOUD_SETUP.md) for detailed guide
+   - Enable: Vision API (required), Custom Search API (optional)
+   - Get API key from Google Cloud Console
+   
+2. **Configure Gemini API** → Settings → AI Configuration
+   - For real-time product vision analysis
+   - Get key at: https://aistudio.google.com/app/apikey
+   
+3. **Add eBay Credentials** → Settings → eBay Integration
+   - For real market data and sold listings research
+   - Get at: https://developer.ebay.com
+   - Minimum required: App ID
+   
 4. **Start a Session** and begin scanning items!
+
+### What Each API Enables
+
+| API | Feature | Status | Priority |
+|-----|---------|--------|----------|
+| Google Vision API | Product identification from photos | ✅ Ready | **Required** |
+| Google Gemini API | AI analysis & listing generation | ✅ Ready | **Required** |
+| eBay API | Market data & pricing | ✅ Ready | **Recommended** |
+| Google Custom Search | Enhanced visual matching | ✅ Ready | Optional |
+| Google Maps API | Local market intelligence | 🔌 Connected | Optional |
+| Anthropic Claude | Backup AI provider | 🔌 Connected | Optional |
 
 ### Future Enhancements
 - Background removal for product photos
