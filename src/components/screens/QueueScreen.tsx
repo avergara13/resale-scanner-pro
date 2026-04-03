@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -237,6 +237,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [presetsOpen, setPresetsOpen] = useState(false)
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
+  const [previousItemCount, setPreviousItemCount] = useState<number>(queueItems.length)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -506,6 +507,23 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const allFilteredSelected = filteredItems.length > 0 && selectedIds.size === filteredItems.length
   const someFilteredSelected = selectedIds.size > 0 && selectedIds.size < filteredItems.length
 
+  useEffect(() => {
+    if (sortedItems.length !== previousItemCount) {
+      const diff = sortedItems.length - previousItemCount
+      setPreviousItemCount(sortedItems.length)
+      
+      if (diff !== 0 && previousItemCount !== queueItems.length) {
+        const message = diff > 0 
+          ? `Showing ${Math.abs(diff)} more item${Math.abs(diff) !== 1 ? 's' : ''}`
+          : `Showing ${Math.abs(diff)} fewer item${Math.abs(diff) !== 1 ? 's' : ''}`
+        
+        toast.info(message, {
+          duration: 2000,
+        })
+      }
+    }
+  }, [sortedItems.length, previousItemCount, queueItems.length])
+
   const handleEdit = (item: ScannedItem) => {
     setEditingItem(item)
   }
@@ -592,7 +610,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <h1 className="text-xl font-black tracking-tight">LISTING QUEUE</h1>
-              <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">{queueItems.length} Items Pending</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
+                  {queueItems.length} Items Total
+                </p>
+                {sortedItems.length !== queueItems.length && (
+                  <Badge 
+                    variant="secondary" 
+                    className="h-5 px-2 text-[10px] font-bold bg-b1/15 text-b1 border-b1/30"
+                  >
+                    {sortedItems.length} visible
+                  </Badge>
+                )}
+              </div>
             </div>
             <ThemeToggle />
           </div>
