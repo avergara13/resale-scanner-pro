@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
-import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk } from '@phosphor-icons/react'
-import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
+import { useState, useMemo, useRef } from 'react'
+import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti } from '@phosphor-icons/react'
+import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -25,6 +25,64 @@ interface AIScreenProps {
   onSaveDraft: (price: number, notes: string) => void
 }
 
+function CelebrationParticle({ delay, index }: { delay: number; index: number }) {
+  const randomX = Math.random() * 200 - 100
+  const randomRotation = Math.random() * 720 - 360
+  const colors = ['#60aa82', '#c17c5f', '#555ce2', '#f0c75e']
+  const color = colors[index % colors.length]
+  const shapes = ['○', '●', '◆', '★', '✦', '✨']
+  const shape = shapes[index % shapes.length]
+  
+  return (
+    <motion.div
+      className="absolute font-bold text-2xl pointer-events-none"
+      style={{ 
+        left: '50%',
+        top: '50%',
+        color,
+        textShadow: `0 0 8px ${color}`,
+      }}
+      initial={{ 
+        opacity: 0,
+        x: 0,
+        y: 0,
+        scale: 0,
+        rotate: 0
+      }}
+      animate={{ 
+        opacity: [0, 1, 1, 0],
+        x: randomX,
+        y: [-80, -120, -160],
+        scale: [0, 1.2, 1, 0.8],
+        rotate: randomRotation
+      }}
+      transition={{ 
+        duration: 1.2,
+        delay,
+        ease: 'easeOut'
+      }}
+    >
+      {shape}
+    </motion.div>
+  )
+}
+
+function CelebrationEffect() {
+  const particleCount = 20
+  
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-visible z-50">
+      {Array.from({ length: particleCount }).map((_, i) => (
+        <CelebrationParticle 
+          key={i} 
+          index={i} 
+          delay={i * 0.03}
+        />
+      ))}
+    </div>
+  )
+}
+
 function OverallProgress({ steps }: { steps: PipelineStep[] }) {
   const overallProgress = useMemo(() => {
     if (steps.length === 0) return 0
@@ -43,6 +101,8 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
 
   const count = useMotionValue(0)
   const rounded = useTransform(count, Math.round)
+  const [showCelebration, setShowCelebration] = useState(false)
+  const previousProgress = useRef(0)
 
   useEffect(() => {
     const controls = animate(count, overallProgress, {
@@ -52,18 +112,27 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
     return controls.stop
   }, [count, overallProgress])
 
+  useEffect(() => {
+    if (overallProgress === 100 && previousProgress.current < 100) {
+      setShowCelebration(true)
+      const timer = setTimeout(() => setShowCelebration(false), 1500)
+      return () => clearTimeout(timer)
+    }
+    previousProgress.current = overallProgress
+  }, [overallProgress])
+
   const isComplete = overallProgress === 100
   const isProcessing = overallProgress > 0 && overallProgress < 100
 
   if (steps.length === 0) return null
 
   return (
-    <div className="mb-4 space-y-2">
+    <div className="mb-4 space-y-2 relative">
       <div className="flex items-center justify-between">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-t2">
           OVERALL PROGRESS
         </h3>
-        <motion.div className="text-lg font-mono font-black tabular-nums">
+        <motion.div className="text-lg font-mono font-black tabular-nums relative">
           <motion.span
             className={cn(
               "transition-colors duration-300",
@@ -71,10 +140,27 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
               isProcessing && "text-b1",
               !isProcessing && !isComplete && "text-t2"
             )}
+            animate={isComplete ? {
+              scale: [1, 1.15, 1],
+            } : {}}
+            transition={{
+              duration: 0.5,
+              ease: 'easeOut'
+            }}
           >
             {rounded}
           </motion.span>
           <span className="text-t3 text-sm">%</span>
+          {isComplete && (
+            <motion.span
+              className="ml-2 text-green"
+              initial={{ opacity: 0, scale: 0, rotate: -180 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              transition={{ duration: 0.5, ease: 'backOut' }}
+            >
+              ✓
+            </motion.span>
+          )}
         </motion.div>
       </div>
       
@@ -118,6 +204,10 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
           )}
         </motion.div>
       </div>
+
+      <AnimatePresence>
+        {showCelebration && <CelebrationEffect />}
+      </AnimatePresence>
     </div>
   )
 }
