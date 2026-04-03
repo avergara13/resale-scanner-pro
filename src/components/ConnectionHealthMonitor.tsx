@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useConnectionHealth, type ConnectionStatus } from '@/hooks/use-connection-health'
+import { useConnectionHistory } from '@/hooks/use-connection-history'
 import type { AppSettings } from '@/types'
 
 interface ConnectionHealthMonitorProps {
@@ -33,6 +34,8 @@ export function ConnectionHealthMonitor({
     settings,
     enabled,
   })
+
+  useConnectionHistory(health, { enabled })
 
   const prevStatusRef = useRef<ConnectionStatus>(health.overall)
   const hasNotifiedRef = useRef(false)

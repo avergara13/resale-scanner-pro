@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/accordion'
 import { CheckCircle, XCircle, Info, Eye, EyeClosed } from '@phosphor-icons/react'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
+import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
 import type { AppSettings } from '@/types'
 
 interface SettingsScreenProps {
@@ -96,6 +97,24 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 </div>
 
                 <ApiStatusIndicator settings={settings} liveUpdates={true} checkInterval={30000} />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="history" className="border border-s2 rounded-lg px-4 bg-s1">
+              <AccordionTrigger className="text-sm font-semibold text-fg uppercase tracking-wide hover:no-underline">
+                Connection History & Downtime Tracking
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2">
+                <div className="p-3 bg-t4 border border-t3 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <Info className="text-b1 mt-0.5" size={16} />
+                    <p className="text-xs text-s4 leading-relaxed">
+                      Track connection events and identify downtime patterns over the last 30 days. Analyze service reliability and incident history.
+                    </p>
+                  </div>
+                </div>
+
+                <ConnectionHistoryPanel settings={settings} />
               </AccordionContent>
             </AccordionItem>
 

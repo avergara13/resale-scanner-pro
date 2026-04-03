@@ -133,3 +133,35 @@ export interface EbayListing {
   condition: string
   status: 'draft' | 'published'
 }
+
+export interface ConnectionEvent {
+  id: string
+  timestamp: number
+  service: 'gemini' | 'googleLens' | 'ebay' | 'overall'
+  previousStatus: 'healthy' | 'degraded' | 'offline' | 'checking'
+  newStatus: 'healthy' | 'degraded' | 'offline' | 'checking'
+  latency?: number
+  error?: string
+  duration?: number
+}
+
+export interface DowntimeIncident {
+  id: string
+  service: 'gemini' | 'googleLens' | 'ebay' | 'overall'
+  startTime: number
+  endTime?: number
+  duration?: number
+  resolved: boolean
+  error?: string
+  impactedOperations?: number
+}
+
+export interface ConnectionHistoryStats {
+  totalEvents: number
+  totalDowntime: number
+  averageUptime: number
+  incidentCount: number
+  mostUnreliableService?: string
+  lastIncident?: DowntimeIncident
+  uptimePercentage: Record<string, number>
+}
