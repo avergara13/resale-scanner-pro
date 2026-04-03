@@ -4,7 +4,7 @@ A professional mobile-first Progressive Web App for resellers to scan and analyz
 
 ## Features
 
-### Core Workflow
+### Core Workflow ✅
 - **Camera Scanner**: Fullscreen camera overlay with live viewfinder and corner bracket frame
 - **5-Phase AI Pipeline**: Vision Analysis → Google Lens → Market Research → Profit Calculation → GO/PASS Decision
 - **Agent/Manual Modes**: AI-guided workflow or manual data entry
@@ -12,14 +12,23 @@ A professional mobile-first Progressive Web App for resellers to scan and analyz
 - **Queue Management**: Save promising items for batch processing and listing creation
 - **Settings**: Configure API keys, business rules, and app preferences
 
-### AI & Integrations (Ready for Backend)
-- Google Gemini models for product identification and analysis
+### AI & Integrations ✅
+- **Google Gemini**: Product identification, vision analysis, listing generation, and chatbot
+- **Voice Input**: Browser-based speech recognition for hands-free operation (all text fields)
+- **Photo Editing**: Brightness, contrast, saturation controls, and eBay optimization
+- **eBay API**: Sold listing research, active listing analysis, profit calculations
+- **AI Research Center**: Market research, trend analysis, competitor scanning, and insights
+
+### Ready for Connection 🔌
 - Google Lens API for visual product search
 - Google Maps API for local market intelligence  
 - Google Search API to reduce AI hallucinations
-- eBay API for sold listing research and automated posting
 - Anthropic Claude as fallback AI provider
-- Voice input across all text fields (Web Speech API)
+- Supabase with Docker deployment support
+- n8n workflow automation integration points
+- Railway deployment optimized
+- Google Cloud infrastructure compatible
+- Notion workspace sync capabilities
 
 ### Data Architecture
 - Supabase-ready with Docker deployment support
@@ -88,14 +97,21 @@ Uses Spark's `useKV` hook for persistent data:
 
 ## Next Steps
 
-1. **Backend Integration**: Wire up Google Gemini API in the pipeline handlers
-2. **Google Lens**: Add API calls for visual product search
-3. **eBay Research**: Implement sold listings query and profit calculation
-4. **Voice Input**: Enable Web Speech API for dictation
-5. **Photo Editing**: Add crop/enhance/background removal for listings
-6. **Supabase Sync**: Connect persistent storage and multi-device sync
-7. **n8n Workflows**: Create automation triggers for listing creation
-8. **Notion Integration**: Sync inventory and research notes
+### To Start Using the App
+1. **Configure Gemini API** in Settings for AI product analysis
+2. **Add eBay credentials** for real market data (minimum: App ID)
+3. **Optional**: Add Google API key for Lens/Maps/Search features
+4. **Start a Session** and begin scanning items!
+
+### Future Enhancements
+- Background removal for product photos
+- Automated eBay listing publishing
+- Batch photo editing for multiple items
+- Google Maps local competitor analysis
+- Google Search live price checking
+- Supabase multi-device sync
+- n8n automated listing workflows
+- Notion inventory management sync
 
 ## Development
 

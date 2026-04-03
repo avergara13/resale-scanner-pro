@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { PipelinePanel } from './PipelinePanel'
 import { DecisionSignal } from './DecisionSignal'
 import { MarketDataPanel } from '../MarketDataPanel'
+import { useVoiceInput } from '@/hooks/use-voice-input'
 import type { ScannedItem, PipelineStep } from '@/types'
 
 interface AIScreenProps {
@@ -20,6 +21,7 @@ interface AIScreenProps {
 export function AIScreen({ currentItem, pipeline, onAddToQueue, onDeepSearch }: AIScreenProps) {
   const [tab, setTab] = useState<'agent' | 'manual'>('agent')
   const [description, setDescription] = useState('')
+  const { isListening, startListening, isSupported } = useVoiceInput()
 
   const hasDecision = pipeline.some(p => p.id === 'decision' && p.status === 'complete')
   const decision = currentItem?.decision
@@ -145,12 +147,20 @@ export function AIScreen({ currentItem, pipeline, onAddToQueue, onDeepSearch }: 
               placeholder="Describe the item or ask a question..."
               className="min-h-0 h-12 resize-none pr-12"
             />
-            <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md bg-s1 hover:bg-s2 flex items-center justify-center text-s4 hover:text-fg transition-colors"
-              style={{ minWidth: '44px', minHeight: '44px' }}
-            >
-              <Microphone size={18} weight="bold" />
-            </button>
+            {isSupported && (
+              <button
+                onClick={() => startListening((text) => setDescription(text))}
+                className={cn(
+                  "absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                  isListening
+                    ? "bg-red text-bg animate-pulse"
+                    : "bg-s1 hover:bg-s2 text-s4 hover:text-fg"
+                )}
+                style={{ minWidth: '44px', minHeight: '44px' }}
+              >
+                <Microphone size={18} weight="bold" />
+              </button>
+            )}
           </div>
         </div>
       </div>
