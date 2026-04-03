@@ -1,4 +1,5 @@
-import { Trash, ArrowRight, Lightning } from '@phosphor-icons/react'
+import { useState } from 'react'
+import { Trash, ArrowRight, Lightning, Funnel } from '@phosphor-icons/react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,10 +14,26 @@ interface QueueScreenProps {
   isBatchAnalyzing?: boolean
 }
 
+type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
+
 export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnalyze, isBatchAnalyzing }: QueueScreenProps) {
-  const sortedItems = [...queueItems].sort((a, b) => (b.profitMargin || 0) - (a.profitMargin || 0))
+  const [filter, setFilter] = useState<FilterOption>('ALL')
+  
+  const filteredItems = queueItems.filter(item => {
+    if (filter === 'ALL') return true
+    if (filter === 'GO') return item.decision === 'GO'
+    if (filter === 'PASS') return item.decision === 'PASS'
+    if (filter === 'PENDING') return item.decision === 'PENDING'
+    return true
+  })
+  
+  const sortedItems = [...filteredItems].sort((a, b) => (b.profitMargin || 0) - (a.profitMargin || 0))
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
   const analyzedItems = queueItems.filter(item => item.productName && item.productName !== 'Quick Draft')
+  
+  const goCount = queueItems.filter(item => item.decision === 'GO').length
+  const passCount = queueItems.filter(item => item.decision === 'PASS').length
+  const pendingCount = queueItems.filter(item => item.decision === 'PENDING').length
 
   return (
     <div id="scr-queue" className="flex flex-col h-full">
@@ -37,6 +54,61 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnal
             </Button>
           )}
         </div>
+        
+        <div className="flex items-center gap-2 mb-3">
+          <Funnel size={16} weight="bold" className="text-s4" />
+          <div className="flex gap-2 flex-1">
+            <Button
+              onClick={() => setFilter('ALL')}
+              size="sm"
+              variant={filter === 'ALL' ? 'default' : 'outline'}
+              className={`h-8 px-3 text-xs font-medium ${
+                filter === 'ALL' 
+                  ? 'bg-b1 hover:bg-b2 text-bg border-0' 
+                  : 'border border-s2 bg-bg text-s4 hover:bg-s1 hover:text-fg'
+              }`}
+            >
+              All ({queueItems.length})
+            </Button>
+            <Button
+              onClick={() => setFilter('GO')}
+              size="sm"
+              variant={filter === 'GO' ? 'default' : 'outline'}
+              className={`h-8 px-3 text-xs font-medium ${
+                filter === 'GO' 
+                  ? 'bg-green hover:bg-green text-bg border-0' 
+                  : 'border border-s2 bg-bg text-s4 hover:bg-green/10 hover:text-green'
+              }`}
+            >
+              GO ({goCount})
+            </Button>
+            <Button
+              onClick={() => setFilter('PASS')}
+              size="sm"
+              variant={filter === 'PASS' ? 'default' : 'outline'}
+              className={`h-8 px-3 text-xs font-medium ${
+                filter === 'PASS' 
+                  ? 'bg-red hover:bg-red text-bg border-0' 
+                  : 'border border-s2 bg-bg text-s4 hover:bg-red/10 hover:text-red'
+              }`}
+            >
+              PASS ({passCount})
+            </Button>
+            <Button
+              onClick={() => setFilter('PENDING')}
+              size="sm"
+              variant={filter === 'PENDING' ? 'default' : 'outline'}
+              className={`h-8 px-3 text-xs font-medium ${
+                filter === 'PENDING' 
+                  ? 'bg-amber hover:bg-amber text-bg border-0' 
+                  : 'border border-s2 bg-bg text-s4 hover:bg-amber/10 hover:text-amber'
+              }`}
+            >
+              Pending ({pendingCount})
+            </Button>
+          </div>
+        </div>
+        
         {unanalyzedItems.length > 0 && (
           <div className="bg-t4 border border-t3 rounded-md px-3 py-2 flex items-center gap-2">
             <span className="text-xs text-t1 font-medium">
@@ -46,13 +118,22 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onBatchAnal
         )}
       </div>
 
-      {queueItems.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
           <div className="w-20 h-20 rounded-full bg-s1 flex items-center justify-center mb-4">
-            <p className="text-3xl">📦</p>
+            <p className="text-3xl">
+              {filter === 'GO' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
+            </p>
           </div>
-          <h2 className="text-lg font-semibold text-fg mb-2">Queue is empty</h2>
-          <p className="text-sm text-s4 max-w-xs">Scan items and add GO decisions to your queue</p>
+          <h2 className="text-lg font-semibold text-fg mb-2">
+            {queueItems.length === 0 ? 'Queue is empty' : `No ${filter} items`}
+          </h2>
+          <p className="text-sm text-s4 max-w-xs">
+            {queueItems.length === 0 
+              ? 'Scan items and add GO decisions to your queue'
+              : `Try selecting a different filter to view items`
+            }
+          </p>
         </div>
       ) : (
         <ScrollArea className="flex-1 px-4 py-4">
