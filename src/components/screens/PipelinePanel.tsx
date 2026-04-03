@@ -67,11 +67,11 @@ function AnimatedPercentage({ targetValue, isActive }: { targetValue: number; is
   }, [count, targetValue, isActive])
 
   if (!isActive) {
-    return <span className="text-xs font-mono font-bold text-t2">{targetValue}%</span>
+    return <span className="text-sm font-mono font-bold text-t3">{targetValue}%</span>
   }
 
   return (
-    <motion.span className="text-xs font-mono font-bold text-b1 tabular-nums">
+    <motion.span className="text-sm font-mono font-black text-b1 tabular-nums">
       {displayValue}
     </motion.span>
   )
@@ -123,29 +123,29 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div
                   className={cn(
-                    'w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 relative z-10 flex-shrink-0',
-                    isComplete && 'bg-green text-bg shadow-[0_0_12px_oklch(0.60_0.17_145_/_0.4)]',
-                    isProcessing && 'bg-b1 text-bg shadow-[0_0_12px_oklch(0.55_0.15_250_/_0.4)]',
-                    isPending && 'bg-s2 text-t2',
-                    isError && 'bg-red text-bg shadow-[0_0_12px_oklch(0.58_0.20_25_/_0.4)]'
+                    'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 relative z-10 flex-shrink-0 border-2',
+                    isComplete && 'bg-green text-white border-green shadow-[0_0_16px_oklch(0.55_0.20_145_/_0.5)]',
+                    isProcessing && 'bg-b1 text-white border-b1 shadow-[0_0_16px_oklch(0.50_0.18_250_/_0.5)] animate-pulse',
+                    isPending && 'bg-s1 text-t3 border-s2',
+                    isError && 'bg-red text-white border-red shadow-[0_0_16px_oklch(0.55_0.22_25_/_0.5)]'
                   )}
                 >
                   {isComplete ? (
-                    <CheckCircle size={12} weight="bold" />
+                    <CheckCircle size={16} weight="fill" />
                   ) : isProcessing ? (
-                    <Lightning size={12} weight="bold" className="animate-pulse" />
+                    <Lightning size={16} weight="fill" />
                   ) : (
-                    <Clock size={12} weight="bold" />
+                    <Clock size={14} weight="bold" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-bold text-t1 uppercase tracking-wider">{config.label}</h4>
+                  <h4 className="text-sm font-bold text-t1 uppercase tracking-wide">{config.label}</h4>
                   {(isProcessing || step.data) && (
-                    <p className="text-[10px] text-t2 mt-0.5">
+                    <p className="text-xs text-t2 mt-1 font-medium">
                       {step.data && typeof step.data === 'string' ? step.data : config.detail}
                     </p>
                   )}
-                  {step.error && <p className="text-[10px] text-red mt-0.5">{step.error}</p>}
+                  {step.error && <p className="text-xs text-red mt-1 font-semibold">{step.error}</p>}
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0 ml-2">
@@ -156,13 +156,13 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   />
                 )}
                 {isComplete && (
-                  <span className="text-xs font-mono font-bold text-green tabular-nums">100%</span>
+                  <span className="text-sm font-mono font-black text-green tabular-nums">100%</span>
                 )}
                 {isPending && (
-                  <span className="text-xs font-mono font-bold text-t2 tabular-nums">0%</span>
+                  <span className="text-sm font-mono font-bold text-t3 tabular-nums">0%</span>
                 )}
                 {isError && (
-                  <span className="text-xs font-mono font-bold text-red tabular-nums">ERR</span>
+                  <span className="text-sm font-mono font-black text-red tabular-nums">ERR</span>
                 )}
               </div>
             </div>

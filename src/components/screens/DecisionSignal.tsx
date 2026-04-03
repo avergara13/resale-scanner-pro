@@ -17,14 +17,20 @@ export function DecisionSignal({ decision, item }: DecisionSignalProps) {
     <motion.div
       initial={{ scale: 0.5, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: 'spring', bounce: 0.4 }}
       id="decision-signal"
       className={cn(
-        'mt-4 py-3 rounded-xl flex items-center justify-center font-black text-2xl tracking-tighter border-4',
-        isGo && 'bg-green/10 text-green border-green',
-        isPass && 'bg-red/10 text-red border-red'
+        'mt-4 py-6 rounded-2xl flex flex-col items-center justify-center font-black border-4 shadow-xl',
+        isGo && 'bg-gradient-to-br from-green/20 to-green/10 text-green border-green',
+        isPass && 'bg-gradient-to-br from-red/20 to-red/10 text-red border-red'
       )}
     >
-      {decision}
+      <div className="text-5xl tracking-tight mb-2">{decision}</div>
+      {item?.profitMargin !== undefined && (
+        <div className="text-base font-bold opacity-80">
+          Margin: {item.profitMargin.toFixed(1)}%
+        </div>
+      )}
     </motion.div>
   )
 }

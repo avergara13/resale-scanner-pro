@@ -1,12 +1,14 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { MagnifyingGlass, Lightbulb, ChartLine, Robot, Sparkle, TrendUp, MapPin, Globe } from '@phosphor-icons/react'
+import { MagnifyingGlass, Lightbulb, ChartLine, Robot, Sparkle, TrendUp, MapPin, Globe, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { ThemeToggle } from '../ThemeToggle'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import type { ChatMessage } from '@/types'
 
 interface ResearchTask {
@@ -16,6 +18,53 @@ interface ResearchTask {
   status: 'pending' | 'running' | 'complete'
   timestamp: number
   result?: string
+}
+
+function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLines?: number }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [needsCollapse, setNeedsCollapse] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (contentRef.current) {
+      const lineHeight = parseInt(window.getComputedStyle(contentRef.current).lineHeight)
+      const height = contentRef.current.scrollHeight
+      const lines = Math.round(height / lineHeight)
+      setNeedsCollapse(lines > maxLines)
+    }
+  }, [message, maxLines])
+
+  return (
+    <div>
+      <div
+        ref={contentRef}
+        className={cn(
+          "text-sm whitespace-pre-wrap overflow-hidden transition-all duration-300",
+          !isExpanded && needsCollapse && "line-clamp-4"
+        )}
+      >
+        {message}
+      </div>
+      {needsCollapse && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="mt-2 text-xs font-semibold text-b1 hover:text-b2 flex items-center gap-1 transition-colors"
+        >
+          {isExpanded ? (
+            <>
+              <CaretUp size={14} weight="bold" />
+              Show Less
+            </>
+          ) : (
+            <>
+              <CaretDown size={14} weight="bold" />
+              Read More
+            </>
+          )}
+        </button>
+      )}
+    </div>
+  )
 }
 
 export function ResearchScreen() {
@@ -137,238 +186,256 @@ export function ResearchScreen() {
 
   return (
     <div className="flex flex-col h-full bg-bg">
-      <div className="bg-t4 border-b border-s2 px-4 py-3 flex items-center justify-between gap-2">
+      <div className="bg-fg border-b border-s2 px-4 py-3 flex items-center justify-between gap-2 sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-2">
-          <Robot size={24} weight="duotone" className="text-b1" />
-          <h1 className="text-lg font-semibold text-fg">AI Research Center</h1>
+          <div className="w-9 h-9 bg-gradient-to-br from-b1 to-b2 text-white rounded-lg flex items-center justify-center">
+            <Robot size={20} weight="fill" />
+          </div>
+          <h1 className="text-base font-bold text-t1">AI Research Center</h1>
         </div>
         <ThemeToggle />
       </div>
 
-      <Tabs defaultValue="chat" className="flex-1 flex flex-col">
-        <TabsList className="mx-4 mt-3 grid grid-cols-3 bg-s1">
-          <TabsTrigger value="chat" className="flex items-center gap-1.5">
-            <Sparkle size={16} />
+      <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
+        <TabsList className="mx-4 mt-3 mb-0 grid grid-cols-3 bg-s1 border border-s2">
+          <TabsTrigger value="chat" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-fg data-[state=active]:text-b1">
+            <Sparkle size={16} weight="fill" />
             <span>Chat</span>
           </TabsTrigger>
-          <TabsTrigger value="research" className="flex items-center gap-1.5">
-            <MagnifyingGlass size={16} />
+          <TabsTrigger value="research" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-fg data-[state=active]:text-b1">
+            <MagnifyingGlass size={16} weight="bold" />
             <span>Research</span>
           </TabsTrigger>
-          <TabsTrigger value="insights" className="flex items-center gap-1.5">
-            <Lightbulb size={16} />
+          <TabsTrigger value="insights" className="flex items-center gap-1.5 text-xs font-semibold data-[state=active]:bg-fg data-[state=active]:text-b1">
+            <Lightbulb size={16} weight="fill" />
             <span>Insights</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="chat" className="flex-1 flex flex-col mt-0 px-4 pb-4">
-          <div className="flex-1 overflow-y-auto space-y-3 py-4 min-h-0">
-            {chatMessages && chatMessages.length === 0 && (
-              <div className="text-center py-12 text-s3">
-                <Robot size={48} weight="duotone" className="mx-auto mb-3 text-b1" />
-                <p className="text-sm">Ask me anything about resale strategy,</p>
-                <p className="text-sm">market trends, or pricing insights.</p>
-              </div>
-            )}
-            
-            {chatMessages && chatMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2.5 ${
-                    msg.role === 'user'
-                      ? 'bg-b1 text-bg'
-                      : 'bg-s1 text-fg border border-s2'
-                  }`}
-                >
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+        <TabsContent value="chat" className="flex-1 flex flex-col mt-0 min-h-0 data-[state=active]:flex">
+          <ScrollArea className="flex-1 px-4">
+            <div className="space-y-3 py-4">
+              {chatMessages && chatMessages.length === 0 && (
+                <div className="text-center py-16 px-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-bg mb-4">
+                    <Robot size={32} weight="duotone" className="text-b1" />
+                  </div>
+                  <h3 className="font-bold text-t1 mb-2">AI Assistant Ready</h3>
+                  <p className="text-sm text-t2 max-w-xs mx-auto">Ask me anything about resale strategy, market trends, or pricing insights.</p>
                 </div>
-              </div>
-            ))}
-            
-            {isProcessing && (
-              <div className="flex justify-start">
-                <div className="bg-s1 border border-s2 rounded-lg px-4 py-2.5">
-                  <div className="flex items-center gap-2 text-s3">
-                    <div className="w-2 h-2 bg-b1 rounded-full animate-pulse" />
-                    <div className="w-2 h-2 bg-b1 rounded-full animate-pulse delay-150" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-b1 rounded-full animate-pulse delay-300" style={{ animationDelay: '300ms' }} />
+              )}
+              
+              {chatMessages && chatMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-2xl px-4 py-3 shadow-sm",
+                      msg.role === 'user'
+                        ? 'bg-gradient-to-br from-b1 to-b2 text-white rounded-br-md'
+                        : 'bg-fg text-t1 border border-s2 rounded-bl-md'
+                    )}
+                  >
+                    {msg.role === 'assistant' ? (
+                      <CollapsibleMessage message={msg.content} maxLines={6} />
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-2 pt-3 border-t border-s2">
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Ask AI about market trends, pricing..."
-              className="flex-1"
-              disabled={isProcessing}
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={!input.trim() || isProcessing}
-              size="icon"
-              className="bg-b1 hover:bg-b2"
-            >
-              <Sparkle size={18} weight="fill" />
-            </Button>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="research" className="flex-1 flex flex-col mt-0 px-4 pb-4 overflow-y-auto">
-          <div className="py-4 space-y-4">
-            <Card className="p-4 bg-s1 border-s2">
-              <h3 className="font-semibold text-fg mb-3 flex items-center gap-2">
-                <MagnifyingGlass size={18} weight="bold" />
-                Market Research
-              </h3>
-              <div className="flex gap-2">
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="e.g., vintage Nike sneakers"
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === 'Enter' && handleMarketResearch()}
-                />
-                <Button onClick={handleMarketResearch} className="bg-b1 hover:bg-b2">
-                  Research
-                </Button>
-              </div>
-            </Card>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={handleTrendAnalysis}
-                variant="outline"
-                className="h-auto py-4 flex flex-col items-center gap-2 bg-s1 border-s2 hover:bg-t4"
-              >
-                <TrendUp size={24} className="text-b1" />
-                <span className="text-xs font-medium">Trend Analysis</span>
-              </Button>
+              ))}
               
-              <Button
-                onClick={() => toast.info('Coming soon')}
-                variant="outline"
-                className="h-auto py-4 flex flex-col items-center gap-2 bg-s1 border-s2 hover:bg-t4"
-              >
-                <ChartLine size={24} className="text-b1" />
-                <span className="text-xs font-medium">Price Optimizer</span>
-              </Button>
+              {isProcessing && (
+                <div className="flex justify-start">
+                  <div className="bg-fg border border-s2 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-b1 rounded-full animate-pulse" />
+                      <div className="w-2 h-2 bg-b1 rounded-full animate-pulse" style={{ animationDelay: '200ms' }} />
+                      <div className="w-2 h-2 bg-b1 rounded-full animate-pulse" style={{ animationDelay: '400ms' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
 
+          <div className="flex-shrink-0 p-4 bg-fg border-t border-s2 shadow-lg">
+            <div className="flex gap-2">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                placeholder="Ask AI about market trends, pricing..."
+                className="flex-1 h-11 bg-bg border-s2 text-t1 placeholder:text-t3"
+                disabled={isProcessing}
+              />
               <Button
-                onClick={() => toast.info('Coming soon')}
-                variant="outline"
-                className="h-auto py-4 flex flex-col items-center gap-2 bg-s1 border-s2 hover:bg-t4"
+                onClick={handleSendMessage}
+                disabled={!input.trim() || isProcessing}
+                size="icon"
+                className="h-11 w-11 bg-b1 hover:bg-b2 text-white disabled:opacity-50"
               >
-                <MapPin size={24} className="text-b1" />
-                <span className="text-xs font-medium">Local Markets</span>
-              </Button>
-
-              <Button
-                onClick={() => toast.info('Coming soon')}
-                variant="outline"
-                className="h-auto py-4 flex flex-col items-center gap-2 bg-s1 border-s2 hover:bg-t4"
-              >
-                <Globe size={24} className="text-b1" />
-                <span className="text-xs font-medium">Competitor Scan</span>
+                <Sparkle size={20} weight="fill" />
               </Button>
             </div>
-
-            {researchTasks && researchTasks.length > 0 && (
-              <div className="space-y-3 pt-4">
-                <h3 className="text-sm font-semibold text-fg">Research History</h3>
-                {researchTasks.map((task) => (
-                  <Card key={task.id} className="p-4 bg-bg border-s2">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm text-fg">{task.title}</h4>
-                        <p className="text-xs text-s3 mt-0.5">
-                          {new Date(task.timestamp).toLocaleString()}
-                        </p>
-                      </div>
-                      <div
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          task.status === 'complete'
-                            ? 'bg-green/20 text-green'
-                            : task.status === 'running'
-                            ? 'bg-amber/20 text-amber'
-                            : 'bg-s2 text-s3'
-                        }`}
-                      >
-                        {task.status}
-                      </div>
-                    </div>
-                    {task.result && (
-                      <div className="mt-3 p-3 bg-s1 rounded-lg border border-s2">
-                        <p className="text-xs text-fg whitespace-pre-wrap">{task.result}</p>
-                      </div>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            )}
           </div>
         </TabsContent>
 
-        <TabsContent value="insights" className="flex-1 mt-0 px-4 pb-4 overflow-y-auto">
-          <div className="py-4 space-y-4">
-            <Card className="p-4 bg-gradient-to-br from-b1/10 to-t4 border-b1/20">
-              <div className="flex items-start gap-3">
-                <Lightbulb size={24} weight="fill" className="text-b1 flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-fg mb-1">Quick Tips</h3>
-                  <ul className="text-sm text-fg space-y-1.5 list-disc list-inside">
-                    <li>Best resale ROI: Electronics, designer brands, collectibles</li>
-                    <li>Peak selling seasons: Q4 holidays, back-to-school</li>
-                    <li>Price 20-30% below retail for quick turnover</li>
-                    <li>Bundle slow-moving items to increase margins</li>
-                  </ul>
+        <TabsContent value="research" className="flex-1 mt-0 data-[state=active]:block">
+          <ScrollArea className="h-full px-4 pb-20">
+            <div className="py-4 space-y-4">
+              <Card className="p-4 bg-fg border-s2 shadow-sm">
+                <h3 className="font-bold text-t1 mb-3 flex items-center gap-2 text-sm">
+                  <MagnifyingGlass size={18} weight="bold" className="text-b1" />
+                  Market Research
+                </h3>
+                <div className="flex gap-2">
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="e.g., vintage Nike sneakers"
+                    className="flex-1 bg-bg border-s2 text-t1"
+                    onKeyDown={(e) => e.key === 'Enter' && handleMarketResearch()}
+                  />
+                  <Button onClick={handleMarketResearch} className="bg-b1 hover:bg-b2 text-white font-semibold">
+                    Research
+                  </Button>
                 </div>
-              </div>
-            </Card>
+              </Card>
 
-            <Card className="p-4 bg-s1 border-s2">
-              <h3 className="font-semibold text-fg mb-3">Market Intelligence</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-bg rounded border border-s2">
-                  <span className="text-sm text-fg">Today's Hot Categories</span>
-                  <span className="text-xs font-mono text-b1">Sneakers, Vintage</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-bg rounded border border-s2">
-                  <span className="text-sm text-fg">Avg. Sell-Through Rate</span>
-                  <span className="text-xs font-mono text-green">67%</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-bg rounded border border-s2">
-                  <span className="text-sm text-fg">Competitive Listings</span>
-                  <span className="text-xs font-mono text-amber">High</span>
-                </div>
-              </div>
-            </Card>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  onClick={handleTrendAnalysis}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2 bg-fg border-s2 hover:bg-blue-bg hover:border-b1 transition-all"
+                >
+                  <TrendUp size={28} weight="duotone" className="text-b1" />
+                  <span className="text-xs font-bold text-t1">Trend Analysis</span>
+                </Button>
+                
+                <Button
+                  onClick={() => toast.info('Coming soon')}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2 bg-fg border-s2 hover:bg-blue-bg hover:border-b1 transition-all"
+                >
+                  <ChartLine size={28} weight="duotone" className="text-b1" />
+                  <span className="text-xs font-bold text-t1">Price Optimizer</span>
+                </Button>
 
-            <Card className="p-4 bg-s1 border-s2">
-              <h3 className="font-semibold text-fg mb-2">AI Recommendations</h3>
-              <p className="text-sm text-s4 mb-3">
-                Based on your recent scans and market trends
-              </p>
-              <div className="space-y-2">
-                <div className="p-3 bg-bg rounded border border-s2">
-                  <p className="text-sm text-fg">Focus on electronics this week - demand is up 23%</p>
-                </div>
-                <div className="p-3 bg-bg rounded border border-s2">
-                  <p className="text-sm text-fg">Consider bundling smaller items to improve margins</p>
-                </div>
-                <div className="p-3 bg-bg rounded border border-s2">
-                  <p className="text-sm text-fg">Price vintage clothing 15% higher - market is strong</p>
-                </div>
+                <Button
+                  onClick={() => toast.info('Coming soon')}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2 bg-fg border-s2 hover:bg-blue-bg hover:border-b1 transition-all"
+                >
+                  <MapPin size={28} weight="duotone" className="text-b1" />
+                  <span className="text-xs font-bold text-t1">Local Markets</span>
+                </Button>
+
+                <Button
+                  onClick={() => toast.info('Coming soon')}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2 bg-fg border-s2 hover:bg-blue-bg hover:border-b1 transition-all"
+                >
+                  <Globe size={28} weight="duotone" className="text-b1" />
+                  <span className="text-xs font-bold text-t1">Competitor Scan</span>
+                </Button>
               </div>
-            </Card>
-          </div>
+
+              {researchTasks && researchTasks.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-t2">Research History</h3>
+                  {researchTasks.map((task) => (
+                    <Card key={task.id} className="p-4 bg-fg border-s2 shadow-sm">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm text-t1 truncate">{task.title}</h4>
+                          <p className="text-xs text-t3 mt-1">
+                            {new Date(task.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                        <div
+                          className={cn(
+                            "px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide flex-shrink-0",
+                            task.status === 'complete' && 'bg-green-bg text-green border border-green/30',
+                            task.status === 'running' && 'bg-amber/20 text-amber border border-amber/30',
+                            task.status === 'pending' && 'bg-s1 text-t3 border border-s2'
+                          )}
+                        >
+                          {task.status}
+                        </div>
+                      </div>
+                      {task.result && (
+                        <div className="mt-3 p-3 bg-bg rounded-lg border border-s2">
+                          <CollapsibleMessage message={task.result} maxLines={5} />
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="insights" className="flex-1 mt-0 data-[state=active]:block">
+          <ScrollArea className="h-full px-4 pb-20">
+            <div className="py-4 space-y-4">
+              <Card className="p-4 bg-gradient-to-br from-blue-bg to-transparent border-b1/30 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-b1 text-white rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Lightbulb size={22} weight="fill" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-t1 mb-2 text-sm">Quick Tips</h3>
+                    <ul className="text-sm text-t1 space-y-2 list-disc list-inside">
+                      <li>Best resale ROI: Electronics, designer brands, collectibles</li>
+                      <li>Peak selling seasons: Q4 holidays, back-to-school</li>
+                      <li>Price 20-30% below retail for quick turnover</li>
+                      <li>Bundle slow-moving items to increase margins</li>
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-4 bg-fg border-s2 shadow-sm">
+                <h3 className="font-bold text-t1 mb-3 text-sm">Market Intelligence</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-bg rounded-lg border border-s2">
+                    <span className="text-sm font-medium text-t1">Today's Hot Categories</span>
+                    <span className="text-xs font-mono font-bold text-b1 bg-blue-bg px-2 py-1 rounded">Sneakers, Vintage</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-bg rounded-lg border border-s2">
+                    <span className="text-sm font-medium text-t1">Avg. Sell-Through Rate</span>
+                    <span className="text-xs font-mono font-bold text-green bg-green-bg px-2 py-1 rounded">67%</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-bg rounded-lg border border-s2">
+                    <span className="text-sm font-medium text-t1">Competitive Listings</span>
+                    <span className="text-xs font-mono font-bold text-amber bg-amber/20 px-2 py-1 rounded">High</span>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-4 bg-fg border-s2 shadow-sm">
+                <h3 className="font-bold text-t1 mb-2 text-sm">AI Recommendations</h3>
+                <p className="text-xs text-t2 mb-3">
+                  Based on your recent scans and market trends
+                </p>
+                <div className="space-y-2">
+                  <div className="p-3 bg-bg rounded-lg border border-s2">
+                    <p className="text-sm text-t1 leading-relaxed">Focus on electronics this week - demand is up 23%</p>
+                  </div>
+                  <div className="p-3 bg-bg rounded-lg border border-s2">
+                    <p className="text-sm text-t1 leading-relaxed">Consider bundling smaller items to improve margins</p>
+                  </div>
+                  <div className="p-3 bg-bg rounded-lg border border-s2">
+                    <p className="text-sm text-t1 leading-relaxed">Price vintage clothing 15% higher - market is strong</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </ScrollArea>
         </TabsContent>
       </Tabs>
     </div>
