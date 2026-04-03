@@ -78,6 +78,26 @@ export interface ScannedItem {
   isMultiProduct?: boolean
   parentItemId?: string
   location?: ThriftStoreLocation
+  optimizedListing?: OptimizedListing
+  listingStatus?: 'not-started' | 'optimizing' | 'ready' | 'published'
+  ebayListingId?: string
+  notionPageId?: string
+  notionUrl?: string
+}
+
+export interface OptimizedListing {
+  title: string
+  description: string
+  category: string
+  condition: string
+  price: number
+  shippingCost: number
+  itemSpecifics: Record<string, string>
+  keywords: string[]
+  suggestedTags: string[]
+  seoScore: number
+  recommendations: string[]
+  optimizedAt: number
 }
 
 export interface ThriftStoreLocation {

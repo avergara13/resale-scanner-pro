@@ -63,8 +63,13 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
   {
     emoji: '📦',
-    label: 'Create Listing',
-    prompt: 'Help me create an optimized listing for my current items in queue'
+    label: 'Create Listings',
+    prompt: 'Create optimized eBay listings for all GO items in my queue'
+  },
+  {
+    emoji: '📤',
+    label: 'Push to Notion',
+    prompt: 'Push all ready listings to Notion'
   },
   {
     emoji: '📊',
@@ -150,11 +155,13 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
 interface AgentScreenProps {
   queueItems?: ScannedItem[]
   settings?: AppSettings
-  onCreateListing?: (item: ScannedItem) => void
+  onCreateListing?: (itemId: string) => Promise<void>
+  onOptimizeItem?: (itemId: string) => Promise<void>
+  onPushToNotion?: (itemId: string) => Promise<void>
   onNavigateToQueue?: () => void
 }
 
-export function AgentScreen({ queueItems = [], settings, onCreateListing, onNavigateToQueue }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onNavigateToQueue }: AgentScreenProps) {
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
   const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
   const [input, setInput] = useState('')
@@ -321,6 +328,142 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onNavi
     setIsProcessing(true)
 
     try {
+      const lowerText = text.toLowerCase()
+      
+      if (lowerText.includes('create listing') || lowerText.includes('optimize listing')) {
+        const goItems = queueItems.filter(item => item.decision === 'GO' && !item.optimizedListing)
+        
+        if (goItems.length === 0) {
+          const aiMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: 'I don\'t see any GO items in your queue that need listing optimization. Would you like me to analyze your current queue items?',
+            timestamp: Date.now(),
+          }
+          setChatSessions((prev) =>
+            (prev || []).map(s =>
+              s.id === activeSessionId
+                ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
+                : s
+            )
+          )
+          setIsProcessing(false)
+          return
+        }
+
+        const responseText = `I'll create optimized eBay listings for ${goItems.length} item${goItems.length !== 1 ? 's' : ''} in your queue. This will include:\n\n- SEO-optimized titles (80 chars max)\n- Detailed product descriptions\n- Competitive pricing analysis\n- Item-specific keywords\n- Recommended shipping costs\n\nStarting optimization now...`
+        
+        const aiMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: responseText,
+          timestamp: Date.now(),
+        }
+
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === activeSessionId
+              ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+
+        for (const item of goItems) {
+          if (onOptimizeItem) {
+            await onOptimizeItem(item.id)
+          }
+        }
+
+        const completionMessage: ChatMessage = {
+          id: (Date.now() + 2).toString(),
+          role: 'assistant',
+          content: `✅ Successfully optimized ${goItems.length} listing${goItems.length !== 1 ? 's' : ''}! They're now ready to publish to eBay or push to Notion. Check the Queue to review them.`,
+          timestamp: Date.now(),
+        }
+
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === activeSessionId
+              ? { ...s, messages: [...s.messages, completionMessage], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+        
+        toast.success(`Optimized ${goItems.length} listings`)
+        setIsProcessing(false)
+        return
+      }
+
+      if (lowerText.includes('push to notion') || lowerText.includes('send to notion')) {
+        const readyItems = queueItems.filter(item => item.optimizedListing && !item.notionPageId)
+        
+        if (readyItems.length === 0) {
+          const aiMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: 'No optimized listings ready to push to Notion. Would you like me to create optimized listings first?',
+            timestamp: Date.now(),
+          }
+          setChatSessions((prev) =>
+            (prev || []).map(s =>
+              s.id === activeSessionId
+                ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
+                : s
+            )
+          )
+          setIsProcessing(false)
+          return
+        }
+
+        const responseText = `Pushing ${readyItems.length} optimized listing${readyItems.length !== 1 ? 's' : ''} to your Notion database...`
+        
+        const aiMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: responseText,
+          timestamp: Date.now(),
+        }
+
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === activeSessionId
+              ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+
+        let successCount = 0
+        for (const item of readyItems) {
+          if (onPushToNotion) {
+            try {
+              await onPushToNotion(item.id)
+              successCount++
+            } catch (error) {
+              console.error('Failed to push item:', item.id, error)
+            }
+          }
+        }
+
+        const completionMessage: ChatMessage = {
+          id: (Date.now() + 2).toString(),
+          role: 'assistant',
+          content: `✅ Successfully pushed ${successCount} of ${readyItems.length} listings to Notion!`,
+          timestamp: Date.now(),
+        }
+
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === activeSessionId
+              ? { ...s, messages: [...s.messages, completionMessage], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+        
+        toast.success(`Pushed ${successCount} listings to Notion`)
+        setIsProcessing(false)
+        return
+      }
+
       const context = buildContext()
       const systemPrompt = `You are an expert AI agent for resale business optimization. You help users research products, analyze profitability, create optimized listings, and make data-driven decisions.
 
@@ -329,7 +472,12 @@ Current Context:
 - Potential profit: $${queueStats.totalProfit.toFixed(2)}
 - Settings: ${settings?.minProfitMargin}% min margin, ${settings?.ebayFeePercent}% eBay fees
 
-When asked to create listings, provide detailed, optimized titles, descriptions, and pricing strategies.
+Available Commands:
+- "Create listings" or "Optimize listings" - Generate optimized eBay listings for all GO items
+- "Push to Notion" - Send optimized listings to Notion database
+- Ask questions about market research, pricing strategies, or product analysis
+
+When asked to create listings, trigger the autonomous listing creation flow.
 When analyzing trends, reference real market data and best practices.
 Be proactive and actionable - suggest specific next steps the user can take.`
 
@@ -356,7 +504,7 @@ Be proactive and actionable - suggest specific next steps the user can take.`
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, handleCreateSession, setChatSessions, buildContext, queueStats, settings])
+  }, [input, isProcessing, activeSessionId, handleCreateSession, setChatSessions, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion])
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)
