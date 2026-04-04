@@ -31,54 +31,32 @@
   --red-bg: oklch(0.52 0.22 25 / 0.12);
   --blue-bg: oklch(0.50 0.18 250 / 0.08);
   
-  --border: oklch(0.80 0.05 75);
+  --border: oklch(0.88 0 0);
   --radius: 0.75rem;
   
-  --capture-color: oklch(0.50 0.18 250);
-  --analyzing-color: oklch(0.68 0.18 75);
-  --success-color: oklch(0.52 0.20 145);
-  --fail-color: oklch(0.52 0.22 25);
-  --font-sans: "Poppins";
-  --font-serif: "Merriweather";
-  --font-mono: "Source Code Pro";
-  --background: oklch(0.97 0.02 75);
-  --foreground: oklch(0.22 0.04 55);
-  --card: oklch(0.99 0.01 75);
-  --card-foreground: oklch(0.22 0.04 55);
-  --popover: oklch(1.00 0 0);
-  --popover-foreground: oklch(0.22 0.04 55);
-  --primary: oklch(0.58 0.15 65);
-  --primary-foreground: oklch(0.97 0.02 75);
-  --secondary: oklch(0.85 0.08 85);
-  --secondary-foreground: oklch(0.28 0.04 55);
-  --muted: oklch(0.92 0.03 75);
-  --muted-foreground: oklch(0.48 0.02 55);
-  --accent: oklch(0.78 0.12 45);
-  --accent-foreground: oklch(0.22 0.04 55);
-  --destructive: oklch(0.62 0.18 35);
-  --destructive-foreground: oklch(0.97 0.02 75);
-  --input: oklch(0.80 0.05 75);
-  --ring: oklch(0.58 0.15 65);
-  --chart-1: oklch(0.58 0.15 65);
-  --chart-2: oklch(0.78 0.12 45);
-  --chart-3: oklch(0.68 0.10 85);
-  --chart-4: oklch(0.48 0.12 25);
-  --chart-5: oklch(0.88 0.08 95);
-  --sidebar: oklch(0.94 0.02 75);
-  --sidebar-foreground: oklch(0.22 0.04 55);
-  --sidebar-primary: oklch(0.58 0.15 65);
-  --sidebar-primary-foreground: oklch(0.97 0.02 75);
-  --sidebar-accent: oklch(0.85 0.08 85);
-  --sidebar-accent-foreground: oklch(0.28 0.04 55);
-  --sidebar-border: oklch(0.80 0.05 75);
-  --sidebar-ring: oklch(0.58 0.15 65);
-  --shadow-color: oklch(0.58 0.15 65);
-  --shadow-opacity: 0.16;
-  --shadow-blur: 18px;
-  --shadow-spread: 3px;
-  --shadow-offset-x: 0px;
-  --shadow-offset-y: 9px;
-  --spacing: 0.20rem;
+  --capture-color: var(--b1);
+  --analyzing-color: var(--amber);
+  --success-color: var(--green);
+  --fail-color: var(--red);
+  
+  --background: var(--bg);
+  --foreground: var(--t1);
+  --card: var(--fg);
+  --card-foreground: var(--t1);
+  --popover: var(--fg);
+  --popover-foreground: var(--t1);
+  --primary: var(--b1);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: var(--s1);
+  --secondary-foreground: var(--t1);
+  --muted: var(--s1);
+  --muted-foreground: var(--t3);
+  --accent: var(--b1);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: var(--red);
+  --destructive-foreground: oklch(1 0 0);
+  --input: var(--s2);
+  --ring: var(--b1);
 }
 
 .dark {
@@ -105,18 +83,34 @@
   --red-bg: oklch(0.68 0.22 25 / 0.18);
   --blue-bg: oklch(0.65 0.20 260 / 0.12);
   
-  --border: oklch(0.80 0.05 75);
+  --border: oklch(0.28 0 0);
   
-  --capture-color: oklch(0.65 0.20 260);
-  --analyzing-color: oklch(0.82 0.18 75);
-  --success-color: oklch(0.68 0.20 145);
-  --fail-color: oklch(0.68 0.22 25);
+  --capture-color: var(--b1);
+  --analyzing-color: var(--amber);
+  --success-color: var(--green);
+  --fail-color: var(--red);
+  
+  --background: var(--bg);
+  --foreground: var(--t1);
+  --card: var(--fg);
+  --card-foreground: var(--t1);
+  --popover: var(--fg);
+  --popover-foreground: var(--t1);
+  --primary: var(--b1);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: var(--s1);
+  --secondary-foreground: var(--t1);
+  --muted: var(--s1);
+  --muted-foreground: var(--t3);
+  --accent: var(--b1);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: var(--red);
+  --destructive-foreground: oklch(1 0 0);
+  --input: var(--s2);
+  --ring: var(--b1);
 }
 
 @theme {
-  --font-family-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
-  --font-family-mono: 'IBM Plex Mono', monospace;
-  
   --color-bg: var(--bg);
   --color-fg: var(--fg);
   --color-s1: var(--s1);
@@ -137,20 +131,40 @@
   --color-blue-bg: var(--blue-bg);
   --color-border: var(--border);
   
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.5);
+  --radius-xl: calc(var(--radius) * 2);
+  --radius-2xl: calc(var(--radius) * 3);
+  --radius-full: 9999px;
 }
 
 body {
-  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  font-family: 'Poppins', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background-color: var(--bg);
   color: var(--t1);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
-  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
   overflow-x: hidden;
   max-width: 100vw;
 }
@@ -167,33 +181,18 @@ body {
   }
 }
 
+.font-mono {
+  font-family: 'Source Code Pro', monospace;
+}
+
+html, body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
 * {
   transition-property: background-color, border-color, color, fill, stroke;
-  transition-duration: 0.3s;
-  transition-timing-function: ease-in-out;
-}
-
-.no-theme-transition,
-.no-theme-transition * {
-  transition: none !important;
-}
-
-button,
-input,
-textarea,
-select {
-  transition: background-color 0.3s ease-in-out,
-              border-color 0.3s ease-in-out,
-              color 0.3s ease-in-out,
-              fill 0.3s ease-in-out,
-              stroke 0.3s ease-in-out,
-              box-shadow 0.15s ease-in-out,
-              transform 0.15s ease-in-out,
-              opacity 0.15s ease-in-out;
-}
-
-.font-mono {
-  font-family: var(--font-family-mono);
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
 }
 
 #app-container {
@@ -253,8 +252,6 @@ input, textarea, select {
   border-radius: 12px;
   border: 1px solid var(--s2);
   backdrop-filter: blur(8px);
-  transition: background-color 0.3s ease-in-out,
-              border-color 0.3s ease-in-out;
 }
 
 .tab-btn {
@@ -265,9 +262,7 @@ input, textarea, select {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   border-radius: 10px;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              color 0.3s ease-in-out,
-              background-color 0.3s ease-in-out;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   color: var(--t3);
   background: transparent;
   position: relative;
@@ -285,8 +280,7 @@ input, textarea, select {
   background: var(--fg);
   opacity: 0;
   transform: scale(0.95);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              background-color 0.3s ease-in-out;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tab-btn:hover:not(.active) {
@@ -318,9 +312,7 @@ input, textarea, select {
   border-radius: 10px;
   border: 1px solid var(--s1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.01);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1), 
-              background-color 0.3s ease-in-out,
-              border-color 0.3s ease-in-out;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
@@ -368,9 +360,7 @@ input, textarea, select {
   border: 1px solid var(--s1);
   border-radius: 10px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              background-color 0.3s ease-in-out,
-              border-color 0.3s ease-in-out;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
@@ -421,9 +411,7 @@ input, textarea, select {
   border-radius: 12px;
   border: 1px solid var(--s2);
   background: var(--fg);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              background-color 0.3s ease-in-out,
-              border-color 0.3s ease-in-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -771,9 +759,6 @@ input, textarea, select {
   color: var(--t1);
   border-bottom-left-radius: 6px;
   max-width: 100%;
-  transition: background-color 0.3s ease-in-out,
-              border-color 0.3s ease-in-out,
-              color 0.3s ease-in-out;
 }
 
 @keyframes bubble-shine {
@@ -832,8 +817,7 @@ input, textarea, select {
   border-radius: 12px;
   position: relative;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              background-color 0.3s ease-in-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
 }
 
@@ -882,9 +866,7 @@ select:focus {
   box-shadow: 0 0 0 4px rgba(85, 92, 226, 0.12), 0 2px 8px rgba(85, 92, 226, 0.08);
   transform: translateY(-1px);
   background: var(--fg);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              background-color 0.3s ease-in-out,
-              border-color 0.3s ease-in-out;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 button:not(:disabled) {
