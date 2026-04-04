@@ -681,9 +681,10 @@ function App() {
 
         // Cost optimization: batch mode skips Google Lens entirely
         // Saves Custom Search API quota — eBay data is sufficient for batch decisions
-        if (googleLensService && visionResult && false && item.imageData) { // disabled in batch
+        if (googleLensService && visionResult && item.imageData && false) { // disabled in batch
           try {
-            lensAnalysis = await googleLensService.searchByImage(item.imageData, visionResult.productName)
+            const productName = visionResult?.productName || mockProductName
+            lensAnalysis = await googleLensService.searchByImage(item.imageData, productName)
           } catch (error) {
             console.error('Google Lens failed for item:', item.id, error)
           }

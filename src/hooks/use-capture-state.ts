@@ -1,54 +1,52 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 
 export type CaptureState = 'idle' | 'capturing' | 'analyzing' | 'success' | 'fail'
 
 export function useCaptureState() {
   const [captureState, setCaptureState] = useState<CaptureState>('idle')
-  const [stateTimeout, setStateTimeout] = useState<number | null>(null)
+  const stateTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     return () => {
-      if (stateTimeout) {
-        clearTimeout(stateTimeout)
+      if (stateTimeoutRef.current) {
+        clearTimeout(stateTimeoutRef.current)
       }
     }
-  }, [stateTimeout])
+  }, [])
 
   const triggerCapture = useCallback(() => {
+    if (stateTimeoutRef.current) clearTimeout(stateTimeoutRef.current)
     setCaptureState('capturing')
-    const timeout = setTimeout(() => {
+    stateTimeoutRef.current = window.setTimeout(() => {
       setCaptureState('idle')
     }, 600)
-    setStateTimeout(timeout)
   }, [])
 
   const startAnalyzing = useCallback(() => {
-    if (stateTimeout) clearTimeout(stateTimeout)
+    if (stateTimeoutRef.current) clearTimeout(stateTimeoutRef.current)
     setCaptureState('analyzing')
-  }, [stateTimeout])
+  }, [])
 
   const triggerSuccess = useCallback(() => {
-    if (stateTimeout) clearTimeout(stateTimeout)
+    if (stateTimeoutRef.current) clearTimeout(stateTimeoutRef.current)
     setCaptureState('success')
-    const timeout = setTimeout(() => {
+    stateTimeoutRef.current = window.setTimeout(() => {
       setCaptureState('idle')
     }, 800)
-    setStateTimeout(timeout)
-  }, [stateTimeout])
+  }, [])
 
   const triggerFail = useCallback(() => {
-    if (stateTimeout) clearTimeout(stateTimeout)
+    if (stateTimeoutRef.current) clearTimeout(stateTimeoutRef.current)
     setCaptureState('fail')
-    const timeout = setTimeout(() => {
+    stateTimeoutRef.current = window.setTimeout(() => {
       setCaptureState('idle')
     }, 800)
-    setStateTimeout(timeout)
-  }, [stateTimeout])
+  }, [])
 
   const reset = useCallback(() => {
-    if (stateTimeout) clearTimeout(stateTimeout)
+    if (stateTimeoutRef.current) clearTimeout(stateTimeoutRef.current)
     setCaptureState('idle')
-  }, [stateTimeout])
+  }, [])
 
   return {
     captureState,

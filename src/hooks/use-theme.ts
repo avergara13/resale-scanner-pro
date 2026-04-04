@@ -21,29 +21,35 @@ export function useTheme() {
   const [useAmbientLight, setUseAmbientLight] = useKV<boolean>('use-ambient-light', false)
   const [actualTheme, setActualTheme] = useState<Theme>('light')
 
-  const updateThemeFromAmbient = useCallback(async () => {
-    if (!useAmbientLight || themeMode !== 'auto') return
-
-    try {
-      if ('AmbientLightSensor' in window) {
-        const sensor = new (window as any).AmbientLightSensor()
-        sensor.addEventListener('reading', () => {
-          const lux = sensor.illuminance
-          const newTheme = lux < 50 ? 'dark' : 'light'
-          setActualTheme(newTheme)
-        })
-        await sensor.start()
-        return () => sensor.stop()
-      }
-    } catch (error) {
-      console.log('Ambient light sensor not available')
-    }
-  }, [useAmbientLight, themeMode])
-
   useEffect(() => {
     if (themeMode === 'auto') {
       if (useAmbientLight) {
-        updateThemeFromAmbient()
+        let sensorCleanup: (() => void) | undefined
+        
+        const startSensor = async () => {
+          try {
+            if ('AmbientLightSensor' in window) {
+              const sensor = new (window as any).AmbientLightSensor()
+              sensor.addEventListener('reading', () => {
+                const lux = sensor.illuminance
+                const newTheme = lux < 50 ? 'dark' : 'light'
+                setActualTheme(newTheme)
+              })
+              await sensor.start()
+              sensorCleanup = () => sensor.stop()
+            }
+          } catch (error) {
+            console.log('Ambient light sensor not available')
+          }
+        }
+        
+        startSensor()
+        
+        return () => {
+          if (sensorCleanup) {
+            sensorCleanup()
+          }
+        }
       } else {
         setActualTheme(getTimeBasedTheme())
         
@@ -56,7 +62,7 @@ export function useTheme() {
     } else if (themeMode) {
       setActualTheme(themeMode)
     }
-  }, [themeMode, useAmbientLight, updateThemeFromAmbient])
+  }, [themeMode, useAmbientLight])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
