@@ -63,7 +63,7 @@ function formatDuration(ms: number): string {
 function getServiceDisplayName(service: string): string {
   const names: Record<string, string> = {
     gemini: 'Gemini AI',
-    googleLens: 'Google Lens',
+    googleLens: 'Google Vision',
     ebay: 'eBay API',
     overall: 'Overall',
   }
@@ -89,7 +89,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
-        <div className="p-4 bg-t4 border border-t3 rounded-lg">
+        <div className="p-4 bg-s1 border border-s2 rounded-lg">
           <div className="text-xs font-medium text-s4 uppercase tracking-wide mb-1">
             Avg Uptime (24h)
           </div>
@@ -99,7 +99,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
           <Progress value={stats.averageUptime} className="h-1.5" />
         </div>
 
-        <div className="p-4 bg-t4 border border-t3 rounded-lg">
+        <div className="p-4 bg-s1 border border-s2 rounded-lg">
           <div className="text-xs font-medium text-s4 uppercase tracking-wide mb-1">
             Incidents (24h)
           </div>

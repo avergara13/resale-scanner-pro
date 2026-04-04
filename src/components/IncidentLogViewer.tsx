@@ -80,7 +80,7 @@ function formatDuration(ms: number): string {
 function getServiceDisplayName(service: string): string {
   const names: Record<string, string> = {
     gemini: 'Gemini AI',
-    googleLens: 'Google Lens',
+    googleLens: 'Google Vision',
     ebay: 'eBay API',
     overall: 'Overall System',
   }
@@ -106,9 +106,9 @@ function getSeverityColor(severity: string): string {
   switch (severity) {
     case 'critical': return 'bg-red text-white'
     case 'high': return 'bg-amber text-white'
-    case 'medium': return 'bg-t2 text-fg'
-    case 'low': return 'bg-s2 text-s4'
-    default: return 'bg-s2 text-s4'
+    case 'medium': return 'bg-s2 text-t1'
+    case 'low': return 'bg-s1 text-t2'
+    default: return 'bg-s1 text-t2'
   }
 }
 
@@ -227,7 +227,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
             <SelectContent>
               <SelectItem value="all">All Services</SelectItem>
               <SelectItem value="gemini">Gemini AI</SelectItem>
-              <SelectItem value="googleLens">Google Lens</SelectItem>
+              <SelectItem value="googleLens">Google Vision</SelectItem>
               <SelectItem value="ebay">eBay API</SelectItem>
             </SelectContent>
           </Select>
@@ -252,7 +252,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
         )}
       </div>
 
-      <Card className="p-4 bg-t4 border-t3">
+      <Card className="p-4 bg-s1 border-s2">
         <div className="grid grid-cols-3 gap-4">
           {incidentsByService.map(({ service, total, active, resolved }) => (
             <div key={service} className="space-y-1">

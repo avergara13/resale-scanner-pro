@@ -167,6 +167,21 @@ const WIRING_CHECKS = [
     )
   },
 
+  // ── 7. Profit math integrity guard ────────────────────────────────────────
+  // Detect-only. Does NOT patch. Warns loudly if Spark has removed
+  // calculateProfitMetrics from App.tsx. CI run will show the warning
+  // in the wiring script output. CE-VS or SA-VS should investigate before deploy.
+  {
+    name: 'Guard: calculateProfitMetrics present in App.tsx',
+    detect: src => src.includes('calculateProfitMetrics'),
+    patch: src => {
+      console.error('🚨 PROFIT MATH MISSING: calculateProfitMetrics not found in App.tsx.')
+      console.error('   Spark may have removed or renamed handleCapture/handleBatchAnalyze.')
+      console.error('   Do NOT deploy until the profit calculation is restored.')
+      return src  // detect-only — never auto-patch business logic
+    }
+  },
+
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
