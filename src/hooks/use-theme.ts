@@ -83,11 +83,15 @@ export function useTheme() {
   useEffect(() => {
     const root = document.documentElement
     
-    if (actualTheme === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
+    root.style.setProperty('color-scheme', actualTheme)
+    
+    requestAnimationFrame(() => {
+      if (actualTheme === 'dark') {
+        root.classList.add('dark')
+      } else {
+        root.classList.remove('dark')
+      }
+    })
   }, [actualTheme])
 
   const setTheme = useCallback((mode: ThemeMode) => {

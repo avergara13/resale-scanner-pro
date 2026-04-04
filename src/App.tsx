@@ -859,7 +859,7 @@ function App() {
         compact={false}
       />
       
-      <div className="flex-1 relative w-full" style={{ minHeight: 'calc(100vh - 80px)' }}>
+      <div className="flex-1 relative w-full" style={{ minHeight: 'calc(100vh - 96px)' }}>
         <AnimatePresence mode="wait" custom={direction}>
           {screen === 'session' && (
             <motion.div
@@ -1015,7 +1015,7 @@ function App() {
         </AnimatePresence>
       </div>
 
-      <div className="h-[64px] sm:h-[80px] flex-shrink-0" />
+      <div className="h-[80px] sm:h-[88px] flex-shrink-0" />
 
       <BottomNav
         currentScreen={screen}

@@ -342,16 +342,39 @@ body {
   font-family: 'IBM Plex Mono', monospace;
 }
 
+html {
+  color-scheme: light dark;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
 html, body {
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.35s cubic-bezier(0.4, 0, 0.2, 1), color 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
 }
 
 * {
   transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 0.35s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button, [role="button"], a, input, select, textarea {
   transition-duration: 0.2s;
-  transition-timing-function: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, html, body {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 
 #app-container {
