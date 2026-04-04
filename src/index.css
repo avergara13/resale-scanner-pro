@@ -57,28 +57,6 @@
   --destructive-foreground: oklch(1 0 0);
   --input: var(--s2);
   --ring: var(--b1);
-}
-
-.dark {
-  --bg: oklch(0.13 0 0);
-  --fg: oklch(0.18 0 0);
-  
-  --s1: oklch(0.20 0 0);
-  --s2: oklch(0.28 0 0);
-  --s3: oklch(0.52 0 0);
-  --s4: oklch(0.68 0 0);
-  
-  --b1: oklch(0.65 0.20 260);
-  --b2: oklch(0.55 0.18 260);
-  
-  --t1: oklch(0.96 0 0);
-  --t2: oklch(0.78 0 0);
-  --t3: oklch(0.62 0 0);
-  --t4: oklch(0.24 0 0);
-  
-  --green: oklch(0.68 0.20 145);
-  --green-bg: oklch(0.68 0.20 145 / 0.18);
-  --amber: oklch(0.82 0.18 75);
   --red: oklch(0.68 0.22 25);
   --red-bg: oklch(0.68 0.22 25 / 0.18);
   --blue-bg: oklch(0.65 0.20 260 / 0.12);
@@ -105,31 +83,31 @@
   --accent: var(--b1);
   --accent-foreground: oklch(1 0 0);
   --destructive: var(--red);
+  --border: oklch(0.28 0 0);
+  --input: var(--s2);
+  --capture-color: var(--b1);
+  --analyzing-color: var(--amber);
+  --success-color: var(--green);
+  --fail-color: var(--red);
+  
+  --background: var(--bg);
+  --foreground: var(--t1);
+  --card: var(--fg);
+  --card-foreground: var(--t1);
+  --popover: var(--fg);
+  --popover-foreground: var(--t1);
+  --primary: var(--b1);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: var(--s1);
+  --secondary-foreground: var(--t1);
+  --muted: var(--s1);
+  --muted-foreground: var(--t3);
+  --accent: var(--b1);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: var(--red);
   --destructive-foreground: oklch(1 0 0);
   --input: var(--s2);
   --ring: var(--b1);
-}
-
-@theme {
-  --color-bg: var(--bg);
-  --color-fg: var(--fg);
-  --color-s1: var(--s1);
-  --color-s2: var(--s2);
-  --color-s3: var(--s3);
-  --color-s4: var(--s4);
-  --color-b1: var(--b1);
-  --color-b2: var(--b2);
-  --color-t1: var(--t1);
-  --color-t2: var(--t2);
-  --color-t3: var(--t3);
-  --color-t4: var(--t4);
-  --color-green: var(--green);
-  --color-green-bg: var(--green-bg);
-  --color-amber: var(--amber);
-  --color-red: var(--red);
-  --color-red-bg: var(--red-bg);
-  --color-blue-bg: var(--blue-bg);
-  --color-border: var(--border);
   
   --color-background: var(--background);
   --color-foreground: var(--foreground);
