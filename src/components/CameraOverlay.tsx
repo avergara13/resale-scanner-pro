@@ -294,6 +294,3 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
           <canvas ref={canvasRef} className="hidden" />
         </motion.div>
       )}
-    </AnimatePresence>
-  )
-}
