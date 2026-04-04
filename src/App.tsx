@@ -883,27 +883,7 @@ function App() {
             </motion.div>
           )}
 
-          {screen === 'incidents' && (
-            <motion.div
-              key="incidents"
-              custom={direction}
-              variants={screenVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-              className="w-full h-full"
-            >
-              <IncidentsScreen settings={settings} />
-            </motion.div>
-          )}
-          {screen === 'ai' && (
-            <motion.div
-              key="ai"
-              custom={direction}
-              variants={screenVariants}
-              initial="initial"
-              animate="animate"
+&& (
               exit="exit"
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
               className="w-full h-full"
