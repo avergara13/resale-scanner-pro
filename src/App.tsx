@@ -10,7 +10,6 @@ import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { TouchTargetVerifier } from './components/TouchTargetVerifier'
 import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
-import { AgentScreen } from './components/screens/AgentScreen'
 import { IncidentsScreen } from './components/screens/IncidentsScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -33,7 +32,7 @@ import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, 
 import { cn } from './lib/utils'
 
 function App() {
-  const [screen, setScreen] = useState<Screen>('agent')
+  const [screen, setScreen] = useState<Screen>('session')
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
@@ -870,7 +869,7 @@ function App() {
               key="session"
               custom={direction}
               variants={screenVariants}
-              variants={screenVariants}
+              initial="initial"
               animate="animate"
               exit="exit"
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
@@ -883,27 +882,7 @@ function App() {
               />
             </motion.div>
           )}
-          {screen === 'agent' && (
-            <motion.div
-              key="agent"
-              custom={direction}
-              variants={screenVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-              className="w-full h-full"
-            >
-              <AgentScreen
-                queueItems={queue || []}
-                settings={settings}
-                onOptimizeItem={handleOptimizeItem}
-                onPushToNotion={handlePushToNotion}
-                onNavigateToQueue={() => setScreen('queue')}
-                onOpenCamera={() => setCameraOpen(true)}
-              />
-            </motion.div>
-          )}
+
           {screen === 'incidents' && (
             <motion.div
               key="incidents"
