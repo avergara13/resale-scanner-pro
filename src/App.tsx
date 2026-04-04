@@ -19,7 +19,6 @@ import { LocationInsightsScreen } from './components/screens/LocationInsightsScr
 import { createEbayService } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
-import { createObjectDetectionService } from './lib/object-detection-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
 import { createListingOptimizationService } from './lib/listing-optimization-service'
 import { createNotionService } from './lib/notion-service'
@@ -93,11 +92,6 @@ function App() {
     const engineId = settings?.googleSearchEngineId || import.meta.env.VITE_GOOGLE_SEARCH_ENGINE_ID
     return createGoogleLensService(key, engineId)
   }, [settings?.googleApiKey, settings?.googleSearchEngineId])
-
-  const objectDetectionService = useMemo(() => {
-    const key = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
-    return createObjectDetectionService(key, settings?.preferredAiModel)
-  }, [settings?.geminiApiKey, settings?.preferredAiModel])
 
   const tagSuggestionService = useMemo(() => createTagSuggestionService(), [])
 
@@ -599,47 +593,7 @@ function App() {
     }
   }, [session, setSession, setQueue, optimizeAndCache])
 
-  const handleMultiCapture = useCallback(async (products: import('@/types').DetectedProduct[], baseImageData: string, totalPrice: number, location?: ThriftStoreLocation) => {
-    const timestamp = Date.now()
-    const parentId = `multi-${timestamp}`
-    
-    for (const [index, product] of products.entries()) {
-      const itemPrice = totalPrice / products.length
-      const optimized = await optimizeAndCache(product.croppedImageData || baseImageData)
-      
-      const multiItem: ScannedItem = {
-        id: `${parentId}-${index}`,
-        timestamp: timestamp + index,
-        imageData: optimized.original,
-        imageThumbnail: optimized.thumbnail,
-        imageOptimized: optimized.original,
-        purchasePrice: itemPrice,
-        productName: product.name,
-        description: `Part of multi-item capture (${index + 1} of ${products.length})`,
-        decision: 'PENDING',
-        inQueue: true,
-        isMultiProduct: true,
-        parentItemId: parentId,
-        detectedProducts: [product],
-        location,
-      }
-      
-      setQueue((prev) => [...(prev || []), multiItem])
-    }
 
-    if (session?.active) {
-      setSession((prev) => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          itemsScanned: prev.itemsScanned + products.length,
-        }
-      })
-    }
-
-    toast.success(`Added ${products.length} items to queue`)
-    setScreen('queue')
-  }, [session, setSession, setQueue])
 
   const handleEditQueueItem = useCallback((itemId: string, updates: Partial<ScannedItem>) => {
     setQueue((prev) => {
@@ -1019,8 +973,6 @@ function App() {
         onClose={() => setCameraOpen(false)}
         onCapture={handleCapture}
         onQuickDraft={handleQuickDraft}
-        onMultiCapture={handleMultiCapture}
-        objectDetectionService={objectDetectionService}
       />
 
       {isBatchAnalyzing && (
