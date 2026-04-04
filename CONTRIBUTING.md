@@ -51,6 +51,67 @@ Types: `feat`, `fix`, `ci`, `perf`, `docs`, `refactor`, `test`
 
 ---
 
+## Multi-Agent Lane Separation
+
+Three agents touch this repo. They never step on each other because each owns
+distinct surfaces and branches.
+
+| Agent | A77 Role | Owns | Never touches |
+|---|---|---|---|
+| **Claude (this chat)** | SA-VS | `main` wiring commits, `server.js`, docs, Notion, AGENTS.md topology table | WO branches, Railway UI, Supabase, n8n |
+| **VS Code Copilot/Codex** | CE-VS | WO branches, PRs, Railway/Supabase/n8n setup, A77 WO execution | Force-pushing to `main`, `deploy/production` |
+| **GitHub Actions** | Automation | `deploy/production` exclusively — triggered by every clean `main` push | N/A — automated only |
+| **GitHub Spark** | Rapid proto | Spark-generated commits to `main` | Governance branches, CI config |
+
+### Six rules that prevent conflicts
+
+**Rule 1 — Branch ownership is exclusive.**
+Claude commits to `main` only (wiring, docs, server.js). CE-VS works on WO branches
+and merges via PR. Spark publishes to `main`. These never collide because they live
+on separate branches until a WO PR merges.
+
+**Rule 2 — `deploy/production` is Actions-only after pipeline is live.**
+No agent manually force-pushes to `deploy/production` once the pipeline is running.
+If a sync is needed, trigger `workflow_dispatch` on Wire + Deploy.
+Emergency manual syncs must note `[emergency-sync]` in the commit message.
+
+**Rule 3 — Wiring is idempotent, so merge order does not matter.**
+When any WO PR merges to `main`, Actions re-runs `apply-wiring.mjs`. Already-wired
+code is detected and skipped. Missing wiring is re-applied. CE-VS cannot accidentally
+un-wire integrations by merging feature changes.
+
+**Rule 4 — AGENTS.md topology table is SA-VS territory between WOs.**
+Claude updates the topology table in `loft_os_architect/AGENTS.md` directly
+(app name, PRJ, deploy branch, status). If a WO also touches it, the WO allowlist
+declares it and the PR body describes the change. WO change wins on conflict.
+
+**Rule 5 — Sous Chef WOs (225, 226+) and Resale Scanner work are fully parallel.**
+`loft_os_architect` WO branches and `resale-scanner-pro` main are in separate repos.
+CE-VS executing WO-225 on `loft_os_architect` has zero overlap with Claude
+wiring `resale-scanner-pro`. No coordination needed between those lanes.
+
+**Rule 6 — SA-VS drafts; CE-VS executes. Never in the same message.**
+Claude drafts the WO and stops. CE-VS picks it up in VS Code after the ED token.
+There is no in-chat execution handoff. Planning and execution are always separate turns.
+
+### Handoff pattern (fast path)
+
+```
+Claude (SA-VS, this chat)            VS Code Copilot (CE-VS)
+─────────────────────────            ──────────────────────────
+Sketch → ENQ → WO draft   ────→     Open loft_os_architect in VS Code
+                                     Pin the WO file
+ED: "Approved to Execute: <WO_ID>"  ← ED issues token in chat
+                                     Execute → branch → PR → merge → closeout
+Update Notion, topology,   ←────    Certification Handoff Packet posted in chat
+wiring if needed (parallel)
+```
+
+Claude's Notion/wiring work and CE-VS's branch work run simultaneously.
+They only synchronize at two points: ED token issuance and Certification Handoff.
+
+---
+
 ## Architecture Record — What Was Built and Why
 
 This section serves as the permanent engineering record for the initial build of
