@@ -1339,19 +1339,7 @@ button:disabled {
   filter: blur(20px);
 }
 
-.camera-fab-animated::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%);
-  animation: shimmer-sweep 3s ease-in-out infinite;
-  pointer-events: none;
-}
 
-.camera-fab-animated.camera-analyzing::after {
-  animation: shimmer-sweep 1.5s ease-in-out infinite;
-}
 
 @keyframes gentle-pulse {
   0%, 100% {
