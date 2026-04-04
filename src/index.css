@@ -42,7 +42,7 @@
   --blue-bg: oklch(0.55 0.15 250 / 0.08);
   
   --border: oklch(0.80 0.05 75);
-  --radius: 1rem;
+  --radius: 0.75rem;
   
   --capture-color: var(--b1);
   --analyzing-color: var(--amber);
@@ -94,9 +94,9 @@
   --radius-xl: calc(var(--radius) * 2);
   --radius-2xl: calc(var(--radius) * 3);
   --radius-full: 9999px;
-  --font-sans: "Poppins";
-  --font-serif: "Merriweather";
-  --font-mono: "Source Code Pro";
+  --font-sans: IBM Plex Sans;
+  --font-serif: Noto Serif;
+  --font-mono: Source Code Pro;
   --chart-1: oklch(0.58 0.15 65);
   --chart-2: oklch(0.78 0.12 45);
   --chart-3: oklch(0.68 0.10 85);
