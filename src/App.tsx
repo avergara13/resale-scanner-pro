@@ -50,6 +50,7 @@ function App() {
     agenticMode: true,
     liveSearchEnabled: true,
     darkMode: false,
+    apiNotificationsEnabled: false,
     minProfitMargin: 30,
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
@@ -851,7 +852,7 @@ function App() {
         captureState === 'fail' && "fail-flash"
       )}
     >
-      <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
+      <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={settings?.apiNotificationsEnabled ?? false} />
       
       <RetryStatusIndicator 
         activeRetries={retryState.activeRetries}

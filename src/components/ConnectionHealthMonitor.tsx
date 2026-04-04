@@ -37,22 +37,32 @@ export function ConnectionHealthMonitor({
 
   useConnectionHistory(health, { enabled })
 
-  const prevStatusRef = useRef<ConnectionStatus>(health.overall)
+  const prevStatusRef = useRef<ConnectionStatus | null>(null)
   const hasNotifiedRef = useRef(false)
+  const isInitialCheckRef = useRef(true)
 
   useEffect(() => {
     if (!enabled || !notifyOnChange) return
 
-    const prevStatus = prevStatusRef.current
     const currentStatus = health.overall
-
-    if (prevStatus === currentStatus) return
 
     if (currentStatus === 'checking') {
       return
     }
 
-    if (!hasNotifiedRef.current && currentStatus === 'offline') {
+    if (isInitialCheckRef.current) {
+      prevStatusRef.current = currentStatus
+      isInitialCheckRef.current = false
+      return
+    }
+
+    const prevStatus = prevStatusRef.current
+
+    if (prevStatus === currentStatus || prevStatus === null) {
+      return
+    }
+
+    if (!hasNotifiedRef.current && currentStatus === 'offline' && prevStatus !== 'checking') {
       toast.error('Connection Lost', {
         description: getStatusMessage(currentStatus),
         duration: 5000,

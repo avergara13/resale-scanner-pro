@@ -669,6 +669,20 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   />
                 </div>
 
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <Label htmlFor="api-notifications" className="text-sm text-t1 font-medium">
+                      API Connection Notifications
+                    </Label>
+                    <p className="text-xs text-t2 mt-0.5">Show alerts when APIs go offline</p>
+                  </div>
+                  <Switch
+                    id="api-notifications"
+                    checked={settings.apiNotificationsEnabled || false}
+                    onCheckedChange={(checked) => onUpdate({ apiNotificationsEnabled: checked })}
+                  />
+                </div>
+
                 <Separator className="bg-s2" />
 
                 <div className="space-y-3">

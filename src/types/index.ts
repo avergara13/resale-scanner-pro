@@ -255,6 +255,7 @@ export interface AppSettings {
   darkMode: boolean
   themeMode?: 'light' | 'dark' | 'auto'
   useAmbientLight?: boolean
+  apiNotificationsEnabled?: boolean
   minProfitMargin: number
   defaultShippingCost: number
   ebayFeePercent: number
