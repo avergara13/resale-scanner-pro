@@ -81,13 +81,13 @@ export class CostTrackingService {
     const logs = await this.getAllLogs()
     logs.push(fullLog)
     
-    await spark.kv.set(this.storageKey, logs)
+    await window.spark.kv.set(this.storageKey, logs)
 
     await this.checkBudgets(log.service, log.cost)
   }
 
   async getAllLogs(): Promise<ApiUsageLog[]> {
-    const logs = await spark.kv.get<ApiUsageLog[]>(this.storageKey)
+    const logs = await window.spark.kv.get<ApiUsageLog[]>(this.storageKey)
     return logs || []
   }
 
@@ -223,11 +223,11 @@ export class CostTrackingService {
       budgets.push(budget)
     }
     
-    await spark.kv.set(this.budgetKey, budgets)
+    await window.spark.kv.set(this.budgetKey, budgets)
   }
 
   async getAllBudgets(): Promise<CostBudget[]> {
-    const budgets = await spark.kv.get<CostBudget[]>(this.budgetKey)
+    const budgets = await window.spark.kv.get<CostBudget[]>(this.budgetKey)
     return budgets || []
   }
 
@@ -332,11 +332,11 @@ export class CostTrackingService {
     }
 
     alerts.push(fullAlert)
-    await spark.kv.set(this.alertsKey, alerts)
+    await window.spark.kv.set(this.alertsKey, alerts)
   }
 
   async getAllAlerts(): Promise<CostAlert[]> {
-    const alerts = await spark.kv.get<CostAlert[]>(this.alertsKey)
+    const alerts = await window.spark.kv.get<CostAlert[]>(this.alertsKey)
     return alerts || []
   }
 
@@ -351,7 +351,7 @@ export class CostTrackingService {
     
     if (alert) {
       alert.acknowledged = true
-      await spark.kv.set(this.alertsKey, alerts)
+      await window.spark.kv.set(this.alertsKey, alerts)
     }
   }
 
@@ -359,7 +359,7 @@ export class CostTrackingService {
     const cutoffDate = Date.now() - (daysToKeep * 24 * 60 * 60 * 1000)
     const logs = await this.getAllLogs()
     const recentLogs = logs.filter(log => log.timestamp >= cutoffDate)
-    await spark.kv.set(this.storageKey, recentLogs)
+    await window.spark.kv.set(this.storageKey, recentLogs)
   }
 
   calculateCost(service: ApiService, operation: string, details: {
