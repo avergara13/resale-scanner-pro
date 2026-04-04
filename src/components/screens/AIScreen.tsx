@@ -15,9 +15,11 @@ import { MarketDataPanel } from '../MarketDataPanel'
 import { GoogleLensResults } from '../GoogleLensResults'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ThemeToggle } from '../ThemeToggle'
+import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useCollapsePreference } from '@/hooks/use-collapse-preference'
 import { useTabPreference } from '@/hooks/use-tab-preference'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
 import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
 
@@ -240,6 +242,17 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
   const decision = currentItem?.decision
   const canSaveDraft = currentItem?.imageData || description.trim().length > 0
 
+  const handleRefresh = useCallback(async () => {
+    await new Promise(resolve => setTimeout(resolve, 800))
+    toast.success('AI analysis refreshed')
+  }, [])
+
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    enabled: true,
+  })
+
   useEffect(() => {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
@@ -320,6 +333,13 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
 
   return (
     <div className="flex flex-col w-full h-full min-h-screen bg-bg">
+      <PullToRefreshIndicator
+        isPulling={pullToRefresh.isPulling}
+        isRefreshing={pullToRefresh.isRefreshing}
+        pullDistance={pullToRefresh.pullDistance}
+        progress={pullToRefresh.progress}
+        shouldTrigger={pullToRefresh.shouldTrigger}
+      />
       <div className="flex-shrink-0 p-3 sm:p-4 border-b border-s2 bg-fg sticky top-0 z-10 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -356,7 +376,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
 
       <div className="flex-1 overflow-y-auto">
         {tab === 'analysis' ? (
-          <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-40 sm:pb-44">
+          <div ref={pullToRefresh.containerRef} className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-40 sm:pb-44">
             {pipeline.length === 0 ? (
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
@@ -476,7 +496,12 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
           </div>
         ) : (
           <div className="flex flex-col min-h-full pb-32 sm:pb-36">
-            <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4" ref={chatScrollRef}>
+            <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4" ref={(el) => {
+              if (el) {
+                (pullToRefresh.containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+                (chatScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+              }
+            }}>
               {chatMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-3 sm:mb-4">

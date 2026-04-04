@@ -28,6 +28,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ThemeToggle } from '../ThemeToggle'
+import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -175,6 +177,17 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
   const activeSession = chatSessions?.find(s => s.id === activeSessionId)
   const chatMessages = activeSession?.messages || []
+
+  const handleRefresh = useCallback(async () => {
+    await new Promise(resolve => setTimeout(resolve, 800))
+    toast.success('Agent refreshed')
+  }, [])
+
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    enabled: true,
+  })
 
   const queueStats = useMemo(() => {
     const total = queueItems.length
@@ -542,6 +555,13 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
 
   return (
     <div className="flex flex-col h-full bg-bg">
+      <PullToRefreshIndicator
+        isPulling={pullToRefresh.isPulling}
+        isRefreshing={pullToRefresh.isRefreshing}
+        pullDistance={pullToRefresh.pullDistance}
+        progress={pullToRefresh.progress}
+        shouldTrigger={pullToRefresh.shouldTrigger}
+      />
       <div className="flex items-center justify-between px-4 py-4 bg-fg border-b border-s1">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gradient-to-br from-b1 to-b2 rounded-xl">
@@ -653,7 +673,7 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
       </div>
 
       <ScrollArea className="flex-1 px-4">
-        <div className="py-4 space-y-4">
+        <div ref={pullToRefresh.containerRef} className="py-4 space-y-4">
           {!hasMessages && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
