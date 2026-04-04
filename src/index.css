@@ -1503,75 +1503,36 @@ button:disabled {
   }
   
   h3 {
-    font-size: 1.1rem;
+@media (min-width: 744px) and (max-width: 834px) {
   }
-  
+    max-width: 834px;
   h4 {
     font-size: 1rem;
   }
-
+    padding: 16px;
   .grid {
     gap: 0.5rem;
   }
-}
-
+    padding: 18px;
+    gap: 14px;
 @media (min-width: 431px) and (max-width: 743px) {
   #app-container {
     padding: 0;
-  }
-
+    padding: 18px;
+    margin-bottom: 12px;
   h1 {
     font-size: 1.875rem;
   }
-
+    padding: 20px 22px;
   h2 {
-    font-size: 1.625rem;
+    max-width: 88%;
   }
 
   h3 {
-    font-size: 1.375rem;
-  }
-
-  .stat-card {
-    padding: 12px;
-  }
-
-  .grid {
-    gap: 1rem;
-  }
-}
-
-@media (min-width: 744px) and (max-width: 834px) {
-  #app-container {
-    max-width: 834px;
-    padding: 0 1rem;
-  }
-  
-  .stat-card {
-    padding: 16px;
-  }
-  
-  .item-row {
-    padding: 18px;
-    gap: 14px;
-  }
-  
-  .pipeline-card {
-    padding: 18px;
-    margin-bottom: 12px;
-  }
-  
-  .chat-bubble {
-    padding: 20px 22px;
-    font-size: 15px;
-    max-width: 88%;
-  }
-  
-  .decision-signal {
     padding: 44px;
     font-size: 76px;
     border-radius: 26px;
-  }
+  .stat-card {
 
   h1 {
     font-size: 2rem;
@@ -1584,28 +1545,11 @@ button:disabled {
   h3 {
     font-size: 1.5rem;
   }
-
-  .grid {
-    gap: 1.25rem;
   }
-
-  header {
-    padding: 1.25rem;
-  }
-
-  .space-y-4 > * + * {
-    margin-top: 1.25rem;
-  }
-
-  .space-y-6 > * + * {
-    margin-top: 1.75rem;
-  }
-}
-
+  
 @media (min-width: 835px) and (max-width: 1024px) {
   #app-container {
     max-width: 1024px;
-    padding: 0 1.5rem;
   }
   
   .stat-card {
@@ -1635,6 +1579,62 @@ button:disabled {
   }
 
   h1 {
+    font-size: 2.25rem;
+  }
+
+  h2 {
+    font-size: 2rem;
+  }
+
+  h3 {
+    font-size: 1.75rem;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1366px) {
+  #app-container {
+    max-width: 1366px;
+  }
+  
+  .stat-card {
+    padding: 20px;
+  }
+  
+  .item-row {
+    padding: 22px;
+    gap: 18px;
+  }
+  
+  .pipeline-card {
+    padding: 22px;
+    margin-bottom: 16px;
+  }
+  
+  .chat-bubble {
+    padding: 24px 26px;
+    font-size: 17px;
+    max-width: 80%;
+  }
+  
+  .decision-signal {
+    padding: 52px;
+    font-size: 88px;
+    border-radius: 32px;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+  }
+
+  h2 {
+    font-size: 2.25rem;
+  }
+
+  h3 {
+    font-size: 2rem;
+  }
+}
+
     font-size: 2.25rem;
   }
 
