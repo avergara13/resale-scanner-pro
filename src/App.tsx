@@ -870,7 +870,7 @@ function App() {
               key="session"
               custom={direction}
               variants={screenVariants}
-              initial="initial"
+              variants={screenVariants}
               animate="animate"
               exit="exit"
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
