@@ -83,6 +83,11 @@ const QUICK_ACTIONS: QuickAction[] = [
     label: 'Optimize Queue',
     prompt: 'Review my queue and suggest which items to prioritize'
   },
+  {
+    emoji: '🚀',
+    label: 'Full Pipeline',
+    prompt: 'Run full pipeline: analyze all drafts, optimize GO listings, and push to Notion'
+  },
 ]
 
 function formatMessage(text: string): string {
@@ -155,11 +160,12 @@ interface AgentScreenProps {
   onCreateListing?: (itemId: string) => Promise<void>
   onOptimizeItem?: (itemId: string) => Promise<void>
   onPushToNotion?: (itemId: string) => Promise<void>
+  onBatchAnalyze?: () => Promise<void>
   onNavigateToQueue?: () => void
   onOpenCamera?: () => void
 }
 
-export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onNavigateToQueue, onOpenCamera }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onNavigateToQueue, onOpenCamera }: AgentScreenProps) {
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
   const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
   const [input, setInput] = useState('')
@@ -365,6 +371,81 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
     try {
       const lowerText = text.toLowerCase()
       
+      // Full agentic pipeline: analyze → optimize → push
+      if (lowerText.includes('full pipeline') || lowerText.includes('auto-list') || lowerText.includes('process queue') || lowerText.includes('run pipeline')) {
+        const addAgentMessage = (content: string) => {
+          const msg: ChatMessage = {
+            id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+            role: 'assistant',
+            content,
+            timestamp: Date.now(),
+          }
+          setChatSessions((prev) =>
+            (prev || []).map(s =>
+              s.id === activeSessionId
+                ? { ...s, messages: [...s.messages, msg], lastMessageAt: Date.now() }
+                : s
+            )
+          )
+        }
+
+        // Step 1: Batch analyze unanalyzed items
+        const drafts = queueItems.filter(i => !i.productName || i.productName === 'Quick Draft')
+        if (drafts.length > 0 && onBatchAnalyze) {
+          addAgentMessage(`**Step 1/3 — Analyzing ${drafts.length} draft(s)**\nRunning AI vision, market research, and profit analysis...`)
+          try {
+            await onBatchAnalyze()
+            addAgentMessage(`✅ Batch analysis complete.`)
+          } catch (error) {
+            addAgentMessage(`⚠️ Batch analysis encountered errors — continuing with available data.`)
+          }
+        } else if (drafts.length === 0) {
+          addAgentMessage(`**Step 1/3 — Analyze:** No drafts to analyze — all items already processed.`)
+        }
+
+        // Step 2: Optimize GO items that don't have listings yet
+        // Re-read queueItems as they may have been updated by batch analysis
+        const goItemsToOptimize = queueItems.filter(i => i.decision === 'GO' && !i.optimizedListing)
+        if (goItemsToOptimize.length > 0 && onOptimizeItem) {
+          addAgentMessage(`**Step 2/3 — Optimizing ${goItemsToOptimize.length} GO listing(s)**\nGenerating SEO titles, descriptions, and pricing...`)
+          let optimized = 0
+          for (const item of goItemsToOptimize) {
+            try {
+              await onOptimizeItem(item.id)
+              optimized++
+            } catch (error) {
+              console.error('Optimize failed for:', item.id, error)
+            }
+          }
+          addAgentMessage(`✅ Optimized ${optimized} of ${goItemsToOptimize.length} listings.`)
+        } else {
+          addAgentMessage(`**Step 2/3 — Optimize:** No new GO items need optimization.`)
+        }
+
+        // Step 3: Push optimized items to Notion
+        const readyToPush = queueItems.filter(i => i.optimizedListing && !i.notionPageId)
+        if (readyToPush.length > 0 && onPushToNotion) {
+          addAgentMessage(`**Step 3/3 — Publishing ${readyToPush.length} listing(s) to Notion**`)
+          let pushed = 0
+          for (const item of readyToPush) {
+            try {
+              await onPushToNotion(item.id)
+              pushed++
+            } catch (error) {
+              console.error('Push failed for:', item.id, error)
+            }
+          }
+          addAgentMessage(`✅ Published ${pushed} of ${readyToPush.length} listings to Notion.`)
+        } else {
+          addAgentMessage(`**Step 3/3 — Publish:** No listings ready to push (already published or not optimized).`)
+        }
+
+        addAgentMessage(`🏁 **Pipeline complete!** Check your Queue to review results. You can manually edit any listing before final publishing.`)
+        toast.success('Full pipeline complete')
+        setIsProcessing(false)
+        return
+      }
+
       if (lowerText.includes('create listing') || lowerText.includes('optimize listing')) {
         const goItems = queueItems.filter(item => item.decision === 'GO' && !item.optimizedListing)
         
@@ -511,6 +592,7 @@ Available Commands:
 - "Scan" or "Camera" or "Capture" - Opens the AI Camera to scan new items (you can directly trigger the camera)
 - "Create listings" or "Optimize listings" - Generate optimized eBay listings for all GO items
 - "Push to Notion" - Send optimized listings to Notion database
+- "Full pipeline" or "Run pipeline" - End-to-end automation: analyze drafts → optimize GO items → push to Notion
 - Ask questions about market research, pricing strategies, or product analysis
 
 The AI Camera uses vision analysis to identify products and calculate profit potential instantly.
@@ -519,7 +601,7 @@ Be proactive and actionable - suggest specific next steps the user can take.
 If the queue is empty or has few items, suggest using the camera to scan more products.`
 
       const fullPrompt = `${systemPrompt}\n\nUser: ${text}`
-      const response = await window.spark.llm(fullPrompt, settings?.preferredAiModel || 'gpt-4o')
+      const response = await window.spark.llm(fullPrompt, settings?.preferredAiModel || 'gemini-2.0-flash-exp')
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -541,7 +623,7 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, handleCreateSession, setChatSessions, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion])
+  }, [input, isProcessing, activeSessionId, handleCreateSession, setChatSessions, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze])
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)

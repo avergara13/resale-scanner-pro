@@ -9,7 +9,7 @@ export interface PipelineStep {
   label: string
   status: 'pending' | 'processing' | 'complete' | 'error'
   progress?: number
-  data?: any
+  data?: string
   error?: string
 }
 
@@ -261,6 +261,8 @@ export interface AppSettings {
   ebayFeePercent: number
   paypalFeePercent: number
   imageQuality?: ImageQualitySettings
+  enableLensInBatch?: boolean
+  lensSkipConfidence?: number
 }
 
 export interface ChatMessage {

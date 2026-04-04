@@ -32,16 +32,17 @@ export class GoogleLensService {
   async searchByImage(imageData: string, productName?: string): Promise<GoogleLensAnalysis> {
     try {
       const results = await this.performVisualSearch(imageData, productName)
-      
+
       if (results.length === 0) {
-        return this.getEnhancedMockResults()
+        return { results: [], dominantSources: [] }
       }
 
       const analysis = this.analyzeResults(results)
       return analysis
     } catch (error) {
       console.error('Google Lens search failed:', error)
-      return this.getEnhancedMockResults()
+      // Re-throw so callers can handle/retry — don't mask errors with mock data
+      throw error
     }
   }
 

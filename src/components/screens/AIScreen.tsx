@@ -305,7 +305,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
       const promptText = `You are an AI assistant specialized in resale business analysis. You have access to the following app context:\n\n${contextData}\n\nUser question: ${chatInput}\n\nProvide a helpful, concise response based on the context. If analyzing an item, reference specific data from the current analysis. Be professional but conversational.`
       const prompt = window.spark.llmPrompt([promptText] as any, contextData, chatInput)
 
-      const response = await window.spark.llm(promptText, settings?.preferredAiModel || 'gpt-4o')
+      const response = await window.spark.llm(promptText, settings?.preferredAiModel || 'gemini-2.0-flash-exp')
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
