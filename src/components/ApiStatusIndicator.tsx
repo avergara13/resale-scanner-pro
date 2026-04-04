@@ -1,7 +1,8 @@
-import { CheckCircle, XCircle, Warning, ArrowsClockwise, Pulse } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Warning, ArrowsClockwise, Pulse, ArrowClockwise } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useConnectionHealth, type ConnectionStatus } from '@/hooks/use-connection-health'
 import type { AppSettings } from '@/types'
+import type { RetryState } from '@/hooks/use-retry-tracker'
 
 interface ApiStatusIndicatorProps {
   settings?: AppSettings
@@ -9,6 +10,7 @@ interface ApiStatusIndicatorProps {
   liveUpdates?: boolean
   checkInterval?: number
   onStatusChange?: (status: ConnectionStatus) => void
+  activeRetries?: RetryState[]
 }
 
 function getStatusColor(status: ConnectionStatus): string {
@@ -62,6 +64,7 @@ export function ApiStatusIndicator({
   liveUpdates = true,
   checkInterval = 30000,
   onStatusChange,
+  activeRetries = [],
 }: ApiStatusIndicatorProps) {
   const { health, checkHealth, isChecking } = useConnectionHealth({
     settings,
@@ -69,51 +72,61 @@ export function ApiStatusIndicator({
     enabled: liveUpdates,
   })
 
+  const hasRetries = activeRetries.length > 0
+
   if (compact) {
     return (
-      <button
-        onClick={() => !isChecking && checkHealth()}
-        disabled={isChecking}
-        className="flex items-center gap-1.5 group cursor-pointer disabled:cursor-wait"
-        title={`Overall Status: ${getStatusText(health.overall)} - Click to refresh`}
-      >
-        <div className="flex items-center gap-1">
-          <div
-            className={cn(
-              'w-2 h-2 rounded-full transition-all',
-              getStatusColor(health.gemini.status),
-              health.gemini.status === 'checking' && 'animate-pulse',
-              health.gemini.status === 'offline' && health.gemini.critical && 'animate-pulse'
-            )}
-            title={`Gemini: ${getStatusText(health.gemini.status)}${
-              health.gemini.latency ? ` (${health.gemini.latency}ms)` : ''
-            }`}
-          />
-          <div
-            className={cn(
-              'w-2 h-2 rounded-full transition-all',
-              getStatusColor(health.googleLens.status),
-              health.googleLens.status === 'checking' && 'animate-pulse'
-            )}
-            title={`Google Lens: ${getStatusText(health.googleLens.status)}${
-              health.googleLens.latency ? ` (${health.googleLens.latency}ms)` : ''
-            }`}
-          />
-          <div
-            className={cn(
-              'w-2 h-2 rounded-full transition-all',
-              getStatusColor(health.ebay.status),
-              health.ebay.status === 'checking' && 'animate-pulse'
-            )}
-            title={`eBay: ${getStatusText(health.ebay.status)}${
-              health.ebay.latency ? ` (${health.ebay.latency}ms)` : ''
-            }`}
-          />
-        </div>
-        {liveUpdates && (
-          <Pulse size={10} weight="fill" className="text-green animate-pulse opacity-60" />
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => !isChecking && checkHealth()}
+          disabled={isChecking}
+          className="flex items-center gap-1.5 group cursor-pointer disabled:cursor-wait"
+          title={`Overall Status: ${getStatusText(health.overall)} - Click to refresh`}
+        >
+          <div className="flex items-center gap-1">
+            <div
+              className={cn(
+                'w-2 h-2 rounded-full transition-all',
+                getStatusColor(health.gemini.status),
+                health.gemini.status === 'checking' && 'animate-pulse',
+                health.gemini.status === 'offline' && health.gemini.critical && 'animate-pulse'
+              )}
+              title={`Gemini: ${getStatusText(health.gemini.status)}${
+                health.gemini.latency ? ` (${health.gemini.latency}ms)` : ''
+              }`}
+            />
+            <div
+              className={cn(
+                'w-2 h-2 rounded-full transition-all',
+                getStatusColor(health.googleLens.status),
+                health.googleLens.status === 'checking' && 'animate-pulse'
+              )}
+              title={`Google Lens: ${getStatusText(health.googleLens.status)}${
+                health.googleLens.latency ? ` (${health.googleLens.latency}ms)` : ''
+              }`}
+            />
+            <div
+              className={cn(
+                'w-2 h-2 rounded-full transition-all',
+                getStatusColor(health.ebay.status),
+                health.ebay.status === 'checking' && 'animate-pulse'
+              )}
+              title={`eBay: ${getStatusText(health.ebay.status)}${
+                health.ebay.latency ? ` (${health.ebay.latency}ms)` : ''
+              }`}
+            />
+          </div>
+          {liveUpdates && (
+            <Pulse size={10} weight="fill" className="text-green animate-pulse opacity-60" />
+          )}
+        </button>
+        {hasRetries && (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-amber/10 rounded-md" title={`${activeRetries.length} active retries`}>
+            <ArrowClockwise size={10} weight="bold" className="text-amber animate-spin" />
+            <span className="text-[9px] font-bold text-amber">{activeRetries.length}</span>
+          </div>
         )}
-      </button>
+      </div>
     )
   }
 

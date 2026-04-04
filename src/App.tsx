@@ -6,6 +6,7 @@ import { BottomNav } from './components/BottomNav'
 import { CameraOverlay } from './components/CameraOverlay'
 import { ConnectionHealthMonitor } from './components/ConnectionHealthMonitor'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
+import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { AgentScreen } from './components/screens/AgentScreen'
@@ -24,6 +25,7 @@ import { createNotionService } from './lib/notion-service'
 import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
 import { useImageOptimization } from './hooks/use-image-optimization'
+import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation } from './types'
@@ -60,6 +62,7 @@ function App() {
   const { theme, themeMode, setTheme, useAmbientLight, toggleAmbientLight } = useTheme()
   const imageQualityPreset = settings?.imageQuality?.preset || 'balanced'
   const { optimizeAndCache, isOptimizing: isOptimizingImage } = useImageOptimization(imageQualityPreset)
+  const { state: retryState, startRetry, updateRetry, completeRetry } = useRetryTracker()
 
   const ebayService = useMemo(() => {
     return createEbayService(
@@ -848,6 +851,12 @@ function App() {
       )}
     >
       <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={true} />
+      
+      <RetryStatusIndicator 
+        activeRetries={retryState.activeRetries}
+        position="top-right"
+        compact={false}
+      />
       
       <div className="flex-1 relative w-full" style={{ minHeight: 'calc(100vh - 80px)' }}>
         <AnimatePresence mode="wait" custom={direction}>
