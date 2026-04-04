@@ -1,10 +1,13 @@
-import { useRef, useState, useEffect } from 'react'
-import { X, Lightning, Check, MapPin } from '@phosphor-icons/react'
+import { useRef, useState, useEffect, useMemo } from 'react'
+import { X, Lightning, Check, MapPin, Barcode as BarcodeIcon } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useKV } from '@github/spark/hooks'
 import { AddLocationDialog } from './AddLocationDialog'
+import { BarcodeScanner } from './BarcodeScanner'
+import { createBarcodeService } from '@/lib/barcode-service'
 import type { ThriftStoreLocation } from '@/types'
+import type { BarcodeProduct } from '@/lib/barcode-service'
 
 interface CameraOverlayProps {
   isOpen: boolean
@@ -17,7 +20,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
-  const [mode, setMode] = useState<'lens' | 'listing'>('lens')
+  const [mode, setMode] = useState<'lens' | 'listing' | 'barcode'>('lens')
   const [price, setPrice] = useState('')
   const [quickDraftMode, setQuickDraftMode] = useState(false)
   const [draftCount, setDraftCount] = useState(0)
@@ -25,6 +28,9 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
   const [savedLocations, setSavedLocations] = useKV<ThriftStoreLocation[]>('saved-locations', [])
   const [selectedLocation, setSelectedLocation] = useState<ThriftStoreLocation | undefined>(undefined)
   const [showLocationDialog, setShowLocationDialog] = useState(false)
+  const [barcodeProduct, setBarcodeProduct] = useState<BarcodeProduct | null>(null)
+  
+  const barcodeService = useMemo(() => createBarcodeService(), [])
 
   useEffect(() => {
     if (isOpen) {
@@ -107,6 +113,21 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
     setShowLocationDialog(false)
   }
 
+  const handleBarcodeDetected = async (barcode: string, product?: BarcodeProduct) => {
+    setBarcodeProduct(product || null)
+    if (product) {
+      setPrice('')
+    }
+  }
+
+  const handleLookupProduct = async (barcode: string): Promise<BarcodeProduct | null> => {
+    const result = await barcodeService.lookupBarcode(barcode)
+    if (result.success && result.product) {
+      return result.product
+    }
+    return null
+  }
+
   return (
     <>
       <AnimatePresence>
@@ -140,7 +161,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                 )}
               </AnimatePresence>
 
-              <div className="absolute top-16 left-1/2 -translate-x-1/2 flex bg-black/50 p-1 rounded-xl w-48 backdrop-blur-md border border-white/10 z-10">
+              <div className="absolute top-16 left-1/2 -translate-x-1/2 flex bg-black/50 p-1 rounded-xl backdrop-blur-md border border-white/10 z-10" style={{ width: mode === 'barcode' ? '260px' : '200px' }}>
                 <button
                   onClick={() => setMode('lens')}
                   className={cn(
@@ -149,6 +170,16 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                   )}
                 >
                   AI LENS
+                </button>
+                <button
+                  onClick={() => setMode('barcode')}
+                  className={cn(
+                    'flex-1 py-2 px-1 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1',
+                    mode === 'barcode' ? 'bg-white text-black shadow-sm' : 'text-white'
+                  )}
+                >
+                  <BarcodeIcon size={14} weight="bold" />
+                  SCAN
                 </button>
                 <button
                   onClick={() => setMode('listing')}
@@ -293,6 +324,15 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
             </div>
 
             <canvas ref={canvasRef} className="hidden" />
+            
+            {mode === 'barcode' && (
+              <BarcodeScanner
+                isActive={mode === 'barcode'}
+                onBarcodeDetected={handleBarcodeDetected}
+                onClose={() => setMode('lens')}
+                onLookupProduct={handleLookupProduct}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
