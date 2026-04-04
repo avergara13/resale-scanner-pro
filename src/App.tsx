@@ -424,7 +424,7 @@ function App() {
       })))
       toast.error('Analysis failed. Please try again.')
     }
-  }, [settings, session, setSession, ebayService, geminiService, googleLensService])
+  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, simulateProgress, completeStep, tagSuggestionService])
 
   const handleAddToQueue = useCallback(() => {
     if (currentItem && currentItem.decision === 'GO') {
