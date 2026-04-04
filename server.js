@@ -8,9 +8,12 @@
  * Railway injects PORT automatically. Do not hardcode it.
  */
 
-const http = require('node:http')
-const fs   = require('node:fs')
-const path = require('node:path')
+import http from 'node:http'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const port    = Number(process.env.PORT || 3000)
 const distDir = path.join(__dirname, 'dist')
