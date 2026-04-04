@@ -1,5 +1,5 @@
 import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy, MapPin } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +9,10 @@ import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
 import { TimeBasedRecommendations } from '../TimeBasedRecommendations'
 import { LocationInsights } from '../LocationInsights'
+import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { toast } from 'sonner'
 import type { Session, ScannedItem, ProfitGoal } from '@/types'
 
 interface SessionScreenProps {
@@ -22,9 +25,9 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
   const [showTrends, setShowTrends] = useState(false)
   const [showGoalTracking, setShowGoalTracking] = useState(false)
   const [showLocations, setShowLocations] = useState(false)
-  const [queue] = useKV<ScannedItem[]>('queue', [])
-  const [allSessions] = useKV<Session[]>('all-sessions', [])
-  const [goals] = useKV<ProfitGoal[]>('profit-goals', [])
+  const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
+  const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
+  const [goals, setGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
@@ -32,8 +35,53 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
     return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`
   }
 
+  const handleRefresh = useCallback(async () => {
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    const currentQueue = await window.spark.kv.get<ScannedItem[]>('queue')
+    const currentSessions = await window.spark.kv.get<Session[]>('all-sessions')
+    const currentGoals = await window.spark.kv.get<ProfitGoal[]>('profit-goals')
+    
+    if (currentQueue) setQueue(currentQueue)
+    if (currentSessions) setAllSessions(currentSessions)
+    if (currentGoals) setGoals(currentGoals)
+    
+    toast.success('Session data refreshed')
+  }, [setQueue, setAllSessions, setGoals])
+
+  const {
+    containerRef,
+    isPulling,
+    isRefreshing,
+    pullDistance,
+    progress,
+    shouldTrigger,
+  } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    maxPullDistance: 150,
+    enabled: true,
+  })
+
   return (
-    <div id="scr-session" className="flex flex-col h-full px-4 py-6">
+    <div 
+      ref={containerRef}
+      id="scr-session" 
+      className="flex flex-col h-full overflow-y-auto scrollable-content"
+      style={{ 
+        paddingTop: isPulling || isRefreshing ? `${Math.max(pullDistance, 60)}px` : '0px',
+        transition: isPulling ? 'none' : 'padding-top 0.3s ease-out'
+      }}
+    >
+      <PullToRefreshIndicator
+        isPulling={isPulling}
+        isRefreshing={isRefreshing}
+        pullDistance={pullDistance}
+        progress={progress}
+        shouldTrigger={shouldTrigger}
+      />
+
+      <div className="px-4 py-6">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-xl font-black tracking-tight text-t1">
@@ -193,6 +241,7 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
           </Button>
         </div>
       )}
+      </div>
     </div>
   )
 }

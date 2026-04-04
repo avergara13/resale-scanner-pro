@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -20,11 +20,13 @@ import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { ThemeToggle } from '../ThemeToggle'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
-import { FilterPresetsManager } from '@/components/FilterPresetsManager'
-import { BulkTagOperations } from '@/components/BulkTagOperations'
-import { LocationInsights } from '@/components/LocationInsights'
+import { FilterPresetsManager } from '../FilterPresetsManager'
+import { BulkTagOperations } from '../BulkTagOperations'
+import { LocationInsights } from '../LocationInsights'
+import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-preference'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { cn } from '@/lib/utils'
 import type { ScannedItem, CategoryPreset, ItemTag } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
@@ -612,8 +614,50 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     setAllTags((prev) => [...(prev || []), newTag])
   }
 
+  const handleRefresh = useCallback(async () => {
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    const currentQueue = await window.spark.kv.get<ScannedItem[]>('queue')
+    const currentTags = await window.spark.kv.get<ItemTag[]>('all-tags')
+    
+    if (currentQueue && queueItems !== currentQueue) {
+      toast.success(`Queue refreshed - ${currentQueue.length} items`)
+    } else {
+      toast.success('Queue is up to date')
+    }
+  }, [queueItems])
+
+  const {
+    containerRef,
+    isPulling,
+    isRefreshing,
+    pullDistance,
+    progress,
+    shouldTrigger,
+  } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    maxPullDistance: 150,
+    enabled: true,
+  })
+
   return (
-    <div id="scr-queue" className="flex flex-col h-full w-full overflow-x-hidden">
+    <div 
+      ref={containerRef}
+      id="scr-queue" 
+      className="flex flex-col h-full w-full overflow-y-auto overflow-x-hidden scrollable-content"
+      style={{ 
+        paddingTop: isPulling || isRefreshing ? `${Math.max(pullDistance, 60)}px` : '0px',
+        transition: isPulling ? 'none' : 'padding-top 0.3s ease-out'
+      }}
+    >
+      <PullToRefreshIndicator
+        isPulling={isPulling}
+        isRefreshing={isRefreshing}
+        pullDistance={pullDistance}
+        progress={progress}
+        shouldTrigger={shouldTrigger}
+      />
       <ItemEditDialog
         item={editingItem}
         isOpen={editingItem !== null}
