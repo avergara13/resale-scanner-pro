@@ -16,7 +16,7 @@ import { SettingsScreen } from './components/screens/SettingsScreen'
 import { TagAnalyticsScreen } from './components/screens/TagAnalyticsScreen'
 import { LocationInsightsScreen } from './components/screens/LocationInsightsScreen'
 import { CostTrackingScreen } from './components/screens/CostTrackingScreen'
-import { createEbayService } from './lib/ebay-service'
+import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
@@ -221,7 +221,8 @@ function App() {
       // Cost optimization: skip Google Lens if Gemini is already highly confident
       // Saves a Custom Search API call (~100/day free tier) on clear identifications
       const geminiConfidence = visionResult ? visionResult.confidence : 0
-      const skipLens = geminiConfidence >= 0.92
+      const lensThreshold = settings?.lensSkipConfidence || 0.85
+      const skipLens = geminiConfidence >= lensThreshold
 
       simulateProgress(1, skipLens ? 800 : 2500)
 
@@ -352,15 +353,16 @@ function App() {
         settings?.defaultShippingCost || 5.0,
         settings?.ebayFeePercent || 12.9,
         settings?.paypalFeePercent || 3.49
-      ) || {
-        netProfit: sellPrice - price,
-        profitMargin: ((sellPrice - price) / sellPrice) * 100,
-        roi: ((sellPrice - price) / price) * 100,
-      }
-      
+      ) || calculateProfitFallback(
+        price,
+        sellPrice,
+        settings?.defaultShippingCost || 5.0,
+        settings?.ebayFeePercent || 12.9
+      )
+
       const minMargin = settings?.minProfitMargin || 30
       const decision = profitMetrics.profitMargin > minMargin ? 'GO' : 'PASS'
-      
+
       if (decision === 'GO') {
         triggerSuccess()
       } else {
@@ -425,7 +427,11 @@ function App() {
 
   const handleAddToQueue = useCallback(() => {
     if (currentItem && currentItem.decision === 'GO') {
-      setQueue((prev) => [...(prev || []), { ...currentItem, inQueue: true }])
+      setQueue((prev) => {
+        const current = prev || []
+        if (current.some(i => i.id === currentItem.id)) return current
+        return [...current, { ...currentItem, inQueue: true }]
+      })
       toast.success('Added to queue')
     }
   }, [currentItem, setQueue])
@@ -565,7 +571,11 @@ function App() {
       inQueue: true,
     }
 
-    setQueue((prev) => [...(prev || []), draftItem])
+    setQueue((prev) => {
+      const current = prev || []
+      if (current.some(i => i.id === draftItem.id)) return current
+      return [...current, draftItem]
+    })
     toast.success('Draft saved to queue')
     setScreen('queue')
   }, [currentItem, setQueue])
@@ -628,17 +638,28 @@ function App() {
     let processedCount = 0
     let goCount = 0
     let passCount = 0
+    let totalNewProfit = 0
+    const failedItems: string[] = []
+    const skippedItems: string[] = []
+    const updatedItemsMap = new Map<string, ScannedItem>()
 
     for (const item of unanalyzedItems) {
+      // Fix 3: guard against missing imageData to prevent runtime crash
+      if (!item.imageData) {
+        skippedItems.push(item.id)
+        console.warn(`Skipping item ${item.id}: no image data`)
+        continue
+      }
+
       setBatchProgress({ current: processedCount + 1, total: unanalyzedItems.length, currentItemName: `Item ${processedCount + 1}` })
-      
+
       try {
         let visionResult: GeminiVisionResponse | undefined
         let mockProductName = 'Unknown Product'
-        
+
         if (geminiService) {
           try {
-            visionResult = await geminiService.analyzeProductImage(item.imageData!, {}, item.purchasePrice)
+            visionResult = await geminiService.analyzeProductImage(item.imageData, {}, item.purchasePrice)
             mockProductName = visionResult.productName
             setBatchProgress({ current: processedCount + 1, total: unanalyzedItems.length, currentItemName: visionResult.productName })
           } catch (error) {
@@ -648,9 +669,8 @@ function App() {
 
         let lensAnalysis: GoogleLensAnalysis | undefined
 
-        // Cost optimization: batch mode skips Google Lens entirely
-        // Saves Custom Search API quota — eBay data is sufficient for batch decisions
-        if (googleLensService && visionResult?.productName && item.imageData && false) { // disabled in batch
+        // Google Lens in batch mode — configurable via settings (default: enabled)
+        if (googleLensService && visionResult?.productName && item.imageData && settings?.enableLensInBatch !== false) {
           try {
             lensAnalysis = await googleLensService.searchByImage(item.imageData, visionResult.productName)
           } catch (error) {
@@ -692,11 +712,12 @@ function App() {
           settings?.defaultShippingCost || 5.0,
           settings?.ebayFeePercent || 12.9,
           settings?.paypalFeePercent || 3.49
-        ) || {
-          netProfit: sellPrice - item.purchasePrice,
-          profitMargin: ((sellPrice - item.purchasePrice) / sellPrice) * 100,
-          roi: ((sellPrice - item.purchasePrice) / item.purchasePrice) * 100,
-        }
+        ) || calculateProfitFallback(
+          item.purchasePrice,
+          sellPrice,
+          settings?.defaultShippingCost || 5.0,
+          settings?.ebayFeePercent || 12.9
+        )
         
         const minMargin = settings?.minProfitMargin || 30
         const decision = profitMetrics.profitMargin > minMargin ? 'GO' : 'PASS'
@@ -714,35 +735,51 @@ function App() {
           marketData,
         }
 
-        setQueue((prev) => {
-          const currentQueue = prev || []
-          return currentQueue.map(qItem => qItem.id === item.id ? updatedItem : qItem)
-        })
+        updatedItemsMap.set(item.id, updatedItem)
 
         processedCount++
-        if (decision === 'GO') goCount++
-        if (decision === 'PASS') passCount++
-
-        if (session?.active) {
-          setSession((prev) => {
-            if (!prev) return prev
-            return {
-              ...prev,
-              goCount: decision === 'GO' ? prev.goCount + 1 : prev.goCount,
-              passCount: decision === 'PASS' ? prev.passCount + 1 : prev.passCount,
-              totalPotentialProfit: decision === 'GO' ? prev.totalPotentialProfit + profitMetrics.netProfit : prev.totalPotentialProfit,
-            }
-          })
+        if (decision === 'GO') {
+          goCount++
+          totalNewProfit += profitMetrics.netProfit
         }
+        if (decision === 'PASS') passCount++
 
         await new Promise(resolve => setTimeout(resolve, 500))
       } catch (error) {
         console.error('Failed to analyze item:', item.id, error)
+        failedItems.push(item.id)
       }
+    }
+
+    // Apply all queue updates in a single batch to avoid race conditions
+    if (updatedItemsMap.size > 0) {
+      setQueue((prev) => {
+        const currentQueue = prev || []
+        return currentQueue.map(qItem => updatedItemsMap.get(qItem.id) || qItem)
+      })
+    }
+
+    if (session?.active && (goCount > 0 || passCount > 0)) {
+      setSession((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          goCount: prev.goCount + goCount,
+          passCount: prev.passCount + passCount,
+          totalPotentialProfit: prev.totalPotentialProfit + totalNewProfit,
+        }
+      })
     }
 
     setIsBatchAnalyzing(false)
     setBatchProgress({ current: 0, total: 0, currentItemName: '' })
+
+    if (failedItems.length > 0) {
+      toast.warning(`${failedItems.length} item(s) failed analysis`)
+    }
+    if (skippedItems.length > 0) {
+      toast.info(`${skippedItems.length} item(s) skipped (no image)`)
+    }
     toast.success(`Analyzed ${processedCount} items: ${goCount} GO, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
@@ -865,6 +902,7 @@ function App() {
                 settings={settings}
                 onOptimizeItem={handleOptimizeItem}
                 onPushToNotion={handlePushToNotion}
+                onBatchAnalyze={handleBatchAnalyze}
                 onNavigateToQueue={() => setScreen('queue')}
                 onOpenCamera={() => setCameraOpen(true)}
               />

@@ -343,6 +343,26 @@ export class EbayService {
   }
 }
 
+/**
+ * Standalone profit calculation for when EbayService is not available (no API key).
+ * Applies the same fee math as EbayService.calculateProfitMetrics so that
+ * fallback profit margins are accurate — not inflated.
+ */
+export function calculateProfitFallback(
+  purchasePrice: number,
+  sellPrice: number,
+  shippingCost: number = 5.0,
+  ebayFeePercent: number = 12.9,
+  perOrderFee: number = 0.30
+) {
+  const ebayFee = sellPrice * (ebayFeePercent / 100)
+  const totalFees = ebayFee + perOrderFee
+  const netProfit = sellPrice - purchasePrice - shippingCost - totalFees
+  const profitMargin = sellPrice > 0 ? (netProfit / sellPrice) * 100 : 0
+  const roi = purchasePrice > 0 ? (netProfit / purchasePrice) * 100 : 0
+  return { netProfit, profitMargin, roi, totalFees }
+}
+
 export function createEbayService(
   appId?: string,
   devId?: string,

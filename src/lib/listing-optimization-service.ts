@@ -32,7 +32,7 @@ export class ListingOptimizationService {
 
   constructor(geminiApiKey?: string, preferredModel?: string) {
     this.geminiApiKey = geminiApiKey
-    this.preferredModel = preferredModel || 'gpt-4o'
+    this.preferredModel = preferredModel || 'gemini-2.0-flash-exp'
   }
 
   async generateOptimizedListing(context: ListingOptimizationContext): Promise<OptimizedListing> {

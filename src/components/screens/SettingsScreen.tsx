@@ -970,6 +970,39 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <div className="flex items-center justify-between py-2">
                   <div>
+                    <Label htmlFor="lens-in-batch" className="text-sm text-t1 font-medium">
+                      Google Lens in Batch
+                    </Label>
+                    <p className="text-xs text-t2 mt-0.5">Run visual search during batch analysis</p>
+                  </div>
+                  <Switch
+                    id="lens-in-batch"
+                    checked={settings.enableLensInBatch !== false}
+                    onCheckedChange={(checked) => onUpdate({ enableLensInBatch: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between py-2">
+                  <div>
+                    <Label htmlFor="lens-confidence" className="text-sm text-t1 font-medium">
+                      Lens Skip Confidence
+                    </Label>
+                    <p className="text-xs text-t2 mt-0.5">Skip Google Lens when AI confidence exceeds this (0-1)</p>
+                  </div>
+                  <Input
+                    id="lens-confidence"
+                    type="number"
+                    min={0.5}
+                    max={1}
+                    step={0.05}
+                    value={settings.lensSkipConfidence ?? 0.85}
+                    onChange={(e) => onUpdate({ lensSkipConfidence: parseFloat(e.target.value) || 0.85 })}
+                    className="w-20 h-8 text-sm text-right"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between py-2">
+                  <div>
                     <Label htmlFor="voice-enabled" className="text-sm text-t1 font-medium">
                       Voice Input
                     </Label>

@@ -29,6 +29,14 @@ export class GeminiService {
     this.model = model
   }
 
+  private extractResponseText(data: any): string {
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+    if (!text) {
+      throw new Error('Gemini returned empty or blocked response')
+    }
+    return text
+  }
+
   async analyzeProductImage(
     imageData: string,
     options: GeminiAnalysisOptions = {},
@@ -82,11 +90,7 @@ export class GeminiService {
         }
       })
 
-      if (!data.candidates || data.candidates.length === 0) {
-        throw new Error('No candidates returned from Gemini API')
-      }
-
-      const textContent = data.candidates[0].content.parts[0].text
+      const textContent = this.extractResponseText(data)
       const result = JSON.parse(textContent) as GeminiVisionResponse
 
       return {
@@ -203,7 +207,7 @@ Focus on clearly identifying the product boundaries to create a clean cutout.`
         }
       })
 
-      const textContent = data.candidates[0].content.parts[0].text
+      const textContent = this.extractResponseText(data)
       const result = JSON.parse(textContent)
 
       return this.applyBackgroundRemoval(imageData, result.boundingBox, backgroundColor)
@@ -385,7 +389,7 @@ You are an expert resale consultant helping a reseller make informed buying deci
         }
       })
 
-      return data.candidates[0].content.parts[0].text
+      return this.extractResponseText(data)
     } catch (error) {
       console.error('Gemini chat failed:', error)
       throw error
@@ -452,7 +456,7 @@ Make the title compelling and searchable. The description should be professional
         }
       })
 
-      const textContent = data.candidates[0].content.parts[0].text
+      const textContent = this.extractResponseText(data)
       return JSON.parse(textContent)
     } catch (error) {
       console.error('Gemini listing generation failed:', error)
