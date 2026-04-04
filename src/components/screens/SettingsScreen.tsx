@@ -19,7 +19,18 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target } from '@phosphor-icons/react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target, ArrowCounterClockwise } from '@phosphor-icons/react'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
 import { IncidentLogViewer } from '../IncidentLogViewer'
@@ -29,6 +40,7 @@ import { ThemeToggle } from '../ThemeToggle'
 import { TagPresetsManager } from '../TagPresetsManager'
 import { CompressionAnalytics } from '../CompressionAnalytics'
 import { RetryConfigPanel } from '../RetryConfigPanel'
+import { toast } from 'sonner'
 import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
@@ -41,6 +53,45 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
   const toggleKeyVisibility = (key: string) => {
     setShowKeys(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const handleResetSettings = () => {
+    const preservedKeys = {
+      geminiApiKey: settings.geminiApiKey,
+      anthropicApiKey: settings.anthropicApiKey,
+      notionApiKey: settings.notionApiKey,
+      googleApiKey: settings.googleApiKey,
+      googleSearchEngineId: settings.googleSearchEngineId,
+      ebayAppId: settings.ebayAppId,
+      ebayDevId: settings.ebayDevId,
+      ebayCertId: settings.ebayCertId,
+      ebayApiKey: settings.ebayApiKey,
+      supabaseUrl: settings.supabaseUrl,
+      supabaseKey: settings.supabaseKey,
+      n8nWebhookUrl: settings.n8nWebhookUrl,
+      notionDatabaseId: settings.notionDatabaseId,
+    }
+
+    const defaultSettings: AppSettings = {
+      voiceEnabled: true,
+      autoCapture: true,
+      agenticMode: true,
+      liveSearchEnabled: true,
+      darkMode: false,
+      themeMode: 'auto',
+      useAmbientLight: false,
+      apiNotificationsEnabled: false,
+      minProfitMargin: 30,
+      defaultShippingCost: 5.0,
+      ebayFeePercent: 12.9,
+      paypalFeePercent: 3.49,
+      preferredAiModel: 'gemini-2.0-flash-exp',
+      imageQuality: { preset: 'balanced' },
+      ...preservedKeys,
+    }
+
+    onUpdate(defaultSettings)
+    toast.success('Settings reset to defaults - API keys preserved')
   }
 
   const hasKey = (key?: string) => key && key.length > 8
@@ -1207,14 +1258,78 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             </AccordionItem>
           </Accordion>
 
-          <div className="pt-4">
+          <div className="pt-4 space-y-3">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full gap-2 border-b1 text-b1 hover:bg-b1/10 hover:border-b1"
+                >
+                  <ArrowCounterClockwise size={18} weight="bold" />
+                  Reset All Settings
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-md">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-lg">
+                    <ArrowCounterClockwise size={24} className="text-b1" weight="bold" />
+                    Reset All Settings?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-3 text-sm">
+                    <p>
+                      This will restore all settings to their default values.
+                    </p>
+                    <div className="p-3 bg-green-bg border border-green/30 rounded-md">
+                      <p className="text-xs text-t1">
+                        <strong className="text-green">✓ API Keys Will Be Preserved:</strong>
+                      </p>
+                      <ul className="text-xs text-t2 mt-2 space-y-1 ml-4 list-disc">
+                        <li>Gemini & Anthropic API keys</li>
+                        <li>Google Cloud API credentials</li>
+                        <li>eBay API credentials</li>
+                        <li>Notion & Supabase keys</li>
+                        <li>All other API integrations</li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-amber/10 border border-amber/30 rounded-md">
+                      <p className="text-xs text-t1">
+                        <strong className="text-amber">⚠ Settings That Will Reset:</strong>
+                      </p>
+                      <ul className="text-xs text-t2 mt-2 space-y-1 ml-4 list-disc">
+                        <li>Feature toggles (voice, auto-capture, etc.)</li>
+                        <li>Theme mode (reset to Auto)</li>
+                        <li>Business rules (profit margin, fees, etc.)</li>
+                        <li>AI model preference</li>
+                        <li>Image quality settings</li>
+                      </ul>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={handleResetSettings}
+                    className="bg-b1 hover:bg-b2 text-fg"
+                  >
+                    Reset Settings
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <p className="text-xs text-t2 text-center">
+              Restore default settings while keeping your API keys
+            </p>
+
+            <Separator className="bg-s2" />
+
             <Button 
               variant="outline" 
               className="w-full text-red hover:bg-red hover:text-fg border-s2 hover:border-red"
             >
               Clear All App Data
             </Button>
-            <p className="text-xs text-t2 text-center mt-2">
+            <p className="text-xs text-t2 text-center">
               This will reset all settings and stored data
             </p>
           </div>
