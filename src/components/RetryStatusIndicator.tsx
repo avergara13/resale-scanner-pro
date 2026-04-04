@@ -43,16 +43,20 @@ export function RetryStatusIndicator({
   }, [activeRetries])
 
   const positionClasses = {
-    'top-right': 'top-4 right-4',
-    'top-left': 'top-4 left-4',
+    'top-right': 'right-4',
+    'top-left': 'left-4',
     'bottom-right': 'bottom-20 right-4',
     'bottom-left': 'bottom-20 left-4',
   }
 
+  const topStyle = position === 'top-right' || position === 'top-left'
+    ? { top: 'max(env(safe-area-inset-top, 0px), 1rem)' }
+    : undefined
+
   if (activeRetries.length === 0 && !showCompleted) return null
 
   return (
-    <div className={cn('fixed z-50', positionClasses[position])}>
+    <div className={cn('fixed z-50', positionClasses[position])} style={topStyle}>
       <AnimatePresence mode="popLayout">
         {activeRetries.map((retry) => (
           <motion.div

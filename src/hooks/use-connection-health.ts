@@ -101,6 +101,25 @@ async function checkGoogleLensHealth(
       }
     }
 
+    // HTTP 400 with empty requests[] = API is reachable, key is valid (request body was intentionally minimal)
+    if (response.status === 400) {
+      return {
+        status: 'healthy',
+        latency,
+        lastChecked: Date.now(),
+      }
+    }
+
+    // HTTP 403 = key exists but Vision API not enabled in Google Cloud Console
+    if (response.status === 403) {
+      return {
+        status: 'degraded',
+        error: 'Vision API not enabled — enable in Google Cloud Console',
+        latency,
+        lastChecked: Date.now(),
+      }
+    }
+
     return {
       status: 'offline',
       error: `HTTP ${response.status}`,
