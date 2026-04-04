@@ -15,6 +15,7 @@ import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
 import { TagAnalyticsScreen } from './components/screens/TagAnalyticsScreen'
 import { LocationInsightsScreen } from './components/screens/LocationInsightsScreen'
+import { CostTrackingScreen } from './components/screens/CostTrackingScreen'
 import { createEbayService } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
@@ -964,6 +965,22 @@ function App() {
               <LocationInsightsScreen
                 items={queue || []}
                 onBack={() => setScreen('queue')}
+              />
+            </motion.div>
+          )}
+          {screen === 'cost-tracking' && (
+            <motion.div
+              key="cost-tracking"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="w-full h-full"
+            >
+              <CostTrackingScreen
+                onBack={() => setScreen('settings')}
               />
             </motion.div>
           )}
