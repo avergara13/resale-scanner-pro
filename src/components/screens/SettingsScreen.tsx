@@ -93,7 +93,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="space-y-6 max-w-md pb-20">
-          <Accordion type="multiple" defaultValue={['health']} className="space-y-4">
+          <Accordion type="multiple" defaultValue={['ebay', 'health']} className="space-y-4">
             <AccordionItem value="health" className="border-2 border-green/30 rounded-lg px-4 bg-gradient-to-br from-green/5 to-transparent">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
@@ -409,28 +409,89 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="ebay" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="ebay" className="border-2 border-green/30 rounded-lg px-4 bg-gradient-to-br from-green/5 to-transparent">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🛒 eBay Integration
+                <div className="flex items-center gap-2">
+                  💰 eBay Integration — Market Pricing
+                </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-t2 leading-relaxed">
-                      Get your keys from developer.ebay.com. You'll need App ID, Dev ID, Cert ID, and OAuth token.
+                <div className="p-4 bg-gradient-to-br from-green-bg to-transparent border-2 border-green/30 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green text-fg flex-shrink-0">
+                      <Info size={20} weight="fill" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-t1">Get Real-Time Market Intelligence</p>
+                      <p className="text-xs text-t2 leading-relaxed">
+                        Connect to eBay's API to see live market pricing, sold item data, and accurate profit calculations. Configure once and unlock instant market research on every scan.
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Badge variant="outline" className="text-xs border-green text-green gap-1">
+                          <CheckCircle size={12} weight="fill" />
+                          Live Sold Prices
+                        </Badge>
+                        <Badge variant="outline" className="text-xs border-green text-green gap-1">
+                          <CheckCircle size={12} weight="fill" />
+                          Active Listings
+                        </Badge>
+                        <Badge variant="outline" className="text-xs border-green text-green gap-1">
+                          <CheckCircle size={12} weight="fill" />
+                          Sell-Through Rates
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-s1 border border-s2 rounded-lg">
+                  <p className="text-xs font-semibold text-t1 mb-3 uppercase tracking-wide">📋 Quick Setup Guide</p>
+                  <ol className="text-xs text-t2 space-y-2 ml-1">
+                    <li className="flex gap-2">
+                      <span className="flex-shrink-0 font-semibold text-t1">1.</span>
+                      <span>Go to <a href="https://developer.ebay.com/my/keys" target="_blank" rel="noopener noreferrer" className="text-b1 underline hover:text-b2">developer.ebay.com/my/keys</a></span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="flex-shrink-0 font-semibold text-t1">2.</span>
+                      <span>Sign in with your eBay account (or create a developer account)</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="flex-shrink-0 font-semibold text-t1">3.</span>
+                      <span>Create a new "Production" keyset (not Sandbox)</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="flex-shrink-0 font-semibold text-t1">4.</span>
+                      <span>Copy your <strong>App ID (Client ID)</strong>, <strong>Dev ID</strong>, and <strong>Cert ID (Client Secret)</strong></span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="flex-shrink-0 font-semibold text-t1">5.</span>
+                      <span>Generate an <strong>OAuth User Token</strong> by clicking "Get a Token from eBay via Your Application"</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="flex-shrink-0 font-semibold text-t1">6.</span>
+                      <span>Paste all credentials below and start seeing live market data!</span>
+                    </li>
+                  </ol>
+                  <div className="mt-4 p-3 bg-blue-bg border border-b1/20 rounded-md">
+                    <p className="text-xs text-t2">
+                      <strong className="text-b1">💡 Pro Tip:</strong> OAuth tokens expire after 2 hours. You'll need to regenerate them periodically. The app will notify you when it's time to refresh.
                     </p>
                   </div>
                 </div>
 
+                <Separator className="bg-s2" />
+
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="ebay-app-id" className="text-xs uppercase tracking-wide text-t2">
-                      eBay App ID (Client ID)
+                      <span className="flex items-center gap-1.5">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-fg text-[10px] font-bold">1</span>
+                        eBay App ID (Client ID)
+                      </span>
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('ebayApp')}
-                      className="text-t2 hover:text-t1"
+                      className="text-t2 hover:text-t1 touch-target"
                     >
                       {showKeys.ebayApp ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -443,16 +504,24 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     placeholder="YourApp-YourApp-PRD-..."
                     className="font-mono text-sm"
                   />
+                  {hasKey(settings.ebayAppId) && (
+                    <p className="text-xs text-green mt-1 flex items-center gap-1">
+                      <CheckCircle size={12} weight="fill" /> App ID configured
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="ebay-dev-id" className="text-xs uppercase tracking-wide text-t2">
-                      eBay Dev ID
+                      <span className="flex items-center gap-1.5">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-fg text-[10px] font-bold">2</span>
+                        eBay Dev ID
+                      </span>
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('ebayDev')}
-                      className="text-t2 hover:text-t1"
+                      className="text-t2 hover:text-t1 touch-target"
                     >
                       {showKeys.ebayDev ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -462,19 +531,27 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     type={showKeys.ebayDev ? 'text' : 'password'}
                     value={settings.ebayDevId || ''}
                     onChange={(e) => onUpdate({ ebayDevId: e.target.value })}
-                    placeholder="Dev ID..."
+                    placeholder="a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
                     className="font-mono text-sm"
                   />
+                  {hasKey(settings.ebayDevId) && (
+                    <p className="text-xs text-green mt-1 flex items-center gap-1">
+                      <CheckCircle size={12} weight="fill" /> Dev ID configured
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="ebay-cert-id" className="text-xs uppercase tracking-wide text-t2">
-                      eBay Cert ID (Client Secret)
+                      <span className="flex items-center gap-1.5">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-fg text-[10px] font-bold">3</span>
+                        eBay Cert ID (Client Secret)
+                      </span>
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('ebayCert')}
-                      className="text-t2 hover:text-t1"
+                      className="text-t2 hover:text-t1 touch-target"
                     >
                       {showKeys.ebayCert ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -484,19 +561,27 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     type={showKeys.ebayCert ? 'text' : 'password'}
                     value={settings.ebayCertId || ''}
                     onChange={(e) => onUpdate({ ebayCertId: e.target.value })}
-                    placeholder="PRD-..."
+                    placeholder="PRD-1234abcd5678efgh-90ijk12l"
                     className="font-mono text-sm"
                   />
+                  {hasKey(settings.ebayCertId) && (
+                    <p className="text-xs text-green mt-1 flex items-center gap-1">
+                      <CheckCircle size={12} weight="fill" /> Cert ID configured
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="ebay-api-key" className="text-xs uppercase tracking-wide text-t2">
-                      eBay OAuth Token
+                      <span className="flex items-center gap-1.5">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-fg text-[10px] font-bold">4</span>
+                        eBay OAuth User Token
+                      </span>
                     </Label>
                     <button
                       onClick={() => toggleKeyVisibility('ebayToken')}
-                      className="text-t2 hover:text-t1"
+                      className="text-t2 hover:text-t1 touch-target"
                     >
                       {showKeys.ebayToken ? <EyeClosed size={16} /> : <Eye size={16} />}
                     </button>
@@ -509,11 +594,66 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     placeholder="v^1.1#i^1#..."
                     className="font-mono text-sm"
                   />
-                  {hasKey(settings.ebayApiKey) && hasKey(settings.ebayAppId) && (
-                    <p className="text-xs text-green mt-1 flex items-center gap-1">
-                      <CheckCircle size={12} weight="fill" /> Integration configured
+                  {hasKey(settings.ebayApiKey) && hasKey(settings.ebayAppId) ? (
+                    <div className="mt-2 p-3 bg-gradient-to-br from-green-bg to-transparent border border-green/30 rounded-md">
+                      <p className="text-xs text-green font-semibold flex items-center gap-1.5">
+                        <CheckCircle size={14} weight="fill" /> 
+                        eBay Integration Active — Live Market Pricing Enabled!
+                      </p>
+                      <p className="text-xs text-t2 mt-1">
+                        You'll now see real sold prices, active listings, and accurate profit calculations on every scan.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-amber mt-1.5 flex items-center gap-1">
+                      <Info size={12} weight="fill" />
+                      Complete all 4 fields above to unlock live market data
                     </p>
                   )}
+                </div>
+
+                <Separator className="bg-s2" />
+
+                <div className="p-4 bg-s1 border border-s2 rounded-lg space-y-3">
+                  <p className="text-xs font-semibold text-t1 uppercase tracking-wide">🎯 What You'll Get</p>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
+                      <div className="text-xs text-t2">
+                        <strong className="text-t1">Real Sold Prices:</strong> See what items actually sold for (avg, median, recent sales)
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
+                      <div className="text-xs text-t2">
+                        <strong className="text-t1">Active Listings:</strong> Current competition and pricing trends
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
+                      <div className="text-xs text-t2">
+                        <strong className="text-t1">Sell-Through Rate:</strong> Demand indicator (high = hot item)
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
+                      <div className="text-xs text-t2">
+                        <strong className="text-t1">Profit Calculator:</strong> Net profit after eBay fees, PayPal fees, and shipping
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
+                      <div className="text-xs text-t2">
+                        <strong className="text-t1">Smart Recommendations:</strong> Suggested listing price based on market data
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-amber/10 border border-amber/30 rounded-md">
+                  <p className="text-xs text-t2">
+                    <strong className="text-amber">⚠️ Important:</strong> OAuth tokens expire after 2 hours. When you see "eBay API unavailable" errors, return here and generate a new token. Future updates will add automatic token refresh.
+                  </p>
                 </div>
               </AccordionContent>
             </AccordionItem>
