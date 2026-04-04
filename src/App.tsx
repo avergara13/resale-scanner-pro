@@ -48,6 +48,8 @@ function App() {
     agenticMode: true,
     liveSearchEnabled: true,
     darkMode: false,
+    themeMode: 'auto',
+    useAmbientLight: false,
     apiNotificationsEnabled: false,
     minProfitMargin: 30,
     defaultShippingCost: 5.0,
@@ -463,6 +465,8 @@ function App() {
         agenticMode: true,
         liveSearchEnabled: true,
         darkMode: false,
+        themeMode: 'auto',
+        useAmbientLight: false,
         minProfitMargin: 30,
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
@@ -476,7 +480,10 @@ function App() {
       }
       
       if ('useAmbientLight' in updates && updates.useAmbientLight !== undefined) {
-        toggleAmbientLight()
+        const currentAmbientLight = prev?.useAmbientLight || false
+        if (currentAmbientLight !== updates.useAmbientLight) {
+          toggleAmbientLight()
+        }
       }
       
       if ('darkMode' in updates && updates.darkMode !== undefined && !('themeMode' in updates)) {
@@ -747,12 +754,17 @@ function App() {
   useEffect(() => {
     if (settings) {
       if (settings.themeMode) {
-        setTheme(settings.themeMode)
-      } else if (settings.darkMode !== undefined) {
-        setTheme(settings.darkMode ? 'dark' : 'light')
+        if (settings.themeMode !== themeMode) {
+          setTheme(settings.themeMode)
+        }
+      } else if (settings.darkMode !== undefined && !settings.themeMode) {
+        const inferredMode = settings.darkMode ? 'dark' : 'light'
+        if (inferredMode !== themeMode) {
+          setTheme(inferredMode)
+        }
       }
     }
-  }, [settings?.themeMode, settings?.darkMode, setTheme])
+  }, [])
 
   const screenVariants = {
     initial: (direction: number) => ({
