@@ -58,6 +58,13 @@ function App() {
     preferredAiModel: 'gemini-2.0-flash-exp',
     notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
     imageQuality: { preset: 'balanced' },
+    // Pre-populated from Railway env vars — both users get keys automatically.
+    // Overridable per-device in Settings if needed.
+    geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY || '',
+    anthropicApiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || '',
+    notionApiKey: import.meta.env.VITE_NOTION_API_KEY || '',
+    googleApiKey: import.meta.env.VITE_GOOGLE_API_KEY || '',
+    googleSearchEngineId: import.meta.env.VITE_GOOGLE_SEARCH_ENGINE_ID || '',
   })
   
   const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
@@ -76,37 +83,33 @@ function App() {
   }, [settings?.ebayAppId, settings?.ebayDevId, settings?.ebayCertId, settings?.ebayApiKey])
 
   const geminiService = useMemo(() => {
-    return createGeminiService(
-      settings?.geminiApiKey,
-      settings?.preferredAiModel
-    )
+    // Use stored setting first; fall back to env var so both phones work automatically.
+    const key = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+    return createGeminiService(key, settings?.preferredAiModel)
   }, [settings?.geminiApiKey, settings?.preferredAiModel])
 
   const googleLensService = useMemo(() => {
-    return createGoogleLensService(
-      settings?.googleApiKey,
-      settings?.googleSearchEngineId
-    )
+    const key = settings?.googleApiKey || import.meta.env.VITE_GOOGLE_API_KEY
+    const engineId = settings?.googleSearchEngineId || import.meta.env.VITE_GOOGLE_SEARCH_ENGINE_ID
+    return createGoogleLensService(key, engineId)
   }, [settings?.googleApiKey, settings?.googleSearchEngineId])
 
   const objectDetectionService = useMemo(() => {
-    return createObjectDetectionService(
-      settings?.geminiApiKey,
-      settings?.preferredAiModel
-    )
+    const key = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+    return createObjectDetectionService(key, settings?.preferredAiModel)
   }, [settings?.geminiApiKey, settings?.preferredAiModel])
 
   const tagSuggestionService = useMemo(() => createTagSuggestionService(), [])
 
-  const listingOptimizationService = useMemo(() => 
-    createListingOptimizationService(settings?.geminiApiKey, settings?.preferredAiModel),
-    [settings?.geminiApiKey, settings?.preferredAiModel]
-  )
+  const listingOptimizationService = useMemo(() => {
+    const key = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+    return createListingOptimizationService(key, settings?.preferredAiModel)
+  }, [settings?.geminiApiKey, settings?.preferredAiModel])
 
-  const notionService = useMemo(() =>
-    createNotionService(settings?.notionApiKey, settings?.notionDatabaseId),
-    [settings?.notionApiKey, settings?.notionDatabaseId]
-  )
+  const notionService = useMemo(() => {
+    const key = settings?.notionApiKey || import.meta.env.VITE_NOTION_API_KEY
+    return createNotionService(key, settings?.notionDatabaseId)
+  }, [settings?.notionApiKey, settings?.notionDatabaseId])
 
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
     const updateInterval = 80
