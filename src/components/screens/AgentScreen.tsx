@@ -18,10 +18,7 @@ import {
   Globe,
   Stack,
   CheckCircle,
-  Warning,
-  Camera,
-  Eye,
-  Lightning
+  Warning
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -635,17 +632,7 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
         </div>
       )}
 
-      <div className="px-4 py-2 bg-s1/30 border-b border-s1 space-y-2">
-        {onOpenCamera && (
-          <button
-            onClick={onOpenCamera}
-            className="w-full p-3 bg-gradient-to-r from-b1 to-b2 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:from-b2 hover:to-b1 transition-all shadow-lg hover:shadow-xl active:scale-[0.98] touch-target"
-          >
-            <Eye size={20} weight="bold" />
-            Open AI Camera
-            <Lightning size={16} weight="fill" />
-          </button>
-        )}
+      <div className="px-4 py-2 bg-s1/30 border-b border-s1">
         <div className="grid grid-cols-4 gap-1.5">
           <Card className="p-2 flex flex-col items-center justify-center">
             <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>
@@ -685,23 +672,9 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
                   <Sparkle size={32} weight="fill" className="text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
-                <p className="text-sm text-t3 max-w-xs mx-auto mb-4">
+                <p className="text-sm text-t3 max-w-xs mx-auto">
                   Your AI assistant for research, insights, and automated listing creation
                 </p>
-                {queueStats.total === 0 && onOpenCamera && (
-                  <div className="mt-4 p-4 bg-blue-bg border border-b1/30 rounded-xl">
-                    <p className="text-xs text-t2 mb-3">
-                      Ready to start? Open the <strong className="text-b1">AI Camera</strong> to scan your first item!
-                    </p>
-                    <button
-                      onClick={onOpenCamera}
-                      className="w-full p-3 bg-gradient-to-r from-b1 to-b2 text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:from-b2 hover:to-b1 transition-all active:scale-[0.98] touch-target"
-                    >
-                      <Eye size={18} weight="bold" />
-                      Scan First Item
-                    </button>
-                  </div>
-                )}
               </div>
 
               <div className="space-y-3">
