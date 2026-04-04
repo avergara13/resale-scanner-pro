@@ -9,6 +9,12 @@
 
 @theme {
   --color-border: var(--border);
+  --color-green: var(--green);
+  --color-red: var(--red);
+  --color-amber: var(--amber);
+  --color-blue-bg: var(--blue-bg);
+  --color-green-bg: var(--green-bg);
+  --color-red-bg: var(--red-bg);
 }
 
 :root {
