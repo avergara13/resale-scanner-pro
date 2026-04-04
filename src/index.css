@@ -1464,6 +1464,10 @@ button:disabled {
 }
 
 @media (max-width: 430px) {
+  #app-container {
+    padding: 0;
+  }
+
   h1 {
     font-size: 1.75rem;
   }
@@ -1483,6 +1487,10 @@ button:disabled {
   button {
     min-height: 44px;
   }
+
+  .grid {
+    gap: 0.75rem;
+  }
 }
 
 @media (max-width: 360px) {
@@ -1501,33 +1509,218 @@ button:disabled {
   h4 {
     font-size: 1rem;
   }
+
+  .grid {
+    gap: 0.5rem;
+  }
 }
 
-@media (min-width: 768px) and (max-width: 1024px) {
+@media (min-width: 431px) and (max-width: 743px) {
   #app-container {
-    max-width: 768px;
+    padding: 0;
+  }
+
+  h1 {
+    font-size: 1.875rem;
+  }
+
+  h2 {
+    font-size: 1.625rem;
+  }
+
+  h3 {
+    font-size: 1.375rem;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .grid {
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 744px) and (max-width: 834px) {
+  #app-container {
+    max-width: 834px;
+    padding: 0 1rem;
   }
   
   .stat-card {
-    padding: 14px;
+    padding: 16px;
   }
   
   .item-row {
-    padding: 16px;
+    padding: 18px;
+    gap: 14px;
   }
   
   .pipeline-card {
-    padding: 16px;
+    padding: 18px;
+    margin-bottom: 12px;
   }
   
   .chat-bubble {
-    padding: 18px 20px;
+    padding: 20px 22px;
     font-size: 15px;
+    max-width: 88%;
   }
   
   .decision-signal {
-    padding: 40px;
-    font-size: 72px;
+    padding: 44px;
+    font-size: 76px;
+    border-radius: 26px;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.75rem;
+  }
+
+  h3 {
+    font-size: 1.5rem;
+  }
+
+  .grid {
+    gap: 1.25rem;
+  }
+
+  header {
+    padding: 1.25rem;
+  }
+
+  .space-y-4 > * + * {
+    margin-top: 1.25rem;
+  }
+
+  .space-y-6 > * + * {
+    margin-top: 1.75rem;
+  }
+}
+
+@media (min-width: 835px) and (max-width: 1024px) {
+  #app-container {
+    max-width: 1024px;
+    padding: 0 1.5rem;
+  }
+  
+  .stat-card {
+    padding: 18px;
+  }
+  
+  .item-row {
+    padding: 20px;
+    gap: 16px;
+  }
+  
+  .pipeline-card {
+    padding: 20px;
+    margin-bottom: 14px;
+  }
+  
+  .chat-bubble {
+    padding: 22px 24px;
+    font-size: 16px;
+    max-width: 85%;
+  }
+  
+  .decision-signal {
+    padding: 48px;
+    font-size: 80px;
+    border-radius: 28px;
+  }
+
+  h1 {
+    font-size: 2.25rem;
+  }
+
+  h2 {
+    font-size: 2rem;
+  }
+
+  h3 {
+    font-size: 1.75rem;
+  }
+
+  .grid {
+    gap: 1.5rem;
+  }
+
+  header {
+    padding: 1.5rem;
+  }
+
+  .space-y-4 > * + * {
+    margin-top: 1.5rem;
+  }
+
+  .space-y-6 > * + * {
+    margin-top: 2rem;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1366px) {
+  #app-container {
+    max-width: 1366px;
+    padding: 0 2rem;
+  }
+  
+  .stat-card {
+    padding: 20px;
+  }
+  
+  .item-row {
+    padding: 22px;
+    gap: 18px;
+  }
+  
+  .pipeline-card {
+    padding: 22px;
+    margin-bottom: 16px;
+  }
+  
+  .chat-bubble {
+    padding: 24px 26px;
+    font-size: 17px;
+    max-width: 80%;
+  }
+  
+  .decision-signal {
+    padding: 52px;
+    font-size: 88px;
+    border-radius: 32px;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+  }
+
+  h2 {
+    font-size: 2.25rem;
+  }
+
+  h3 {
+    font-size: 2rem;
+  }
+
+  .grid {
+    gap: 2rem;
+  }
+
+  header {
+    padding: 2rem;
+  }
+
+  .space-y-4 > * + * {
+    margin-top: 2rem;
+  }
+
+  .space-y-6 > * + * {
+    margin-top: 2.5rem;
   }
 }
 
@@ -1618,4 +1811,178 @@ button:disabled {
 
 .trend-indicator-down {
   animation: trend-glow-down 1.5s ease-in-out 2;
+}
+
+
+@media (min-width: 744px) {
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1025px) {
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .grid-cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 744px) and (max-width: 1024px) {
+  #app-container {
+    padding: 0 2rem !important;
+  }
+
+  .stat-card {
+    padding: 14px 18px !important;
+  }
+
+  h1 {
+    font-size: 1.875rem !important;
+  }
+
+  h2 {
+    font-size: 1.625rem !important;
+  }
+
+  .chat-bubble {
+    max-width: 90% !important;
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (orientation: portrait) and (min-width: 744px) and (max-width: 1024px) {
+  .grid-cols-4 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 744px) and (max-width: 1024px) {
+  .px-4 {
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+
+  .py-4 {
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+  }
+
+  .p-4 {
+    padding: 1.25rem !important;
+  }
+
+  .gap-4 {
+    gap: 1.25rem !important;
+  }
+
+  .text-xs {
+    font-size: 0.8125rem !important;
+  }
+
+  .text-sm {
+    font-size: 0.9375rem !important;
+  }
+
+  .text-base {
+    font-size: 1.0625rem !important;
+  }
+
+  .text-lg {
+    font-size: 1.1875rem !important;
+  }
+
+  .mb-4 {
+    margin-bottom: 1.25rem !important;
+  }
+
+  .mb-6 {
+    margin-bottom: 1.75rem !important;
+  }
+
+  .space-y-2 > * + * {
+    margin-top: 0.625rem !important;
+  }
+
+  .space-y-3 > * + * {
+    margin-top: 0.875rem !important;
+  }
+
+  .rounded-xl {
+    border-radius: 0.875rem !important;
+  }
+
+  .rounded-2xl {
+    border-radius: 1.125rem !important;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1366px) {
+  .text-xs {
+    font-size: 0.875rem !important;
+  }
+
+  .text-sm {
+    font-size: 1rem !important;
+  }
+
+  .text-base {
+    font-size: 1.125rem !important;
+  }
+
+  .text-lg {
+    font-size: 1.25rem !important;
+  }
+
+  .rounded-xl {
+    border-radius: 1rem !important;
+  }
+
+  .rounded-2xl {
+    border-radius: 1.25rem !important;
+  }
+}
+
+@media (min-width: 744px) and (max-width: 834px) and (orientation: portrait) {
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .overflow-x-auto {
+    overflow-x: visible !important;
+  }
+
+  button, .button {
+    min-height: 48px !important;
+    padding: 12px 16px !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 100% !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+  }
 }
