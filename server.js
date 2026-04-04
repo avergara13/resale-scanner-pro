@@ -2,7 +2,7 @@
  * Resale Scanner Pro — Static File Server
  * Vergara Inc · Loft OS v1.0
  *
- * Serves the Vite build output from apps/web/dist.
+ * Serves the Vite build output from dist/.
  * Same pattern as Sous Chef — proven on Railway.
  *
  * Railway injects PORT automatically. Do not hardcode it.

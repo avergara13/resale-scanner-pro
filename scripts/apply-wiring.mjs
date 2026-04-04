@@ -30,6 +30,7 @@ console.log(`📄  Target: src/App.tsx\n`)
 let src = readFileSync(APP, 'utf8')
 let changed = false
 let appliedCount = 0
+let anchorMissCount = 0  // tracks silent patch failures — non-zero means Spark refactored an anchor
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WIRING CHECKS
@@ -78,11 +79,7 @@ const WIRING_CHECKS = [
     )
   },
 
-  // ── 4. eBay Finding API — only needs appId, certId not required ──────────
-  // The Finding API is designed for browser use. App ID is a public key.
-  // certId is only needed for OAuth (Browse/Sell APIs) — not used yet.
-
-  // ── 5. Notion DB ID default ────────────────────────────────────────────────
+  // ── 4. Notion DB ID default ────────────────────────────────────────────────
   {
     name: 'Default: notionDatabaseId pre-filled',
     detect: src => src.includes('notionDatabaseId:'),
@@ -92,7 +89,7 @@ const WIRING_CHECKS = [
     )
   },
 
-  // ── 5. handleOptimizeItem handler ─────────────────────────────────────────
+  // ── 5. handleOptimizeItem + handlePushToNotion handlers ───────────────────
   {
     name: 'Handler: handleOptimizeItem',
     detect: src => src.includes('handleOptimizeItem'),
@@ -188,6 +185,7 @@ for (const check of WIRING_CHECKS) {
       console.log(`  🔧  Applied: ${check.name}`)
     } else {
       console.log(`  ⚠️   Anchor not found (Spark may have refactored): ${check.name}`)
+      anchorMissCount++
     }
   }
 }
@@ -197,8 +195,16 @@ console.log()
 if (changed) {
   writeFileSync(APP, src, 'utf8')
   console.log(`✅  Wiring complete — ${appliedCount} patch(es) applied to src/App.tsx`)
-  console.log('🚀  Ready to commit and push to deploy/production')
 } else {
   console.log('✅  All wiring already present — no changes needed')
-  console.log('🚀  Pushing clean main to deploy/production')
 }
+
+if (anchorMissCount > 0) {
+  console.log(`\n⚠️  WARNING: ${anchorMissCount} anchor(s) not found — Spark may have refactored App.tsx`)
+  console.log('   Review apply-wiring.mjs and update anchors to match current App.tsx structure.')
+  console.log('   Deploy will continue but affected wiring concerns may be missing.\n')
+  // Do NOT exit 1 — allow deploy to continue with partial wiring.
+  // Agent instruction: open apply-wiring.mjs, read App.tsx, update anchors, commit.
+}
+
+console.log('🚀  Ready to push to deploy/production')
