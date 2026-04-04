@@ -17,6 +17,7 @@ export interface ConnectionHealth {
   gemini: ServiceHealth
   googleLens: ServiceHealth
   ebay: ServiceHealth
+  anthropic: ServiceHealth
   overall: ConnectionStatus
   lastUpdate: number
 }
@@ -73,24 +74,25 @@ async function checkGeminiHealth(apiKey?: string): Promise<Omit<ServiceHealth, '
 
 async function checkGoogleLensHealth(
   apiKey?: string,
-  searchEngineId?: string
 ): Promise<Omit<ServiceHealth, 'name' | 'configured' | 'critical'>> {
-  if (!apiKey || !searchEngineId) {
-    return { status: 'offline', error: 'API key or Search Engine ID not configured' }
+  if (!apiKey) {
+    return { status: 'offline', error: 'API key not configured' }
   }
 
   const startTime = Date.now()
-  
+
   try {
     const response = await fetch(
-      `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=test&num=1`,
+      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
       {
-        method: 'GET',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests: [] }),
       }
     )
-    
+
     const latency = Date.now() - startTime
-    
+
     if (response.ok) {
       return {
         status: latency < 2000 ? 'healthy' : 'degraded',
@@ -98,7 +100,49 @@ async function checkGoogleLensHealth(
         lastChecked: Date.now(),
       }
     }
-    
+
+    return {
+      status: 'offline',
+      error: `HTTP ${response.status}`,
+      latency,
+      lastChecked: Date.now(),
+    }
+  } catch (error) {
+    return {
+      status: 'offline',
+      error: error instanceof Error ? error.message : 'Network error',
+      latency: Date.now() - startTime,
+      lastChecked: Date.now(),
+    }
+  }
+}
+
+async function checkAnthropicHealth(apiKey?: string): Promise<Omit<ServiceHealth, 'name' | 'configured' | 'critical'>> {
+  if (!apiKey) {
+    return { status: 'offline', error: 'API key not configured' }
+  }
+
+  const startTime = Date.now()
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/models', {
+      method: 'GET',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+    })
+
+    const latency = Date.now() - startTime
+
+    if (response.ok) {
+      return {
+        status: latency < 1000 ? 'healthy' : 'degraded',
+        latency,
+        lastChecked: Date.now(),
+      }
+    }
+
     return {
       status: 'offline',
       error: `HTTP ${response.status}`,
@@ -215,13 +259,19 @@ export function useConnectionHealth({
       critical: true,
     },
     googleLens: {
-      name: 'Google Lens',
+      name: 'Google Vision',
       status: 'checking',
       configured: false,
       critical: false,
     },
     ebay: {
       name: 'eBay API',
+      status: 'checking',
+      configured: false,
+      critical: false,
+    },
+    anthropic: {
+      name: 'Anthropic (Claude)',
       status: 'checking',
       configured: false,
       critical: false,
@@ -234,21 +284,24 @@ export function useConnectionHealth({
     if (!enabled) return
 
     const geminiConfigured = !!settings?.geminiApiKey
-    const googleLensConfigured = !!(settings?.googleApiKey && settings?.googleSearchEngineId)
+    const googleLensConfigured = !!settings?.googleApiKey
     const ebayConfigured = !!(settings?.ebayApiKey && settings?.ebayAppId)
+    const anthropicConfigured = !!settings?.anthropicApiKey
 
     setHealth(prev => ({
       ...prev,
       gemini: { ...prev.gemini, status: 'checking', configured: geminiConfigured },
       googleLens: { ...prev.googleLens, status: 'checking', configured: googleLensConfigured },
       ebay: { ...prev.ebay, status: 'checking', configured: ebayConfigured },
+      anthropic: { ...prev.anthropic, status: 'checking', configured: anthropicConfigured },
       overall: 'checking',
     }))
 
-    const [geminiHealth, googleLensHealth, ebayHealth] = await Promise.all([
+    const [geminiHealth, googleLensHealth, ebayHealth, anthropicHealth] = await Promise.all([
       checkGeminiHealth(settings?.geminiApiKey),
-      checkGoogleLensHealth(settings?.googleApiKey, settings?.googleSearchEngineId),
+      checkGoogleLensHealth(settings?.googleApiKey),
       checkEbayHealth(settings?.ebayApiKey, settings?.ebayAppId),
+      checkAnthropicHealth(settings?.anthropicApiKey),
     ])
 
     const newHealth: ConnectionHealth = {
@@ -259,7 +312,7 @@ export function useConnectionHealth({
         critical: true,
       },
       googleLens: {
-        name: 'Google Lens',
+        name: 'Google Vision',
         ...googleLensHealth,
         configured: googleLensConfigured,
         critical: false,
@@ -270,6 +323,12 @@ export function useConnectionHealth({
         configured: ebayConfigured,
         critical: false,
       },
+      anthropic: {
+        name: 'Anthropic (Claude)',
+        ...anthropicHealth,
+        configured: anthropicConfigured,
+        critical: false,
+      },
       overall: 'checking',
       lastUpdate: Date.now(),
     }
@@ -278,6 +337,7 @@ export function useConnectionHealth({
       newHealth.gemini,
       newHealth.googleLens,
       newHealth.ebay,
+      newHealth.anthropic,
     ])
 
     setHealth(newHealth)

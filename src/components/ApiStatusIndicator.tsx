@@ -101,7 +101,7 @@ export function ApiStatusIndicator({
                 getStatusColor(health.googleLens.status),
                 health.googleLens.status === 'checking' && 'animate-pulse'
               )}
-              title={`Google Lens: ${getStatusText(health.googleLens.status)}${
+              title={`Google Vision: ${getStatusText(health.googleLens.status)}${
                 health.googleLens.latency ? ` (${health.googleLens.latency}ms)` : ''
               }`}
             />
@@ -113,6 +113,16 @@ export function ApiStatusIndicator({
               )}
               title={`eBay: ${getStatusText(health.ebay.status)}${
                 health.ebay.latency ? ` (${health.ebay.latency}ms)` : ''
+              }`}
+            />
+            <div
+              className={cn(
+                'w-2 h-2 rounded-full transition-all',
+                getStatusColor(health.anthropic.status),
+                health.anthropic.status === 'checking' && 'animate-pulse'
+              )}
+              title={`Anthropic: ${getStatusText(health.anthropic.status)}${
+                health.anthropic.latency ? ` (${health.anthropic.latency}ms)` : ''
               }`}
             />
           </div>
@@ -182,6 +192,14 @@ export function ApiStatusIndicator({
           configured={health.ebay.configured}
           critical={health.ebay.critical}
           error={health.ebay.error}
+        />
+        <ServiceStatusRow
+          name={health.anthropic.name}
+          status={health.anthropic.status}
+          latency={health.anthropic.latency}
+          configured={health.anthropic.configured}
+          critical={health.anthropic.critical}
+          error={health.anthropic.error}
         />
       </div>
 
