@@ -116,7 +116,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
   const handleBarcodeDetected = async (barcode: string, product?: BarcodeProduct) => {
     setBarcodeProduct(product || null)
     if (product) {
-      setPrice('')
+      setMode('lens')
     }
   }
 
@@ -235,6 +235,39 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
             </div>
 
             <div className="bg-black p-6 pb-10 flex flex-col gap-4">
+              {barcodeProduct && mode === 'lens' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-green/20 border border-green/40 rounded-lg p-3"
+                >
+                  <div className="flex gap-3 items-center">
+                    {barcodeProduct.imageUrl && (
+                      <img
+                        src={barcodeProduct.imageUrl}
+                        alt={barcodeProduct.title}
+                        className="w-12 h-12 object-cover rounded bg-white flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <BarcodeIcon size={14} className="text-green flex-shrink-0" weight="bold" />
+                        <p className="text-white text-xs font-bold truncate">{barcodeProduct.title || 'Scanned Product'}</p>
+                      </div>
+                      {barcodeProduct.brand && (
+                        <p className="text-white/70 text-xs truncate">{barcodeProduct.brand}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setBarcodeProduct(null)}
+                      className="p-1 hover:bg-white/10 rounded-full transition-colors flex-shrink-0"
+                    >
+                      <X size={16} className="text-white/60" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+              
               {mode === 'lens' && (
                 <>
                   <input

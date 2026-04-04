@@ -82,6 +82,13 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
     }
   }
 
+  const handleUseProduct = () => {
+    if (detectedProduct) {
+      onBarcodeDetected(detectedProduct.barcode, detectedProduct)
+      onClose()
+    }
+  }
+
   return (
     <div className="absolute inset-0 z-20 flex flex-col bg-black">
       <div className="flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
@@ -153,21 +160,30 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
               exit={{ opacity: 0, y: -20 }}
               className="absolute bottom-24 left-4 right-4 bg-gradient-to-br from-green/90 to-green-bg backdrop-blur-md border border-green rounded-2xl p-4"
             >
-              <div className="flex gap-3">
-                {detectedProduct.imageUrl && (
-                  <img
-                    src={detectedProduct.imageUrl}
-                    alt={detectedProduct.title}
-                    className="w-16 h-16 object-cover rounded-lg bg-white"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-bold truncate">{detectedProduct.title || 'Unknown Product'}</p>
-                  {detectedProduct.brand && (
-                    <p className="text-white/80 text-sm truncate">{detectedProduct.brand}</p>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-3">
+                  {detectedProduct.imageUrl && (
+                    <img
+                      src={detectedProduct.imageUrl}
+                      alt={detectedProduct.title}
+                      className="w-16 h-16 object-cover rounded-lg bg-white flex-shrink-0"
+                    />
                   )}
-                  <p className="text-white/60 text-xs mt-1">{detectedProduct.barcode} • {detectedProduct.format}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold truncate">{detectedProduct.title || 'Unknown Product'}</p>
+                    {detectedProduct.brand && (
+                      <p className="text-white/80 text-sm truncate">{detectedProduct.brand}</p>
+                    )}
+                    <p className="text-white/60 text-xs mt-1">{detectedProduct.barcode} • {detectedProduct.format}</p>
+                  </div>
                 </div>
+                <Button
+                  onClick={handleUseProduct}
+                  className="w-full bg-white text-green hover:bg-white/90 font-bold"
+                  size="sm"
+                >
+                  Use This Product
+                </Button>
               </div>
             </motion.div>
           )}
