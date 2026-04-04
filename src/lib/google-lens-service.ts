@@ -1,3 +1,5 @@
+import { retryFetch } from './retry-service'
+
 export interface GoogleLensResult {
   title: string
   link: string
@@ -58,7 +60,7 @@ export class GoogleLensService {
   private async searchWithVisionAPI(base64Data: string, productName?: string): Promise<GoogleLensResult[]> {
     const endpoint = `https://vision.googleapis.com/v1/images:annotate?key=${this.apiKey}`
     
-    const response = await fetch(endpoint, {
+    const data = await retryFetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,13 +79,15 @@ export class GoogleLensService {
           },
         ],
       }),
+    }, {
+      maxRetries: 3,
+      initialDelay: 1000,
+      timeout: 30000,
+      onRetry: (error, attempt, delay) => {
+        console.log(`Google Vision API retry attempt ${attempt} after ${delay}ms:`, error.message)
+      }
     })
 
-    if (!response.ok) {
-      throw new Error(`Vision API error: ${response.status}`)
-    }
-
-    const data = await response.json()
     return this.parseVisionResponse(data)
   }
 
@@ -101,13 +105,15 @@ export class GoogleLensService {
       num: '10',
     })
 
-    const response = await fetch(`${endpoint}?${params.toString()}`)
+    const data = await retryFetch(`${endpoint}?${params.toString()}`, {}, {
+      maxRetries: 3,
+      initialDelay: 1000,
+      timeout: 30000,
+      onRetry: (error, attempt, delay) => {
+        console.log(`Google Custom Search retry attempt ${attempt} after ${delay}ms:`, error.message)
+      }
+    })
     
-    if (!response.ok) {
-      throw new Error(`Custom Search API error: ${response.status}`)
-    }
-
-    const data = await response.json()
     return this.parseCustomSearchResponse(data)
   }
 

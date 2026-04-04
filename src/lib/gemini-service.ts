@@ -1,3 +1,5 @@
+import { retryFetch, aggressiveRetry } from './retry-service'
+
 export interface GeminiVisionResponse {
   productName: string
   description: string
@@ -65,20 +67,20 @@ export class GeminiService {
     const url = `${endpoint}?key=${this.apiKey}`
 
     try {
-      const response = await fetch(url, {
+      const data = await retryFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+      }, {
+        maxRetries: 3,
+        initialDelay: 1000,
+        timeout: 45000,
+        onRetry: (error, attempt, delay) => {
+          console.log(`Gemini API retry attempt ${attempt} after ${delay}ms:`, error.message)
+        }
       })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(`Gemini API error: ${response.status} - ${JSON.stringify(errorData)}`)
-      }
-
-      const data = await response.json()
 
       if (!data.candidates || data.candidates.length === 0) {
         throw new Error('No candidates returned from Gemini API')
@@ -186,19 +188,21 @@ Focus on clearly identifying the product boundaries to create a clean cutout.`
     const url = `${endpoint}?key=${this.apiKey}`
 
     try {
-      const response = await fetch(url, {
+      const data = await retryFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+      }, {
+        maxRetries: 2,
+        initialDelay: 1000,
+        timeout: 30000,
+        onRetry: (error, attempt, delay) => {
+          console.log(`Gemini background removal retry attempt ${attempt} after ${delay}ms:`, error.message)
+        }
       })
 
-      if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status}`)
-      }
-
-      const data = await response.json()
       const textContent = data.candidates[0].content.parts[0].text
       const result = JSON.parse(textContent)
 
@@ -366,19 +370,21 @@ You are an expert resale consultant helping a reseller make informed buying deci
     const url = `${endpoint}?key=${this.apiKey}`
 
     try {
-      const response = await fetch(url, {
+      const data = await retryFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+      }, {
+        maxRetries: 3,
+        initialDelay: 1000,
+        timeout: 30000,
+        onRetry: (error, attempt, delay) => {
+          console.log(`Gemini chat retry attempt ${attempt} after ${delay}ms:`, error.message)
+        }
       })
 
-      if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status}`)
-      }
-
-      const data = await response.json()
       return data.candidates[0].content.parts[0].text
     } catch (error) {
       console.error('Gemini chat failed:', error)
@@ -431,19 +437,21 @@ Make the title compelling and searchable. The description should be professional
     const url = `${endpoint}?key=${this.apiKey}`
 
     try {
-      const response = await fetch(url, {
+      const data = await retryFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+      }, {
+        maxRetries: 3,
+        initialDelay: 1000,
+        timeout: 40000,
+        onRetry: (error, attempt, delay) => {
+          console.log(`Gemini listing generation retry attempt ${attempt} after ${delay}ms:`, error.message)
+        }
       })
 
-      if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status}`)
-      }
-
-      const data = await response.json()
       const textContent = data.candidates[0].content.parts[0].text
       return JSON.parse(textContent)
     } catch (error) {

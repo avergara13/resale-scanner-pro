@@ -1,3 +1,5 @@
+import { retryFetch } from './retry-service'
+
 export interface NotionListingData {
   title: string
   description: string
@@ -46,7 +48,7 @@ export class NotionService {
     }
 
     try {
-      const response = await fetch('https://api.notion.com/v1/pages', {
+      const data = await retryFetch('https://api.notion.com/v1/pages', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
@@ -141,18 +143,14 @@ export class NotionService {
             }
           ]
         })
-      })
-
-      if (!response.ok) {
-        const error = await response.text()
-        console.error('Notion API error:', error)
-        return {
-          success: false,
-          error: `Notion API error: ${response.status} ${response.statusText}`
+      }, {
+        maxRetries: 2,
+        initialDelay: 1000,
+        timeout: 25000,
+        onRetry: (error, attempt, delay) => {
+          console.log(`Notion API retry attempt ${attempt} after ${delay}ms:`, error.message)
         }
-      }
-
-      const data = await response.json()
+      })
       
       return {
         success: true,
