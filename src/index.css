@@ -7,6 +7,10 @@
   }
 }
 
+@theme {
+  --color-border: var(--border);
+}
+
 :root {
   --bg: oklch(0.98 0 0);
   --fg: oklch(1 0 0);
