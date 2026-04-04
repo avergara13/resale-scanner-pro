@@ -18,7 +18,10 @@ import {
   Globe,
   Stack,
   CheckCircle,
-  Warning
+  Warning,
+  Camera,
+  Eye,
+  Lightning
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -80,11 +83,6 @@ const QUICK_ACTIONS: QuickAction[] = [
     emoji: '✨',
     label: 'Optimize Queue',
     prompt: 'Review my queue and suggest which items to prioritize'
-  },
-  {
-    emoji: '🎯',
-    label: 'Profit Tips',
-    prompt: 'Give me 3 quick tips to increase my profit margins'
   },
 ]
 
@@ -159,9 +157,10 @@ interface AgentScreenProps {
   onOptimizeItem?: (itemId: string) => Promise<void>
   onPushToNotion?: (itemId: string) => Promise<void>
   onNavigateToQueue?: () => void
+  onOpenCamera?: () => void
 }
 
-export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onNavigateToQueue }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onNavigateToQueue, onOpenCamera }: AgentScreenProps) {
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
   const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
   const [input, setInput] = useState('')
@@ -306,6 +305,32 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
       setTimeout(() => {
         setInput(text)
       }, 100)
+      return
+    }
+
+    const lowerText = text.toLowerCase()
+    
+    if ((lowerText.includes('scan') || lowerText.includes('capture') || lowerText.includes('camera') || lowerText.includes('photo')) && onOpenCamera) {
+      const quickResponse: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: '📸 Opening the AI Camera for you now! Point it at an item and I\'ll analyze it for you.',
+        timestamp: Date.now(),
+      }
+      
+      setChatSessions((prev) => 
+        (prev || []).map(s => 
+          s.id === activeSessionId 
+            ? { ...s, messages: [...s.messages, quickResponse], lastMessageAt: Date.now() }
+            : s
+        )
+      )
+      
+      setTimeout(() => {
+        onOpenCamera()
+      }, 500)
+      
+      setInput('')
       return
     }
 
@@ -473,13 +498,15 @@ Current Context:
 - Settings: ${settings?.minProfitMargin}% min margin, ${settings?.ebayFeePercent}% eBay fees
 
 Available Commands:
+- "Scan" or "Camera" or "Capture" - Opens the AI Camera to scan new items (you can directly trigger the camera)
 - "Create listings" or "Optimize listings" - Generate optimized eBay listings for all GO items
 - "Push to Notion" - Send optimized listings to Notion database
 - Ask questions about market research, pricing strategies, or product analysis
 
-When asked to create listings, trigger the autonomous listing creation flow.
-When analyzing trends, reference real market data and best practices.
-Be proactive and actionable - suggest specific next steps the user can take.`
+The AI Camera uses vision analysis to identify products and calculate profit potential instantly.
+When users want to scan items, encourage them to use the camera feature.
+Be proactive and actionable - suggest specific next steps the user can take.
+If the queue is empty or has few items, suggest using the camera to scan more products.`
 
       const fullPrompt = `${systemPrompt}\n\nUser: ${text}`
       const response = await window.spark.llm(fullPrompt, settings?.preferredAiModel || 'gpt-4o')
@@ -588,7 +615,17 @@ Be proactive and actionable - suggest specific next steps the user can take.`
         </div>
       )}
 
-      <div className="px-4 py-2 bg-s1/30 border-b border-s1">
+      <div className="px-4 py-2 bg-s1/30 border-b border-s1 space-y-2">
+        {onOpenCamera && (
+          <button
+            onClick={onOpenCamera}
+            className="w-full p-3 bg-gradient-to-r from-b1 to-b2 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:from-b2 hover:to-b1 transition-all shadow-lg hover:shadow-xl active:scale-[0.98] touch-target"
+          >
+            <Eye size={20} weight="bold" />
+            Open AI Camera
+            <Lightning size={16} weight="fill" />
+          </button>
+        )}
         <div className="grid grid-cols-4 gap-1.5">
           <Card className="p-2 flex flex-col items-center justify-center">
             <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>
@@ -628,9 +665,23 @@ Be proactive and actionable - suggest specific next steps the user can take.`
                   <Sparkle size={32} weight="fill" className="text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
-                <p className="text-sm text-t3 max-w-xs mx-auto">
+                <p className="text-sm text-t3 max-w-xs mx-auto mb-4">
                   Your AI assistant for research, insights, and automated listing creation
                 </p>
+                {queueStats.total === 0 && onOpenCamera && (
+                  <div className="mt-4 p-4 bg-blue-bg border border-b1/30 rounded-xl">
+                    <p className="text-xs text-t2 mb-3">
+                      Ready to start? Open the <strong className="text-b1">AI Camera</strong> to scan your first item!
+                    </p>
+                    <button
+                      onClick={onOpenCamera}
+                      className="w-full p-3 bg-gradient-to-r from-b1 to-b2 text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:from-b2 hover:to-b1 transition-all active:scale-[0.98] touch-target"
+                    >
+                      <Eye size={18} weight="bold" />
+                      Scan First Item
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">

@@ -896,6 +896,7 @@ function App() {
                 onOptimizeItem={handleOptimizeItem}
                 onPushToNotion={handlePushToNotion}
                 onNavigateToQueue={() => setScreen('queue')}
+                onOpenCamera={() => setCameraOpen(true)}
               />
             </motion.div>
           )}
