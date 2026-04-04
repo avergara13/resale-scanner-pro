@@ -28,6 +28,7 @@ import { FalsePositiveAnalyzerPanel } from '../FalsePositiveAnalyzer'
 import { ThemeToggle } from '../ThemeToggle'
 import { TagPresetsManager } from '../TagPresetsManager'
 import { CompressionAnalytics } from '../CompressionAnalytics'
+import { RetryConfigPanel } from '../RetryConfigPanel'
 import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
@@ -126,6 +127,29 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 </div>
 
                 <ConnectionHistoryPanel settings={settings} />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="retry" className="border-2 border-b1 rounded-lg px-4 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
+                🔄 Retry Configuration
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2">
+                <div className="p-4 bg-gradient-to-br from-b1/10 to-b1/5 border-2 border-b1/40 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-b1 text-fg flex-shrink-0">
+                      <ClockCounterClockwise size={20} weight="duotone" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-t1">Per-Endpoint Retry Policies</p>
+                      <p className="text-xs text-t2 leading-relaxed">
+                        Each API endpoint has optimized retry behavior based on priority level. Critical endpoints get more retries and longer timeouts. Configure caching and backoff strategies per service.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <RetryConfigPanel />
               </AccordionContent>
             </AccordionItem>
 
