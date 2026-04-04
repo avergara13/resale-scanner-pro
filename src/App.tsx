@@ -7,7 +7,6 @@ import { CameraOverlay } from './components/CameraOverlay'
 import { ConnectionHealthMonitor } from './components/ConnectionHealthMonitor'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
-import { TouchTargetVerifier } from './components/TouchTargetVerifier'
 import { AIScreen } from './components/screens/AIScreen'
 import { AgentScreen } from './components/screens/AgentScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
@@ -984,8 +983,6 @@ function App() {
       )}
 
       <Toaster position="top-center" richColors />
-      
-      <TouchTargetVerifier />
     </div>
   )
 }
