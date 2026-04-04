@@ -1,4 +1,4 @@
-export type Screen = 'session' | 'agent' | 'ai' | 'queue' | 'settings' | 'listing' | 'chat' | 'history' | 'incidents' | 'tag-analytics' | 'location-insights'
+export type Screen = 'session' | 'agent' | 'ai' | 'queue' | 'settings' | 'listing' | 'chat' | 'history' | 'incidents' | 'tag-analytics' | 'location-insights' | 'cost-tracking'
 
 export type PipelinePhase = 'vision' | 'lens' | 'market' | 'profit' | 'decision'
 
@@ -347,4 +347,94 @@ export interface DetectionHistoryStats {
   fastestScan: number
   slowestScan: number
   totalUserCorrections: number
+}
+
+export type ApiService = 'gemini' | 'googleLens' | 'ebay' | 'notion' | 'googleCustomSearch' | 'openai'
+
+export interface ApiCostConfig {
+  service: ApiService
+  name: string
+  pricing: {
+    inputTokenCost?: number
+    outputTokenCost?: number
+    requestCost?: number
+    imageCost?: number
+    searchCost?: number
+    freeTier?: {
+      monthly?: number
+      daily?: number
+      perRequest?: number
+    }
+  }
+}
+
+export interface ApiUsageLog {
+  id: string
+  timestamp: number
+  service: ApiService
+  operation: string
+  cost: number
+  details: {
+    inputTokens?: number
+    outputTokens?: number
+    imageSize?: number
+    searchQueries?: number
+    success: boolean
+    errorMessage?: string
+    sessionId?: string
+    itemId?: string
+  }
+}
+
+export interface ServiceCostSummary {
+  service: ApiService
+  totalCost: number
+  totalRequests: number
+  successfulRequests: number
+  failedRequests: number
+  averageCostPerRequest: number
+  costByOperation: Record<string, number>
+  lastUsed?: number
+}
+
+export interface CostTrackingPeriod {
+  period: 'today' | 'week' | 'month' | 'all'
+  startDate: number
+  endDate: number
+  totalCost: number
+  totalRequests: number
+  services: ServiceCostSummary[]
+  topCostOperations: Array<{
+    service: ApiService
+    operation: string
+    cost: number
+    count: number
+  }>
+  projectedMonthlyCost?: number
+  budgetRemaining?: number
+}
+
+export interface CostBudget {
+  id: string
+  period: 'daily' | 'weekly' | 'monthly'
+  limit: number
+  warningThreshold: number
+  startDate: number
+  endDate: number
+  active: boolean
+  serviceSpecific?: {
+    service: ApiService
+    limit: number
+  }[]
+}
+
+export interface CostAlert {
+  id: string
+  timestamp: number
+  type: 'budget-warning' | 'budget-exceeded' | 'spike-detected' | 'quota-exceeded'
+  service?: ApiService
+  message: string
+  cost: number
+  threshold?: number
+  acknowledged: boolean
 }
