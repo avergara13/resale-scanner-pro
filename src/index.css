@@ -13,7 +13,7 @@
 
 :root {
   --bg: oklch(0.99 0 0);
-  --fg: oklch(0.25 0 0);
+  --fg: oklch(1 0 0);
   
   --s1: oklch(0.96 0 0);
   --s2: oklch(0.88 0 0);
@@ -45,9 +45,9 @@
   
   --background: var(--bg);
   --foreground: var(--t1);
-  --card: var(--bg);
+  --card: var(--fg);
   --card-foreground: var(--t1);
-  --popover: var(--bg);
+  --popover: var(--fg);
   --popover-foreground: var(--t1);
   --primary: var(--b1);
   --primary-foreground: oklch(1 0 0);
