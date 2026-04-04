@@ -2279,3 +2279,88 @@ button:disabled {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
+
+@supports (padding: max(0px)) {
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top, 0), 0.5rem);
+  }
+  
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom, 0), 0.5rem);
+  }
+  
+  .safe-left {
+    padding-left: max(env(safe-area-inset-left, 0), 0);
+  }
+  
+  .safe-right {
+    padding-right: max(env(safe-area-inset-right, 0), 0);
+  }
+  
+  #bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  button, a, [role="button"] {
+    touch-action: manipulation;
+    user-select: none;
+  }
+  
+  input, textarea, select {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 430px) and (orientation: portrait) {
+  .hide-on-phone-portrait {
+    display: none !important;
+  }
+  
+  .stack-on-phone {
+    flex-direction: column !important;
+  }
+  
+  .full-width-on-phone {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 932px) and (orientation: landscape) {
+  body {
+    font-size: 13px;
+  }
+  
+  #app-container {
+    padding: 0 env(safe-area-inset-left, 0) 0 env(safe-area-inset-right, 0);
+  }
+  
+  .landscape-compact {
+    padding: 0.5rem !important;
+  }
+}
+
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-scroll {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+.scrollable-content {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
