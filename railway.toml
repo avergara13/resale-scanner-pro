@@ -1,4 +1,4 @@
-# rebuild: 2026-04-04-v2-esm-fix
+# rebuild: 2026-04-04-v3-force-deploy
 [build]
 builder = "NIXPACKS"
 buildCommand = "npm install && npm run build"
