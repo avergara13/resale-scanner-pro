@@ -833,8 +833,8 @@ function App() {
     'listing': 6,
     'chat': 7,
     'history': 8,
-    'tag-analytics': 9,
     'location-insights': 10,
+    'cost-tracking': 11
     'cost-tracking': 11
   }
 
