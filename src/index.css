@@ -1503,36 +1503,40 @@ button:disabled {
   }
   
   h3 {
-@media (min-width: 744px) and (max-width: 834px) {
+    font-size: 1.1rem;
   }
-    max-width: 834px;
+  
   h4 {
     font-size: 1rem;
   }
-    padding: 16px;
+  
   .grid {
     gap: 0.5rem;
   }
-    padding: 18px;
-    gap: 14px;
+}
+
 @media (min-width: 431px) and (max-width: 743px) {
   #app-container {
     padding: 0;
-    padding: 18px;
-    margin-bottom: 12px;
+  }
+
   h1 {
     font-size: 1.875rem;
   }
-    padding: 20px 22px;
+
   h2 {
-    max-width: 88%;
+    font-size: 1.625rem;
   }
 
   h3 {
-    padding: 44px;
-    font-size: 76px;
-    border-radius: 26px;
-  .stat-card {
+    font-size: 1.375rem;
+  }
+}
+
+@media (min-width: 744px) and (max-width: 834px) {
+  #app-container {
+    max-width: 834px;
+  }
 
   h1 {
     font-size: 2rem;
@@ -1545,7 +1549,7 @@ button:disabled {
   h3 {
     font-size: 1.5rem;
   }
-  }
+}
   
 @media (min-width: 835px) and (max-width: 1024px) {
   #app-container {
@@ -1633,33 +1637,21 @@ button:disabled {
   h3 {
     font-size: 2rem;
   }
-}
-
-    font-size: 2.25rem;
-  }
-
-  h2 {
-    font-size: 2rem;
-  }
-
-  h3 {
-    font-size: 1.75rem;
-  }
 
   .grid {
-    gap: 1.5rem;
+    gap: 2rem;
   }
 
   header {
-    padding: 1.5rem;
+    padding: 2rem;
   }
 
   .space-y-4 > * + * {
-    margin-top: 1.5rem;
+    margin-top: 2rem;
   }
 
   .space-y-6 > * + * {
-    margin-top: 2rem;
+    margin-top: 2.5rem;
   }
 }
 
