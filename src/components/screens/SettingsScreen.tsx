@@ -93,18 +93,26 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="space-y-6 max-w-md pb-20">
-          <Accordion type="multiple" defaultValue={[]} className="space-y-4">
-            <AccordionItem value="health" className="border border-s2 rounded-lg px-4 bg-fg">
+          <Accordion type="multiple" defaultValue={['health']} className="space-y-4">
+            <AccordionItem value="health" className="border-2 border-green/30 rounded-lg px-4 bg-gradient-to-br from-green/5 to-transparent">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                💚 Connection Health
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green animate-pulse" />
+                  <span>Live API Health Status</span>
+                </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2">
-                <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-t2 leading-relaxed">
-                      Real-time monitoring of API connections. Health checks run every 30 seconds to ensure reliable service.
-                    </p>
+                <div className="p-4 bg-gradient-to-br from-green-bg to-transparent border border-green/20 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green text-fg flex-shrink-0">
+                      <Info size={16} weight="fill" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-t1 mb-1">Real-Time Monitoring</p>
+                      <p className="text-xs text-t2 leading-relaxed">
+                        All API connections are monitored continuously with automatic health checks every 30 seconds. Configure your API keys below to see live status indicators.
+                      </p>
+                    </div>
                   </div>
                 </div>
 

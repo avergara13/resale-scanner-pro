@@ -852,7 +852,7 @@ function App() {
         captureState === 'fail' && "fail-flash"
       )}
     >
-      <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={settings?.apiNotificationsEnabled ?? false} />
+      <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={false} />
       
       <RetryStatusIndicator 
         activeRetries={retryState.activeRetries}
