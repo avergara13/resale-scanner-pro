@@ -132,7 +132,8 @@ html, body {
   min-height: 100vh;
   overflow-x: hidden;
   flex-direction: column;
-  overflow-x: hidden;
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   height: 4px;
 }
@@ -148,8 +149,6 @@ html, body {
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: var(--s3);
-}
-
 }
 
 .safe-bottom {
@@ -1363,6 +1362,8 @@ button:disabled {
   }
   100% {
     transform: translateX(200%);
+  }
+}
 
 @media (max-width: 430px) {
   h1 {
@@ -1429,8 +1430,6 @@ button:disabled {
   .decision-signal {
     padding: 40px;
     font-size: 72px;
-  }
-}
   }
 }
 
