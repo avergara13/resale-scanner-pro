@@ -89,7 +89,9 @@ export class EbayService {
 
       const sortedPrices = [...soldPrices].sort((a, b) => a - b)
       const medianSoldPrice = sortedPrices.length > 0
-        ? sortedPrices[Math.floor(sortedPrices.length / 2)]
+        ? sortedPrices.length % 2 === 0
+          ? (sortedPrices[sortedPrices.length / 2 - 1] + sortedPrices[sortedPrices.length / 2]) / 2
+          : sortedPrices[Math.floor(sortedPrices.length / 2)]
         : 0
 
       const soldCount = soldItems.length
@@ -265,16 +267,15 @@ export class EbayService {
     ebayFeePercent: number = 12.9,
     paypalFeePercent: number = 3.49
   ) {
-    const grossProfit = recommendedSellPrice - purchasePrice - shippingCost
     const ebayFee = recommendedSellPrice * (ebayFeePercent / 100)
     const paypalFee = recommendedSellPrice * (paypalFeePercent / 100)
     const totalFees = ebayFee + paypalFee
-    const netProfit = grossProfit - totalFees
-    const profitMargin = (netProfit / recommendedSellPrice) * 100
-    const roi = (netProfit / purchasePrice) * 100
+    const netProfit = recommendedSellPrice - purchasePrice - shippingCost - totalFees
+    const profitMargin = recommendedSellPrice > 0 ? (netProfit / recommendedSellPrice) * 100 : 0
+    const roi = purchasePrice > 0 ? (netProfit / purchasePrice) * 100 : 0
 
     return {
-      grossProfit,
+      grossProfit: recommendedSellPrice - purchasePrice - shippingCost,
       netProfit,
       profitMargin,
       roi,

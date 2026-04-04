@@ -86,7 +86,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
 
     metricsByDay.forEach(metrics => {
       if (metrics.itemsScanned > 0) {
-        metrics.avgProfit = metrics.totalProfit / metrics.goCount || 0
+        metrics.avgProfit = metrics.goCount > 0 ? metrics.totalProfit / metrics.goCount : 0
         metrics.goRate = (metrics.goCount / metrics.itemsScanned) * 100
       }
     })
