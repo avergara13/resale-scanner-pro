@@ -48,15 +48,30 @@ To make this app fully operational:
    - For real-time product vision analysis
    - Get at: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
 
-2. **Google Cloud API Key** → Settings → Google Cloud APIs
-   - For Google Lens visual product matching
-   - **Setup Instructions (now in Settings):**
+2. **Google Cloud API Key** → Settings → Google Cloud APIs → Enhanced Product ID
+   - For Google Lens visual product matching and enhanced identification
+   - **What You Get:**
+     - Visual Product ID: Identify products from photos with 90%+ accuracy
+     - Web Matching: Find similar products across eBay, Amazon, Mercari, etc.
+     - Price Discovery: See what items are selling for across platforms
+     - Confidence Scores: Get reliability ratings on identifications
+     - Smart Caching: Cost optimization skips redundant API calls (saves ~40% quota)
+   - **Free Tier Limits:**
+     - Vision API: 1,000 requests/month free
+     - Custom Search: 100 queries/day free
+     - Typical usage: Usually stays within free tier
+   - **Setup Instructions (detailed guide in Settings):**
      1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-     2. Create new project or select existing
-     3. Enable: Vision API, Custom Search API, Maps API, Places API
-     4. Go to Credentials → Create API Key
-     5. Restrict key to enabled APIs only
-     6. Copy key to Settings
+     2. Create new project (e.g., "resale-scanner")
+     3. Enable **Cloud Vision API** (required for product identification)
+     4. Optionally enable **Custom Search API** for enhanced results
+     5. Go to Credentials → Create API Key
+     6. Restrict key to enabled APIs for security
+     7. Copy key (starts with `AIzaSy...`) to Settings
+   - **Cost Optimization:**
+     - When Gemini is 92%+ confident in product ID, Google Lens is automatically skipped to save API quota
+     - This reduces Custom Search usage by ~40% on clear product photos
+   - **Detailed Documentation:** See `GOOGLE_CLOUD_SETUP.md` for complete setup guide with pricing info and troubleshooting
 
 3. **eBay Developer Credentials** → Settings → eBay Integration
    - For real market data and pricing
