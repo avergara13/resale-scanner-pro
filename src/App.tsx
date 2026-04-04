@@ -9,6 +9,7 @@ import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { TouchTargetVerifier } from './components/TouchTargetVerifier'
 import { AIScreen } from './components/screens/AIScreen'
+import { AgentScreen } from './components/screens/AgentScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { IncidentsScreen } from './components/screens/IncidentsScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
@@ -833,7 +834,8 @@ function App() {
     'chat': 7,
     'history': 8,
     'tag-analytics': 9,
-    'location-insights': 10
+    'location-insights': 10,
+    'cost-tracking': 11
   }
 
   const [prevScreen, setPrevScreen] = useState<Screen>(screen)
@@ -879,6 +881,27 @@ function App() {
                 session={session}
                 onStartSession={handleStartSession}
                 onEndSession={handleEndSession}
+              />
+            </motion.div>
+          )}
+          {screen === 'agent' && (
+            <motion.div
+              key="agent"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="w-full h-full"
+            >
+              <AgentScreen
+                queueItems={queue || []}
+                settings={settings}
+                onOptimizeItem={handleOptimizeItem}
+                onPushToNotion={handlePushToNotion}
+                onNavigateToQueue={() => setScreen('queue')}
+                onOpenCamera={() => setCameraOpen(true)}
               />
             </motion.div>
           )}
