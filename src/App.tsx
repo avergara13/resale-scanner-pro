@@ -839,7 +839,7 @@ function App() {
     <div 
       id="app-container" 
       className={cn(
-        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-[430px] sm:max-w-[768px] md:max-w-[820px] lg:max-w-[1024px] mx-auto overflow-x-hidden px-2 sm:px-4",
+        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-[430px] sm:max-w-[768px] md:max-w-[820px] lg:max-w-[1024px] mx-auto overflow-x-hidden",
         captureState === 'capturing' && "capture-flash",
         captureState === 'analyzing' && "analyzing-flash",
         captureState === 'success' && "success-flash",

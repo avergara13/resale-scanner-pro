@@ -613,7 +613,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   }
 
   return (
-    <div id="scr-queue" className="flex flex-col h-full">
+    <div id="scr-queue" className="flex flex-col h-full w-full overflow-x-hidden">
       <ItemEditDialog
         item={editingItem}
         isOpen={editingItem !== null}
@@ -630,13 +630,13 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         onRemoveTags={handleBulkRemoveTags}
         onCreateTag={handleCreateTag}
       />
-      <div className="px-4 pt-4 pb-4 border-b border-s1">
-        <div className="flex flex-col gap-3 mb-4">
-          <div className="flex items-start justify-between gap-3">
+      <div className="px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 pb-3 sm:pb-4 border-b border-s1">
+        <div className="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-4">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-black tracking-tight">LISTING QUEUE</h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
+              <h1 className="text-lg sm:text-xl font-black tracking-tight text-t1">LISTING QUEUE</h1>
+              <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
+                <p className="text-[10px] sm:text-[11px] text-t3 font-medium uppercase tracking-wider">
                   {queueItems.length} Items Total
                 </p>
                 {sortedItems.length !== queueItems.length && (
@@ -703,14 +703,14 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
             </div>
             <ThemeToggle />
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {onNavigateToLocationInsights && queueItems.some(item => item.location) && (
               <Button
                 onClick={onNavigateToLocationInsights}
                 variant="outline"
-                className="h-9 px-3 border-s2 hover:bg-s1 text-t2 font-bold text-xs transition-all flex-shrink-0"
+                className="h-8 sm:h-9 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
               >
-                <MapPin size={16} weight="bold" className="mr-1.5" />
+                <MapPin size={14} weight="bold" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
                 Locations
               </Button>
             )}
@@ -718,9 +718,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <Button
                 onClick={onNavigateToTagAnalytics}
                 variant="outline"
-                className="h-9 px-3 border-s2 hover:bg-s1 text-t2 font-bold text-xs transition-all flex-shrink-0"
+                className="h-8 sm:h-9 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
               >
-                <ChartBar size={16} weight="bold" className="mr-1.5" />
+                <ChartBar size={14} weight="bold" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
                 Tag ROI
               </Button>
             )}
@@ -728,9 +728,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <Button
                 onClick={onBatchAnalyze}
                 disabled={isBatchAnalyzing}
-                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-xs h-9 px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
               >
-                <Lightning size={16} weight="fill" className="mr-1.5" />
+                <Lightning size={14} weight="fill" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
                 {isBatchAnalyzing ? 'Analyzing...' : `Analyze ${unanalyzedItems.length}`}
               </Button>
             )}
@@ -1046,7 +1046,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           )}
         </div>
       ) : (
-        <ScrollArea className="flex-1 px-4 py-4">
+        <ScrollArea className="flex-1 px-3 sm:px-4 md:px-5 py-3 sm:py-4">
           {onReorder ? (
             <DndContext
               sensors={sensors}
@@ -1057,7 +1057,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 items={sortedItems.map(item => item.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {sortedItems.map((item) => (
                     <SortableItem
                       key={item.id}
