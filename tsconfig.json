@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "ES2020",
     "useDefineForClassFields": true,
@@ -22,6 +24,12 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
+      "@github/spark/hooks": [
+        "./src/lib/spark-hooks.ts"
+      ],
+      "@github/spark/spark": [
+        "./src/lib/spark-runtime.ts"
+      ],
       "@/*": [
         "./src/*"
       ]

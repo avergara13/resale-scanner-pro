@@ -66,6 +66,8 @@ function App() {
     notionApiKey: import.meta.env.VITE_NOTION_API_KEY || '',
     googleApiKey: import.meta.env.VITE_GOOGLE_API_KEY || '',
     googleSearchEngineId: import.meta.env.VITE_GOOGLE_SEARCH_ENGINE_ID || '',
+    supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
+    supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
   })
   
   const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()

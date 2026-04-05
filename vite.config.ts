@@ -19,6 +19,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
+      '@github/spark/hooks': resolve(projectRoot, 'src/lib/spark-hooks.ts'),
+      '@github/spark/spark': resolve(projectRoot, 'src/lib/spark-runtime.ts'),
       '@': resolve(projectRoot, 'src')
     }
   },

@@ -63,9 +63,20 @@ async function checkGeminiHealth(apiKey?: string): Promise<Omit<ServiceHealth, '
       lastChecked: Date.now(),
     }
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Network error'
+
+    if (message === 'Failed to fetch') {
+      return {
+        status: 'degraded',
+        error: 'Browser probe blocked by CORS; Anthropic key is configured',
+        latency: Date.now() - startTime,
+        lastChecked: Date.now(),
+      }
+    }
+
     return {
       status: 'offline',
-      error: error instanceof Error ? error.message : 'Network error',
+      error: message,
       latency: Date.now() - startTime,
       lastChecked: Date.now(),
     }
