@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,6 +40,9 @@ import { ThemeToggle } from '../ThemeToggle'
 import { TagPresetsManager } from '../TagPresetsManager'
 import { CompressionAnalytics } from '../CompressionAnalytics'
 import { RetryConfigPanel } from '../RetryConfigPanel'
+import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { toast } from 'sonner'
 import { toast } from 'sonner'
 import type { AppSettings, ItemTag } from '@/types'
 
@@ -85,7 +88,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       defaultShippingCost: 5.0,
       ebayFeePercent: 12.9,
       paypalFeePercent: 3.49,
-      preferredAiModel: 'gemini-2.0-flash-exp',
+      preferredAiModel: 'gemini-2.0-flash',
       imageQuality: { preset: 'balanced' },
       ...preservedKeys,
     }
@@ -107,9 +110,27 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   const supabaseConfigured = !!(hasKey(settings.supabaseUrl) && hasKey(settings.supabaseKey))
   const notionConfigured = !!hasKey(settings.notionApiKey)
 
+  const handleRefresh = useCallback(async () => {
+    await new Promise(resolve => setTimeout(resolve, 600))
+    toast.success('Settings refreshed')
+  }, [])
+
+  const { containerRef, isPulling, isRefreshing, pullDistance, progress, shouldTrigger } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    enabled: true,
+  })
+
   return (
-    <div id="scr-settings" className="flex flex-col h-full">
-      <div className="px-4 py-6 border-b border-s2 bg-fg">
+    <div id="scr-settings" ref={containerRef} className="flex flex-col h-full overflow-y-auto">
+      <PullToRefreshIndicator
+        isPulling={isPulling}
+        isRefreshing={isRefreshing}
+        pullDistance={pullDistance}
+        progress={progress}
+        shouldTrigger={shouldTrigger}
+      />
+      <div className="px-4 pt-2 pb-4 border-b border-s2 bg-fg">
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-2xl font-semibold text-t1 mb-2">Settings</h1>
@@ -308,14 +329,14 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     Preferred AI Model
                   </Label>
                   <Select 
-                    value={settings.preferredAiModel || 'gemini-2.0-flash-exp'}
+                    value={settings.preferredAiModel || 'gemini-2.0-flash'}
                     onValueChange={(value) => onUpdate({ preferredAiModel: value as AppSettings['preferredAiModel'] })}
                   >
                     <SelectTrigger id="ai-model" className="font-mono text-sm">
                       <SelectValue placeholder="Select model" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Fastest)</SelectItem>
+                      <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash (Fastest)</SelectItem>
                       <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
                       <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
                       <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet (Backup)</SelectItem>

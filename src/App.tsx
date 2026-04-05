@@ -56,7 +56,7 @@ function App() {
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
     paypalFeePercent: 3.49,
-    preferredAiModel: 'gemini-2.0-flash-exp',
+    preferredAiModel: 'gemini-2.0-flash',
     notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
     imageQuality: { preset: 'balanced' },
     // Pre-populated from Railway env vars — both users get keys automatically.
@@ -478,7 +478,7 @@ function App() {
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
         paypalFeePercent: 3.49,
-        preferredAiModel: 'gemini-2.0-flash-exp',
+        preferredAiModel: 'gemini-2.0-flash',
       }
       const newSettings = { ...(prev || defaults), ...updates }
       
@@ -1060,7 +1060,7 @@ function App() {
         />
       )}
 
-      <Toaster position="top-center" richColors />
+      <Toaster position="top-center" richColors offset="60px" />
     </div>
   )
 }
