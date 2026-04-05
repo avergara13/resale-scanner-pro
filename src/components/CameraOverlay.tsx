@@ -113,7 +113,6 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
 
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current) return
-    if (mode === 'lens' && !price) return
 
     const video = videoRef.current
     const canvas = canvasRef.current
@@ -493,9 +492,8 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
               <div className="flex items-center justify-center py-2">
                 <button
                   onClick={handleCapture}
-                  disabled={mode === 'lens' && !price}
                   className={cn(
-                    'w-[72px] h-[72px] rounded-full border-4 p-1 disabled:opacity-40 transition-all',
+                    'w-[72px] h-[72px] rounded-full border-4 p-1 transition-all active:scale-95',
                     quickDraftMode ? 'border-amber' : 'border-white'
                   )}
                 >

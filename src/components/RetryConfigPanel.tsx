@@ -78,18 +78,18 @@ export function RetryConfigPanel({ onConfigChange }: RetryConfigPanelProps) {
   }, {} as Record<string, Array<readonly [string, typeof ENDPOINT_RETRY_CONFIGS[APIEndpoint]]>>)
 
   return (
-    <div className="space-y-4 overflow-hidden">
+    <div className="space-y-3 w-full max-w-full overflow-hidden">
       <div className="flex items-center justify-between gap-2 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <ArrowsClockwise size={20} weight="duotone" className="text-b1 flex-shrink-0" />
-          <h3 className="text-sm font-bold text-t1 truncate">Retry Configuration</h3>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <ArrowsClockwise size={18} weight="duotone" className="text-b1 flex-shrink-0" />
+          <h3 className="text-xs font-bold text-t1 truncate">Retry Config</h3>
         </div>
-        <Badge variant="secondary" className="text-xs">
-          {endpoints.length} Endpoint{endpoints.length !== 1 ? 's' : ''}
+        <Badge variant="secondary" className="text-[10px] flex-shrink-0">
+          {endpoints.length}
         </Badge>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-2">
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
         <Button
           size="sm"
           variant={selectedPriority === 'all' ? 'default' : 'outline'}
@@ -145,7 +145,7 @@ export function RetryConfigPanel({ onConfigChange }: RetryConfigPanelProps) {
                     onOpenChange={() => toggleEndpoint(endpoint)}
                   >
                     <CollapsibleTrigger asChild>
-                      <button className="w-full px-3 py-3 flex items-center justify-between gap-2 hover:bg-s1/50 transition-colors min-w-0">
+                      <button className="w-full px-2 py-2.5 flex items-center justify-between gap-1.5 hover:bg-s1/50 transition-colors min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <Icon size={16} weight="duotone" className={cn(PRIORITY_COLORS[config.priority], 'flex-shrink-0')} />
                           <div className="text-left min-w-0">
@@ -171,7 +171,7 @@ export function RetryConfigPanel({ onConfigChange }: RetryConfigPanelProps) {
                     </CollapsibleTrigger>
 
                     <CollapsibleContent>
-                      <div className="px-4 pb-4 pt-2 space-y-4 border-t border-s2">
+                      <div className="px-2 pb-3 pt-2 space-y-3 border-t border-s2">
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div className="space-y-1">
                             <div className="text-t3 font-medium">Max Retries</div>
