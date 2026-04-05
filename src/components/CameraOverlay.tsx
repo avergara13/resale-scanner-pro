@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from 'react'
-import { X, Lightning, Check, MapPin, Barcode as BarcodeIcon } from '@phosphor-icons/react'
+import { X, Lightning, Check, MapPin, Barcode as BarcodeIcon, Camera, Images, MagicWand, GridFour, Trash } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useKV } from '@github/spark/hooks'
@@ -8,6 +8,14 @@ import { BarcodeScanner } from './BarcodeScanner'
 import { createBarcodeService } from '@/lib/barcode-service'
 import type { ThriftStoreLocation } from '@/types'
 import type { BarcodeProduct } from '@/lib/barcode-service'
+
+const LISTING_PHOTO_TIPS = [
+  'Front view — clean, well-lit',
+  'Back view — show labels/tags',
+  'Detail shot — brand, flaws, features',
+  'Size/scale reference',
+  'Packaging (if applicable)',
+]
 
 interface CameraOverlayProps {
   isOpen: boolean
@@ -25,6 +33,9 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
   const [quickDraftMode, setQuickDraftMode] = useState(false)
   const [draftCount, setDraftCount] = useState(0)
   const [showCaptureFlash, setShowCaptureFlash] = useState(false)
+  const [listingPhotos, setListingPhotos] = useState<string[]>([])
+  const [showGrid, setShowGrid] = useState(true)
+  const [autoEnhance, setAutoEnhance] = useState(true)
   const [savedLocations, setSavedLocations] = useKV<ThriftStoreLocation[]>('saved-locations', [])
   const [selectedLocation, setSelectedLocation] = useState<ThriftStoreLocation | undefined>(undefined)
   const [showLocationDialog, setShowLocationDialog] = useState(false)
@@ -78,6 +89,28 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
     }
   }
 
+  const enhanceListingPhoto = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+    const imgData = ctx.getImageData(0, 0, w, h)
+    const d = imgData.data
+    // Compute average brightness
+    let totalBrightness = 0
+    for (let i = 0; i < d.length; i += 4) {
+      totalBrightness += (d[i] + d[i + 1] + d[i + 2]) / 3
+    }
+    const avgBrightness = totalBrightness / (d.length / 4)
+    // Target brightness ~140 for well-lit product photos
+    const brightnessFactor = avgBrightness < 80 ? 1.3 : avgBrightness < 120 ? 1.1 : 1.0
+    // Slight contrast boost
+    const contrastFactor = 1.08
+    const intercept = 128 * (1 - contrastFactor)
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] = Math.min(255, Math.max(0, d[i] * brightnessFactor * contrastFactor + intercept))
+      d[i + 1] = Math.min(255, Math.max(0, d[i + 1] * brightnessFactor * contrastFactor + intercept))
+      d[i + 2] = Math.min(255, Math.max(0, d[i + 2] * brightnessFactor * contrastFactor + intercept))
+    }
+    ctx.putImageData(imgData, 0, 0)
+  }
+
   const handleCapture = async () => {
     if (!videoRef.current || !canvasRef.current) return
     if (mode === 'lens' && !price) return
@@ -89,8 +122,22 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
     const ctx = canvas.getContext('2d')
     if (ctx) {
       ctx.drawImage(video, 0, 0)
-      const imageData = canvas.toDataURL('image/jpeg', 0.9)
-      
+
+      // Auto-enhance listing photos for brighter, higher-contrast product shots
+      if (mode === 'listing' && autoEnhance) {
+        enhanceListingPhoto(ctx, canvas.width, canvas.height)
+      }
+
+      const imageData = canvas.toDataURL('image/jpeg', mode === 'listing' ? 0.95 : 0.9)
+
+      if (mode === 'listing') {
+        // Multi-photo: add to listing photos set
+        setListingPhotos(prev => [...prev, imageData])
+        setShowCaptureFlash(true)
+        setTimeout(() => setShowCaptureFlash(false), 300)
+        return
+      }
+
       if (quickDraftMode && onQuickDraft) {
         onQuickDraft(imageData, parseFloat(price) || 0, selectedLocation)
         setDraftCount(prev => prev + 1)
@@ -161,12 +208,15 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                 )}
               </AnimatePresence>
 
-              <div className="absolute left-1/2 -translate-x-1/2 flex bg-black/50 p-1 rounded-xl backdrop-blur-md border border-white/10 z-10" style={{ top: 'calc(env(safe-area-inset-top, 16px) + 48px)', width: mode === 'barcode' ? '260px' : '200px' }}>
+              <div
+                className="absolute left-1/2 -translate-x-1/2 flex bg-black/60 p-1 rounded-2xl backdrop-blur-md border border-white/10 z-10"
+                style={{ top: 'calc(env(safe-area-inset-top, 16px) + 48px)', width: '260px' }}
+              >
                 <button
                   onClick={() => setMode('lens')}
                   className={cn(
-                    'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
-                    mode === 'lens' ? 'bg-white text-black shadow-sm' : 'text-white'
+                    'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all',
+                    mode === 'lens' ? 'bg-white text-black shadow-sm' : 'text-white/70'
                   )}
                 >
                   AI LENS
@@ -174,18 +224,18 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                 <button
                   onClick={() => setMode('barcode')}
                   className={cn(
-                    'flex-1 py-2 px-1 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1',
-                    mode === 'barcode' ? 'bg-white text-black shadow-sm' : 'text-white'
+                    'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1',
+                    mode === 'barcode' ? 'bg-white text-black shadow-sm' : 'text-white/70'
                   )}
                 >
-                  <BarcodeIcon size={14} weight="bold" />
+                  <BarcodeIcon size={13} weight="bold" />
                   SCAN
                 </button>
                 <button
                   onClick={() => setMode('listing')}
                   className={cn(
-                    'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
-                    mode === 'listing' ? 'bg-white text-black shadow-sm' : 'text-white'
+                    'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all',
+                    mode === 'listing' ? 'bg-white text-black shadow-sm' : 'text-white/70'
                   )}
                 >
                   LISTING
@@ -219,12 +269,30 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                 </motion.button>
               )}
 
-              <div className="absolute inset-12 border-2 border-white/30 pointer-events-none mt-24">
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white" />
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white" />
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white" />
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white" />
-              </div>
+              {/* Viewfinder brackets for lens/barcode modes */}
+              {mode !== 'listing' && (
+                <div className="absolute inset-12 border-2 border-white/30 pointer-events-none mt-24">
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white" />
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white" />
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white" />
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white" />
+                </div>
+              )}
+
+              {/* Rule-of-thirds grid for listing mode */}
+              {mode === 'listing' && showGrid && (
+                <div className="absolute inset-0 pointer-events-none z-[5]" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 90px)', bottom: '0' }}>
+                  <div className="absolute left-1/3 top-0 bottom-0 w-px bg-white/20" />
+                  <div className="absolute left-2/3 top-0 bottom-0 w-px bg-white/20" />
+                  <div className="absolute top-1/3 left-0 right-0 h-px bg-white/20" />
+                  <div className="absolute top-2/3 left-0 right-0 h-px bg-white/20" />
+                  {/* Center crosshair */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6">
+                    <div className="absolute top-1/2 left-0 right-0 h-px bg-white/30" />
+                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/30" />
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={onClose}
@@ -242,7 +310,10 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
               </button>
             </div>
 
-            <div className="bg-black p-6 pb-10 flex flex-col gap-4">
+            <div
+              className="bg-black px-5 pt-4 flex flex-col gap-3"
+              style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 16px)' }}
+            >
               {barcodeProduct && mode === 'lens' && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -317,7 +388,87 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                   </button>
                 </>
               )}
-              
+
+              {mode === 'listing' && (
+                <>
+                  {/* Listing photo controls */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Images size={18} weight="duotone" className="text-b1" />
+                      <span className="text-white text-sm font-bold">
+                        {listingPhotos.length} / 5 photos
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setShowGrid(!showGrid)}
+                        className={cn(
+                          'p-2 rounded-lg transition-all',
+                          showGrid ? 'bg-white/20 text-white' : 'text-white/40'
+                        )}
+                      >
+                        <GridFour size={18} weight={showGrid ? 'fill' : 'regular'} />
+                      </button>
+                      <button
+                        onClick={() => setAutoEnhance(!autoEnhance)}
+                        className={cn(
+                          'p-2 rounded-lg transition-all',
+                          autoEnhance ? 'bg-b1/30 text-b1' : 'text-white/40'
+                        )}
+                      >
+                        <MagicWand size={18} weight={autoEnhance ? 'fill' : 'regular'} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Current shot tip */}
+                  {listingPhotos.length < LISTING_PHOTO_TIPS.length && (
+                    <div className="bg-white/10 border border-white/20 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Camera size={14} className="text-b1 flex-shrink-0" />
+                        <span className="text-white/80 text-xs">
+                          <span className="font-bold text-white">Shot {listingPhotos.length + 1}:</span>{' '}
+                          {LISTING_PHOTO_TIPS[listingPhotos.length]}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Thumbnail strip */}
+                  {listingPhotos.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {listingPhotos.map((photo, idx) => (
+                        <div key={idx} className="relative flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 border-white/30">
+                          <img src={photo} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => setListingPhotos(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
+                          >
+                            <X size={10} weight="bold" className="text-white" />
+                          </button>
+                          <span className="absolute bottom-0.5 left-0.5 text-[8px] font-bold text-white bg-black/60 px-1 rounded">
+                            {idx + 1}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Done button when photos captured */}
+                  {listingPhotos.length > 0 && (
+                    <button
+                      onClick={() => {
+                        onCapture(listingPhotos[0], 0, selectedLocation)
+                        setListingPhotos([])
+                      }}
+                      className="w-full py-3 bg-b1 text-white font-bold rounded-lg text-sm transition-all active:scale-[0.98]"
+                    >
+                      Use {listingPhotos.length} {listingPhotos.length === 1 ? 'Photo' : 'Photos'} for Listing
+                    </button>
+                  )}
+                </>
+              )}
+
               {quickDraftMode && draftCount > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -339,12 +490,12 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                 </motion.div>
               )}
               
-              <div className="flex items-center justify-center px-4 gap-4">
+              <div className="flex items-center justify-center py-2">
                 <button
                   onClick={handleCapture}
                   disabled={mode === 'lens' && !price}
                   className={cn(
-                    'w-20 h-20 rounded-full border-4 p-1 disabled:opacity-40 transition-all',
+                    'w-[72px] h-[72px] rounded-full border-4 p-1 disabled:opacity-40 transition-all',
                     quickDraftMode ? 'border-amber' : 'border-white'
                   )}
                 >

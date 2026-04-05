@@ -145,7 +145,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="space-y-6 pb-20 overflow-x-hidden">
           <Accordion type="multiple" defaultValue={['health']} className="space-y-4">
-            <AccordionItem value="health" className="border-2 border-green/30 rounded-lg px-4 bg-gradient-to-br from-green/5 to-transparent">
+            <AccordionItem value="health" className="border border-green/20 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-green animate-pulse" />
@@ -189,7 +189,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="retry" className="border-2 border-b1 rounded-lg px-4 bg-fg">
+            <AccordionItem value="retry" className="border border-s2 rounded-lg px-4 bg-fg overflow-hidden">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🔄 Retry Configuration
               </AccordionTrigger>
@@ -250,7 +250,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="false-positives" className="border-2 border-b1 rounded-lg px-4 bg-fg">
+            <AccordionItem value="false-positives" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   🎯 False Positive Analysis & Optimization
@@ -289,7 +289,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="ai" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="ai" className="border border-b1/20 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🤖 AI Configuration
               </AccordionTrigger>
@@ -374,7 +374,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="google" className="border-2 border-b1/30 rounded-lg px-4 bg-gradient-to-br from-b1/5 to-transparent">
+            <AccordionItem value="google" className="border border-b1/20 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   🔍 Google Cloud APIs — Enhanced Product ID
@@ -588,7 +588,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="ebay" className="border-2 border-green/30 rounded-lg px-4 bg-gradient-to-br from-green/5 to-transparent">
+            <AccordionItem value="ebay" className="border border-b1/20 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   💰 eBay Integration — Market Pricing
@@ -837,7 +837,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="database" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="database" className="border border-b1/20 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🗄️ Database & Automation
               </AccordionTrigger>
