@@ -161,7 +161,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                 )}
               </AnimatePresence>
 
-              <div className="absolute top-16 left-1/2 -translate-x-1/2 flex bg-black/50 p-1 rounded-xl backdrop-blur-md border border-white/10 z-10" style={{ width: mode === 'barcode' ? '260px' : '200px' }}>
+              <div className="absolute left-1/2 -translate-x-1/2 flex bg-black/50 p-1 rounded-xl backdrop-blur-md border border-white/10 z-10" style={{ top: 'calc(env(safe-area-inset-top, 16px) + 48px)', width: mode === 'barcode' ? '260px' : '200px' }}>
                 <button
                   onClick={() => setMode('lens')}
                   className={cn(
@@ -197,8 +197,9 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   onClick={() => setQuickDraftMode(!quickDraftMode)}
+                  style={{ top: 'calc(env(safe-area-inset-top, 16px) + 96px)' }}
                   className={cn(
-                    'absolute top-32 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border transition-all z-10',
+                    'absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border transition-all z-10',
                     quickDraftMode
                       ? 'bg-amber/90 border-amber text-black shadow-lg'
                       : 'bg-black/50 border-white/20 text-white'
@@ -227,10 +228,17 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
 
               <button
                 onClick={onClose}
-                className="absolute top-6 right-6 p-2 bg-black/40 text-white rounded-full z-10"
-                style={{ minWidth: '44px', minHeight: '44px' }}
+                className="absolute right-4 p-3 bg-black/60 text-white rounded-full z-10 backdrop-blur-sm border border-white/20"
+                style={{
+                  top: 'max(env(safe-area-inset-top, 16px), 16px)',
+                  minWidth: '48px',
+                  minHeight: '48px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
               >
-                <X size={24} />
+                <X size={22} weight="bold" />
               </button>
             </div>
 

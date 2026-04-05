@@ -143,7 +143,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       </div>
 
       <ScrollArea className="flex-1 px-4 py-6">
-        <div className="space-y-6 max-w-md pb-20">
+        <div className="space-y-6 pb-20 overflow-x-hidden">
           <Accordion type="multiple" defaultValue={['health']} className="space-y-4">
             <AccordionItem value="health" className="border-2 border-green/30 rounded-lg px-4 bg-gradient-to-br from-green/5 to-transparent">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
