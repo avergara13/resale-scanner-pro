@@ -307,7 +307,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
 
       // Detect research/price questions and use web-grounded search
       const isResearchQuery = lowerInput.includes('price') || lowerInput.includes('worth') ||
-        lowerInput.includes('value') || lowerInput.includes('research') || lowerInput.includes('find') ||
+        lowerInput.includes('value') || lowerInput.includes('research') ||
         lowerInput.includes('sell for') || lowerInput.includes('market') || lowerInput.includes('how much')
 
       if (isResearchQuery && currentItem?.productName && settings?.geminiApiKey) {
