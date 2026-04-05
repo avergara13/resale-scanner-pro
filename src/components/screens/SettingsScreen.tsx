@@ -115,14 +115,14 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
     toast.success('Settings refreshed')
   }, [])
 
-  const { isPulling, isRefreshing, pullDistance, progress, shouldTrigger } = usePullToRefresh({
+  const { containerRef, isPulling, isRefreshing, pullDistance, progress, shouldTrigger } = usePullToRefresh({
     onRefresh: handleRefresh,
     threshold: 80,
     enabled: true,
   })
 
   return (
-    <div id="scr-settings" className="flex flex-col h-full">
+    <div id="scr-settings" ref={containerRef} className="flex flex-col h-full overflow-y-auto">
       <PullToRefreshIndicator
         isPulling={isPulling}
         isRefreshing={isRefreshing}
