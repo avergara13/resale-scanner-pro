@@ -152,40 +152,10 @@ async function checkAnthropicHealth(apiKey?: string): Promise<Omit<ServiceHealth
     return { status: 'offline', error: 'API key not configured' }
   }
 
-  const startTime = Date.now()
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/models', {
-      method: 'GET',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-    })
-
-    const latency = Date.now() - startTime
-
-    if (response.ok) {
-      return {
-        status: latency < 1000 ? 'healthy' : 'degraded',
-        latency,
-        lastChecked: Date.now(),
-      }
-    }
-
-    return {
-      status: 'offline',
-      error: `HTTP ${response.status}`,
-      latency,
-      lastChecked: Date.now(),
-    }
-  } catch (error) {
-    return {
-      status: 'offline',
-      error: error instanceof Error ? error.message : 'Network error',
-      latency: Date.now() - startTime,
-      lastChecked: Date.now(),
-    }
+  return {
+    status: 'degraded',
+    error: 'Browser health probe unavailable; Anthropic key is configured',
+    lastChecked: Date.now(),
   }
 }
 
