@@ -208,12 +208,15 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                 )}
               </AnimatePresence>
 
-              <div className="absolute left-1/2 -translate-x-1/2 flex bg-black/50 p-1 rounded-xl backdrop-blur-md border border-white/10 z-10" style={{ top: 'calc(env(safe-area-inset-top, 16px) + 48px)', width: mode === 'barcode' ? '260px' : '200px' }}>
+              <div
+                className="absolute left-1/2 -translate-x-1/2 flex bg-black/60 p-1 rounded-2xl backdrop-blur-md border border-white/10 z-10"
+                style={{ top: 'calc(env(safe-area-inset-top, 16px) + 48px)', width: '260px' }}
+              >
                 <button
                   onClick={() => setMode('lens')}
                   className={cn(
-                    'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
-                    mode === 'lens' ? 'bg-white text-black shadow-sm' : 'text-white'
+                    'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all',
+                    mode === 'lens' ? 'bg-white text-black shadow-sm' : 'text-white/70'
                   )}
                 >
                   AI LENS
@@ -221,18 +224,18 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                 <button
                   onClick={() => setMode('barcode')}
                   className={cn(
-                    'flex-1 py-2 px-1 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1',
-                    mode === 'barcode' ? 'bg-white text-black shadow-sm' : 'text-white'
+                    'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1',
+                    mode === 'barcode' ? 'bg-white text-black shadow-sm' : 'text-white/70'
                   )}
                 >
-                  <BarcodeIcon size={14} weight="bold" />
+                  <BarcodeIcon size={13} weight="bold" />
                   SCAN
                 </button>
                 <button
                   onClick={() => setMode('listing')}
                   className={cn(
-                    'flex-1 py-2 text-xs font-bold rounded-lg transition-all',
-                    mode === 'listing' ? 'bg-white text-black shadow-sm' : 'text-white'
+                    'flex-1 py-2.5 text-xs font-bold rounded-xl transition-all',
+                    mode === 'listing' ? 'bg-white text-black shadow-sm' : 'text-white/70'
                   )}
                 >
                   LISTING
@@ -307,7 +310,10 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
               </button>
             </div>
 
-            <div className="bg-black p-6 pb-10 flex flex-col gap-4">
+            <div
+              className="bg-black px-5 pt-4 flex flex-col gap-3"
+              style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 16px)' }}
+            >
               {barcodeProduct && mode === 'lens' && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -484,12 +490,12 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                 </motion.div>
               )}
               
-              <div className="flex items-center justify-center px-4 gap-4">
+              <div className="flex items-center justify-center py-2">
                 <button
                   onClick={handleCapture}
                   disabled={mode === 'lens' && !price}
                   className={cn(
-                    'w-20 h-20 rounded-full border-4 p-1 disabled:opacity-40 transition-all',
+                    'w-[72px] h-[72px] rounded-full border-4 p-1 disabled:opacity-40 transition-all',
                     quickDraftMode ? 'border-amber' : 'border-white'
                   )}
                 >
