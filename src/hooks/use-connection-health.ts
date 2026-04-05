@@ -68,7 +68,7 @@ async function checkGeminiHealth(apiKey?: string): Promise<Omit<ServiceHealth, '
     if (message === 'Failed to fetch') {
       return {
         status: 'degraded',
-        error: 'Browser probe blocked by CORS; Anthropic key is configured',
+        error: 'Browser probe blocked; Gemini key is configured',
         latency: Date.now() - startTime,
         lastChecked: Date.now(),
       }
@@ -85,6 +85,7 @@ async function checkGeminiHealth(apiKey?: string): Promise<Omit<ServiceHealth, '
 
 async function checkGoogleLensHealth(
   apiKey?: string,
+  searchEngineId?: string,
 ): Promise<Omit<ServiceHealth, 'name' | 'configured' | 'critical'>> {
   if (!apiKey) {
     return { status: 'offline', error: 'API key not configured' }
@@ -93,14 +94,27 @@ async function checkGoogleLensHealth(
   const startTime = Date.now()
 
   try {
-    const response = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requests: [] }),
-      }
-    )
+    const response = searchEngineId
+      ? await fetch(
+          `https://www.googleapis.com/customsearch/v1?${new URLSearchParams({
+            key: apiKey,
+            cx: searchEngineId,
+            q: 'test',
+            num: '1',
+          }).toString()}`,
+          {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
+      : await fetch(
+          `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests: [] }),
+          }
+        )
 
     const latency = Date.now() - startTime
 
@@ -112,8 +126,8 @@ async function checkGoogleLensHealth(
       }
     }
 
-    // HTTP 400 with empty requests[] = API is reachable, key is valid (request body was intentionally minimal)
-    if (response.status === 400) {
+    // HTTP 400 with empty requests[] = Vision API is reachable; request body was intentionally minimal.
+    if (!searchEngineId && response.status === 400) {
       return {
         status: 'healthy',
         latency,
@@ -121,11 +135,13 @@ async function checkGoogleLensHealth(
       }
     }
 
-    // HTTP 403 = key exists but Vision API not enabled in Google Cloud Console
+    // HTTP 403 = configured Google credentials are rejected for the active search path.
     if (response.status === 403) {
       return {
         status: 'degraded',
-        error: 'Vision API not enabled — enable in Google Cloud Console',
+        error: searchEngineId
+          ? 'Custom Search credentials rejected (HTTP 403) — scans fall back to Gemini-only'
+          : 'Vision API rejected credentials (HTTP 403) — scans fall back to Gemini-only',
         latency,
         lastChecked: Date.now(),
       }
@@ -299,7 +315,7 @@ export function useConnectionHealth({
 
     const [geminiHealth, googleLensHealth, ebayHealth, anthropicHealth] = await Promise.all([
       checkGeminiHealth(settings?.geminiApiKey),
-      checkGoogleLensHealth(settings?.googleApiKey),
+      checkGoogleLensHealth(settings?.googleApiKey, settings?.googleSearchEngineId),
       checkEbayHealth(settings?.ebayApiKey, settings?.ebayAppId),
       checkAnthropicHealth(settings?.anthropicApiKey),
     ])
@@ -347,6 +363,10 @@ export function useConnectionHealth({
     if (!enabled) return
 
     checkHealth()
+
+    if (checkInterval <= 0) {
+      return
+    }
 
     const interval = setInterval(checkHealth, checkInterval)
 

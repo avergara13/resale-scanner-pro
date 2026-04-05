@@ -4,7 +4,6 @@ import { Toaster, toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BottomNav } from './components/BottomNav'
 import { CameraOverlay } from './components/CameraOverlay'
-import { ConnectionHealthMonitor } from './components/ConnectionHealthMonitor'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { AIScreen } from './components/screens/AIScreen'
@@ -865,8 +864,6 @@ function App() {
         captureState === 'fail' && "fail-flash"
       )}
     >
-      <ConnectionHealthMonitor settings={settings} enabled={true} notifyOnChange={false} />
-      
       <RetryStatusIndicator 
         activeRetries={retryState.activeRetries}
         position="top-right"

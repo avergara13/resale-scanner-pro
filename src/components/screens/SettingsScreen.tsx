@@ -43,7 +43,6 @@ import { RetryConfigPanel } from '../RetryConfigPanel'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
-import { toast } from 'sonner'
 import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
@@ -190,13 +189,13 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     <div>
                       <p className="text-sm font-semibold text-t1 mb-1">Real-Time Monitoring</p>
                       <p className="text-xs text-t2 leading-relaxed">
-                        All API connections are monitored continuously with automatic health checks every 30 seconds. Configure your API keys below to see live status indicators.
+                        Run a live health check on demand from this panel. Persistently failing integrations are shown here so scans can fall back cleanly instead of failing silently.
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <ApiStatusIndicator settings={settings} liveUpdates={true} checkInterval={30000} />
+                <ApiStatusIndicator settings={settings} liveUpdates={true} checkInterval={0} />
               </AccordionContent>
             </AccordionItem>
 
