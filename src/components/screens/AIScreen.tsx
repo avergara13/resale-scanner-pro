@@ -3,7 +3,7 @@ import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti, Pape
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
-import { callLLM } from '@/lib/llm-service'
+import { callLLM, researchProduct } from '@/lib/llm-service'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -302,12 +302,27 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
 
     try {
       const contextData = buildAIContext()
-      const promptText = `You are an AI assistant specialized in resale business analysis. You have access to the following app context:\n\n${contextData}\n\nUser question: ${chatInput}\n\nProvide a helpful, concise response based on the context. If analyzing an item, reference specific data from the current analysis. Be professional but conversational.`
+      const lowerInput = chatInput.toLowerCase()
+      let response: string
 
-      const response = await callLLM(promptText, {
-        task: 'chat',
-        geminiApiKey: settings?.geminiApiKey,
-      })
+      // Detect research/price questions and use web-grounded search
+      const isResearchQuery = lowerInput.includes('price') || lowerInput.includes('worth') ||
+        lowerInput.includes('value') || lowerInput.includes('research') || lowerInput.includes('find') ||
+        lowerInput.includes('sell for') || lowerInput.includes('market') || lowerInput.includes('how much')
+
+      if (isResearchQuery && currentItem?.productName && settings?.geminiApiKey) {
+        response = await researchProduct(
+          currentItem.productName,
+          { purchasePrice: currentItem.purchasePrice, category: currentItem.category },
+          settings.geminiApiKey
+        )
+      } else {
+        const promptText = `You are an AI assistant for resale business analysis. Context:\n\n${contextData}\n\nUser: ${chatInput}\n\nProvide a helpful, concise response. Reference the scanned item's data. If the user asks about pricing or market value and you don't have data, suggest they tap "Research Item" in the Agent tab for live marketplace search.`
+        response = await callLLM(promptText, {
+          task: 'chat',
+          geminiApiKey: settings?.geminiApiKey,
+        })
+      }
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -331,7 +346,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
     } finally {
       setIsSendingMessage(false)
     }
-  }, [chatInput, isSendingMessage, buildAIContext, settings?.preferredAiModel])
+  }, [chatInput, isSendingMessage, buildAIContext, settings?.geminiApiKey, currentItem])
 
   return (
     <div className="flex flex-col w-full h-full min-h-screen bg-bg">
@@ -378,7 +393,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
 
       <div className="flex-1 overflow-y-auto">
         {tab === 'analysis' ? (
-          <div ref={pullToRefresh.containerRef} className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-40 sm:pb-44">
+          <div ref={pullToRefresh.containerRef} className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-52 sm:pb-56">
             {pipeline.length === 0 ? (
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">

@@ -284,7 +284,8 @@ function App() {
       ))
       
       let marketData: typeof newItem.marketData = undefined
-      let ebayAvgPrice = price * 4.5
+      // Estimate sell price: use 4.5x markup if price entered, otherwise use Gemini confidence as a signal
+      let ebayAvgPrice = price > 0 ? price * 4.5 : 0
       
       simulateProgress(2, 3800)
       
@@ -685,7 +686,7 @@ function App() {
         }
 
         let marketData: typeof item.marketData = undefined
-        let ebayAvgPrice = item.purchasePrice * 4.5
+        let ebayAvgPrice = item.purchasePrice > 0 ? item.purchasePrice * 4.5 : 0
         
         if (ebayService && visionResult) {
           try {
