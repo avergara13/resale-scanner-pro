@@ -88,7 +88,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       defaultShippingCost: 5.0,
       ebayFeePercent: 12.9,
       paypalFeePercent: 3.49,
-      preferredAiModel: 'gemini-2.0-flash',
+      preferredAiModel: 'gemini-2.5-flash',
       imageQuality: { preset: 'balanced' },
       ...preservedKeys,
     }
@@ -112,7 +112,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
   const handleRefresh = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, 600))
-    toast.success('Settings refreshed')
+    // silent refresh — no toast needed
   }, [])
 
   const { containerRef, isPulling, isRefreshing, pullDistance, progress, shouldTrigger } = usePullToRefresh({
@@ -122,7 +122,15 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   })
 
   return (
-    <div id="scr-settings" ref={containerRef} className="flex flex-col h-full overflow-y-auto">
+    <div
+      id="scr-settings"
+      ref={containerRef}
+      className="flex flex-col h-full overflow-y-auto"
+      style={{
+        paddingTop: isPulling || isRefreshing ? `${Math.max(pullDistance, 60)}px` : '0px',
+        transition: isPulling ? 'none' : 'padding-top 0.3s ease-out'
+      }}
+    >
       <PullToRefreshIndicator
         isPulling={isPulling}
         isRefreshing={isRefreshing}
@@ -163,10 +171,10 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-4 py-6">
-        <div className="space-y-6 pb-20 overflow-x-hidden">
+      <ScrollArea className="flex-1 px-2 py-6">
+        <div className="space-y-4 pb-20 overflow-hidden">
           <Accordion type="multiple" defaultValue={['health']} className="space-y-4">
-            <AccordionItem value="health" className="border border-green/20 rounded-lg px-4 bg-fg">
+            <AccordionItem value="health" className="border border-green/20 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-green animate-pulse" />
@@ -192,7 +200,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="history" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="history" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 📊 Connection History & Downtime Tracking
               </AccordionTrigger>
@@ -210,7 +218,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="retry" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="retry" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🔄 Retry Configuration
               </AccordionTrigger>
@@ -233,7 +241,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="incidents" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="incidents" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🚨 Incident Logs & API Issues
               </AccordionTrigger>
@@ -251,7 +259,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="detection" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="detection" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   📸 Multi-Object Detection History
@@ -271,7 +279,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="false-positives" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="false-positives" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   🎯 False Positive Analysis & Optimization
@@ -310,7 +318,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="ai" className="border border-b1/20 rounded-lg px-4 bg-fg">
+            <AccordionItem value="ai" className="border border-b1/20 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🤖 AI Configuration
               </AccordionTrigger>
@@ -329,16 +337,15 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     Preferred AI Model
                   </Label>
                   <Select 
-                    value={settings.preferredAiModel || 'gemini-2.0-flash'}
+                    value={settings.preferredAiModel || 'gemini-2.5-flash'}
                     onValueChange={(value) => onUpdate({ preferredAiModel: value as AppSettings['preferredAiModel'] })}
                   >
                     <SelectTrigger id="ai-model" className="font-mono text-sm">
                       <SelectValue placeholder="Select model" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash (Fastest)</SelectItem>
-                      <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
-                      <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
+                      <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</SelectItem>
+                      <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
                       <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet (Backup)</SelectItem>
                     </SelectContent>
                   </Select>
@@ -395,7 +402,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="google" className="border border-b1/20 rounded-lg px-4 bg-fg">
+            <AccordionItem value="google" className="border border-b1/20 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   🔍 Google Cloud APIs — Enhanced Product ID
@@ -609,7 +616,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="ebay" className="border border-b1/20 rounded-lg px-4 bg-fg">
+            <AccordionItem value="ebay" className="border border-b1/20 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 <div className="flex items-center gap-2">
                   💰 eBay Integration — Market Pricing
@@ -858,7 +865,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="database" className="border border-b1/20 rounded-lg px-4 bg-fg">
+            <AccordionItem value="database" className="border border-b1/20 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🗄️ Database & Automation
               </AccordionTrigger>
@@ -956,7 +963,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="features" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="features" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🎛️ Feature Toggles
               </AccordionTrigger>
@@ -1119,7 +1126,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="image-quality" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="image-quality" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 📸 Image Quality
               </AccordionTrigger>
@@ -1200,7 +1207,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="compression" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="compression" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 💾 Compression Analytics
               </AccordionTrigger>
@@ -1218,7 +1225,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="tag-presets" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="tag-presets" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🏷️ Tag Presets
               </AccordionTrigger>
@@ -1240,7 +1247,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="business" className="border border-s2 rounded-lg px-4 bg-fg">
+            <AccordionItem value="business" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 💰 Business Rules
               </AccordionTrigger>

@@ -91,6 +91,28 @@ const defaultTheme = {
         overlay: "var(--color-bg-overlay)",
       },
       "focus-ring": "var(--color-focus-ring)",
+      // shadcn/ui semantic colors
+      background: "var(--background)",
+      foreground: "var(--foreground)",
+      card: {
+        DEFAULT: "var(--card)",
+        foreground: "var(--card-foreground)",
+      },
+      popover: {
+        DEFAULT: "var(--popover)",
+        foreground: "var(--popover-foreground)",
+      },
+      muted: {
+        DEFAULT: "var(--muted)",
+        foreground: "var(--muted-foreground)",
+      },
+      destructive: {
+        DEFAULT: "var(--destructive)",
+      },
+      "accent-foreground": "var(--accent-foreground)",
+      border: "var(--border)",
+      input: "var(--input)",
+      ring: "var(--ring)",
     },
     borderRadius: {
       sm: "var(--radius-sm)",

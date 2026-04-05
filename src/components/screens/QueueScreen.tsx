@@ -272,11 +272,11 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       
       if (sortBy !== 'manual') {
         setSortBy('manual')
-        toast.success('Switched to manual ordering')
+        // silent
       }
       
       onReorder(reorderedItems)
-      toast.success('Queue reordered')
+      // silent
     }
   }
 
@@ -557,7 +557,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
 
   const handleSaveEdit = (itemId: string, updates: Partial<ScannedItem>) => {
     onEdit(itemId, updates)
-    toast.success('Item updated successfully')
+    // silent
   }
 
   const handleRemoveFilter = (filterKey: keyof AdvancedFilterOptions, value?: string) => {
@@ -621,9 +621,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     const currentTags = await window.spark.kv.get<ItemTag[]>('all-tags')
     
     if (currentQueue && queueItems !== currentQueue) {
-      toast.success(`Queue refreshed - ${currentQueue.length} items`)
+      // silent refresh
     } else {
-      toast.success('Queue is up to date')
+      // silent — already up to date
     }
   }, [queueItems])
 
@@ -937,7 +937,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <Button
                 onClick={() => {
                   setSortBy('manual')
-                  toast.success('Switched to manual ordering')
+                  // silent
                 }}
                 size="sm"
                 variant="ghost"
