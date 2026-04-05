@@ -56,7 +56,7 @@ function App() {
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
     paypalFeePercent: 3.49,
-    preferredAiModel: 'gemini-2.0-flash',
+    preferredAiModel: 'gemini-2.5-flash',
     notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
     imageQuality: { preset: 'balanced' },
     // Pre-populated from Railway env vars — both users get keys automatically.
@@ -432,13 +432,13 @@ function App() {
         if (current.some(i => i.id === currentItem.id)) return current
         return [...current, { ...currentItem, inQueue: true }]
       })
-      toast.success('Added to queue')
+      // silent — queue tab badge shows the update
     }
   }, [currentItem, setQueue])
 
   const handleRemoveFromQueue = useCallback((id: string) => {
     setQueue((prev) => (prev || []).filter(item => item.id !== id))
-    toast.success('Removed from queue')
+    // silent removal
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
@@ -478,7 +478,7 @@ function App() {
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
         paypalFeePercent: 3.49,
-        preferredAiModel: 'gemini-2.0-flash',
+        preferredAiModel: 'gemini-2.5-flash',
       }
       const newSettings = { ...(prev || defaults), ...updates }
       
@@ -1060,7 +1060,21 @@ function App() {
         />
       )}
 
-      <Toaster position="top-center" richColors offset="60px" />
+      <Toaster
+        position="top-center"
+        richColors
+        offset="70px"
+        toastOptions={{
+          style: {
+            borderRadius: '14px',
+            padding: '12px 16px',
+            fontSize: '13px',
+            maxWidth: '360px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+          },
+          duration: 2500,
+        }}
+      />
     </div>
   )
 }

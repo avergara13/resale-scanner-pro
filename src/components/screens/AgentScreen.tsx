@@ -183,8 +183,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
   const chatMessages = activeSession?.messages || []
 
   const handleRefresh = useCallback(async () => {
-    await new Promise(resolve => setTimeout(resolve, 800))
-    toast.success('Agent refreshed')
+    await new Promise(resolve => setTimeout(resolve, 600))
   }, [])
 
   const pullToRefresh = usePullToRefresh({
@@ -238,7 +237,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
     setActiveSessionId(newSession.id)
     setNewSessionName('')
     setShowNewSessionDialog(false)
-    toast.success('New session created')
+    // silent
   }, [newSessionName, setChatSessions, setActiveSessionId])
 
   const handleDeleteSession = useCallback((sessionId: string) => {
@@ -256,7 +255,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
       }
     }
     
-    toast.success('Session deleted')
+    // silent
   }, [chatSessions, activeSessionId, setChatSessions, setActiveSessionId])
 
   const handleRenameSession = useCallback(() => {
@@ -274,7 +273,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
     setShowRenameDialog(false)
     setRenameSessionId(null)
     setRenameValue('')
-    toast.success('Session renamed')
+    // silent
   }, [renameSessionId, renameValue, setChatSessions])
 
   const handleOpenRenameDialog = useCallback((sessionId: string) => {
@@ -317,12 +316,24 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
     const text = messageText || input.trim()
     if (!text || isProcessing) return
 
-    if (!activeSessionId) {
-      handleCreateSession()
-      setTimeout(() => {
-        setInput(text)
-      }, 100)
-      return
+    // Auto-create session if none exists, then continue sending in one tap
+    let sessionId = activeSessionId
+    if (!sessionId) {
+      const name = `Session ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+      const newSession: ChatSession = {
+        id: Date.now().toString(),
+        name,
+        createdAt: Date.now(),
+        lastMessageAt: Date.now(),
+        messages: [],
+        isActive: true,
+      }
+      setChatSessions((prev) => {
+        const updated = (prev || []).map(s => ({ ...s, isActive: false }))
+        return [newSession, ...updated]
+      })
+      setActiveSessionId(newSession.id)
+      sessionId = newSession.id
     }
 
     const lowerText = text.toLowerCase()
@@ -337,7 +348,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
       
       setChatSessions((prev) => 
         (prev || []).map(s => 
-          s.id === activeSessionId 
+          s.id === sessionId
             ? { ...s, messages: [...s.messages, quickResponse], lastMessageAt: Date.now() }
             : s
         )
@@ -359,8 +370,8 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
     }
 
     setChatSessions((prev) => 
-      (prev || []).map(s => 
-        s.id === activeSessionId 
+      (prev || []).map(s =>
+        s.id === sessionId 
           ? { ...s, messages: [...s.messages, userMessage], lastMessageAt: Date.now() }
           : s
       )
@@ -383,7 +394,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
           }
           setChatSessions((prev) =>
             (prev || []).map(s =>
-              s.id === activeSessionId
+              s.id === sessionId
                 ? { ...s, messages: [...s.messages, msg], lastMessageAt: Date.now() }
                 : s
             )
@@ -478,7 +489,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
           }
           setChatSessions((prev) =>
             (prev || []).map(s =>
-              s.id === activeSessionId
+              s.id === sessionId
                 ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
                 : s
             )
@@ -498,7 +509,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
         setChatSessions((prev) =>
           (prev || []).map(s =>
-            s.id === activeSessionId
+            s.id === sessionId
               ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
               : s
           )
@@ -519,7 +530,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
         setChatSessions((prev) =>
           (prev || []).map(s =>
-            s.id === activeSessionId
+            s.id === sessionId
               ? { ...s, messages: [...s.messages, completionMessage], lastMessageAt: Date.now() }
               : s
           )
@@ -542,7 +553,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
           }
           setChatSessions((prev) =>
             (prev || []).map(s =>
-              s.id === activeSessionId
+              s.id === sessionId
                 ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
                 : s
             )
@@ -562,7 +573,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
         setChatSessions((prev) =>
           (prev || []).map(s =>
-            s.id === activeSessionId
+            s.id === sessionId
               ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
               : s
           )
@@ -589,7 +600,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
         setChatSessions((prev) =>
           (prev || []).map(s =>
-            s.id === activeSessionId
+            s.id === sessionId
               ? { ...s, messages: [...s.messages, completionMessage], lastMessageAt: Date.now() }
               : s
           )
@@ -636,7 +647,7 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
 
       setChatSessions((prev) =>
         (prev || []).map(s =>
-          s.id === activeSessionId
+          s.id === sessionId
             ? { ...s, messages: [...s.messages, aiMessage], lastMessageAt: Date.now() }
             : s
         )
@@ -648,7 +659,7 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, handleCreateSession, setChatSessions, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze])
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)

@@ -244,8 +244,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
   const canSaveDraft = currentItem?.imageData || description.trim().length > 0
 
   const handleRefresh = useCallback(async () => {
-    await new Promise(resolve => setTimeout(resolve, 800))
-    toast.success('AI analysis refreshed')
+    await new Promise(resolve => setTimeout(resolve, 600))
   }, [])
 
   const pullToRefresh = usePullToRefresh({

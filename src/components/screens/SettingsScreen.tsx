@@ -88,7 +88,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       defaultShippingCost: 5.0,
       ebayFeePercent: 12.9,
       paypalFeePercent: 3.49,
-      preferredAiModel: 'gemini-2.0-flash',
+      preferredAiModel: 'gemini-2.5-flash',
       imageQuality: { preset: 'balanced' },
       ...preservedKeys,
     }
@@ -112,7 +112,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
   const handleRefresh = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, 600))
-    toast.success('Settings refreshed')
+    // silent refresh — no toast needed
   }, [])
 
   const { containerRef, isPulling, isRefreshing, pullDistance, progress, shouldTrigger } = usePullToRefresh({
@@ -122,7 +122,15 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   })
 
   return (
-    <div id="scr-settings" ref={containerRef} className="flex flex-col h-full overflow-y-auto">
+    <div
+      id="scr-settings"
+      ref={containerRef}
+      className="flex flex-col h-full overflow-y-auto"
+      style={{
+        paddingTop: isPulling || isRefreshing ? `${Math.max(pullDistance, 60)}px` : '0px',
+        transition: isPulling ? 'none' : 'padding-top 0.3s ease-out'
+      }}
+    >
       <PullToRefreshIndicator
         isPulling={isPulling}
         isRefreshing={isRefreshing}
@@ -329,16 +337,15 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     Preferred AI Model
                   </Label>
                   <Select 
-                    value={settings.preferredAiModel || 'gemini-2.0-flash'}
+                    value={settings.preferredAiModel || 'gemini-2.5-flash'}
                     onValueChange={(value) => onUpdate({ preferredAiModel: value as AppSettings['preferredAiModel'] })}
                   >
                     <SelectTrigger id="ai-model" className="font-mono text-sm">
                       <SelectValue placeholder="Select model" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash (Fastest)</SelectItem>
-                      <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
-                      <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
+                      <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</SelectItem>
+                      <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
                       <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet (Backup)</SelectItem>
                     </SelectContent>
                   </Select>

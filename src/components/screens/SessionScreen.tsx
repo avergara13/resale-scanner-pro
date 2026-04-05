@@ -46,7 +46,7 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
     if (currentSessions) setAllSessions(currentSessions)
     if (currentGoals) setGoals(currentGoals)
     
-    toast.success('Session data refreshed')
+    // silent refresh
   }, [setQueue, setAllSessions, setGoals])
 
   const {
