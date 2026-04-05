@@ -150,6 +150,7 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
           <div className="flex flex-col items-center justify-center space-y-4 py-8">
             <button
               onClick={onStartSession}
+              aria-label="Start scanning session"
               className="w-24 h-24 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center shadow-lg active:scale-95 transition-all hover:shadow-xl"
             >
               <Play size={40} weight="fill" className="text-white ml-1" />

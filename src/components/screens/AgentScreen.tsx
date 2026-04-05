@@ -29,6 +29,7 @@ import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { callLLM } from '@/lib/llm-service'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   DropdownMenu,
@@ -620,7 +621,10 @@ Be proactive and actionable - suggest specific next steps the user can take.
 If the queue is empty or has few items, suggest using the camera to scan more products.`
 
       const fullPrompt = `${systemPrompt}\n\nUser: ${text}`
-      const response = await window.spark.llm(fullPrompt, settings?.preferredAiModel || 'gemini-2.0-flash-exp')
+      const response = await callLLM(fullPrompt, {
+        model: settings?.preferredAiModel || 'gemini-2.0-flash-exp',
+        geminiApiKey: settings?.geminiApiKey,
+      })
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -637,8 +641,9 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
         )
       )
     } catch (error) {
-      console.error('Error sending message:', error)
-      toast.error('Failed to get response from AI')
+      const msg = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Agent AI error:', msg)
+      toast.error(msg.includes('API key') ? msg : `AI error: ${msg}`)
     } finally {
       setIsProcessing(false)
     }

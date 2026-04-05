@@ -1,4 +1,5 @@
 import type { ScannedItem, MarketData } from '@/types'
+import { callLLM } from './llm-service'
 
 export interface OptimizedListing {
   title: string
@@ -42,7 +43,11 @@ export class ListingOptimizationService {
 
     try {
       const prompt = this.buildOptimizationPrompt(context)
-      const response = await window.spark.llm(prompt, this.preferredModel, true)
+      const response = await callLLM(prompt, {
+        model: this.preferredModel,
+        geminiApiKey: this.geminiApiKey,
+        jsonMode: true,
+      })
       const parsed = JSON.parse(response)
 
       return {
