@@ -567,7 +567,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
       </div>
 
       <div className="fixed bottom-[80px] left-0 right-0 max-w-[480px] mx-auto border-t border-s2 bg-fg/95 backdrop-blur-md z-20 safe-bottom">
-        {tab === 'analysis' && hasDecision && (
+        {tab === 'analysis' && hasDecision && currentItem?.decision === 'GO' && (
           <div className="p-2.5 sm:p-3 border-b border-s2">
             <Button
               onClick={onAddToQueue}

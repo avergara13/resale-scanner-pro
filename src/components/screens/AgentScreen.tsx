@@ -29,7 +29,7 @@ import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { callLLM } from '@/lib/llm-service'
+import { callLLM, researchProduct } from '@/lib/llm-service'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   DropdownMenu,
@@ -75,9 +75,9 @@ const QUICK_ACTIONS: QuickAction[] = [
     prompt: 'Push all ready listings to Notion'
   },
   {
-    emoji: '📊',
-    label: 'Analyze Trends',
-    prompt: 'What trends should I watch in the resale market?'
+    emoji: '🔎',
+    label: 'Research Item',
+    prompt: 'Research the market value of my most recent item'
   },
   {
     emoji: '✨',
@@ -162,11 +162,12 @@ interface AgentScreenProps {
   onOptimizeItem?: (itemId: string) => Promise<void>
   onPushToNotion?: (itemId: string) => Promise<void>
   onBatchAnalyze?: () => Promise<void>
+  onEditItem?: (itemId: string, updates: Partial<ScannedItem>) => void
   onNavigateToQueue?: () => void
   onOpenCamera?: () => void
 }
 
-export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onNavigateToQueue, onOpenCamera }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onNavigateToQueue, onOpenCamera }: AgentScreenProps) {
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
   const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
   const [input, setInput] = useState('')
@@ -611,25 +612,107 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         return
       }
 
+      // Research command — uses Gemini with Google Search grounding for real market data
+      if ((lowerText.includes('research') || lowerText.includes('look up') || lowerText.includes('double check') || lowerText.includes('price check') || lowerText.includes('market value')) && settings?.geminiApiKey) {
+        // Find the most recently discussed item or the most recent queue item
+        const recentItem = queueItems.find(i =>
+          lowerText.includes(i.productName?.toLowerCase() || '')
+        ) || queueItems[queueItems.length - 1]
+
+        if (recentItem?.productName) {
+          const addMsg = (content: string) => {
+            setChatSessions((prev) =>
+              (prev || []).map(s =>
+                s.id === sessionId
+                  ? { ...s, messages: [...s.messages, { id: Date.now().toString() + Math.random().toString(36).slice(2, 5), role: 'assistant' as const, content, timestamp: Date.now() }], lastMessageAt: Date.now() }
+                  : s
+              )
+            )
+          }
+
+          addMsg(`Researching **${recentItem.productName}** across marketplaces...`)
+
+          try {
+            const research = await researchProduct(
+              recentItem.productName,
+              { purchasePrice: recentItem.purchasePrice, category: recentItem.category },
+              settings.geminiApiKey
+            )
+            addMsg(research)
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Research failed'
+            addMsg(`Research error: ${msg}. Try asking me a specific question about the product instead.`)
+          }
+
+          setIsProcessing(false)
+          return
+        }
+      }
+
+      // Edit item command — user says "change price to X", "update description", etc.
+      if ((lowerText.includes('change') || lowerText.includes('update') || lowerText.includes('set')) &&
+          (lowerText.includes('price') || lowerText.includes('description') || lowerText.includes('title') || lowerText.includes('category')) &&
+          onEditItem) {
+        const recentItem = queueItems[queueItems.length - 1]
+        if (recentItem) {
+          const updates: Partial<ScannedItem> = {}
+
+          // Extract price
+          const priceMatch = text.match(/\$?(\d+\.?\d*)/)?.[1]
+          if (priceMatch && lowerText.includes('price')) {
+            const newPrice = parseFloat(priceMatch)
+            if (lowerText.includes('sell') || lowerText.includes('list')) {
+              updates.estimatedSellPrice = newPrice
+            } else {
+              updates.purchasePrice = newPrice
+            }
+          }
+
+          // Extract description
+          if (lowerText.includes('description')) {
+            const descMatch = text.match(/description\s+(?:to\s+)?["']?(.+?)["']?\s*$/i)
+            if (descMatch) updates.description = descMatch[1]
+          }
+
+          if (Object.keys(updates).length > 0) {
+            onEditItem(recentItem.id, updates)
+            const updateSummary = Object.entries(updates).map(([k, v]) => `${k}: ${v}`).join(', ')
+
+            setChatSessions((prev) =>
+              (prev || []).map(s =>
+                s.id === sessionId
+                  ? { ...s, messages: [...s.messages, { id: Date.now().toString(), role: 'assistant' as const, content: `Updated **${recentItem.productName || 'item'}**: ${updateSummary}`, timestamp: Date.now() }], lastMessageAt: Date.now() }
+                  : s
+              )
+            )
+            setIsProcessing(false)
+            return
+          }
+        }
+      }
+
       const context = buildContext()
-      const systemPrompt = `You are an expert AI agent for resale business optimization. You help users research products, analyze profitability, create optimized listings, and make data-driven decisions.
+      const recentItems = queueItems.slice(-3).map(i =>
+        `• ${i.productName || 'Unknown'} — Buy: $${i.purchasePrice.toFixed(2)}, Sell: $${(i.estimatedSellPrice || 0).toFixed(2)}, Margin: ${(i.profitMargin || 0).toFixed(1)}%, Decision: ${i.decision}`
+      ).join('\n')
+
+      const systemPrompt = `You are an expert AI agent for resale business optimization. You help users research products, analyze profitability, create optimized eBay listings, and make data-driven decisions.
 
 Current Context:
-- Queue has ${queueStats.total} items (${queueStats.go} GO, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
+- Queue: ${queueStats.total} items (${queueStats.go} GO, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
 - Potential profit: $${queueStats.totalProfit.toFixed(2)}
-- Settings: ${settings?.minProfitMargin}% min margin, ${settings?.ebayFeePercent}% eBay fees
+- Settings: ${settings?.minProfitMargin}% min margin, $${settings?.defaultShippingCost} shipping, ${settings?.ebayFeePercent}% eBay fee
+${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
 
-Available Commands:
-- "Scan" or "Camera" or "Capture" - Opens the AI Camera to scan new items (you can directly trigger the camera)
-- "Create listings" or "Optimize listings" - Generate optimized eBay listings for all GO items
-- "Push to Notion" - Send optimized listings to Notion database
-- "Full pipeline" or "Run pipeline" - End-to-end automation: analyze drafts → optimize GO items → push to Notion
-- Ask questions about market research, pricing strategies, or product analysis
+You can perform these actions:
+- "Research [product]" — Search real marketplaces for current prices and demand
+- "Change price to $X" / "Update sell price to $X" — Edit item fields directly
+- "Create listings" — Generate optimized eBay listings for GO items
+- "Push to Notion" — Publish ready listings
+- "Full pipeline" — End-to-end: analyze → optimize → publish
+- "Camera" / "Scan" — Open the AI Camera
 
-The AI Camera uses vision analysis to identify products and calculate profit potential instantly.
-When users want to scan items, encourage them to use the camera feature.
-Be proactive and actionable - suggest specific next steps the user can take.
-If the queue is empty or has few items, suggest using the camera to scan more products.`
+When discussing an item, reference its specific data. If the user asks about pricing or market value, use the research command to look up real marketplace data. Be specific with numbers and actionable advice. If an item has a negative margin, explain WHY (fees + shipping often exceed low sell prices) and suggest alternatives (bundle, different marketplace, higher-value items).`
 
       const fullPrompt = `${systemPrompt}\n\nUser: ${text}`
       const response = await callLLM(fullPrompt, {
@@ -659,7 +742,7 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem])
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)

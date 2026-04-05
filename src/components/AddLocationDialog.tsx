@@ -61,7 +61,7 @@ export function AddLocationDialog({ open, onOpenChange, onSave, existingLocation
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md bg-fg border-s1">
+      <DialogContent className="max-w-md bg-neutral-1 border-s1 shadow-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-t1">
             <MapPin size={20} weight="fill" className="text-b1" />

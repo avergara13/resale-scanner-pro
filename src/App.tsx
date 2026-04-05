@@ -913,6 +913,7 @@ function App() {
                 onOptimizeItem={handleOptimizeItem}
                 onPushToNotion={handlePushToNotion}
                 onBatchAnalyze={handleBatchAnalyze}
+                onEditItem={handleEditQueueItem}
                 onNavigateToQueue={() => setScreen('queue')}
                 onOpenCamera={() => setCameraOpen(true)}
               />
