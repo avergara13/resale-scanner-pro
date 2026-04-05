@@ -404,40 +404,52 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         }
 
         // Step 2: Optimize GO items that don't have listings yet
-        // Re-read queueItems as they may have been updated by batch analysis
-        const goItemsToOptimize = queueItems.filter(i => i.decision === 'GO' && !i.optimizedListing)
-        if (goItemsToOptimize.length > 0 && onOptimizeItem) {
-          addAgentMessage(`**Step 2/3 — Optimizing ${goItemsToOptimize.length} GO listing(s)**\nGenerating SEO titles, descriptions, and pricing...`)
+        // Note: After batch analysis, queueItems from props may be stale.
+        // onOptimizeItem reads fresh queue state from App.tsx internally,
+        // so we collect candidate IDs from current props but the actual
+        // optimization operates on up-to-date data in the parent.
+        const goItemIds = queueItems
+          .filter(i => i.decision === 'GO' && !i.optimizedListing)
+          .map(i => i.id)
+        // Also include items that were drafts (just analyzed in step 1) —
+        // they may now be GO but our stale queueItems still shows them as PENDING.
+        const draftIds = drafts.map(i => i.id)
+        const allCandidateIds = [...new Set([...goItemIds, ...draftIds])]
+
+        if (allCandidateIds.length > 0 && onOptimizeItem) {
+          addAgentMessage(`**Step 2/3 — Optimizing up to ${allCandidateIds.length} listing(s)**\nGenerating SEO titles, descriptions, and pricing...`)
           let optimized = 0
-          for (const item of goItemsToOptimize) {
+          for (const itemId of allCandidateIds) {
             try {
-              await onOptimizeItem(item.id)
+              await onOptimizeItem(itemId)
               optimized++
             } catch (error) {
-              console.error('Optimize failed for:', item.id, error)
+              // onOptimizeItem returns early for non-GO or already-optimized items
+              console.error('Optimize skipped or failed for:', itemId, error)
             }
           }
-          addAgentMessage(`✅ Optimized ${optimized} of ${goItemsToOptimize.length} listings.`)
+          addAgentMessage(`✅ Optimized ${optimized} listing(s).`)
         } else {
-          addAgentMessage(`**Step 2/3 — Optimize:** No new GO items need optimization.`)
+          addAgentMessage(`**Step 2/3 — Optimize:** No items to optimize.`)
         }
 
-        // Step 3: Push optimized items to Notion
-        const readyToPush = queueItems.filter(i => i.optimizedListing && !i.notionPageId)
-        if (readyToPush.length > 0 && onPushToNotion) {
-          addAgentMessage(`**Step 3/3 — Publishing ${readyToPush.length} listing(s) to Notion**`)
+        // Step 3: Push to Notion — use all candidate IDs since we can't
+        // read fresh state. onPushToNotion checks item.optimizedListing
+        // internally and skips items without listings.
+        if (allCandidateIds.length > 0 && onPushToNotion) {
+          addAgentMessage(`**Step 3/3 — Publishing listing(s) to Notion**`)
           let pushed = 0
-          for (const item of readyToPush) {
+          for (const itemId of allCandidateIds) {
             try {
-              await onPushToNotion(item.id)
+              await onPushToNotion(itemId)
               pushed++
             } catch (error) {
-              console.error('Push failed for:', item.id, error)
+              console.error('Push skipped or failed for:', itemId, error)
             }
           }
-          addAgentMessage(`✅ Published ${pushed} of ${readyToPush.length} listings to Notion.`)
+          addAgentMessage(`✅ Published ${pushed} listing(s) to Notion.`)
         } else {
-          addAgentMessage(`**Step 3/3 — Publish:** No listings ready to push (already published or not optimized).`)
+          addAgentMessage(`**Step 3/3 — Publish:** No listings to push.`)
         }
 
         addAgentMessage(`🏁 **Pipeline complete!** Check your Queue to review results. You can manually edit any listing before final publishing.`)

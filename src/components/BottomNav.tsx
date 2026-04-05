@@ -21,10 +21,11 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 bg-fg/95 backdrop-blur-md border-t border-s1 safe-bottom z-40"
-      style={{ 
-        maxWidth: '100%', 
+      className="fixed bottom-0 left-0 right-0 bg-fg/95 backdrop-blur-md border-t border-s1 z-40"
+      style={{
+        maxWidth: '100%',
         margin: '0 auto',
+        paddingBottom: 'max(env(safe-area-inset-bottom), 8px)',
         boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
         WebkitBackdropFilter: 'blur(12px)'
       }}

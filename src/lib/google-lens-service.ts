@@ -231,62 +231,6 @@ export class GoogleLensService {
 
     return undefined
   }
-
-  private getEnhancedMockResults(): GoogleLensAnalysis {
-    const results: GoogleLensResult[] = [
-      {
-        title: 'Similar product on eBay - Used',
-        link: 'https://www.ebay.com/itm/123456789',
-        source: 'ebay.com',
-        price: '$49.99',
-        snippet: 'Gently used, excellent condition',
-        thumbnail: 'https://via.placeholder.com/150',
-      },
-      {
-        title: 'New listing on eBay',
-        link: 'https://www.ebay.com/itm/987654321',
-        source: 'ebay.com',
-        price: '$64.99',
-        snippet: 'Brand new in box',
-        thumbnail: 'https://via.placeholder.com/150',
-      },
-      {
-        title: 'Amazon product match',
-        link: 'https://www.amazon.com/dp/B08EXAMPLE',
-        source: 'amazon.com',
-        price: '$54.99',
-        snippet: 'Prime eligible, free shipping',
-        thumbnail: 'https://via.placeholder.com/150',
-      },
-      {
-        title: 'Mercari listing - Like New',
-        link: 'https://www.mercari.com/us/item/m12345678',
-        source: 'mercari.com',
-        price: '$45.00',
-        snippet: 'Like new condition, fast shipping',
-        thumbnail: 'https://via.placeholder.com/150',
-      },
-      {
-        title: 'Poshmark closet item',
-        link: 'https://poshmark.com/listing/example',
-        source: 'poshmark.com',
-        price: '$42.00',
-        snippet: 'Authentic, lightly used',
-        thumbnail: 'https://via.placeholder.com/150',
-      },
-    ]
-
-    return {
-      results,
-      bestMatch: results[0],
-      priceRange: {
-        min: 42.00,
-        max: 64.99,
-        average: 51.39,
-      },
-      dominantSources: ['ebay.com', 'amazon.com', 'mercari.com'],
-    }
-  }
 }
 
 export function createGoogleLensService(
