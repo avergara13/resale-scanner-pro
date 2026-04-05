@@ -25,7 +25,9 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
       style={{
         maxWidth: '100%',
         margin: '0 auto',
-        paddingBottom: 'max(env(safe-area-inset-bottom), 8px)',
+        paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
+        paddingLeft: 'env(safe-area-inset-left, 0px)',
+        paddingRight: 'env(safe-area-inset-right, 0px)',
         boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
         WebkitBackdropFilter: 'blur(12px)'
       }}

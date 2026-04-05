@@ -856,7 +856,7 @@ function App() {
     <div 
       id="app-container" 
       className={cn(
-        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-[430px] sm:max-w-[744px] md:max-w-[834px] lg:max-w-[1024px] xl:max-w-[1366px] mx-auto overflow-x-hidden",
+        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-full sm:max-w-[744px] md:max-w-[834px] lg:max-w-[1024px] xl:max-w-[1366px] mx-auto overflow-x-hidden",
         captureState === 'capturing' && "capture-flash",
         captureState === 'analyzing' && "analyzing-flash",
         captureState === 'success' && "success-flash",
@@ -871,7 +871,13 @@ function App() {
         compact={false}
       />
       
-      <div className="flex-1 relative w-full pt-[env(safe-area-inset-top)] pb-24" style={{ minHeight: 'calc(100vh - 96px)' }}>
+      <div
+        className="flex-1 relative w-full pb-24"
+        style={{
+          minHeight: 'calc(100vh - 96px)',
+          paddingTop: 'env(safe-area-inset-top, 0px)'
+        }}
+      >
         <AnimatePresence mode="wait" custom={direction}>
           {screen === 'session' && (
             <motion.div
