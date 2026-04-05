@@ -348,15 +348,19 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
               
               {mode === 'lens' && (
                 <>
-                  <input
-                    id="camera-price"
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter price ($)"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="bg-white/10 text-white border border-white/20 rounded-lg h-12 px-4 text-base font-mono placeholder:text-white/40 outline-none focus:border-white/60"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 text-base font-mono pointer-events-none">$</span>
+                    <input
+                      id="camera-price"
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="w-full bg-white/10 text-white border border-white/20 rounded-lg h-12 pl-8 pr-4 text-base font-mono placeholder:text-white/30 outline-none focus:border-white/60"
+                    />
+                  </div>
                   
                   <button
                     onClick={() => setShowLocationDialog(true)}
