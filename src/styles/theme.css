@@ -84,6 +84,17 @@
   ::file-selector-button {
     border-color: var(--color-gray-200, currentColor);
   }
+
+  /* Safe area insets for iPhone PWA — notch, home bar, rounded corners */
+  #app-container {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Ensure screen content doesn't overlap bottom nav */
+  #app-container .flex-1 > div {
+    overflow-x: hidden;
+  }
 }
 
 @layer base {
@@ -245,6 +256,22 @@
     /* Focus ring */
     --color-focus-ring: var(--color-accent-9);
 
+    /* shadcn/ui CSS variables — light mode */
+    --background: var(--color-bg);
+    --foreground: var(--color-neutral-12);
+    --card: var(--color-neutral-1);
+    --card-foreground: var(--color-neutral-12);
+    --popover: var(--color-neutral-1);
+    --popover-foreground: var(--color-neutral-12);
+    --muted: var(--color-neutral-3);
+    --muted-foreground: var(--color-neutral-11);
+    --accent: var(--color-neutral-3);
+    --accent-foreground: var(--color-neutral-12);
+    --border: var(--color-neutral-6);
+    --input: var(--color-neutral-6);
+    --ring: var(--color-accent-9);
+    --destructive: var(--red-9);
+
     /* Fonts */
     --font-sans-serif: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
       "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
@@ -258,5 +285,21 @@
     --color-bg: var(--color-neutral-1);
     --color-bg-inset: #000000;
     --color-bg-overlay: var(--color-neutral-3);
+
+    /* shadcn/ui CSS variables — dark mode */
+    --background: var(--color-neutral-1);
+    --foreground: var(--color-neutral-12);
+    --card: var(--color-neutral-2);
+    --card-foreground: var(--color-neutral-12);
+    --popover: var(--color-neutral-2);
+    --popover-foreground: var(--color-neutral-12);
+    --muted: var(--color-neutral-4);
+    --muted-foreground: var(--color-neutral-11);
+    --accent: var(--color-neutral-4);
+    --accent-foreground: var(--color-neutral-12);
+    --border: var(--color-neutral-6);
+    --input: var(--color-neutral-6);
+    --ring: var(--color-accent-9);
+    --destructive: var(--red-9);
   }
 }

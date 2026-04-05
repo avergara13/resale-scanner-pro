@@ -503,7 +503,7 @@ function App() {
 
   const handleOptimizeItem = useCallback(async (itemId: string) => {
     const item = (queue || []).find(i => i.id === itemId)
-    if (!item) return
+    if (!item || item.decision !== 'GO' || item.optimizedListing) return
     const optimized = await listingOptimizationService.generateOptimizedListing({
       item,
       marketData: item.marketData,
@@ -521,7 +521,7 @@ function App() {
       return
     }
     const item = (queue || []).find(i => i.id === itemId)
-    if (!item) return
+    if (!item || item.notionPageId || !item.optimizedListing) return
 
     const listing = item.optimizedListing
     const profit = listing
@@ -670,7 +670,12 @@ function App() {
         let lensAnalysis: GoogleLensAnalysis | undefined
 
         // Google Lens in batch mode — configurable via settings (default: enabled)
-        if (googleLensService && visionResult?.productName && item.imageData && settings?.enableLensInBatch !== false) {
+        // Also skip if Gemini confidence exceeds threshold (same logic as single-item mode)
+        const batchGeminiConfidence = visionResult ? visionResult.confidence : 0
+        const batchLensThreshold = settings?.lensSkipConfidence || 0.85
+        const batchSkipLens = batchGeminiConfidence >= batchLensThreshold
+
+        if (googleLensService && visionResult?.productName && item.imageData && settings?.enableLensInBatch !== false && !batchSkipLens) {
           try {
             lensAnalysis = await googleLensService.searchByImage(item.imageData, visionResult.productName)
           } catch (error) {
@@ -851,7 +856,7 @@ function App() {
     <div 
       id="app-container" 
       className={cn(
-        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-[430px] sm:max-w-[744px] md:max-w-[834px] lg:max-w-[1024px] xl:max-w-[1366px] mx-auto overflow-x-hidden",
+        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-full sm:max-w-[744px] md:max-w-[834px] lg:max-w-[1024px] xl:max-w-[1366px] mx-auto overflow-x-hidden",
         captureState === 'capturing' && "capture-flash",
         captureState === 'analyzing' && "analyzing-flash",
         captureState === 'success' && "success-flash",
@@ -866,7 +871,13 @@ function App() {
         compact={false}
       />
       
-      <div className="flex-1 relative w-full" style={{ minHeight: 'calc(100vh - 96px)' }}>
+      <div
+        className="flex-1 relative w-full pb-24"
+        style={{
+          minHeight: 'calc(100vh - 96px)',
+          paddingTop: 'env(safe-area-inset-top, 0px)'
+        }}
+      >
         <AnimatePresence mode="wait" custom={direction}>
           {screen === 'session' && (
             <motion.div

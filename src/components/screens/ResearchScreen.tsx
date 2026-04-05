@@ -319,7 +319,7 @@ Please provide a clear, well-formatted response following these guidelines:
 
 Format your response to be easy to read and visually scannable.`
       
-      const response = await window.spark.llm(prompt, 'gpt-4o-mini')
+      const response = await window.spark.llm(prompt, 'gemini-2.0-flash-exp')
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -420,7 +420,7 @@ Brief summary of market conditions
 
 Use bullet points, bold key terms, and include specific numbers when possible.`
       
-      const response = await window.spark.llm(prompt, 'gpt-4o')
+      const response = await window.spark.llm(prompt, 'gemini-2.0-flash-exp')
       
       setResearchTasks((prev) =>
         (prev || []).map((t) =>
@@ -469,7 +469,7 @@ End with:
 
 Use bullet points, bold headings, and specific percentages where possible.`
       
-      const response = await window.spark.llm(prompt, 'gpt-4o')
+      const response = await window.spark.llm(prompt, 'gemini-2.0-flash-exp')
       
       setResearchTasks((prev) =>
         (prev || []).map((t) =>
