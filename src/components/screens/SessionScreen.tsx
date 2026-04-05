@@ -147,24 +147,23 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
             items={queue || []}
           />
           
-          <div className="flex flex-col items-center justify-center space-y-6 py-8">
-            <div className="w-24 h-24 rounded-full bg-s1 flex items-center justify-center">
-              <Play size={40} weight="fill" className="text-b1 ml-1" />
-            </div>
-            <div className="text-center space-y-2">
+          <div className="flex flex-col items-center justify-center space-y-4 py-8">
+            <button
+              onClick={onStartSession}
+              aria-label="Start scanning session"
+              className="w-24 h-24 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center shadow-lg active:scale-95 transition-all hover:shadow-xl"
+            >
+              <Play size={40} weight="fill" className="text-white ml-1" />
+            </button>
+            <div className="text-center space-y-1">
               <h2 className="text-xl font-semibold text-t1">No Active Session</h2>
-              <p className="text-sm text-t3 max-w-xs">Start a session to track your scans and profits</p>
+              <p className="text-sm text-t3 max-w-xs">Tap to start tracking scans and profits</p>
             </div>
           </div>
 
           <div className="w-full">
             <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
           </div>
-
-          <Button onClick={onStartSession} className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white px-8 h-12 text-base font-bold shadow-lg active:scale-95 transition-all">
-            <Play size={20} weight="bold" className="mr-2" />
-            Start Session
-          </Button>
         </div>
       ) : (
         <div className="flex-1 space-y-4">

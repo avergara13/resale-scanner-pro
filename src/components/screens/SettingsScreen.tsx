@@ -189,7 +189,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="retry" className="border border-s2 rounded-lg px-4 bg-fg overflow-hidden">
+            <AccordionItem value="retry" className="border border-s2 rounded-lg px-4 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🔄 Retry Configuration
               </AccordionTrigger>

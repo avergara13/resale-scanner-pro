@@ -1,4 +1,5 @@
 import type { ScannedItem, MarketData } from '@/types'
+import { callLLM } from './llm-service'
 
 export interface OptimizedListing {
   title: string
@@ -28,11 +29,9 @@ export interface ListingOptimizationContext {
 
 export class ListingOptimizationService {
   private geminiApiKey?: string
-  private preferredModel: string
 
-  constructor(geminiApiKey?: string, preferredModel?: string) {
+  constructor(geminiApiKey?: string) {
     this.geminiApiKey = geminiApiKey
-    this.preferredModel = preferredModel || 'gemini-2.0-flash-exp'
   }
 
   async generateOptimizedListing(context: ListingOptimizationContext): Promise<OptimizedListing> {
@@ -42,7 +41,11 @@ export class ListingOptimizationService {
 
     try {
       const prompt = this.buildOptimizationPrompt(context)
-      const response = await window.spark.llm(prompt, this.preferredModel, true)
+      const response = await callLLM(prompt, {
+        task: 'listing',
+        geminiApiKey: this.geminiApiKey,
+        jsonMode: true,
+      })
       const parsed = JSON.parse(response)
 
       return {
@@ -296,8 +299,7 @@ Return a JSON object with this exact structure:
 }
 
 export function createListingOptimizationService(
-  geminiApiKey?: string,
-  preferredModel?: string
+  geminiApiKey?: string
 ): ListingOptimizationService {
-  return new ListingOptimizationService(geminiApiKey, preferredModel)
+  return new ListingOptimizationService(geminiApiKey)
 }
