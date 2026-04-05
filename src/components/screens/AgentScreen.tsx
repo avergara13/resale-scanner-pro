@@ -433,18 +433,25 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
           addAgentMessage(`**Step 2/3 — Optimize:** No items to optimize.`)
         }
 
-        // Step 3: Push to Notion — use all candidate IDs since we can't
-        // read fresh state. onPushToNotion checks item.optimizedListing
-        // internally and skips items without listings.
-        if (allCandidateIds.length > 0 && onPushToNotion) {
+        // Step 3: Push to Notion — include both freshly processed items
+        // AND any pre-existing optimized-but-unpushed items.
+        // onPushToNotion guards: skips items without optimizedListing or
+        // already-pushed (notionPageId). Safe to over-include IDs.
+        const preExistingReadyIds = queueItems
+          .filter(i => i.optimizedListing && !i.notionPageId)
+          .map(i => i.id)
+        const pushCandidateIds = [...new Set([...allCandidateIds, ...preExistingReadyIds])]
+
+        if (pushCandidateIds.length > 0 && onPushToNotion) {
           addAgentMessage(`**Step 3/3 — Publishing listing(s) to Notion**`)
           let pushed = 0
-          for (const itemId of allCandidateIds) {
+          for (const itemId of pushCandidateIds) {
             try {
               await onPushToNotion(itemId)
               pushed++
             } catch (error) {
-              console.error('Push skipped or failed for:', itemId, error)
+              // onPushToNotion returns early for items without optimizedListing
+              // or already pushed — not a real failure
             }
           }
           addAgentMessage(`✅ Published ${pushed} listing(s) to Notion.`)

@@ -521,7 +521,7 @@ function App() {
       return
     }
     const item = (queue || []).find(i => i.id === itemId)
-    if (!item || item.notionPageId) return
+    if (!item || item.notionPageId || !item.optimizedListing) return
 
     const listing = item.optimizedListing
     const profit = listing
