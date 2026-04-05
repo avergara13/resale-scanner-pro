@@ -91,22 +91,24 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
 
   return (
     <div className="absolute inset-0 z-20 flex flex-col bg-black">
-      <div className="flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
+      <div
+        className="flex items-center justify-between px-4 bg-gradient-to-b from-black/80 to-transparent"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 16px) + 8px)' }}
+      >
         <div className="flex items-center gap-3">
-          <Barcode size={28} weight="duotone" className="text-primary" />
+          <Barcode size={24} weight="duotone" className="text-primary" />
           <div>
-            <h2 className="text-lg font-bold text-white">Barcode Scanner</h2>
-            <p className="text-xs text-white/70">Scan UPC/EAN for quick lookup</p>
+            <h2 className="text-base font-bold text-white">Barcode Scanner</h2>
+            <p className="text-[10px] text-white/70">Scan UPC/EAN for quick lookup</p>
           </div>
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
+        <button
           onClick={onClose}
-          className="text-white hover:bg-white/20"
+          className="p-3 bg-black/60 text-white rounded-full backdrop-blur-sm border border-white/20"
+          style={{ minWidth: '48px', minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          <X size={24} />
-        </Button>
+          <X size={22} weight="bold" />
+        </button>
       </div>
 
       <div className="flex-1 relative">
