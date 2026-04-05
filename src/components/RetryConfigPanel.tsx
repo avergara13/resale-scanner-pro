@@ -78,11 +78,11 @@ export function RetryConfigPanel({ onConfigChange }: RetryConfigPanelProps) {
   }, {} as Record<string, Array<readonly [string, typeof ENDPOINT_RETRY_CONFIGS[APIEndpoint]]>>)
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <ArrowsClockwise size={20} weight="duotone" className="text-b1" />
-          <h3 className="text-base font-bold text-t1">🔄 Retry Configuration</h3>
+    <div className="space-y-4 overflow-hidden">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <ArrowsClockwise size={20} weight="duotone" className="text-b1 flex-shrink-0" />
+          <h3 className="text-sm font-bold text-t1 truncate">Retry Configuration</h3>
         </div>
         <Badge variant="secondary" className="text-xs">
           {endpoints.length} Endpoint{endpoints.length !== 1 ? 's' : ''}
@@ -145,25 +145,25 @@ export function RetryConfigPanel({ onConfigChange }: RetryConfigPanelProps) {
                     onOpenChange={() => toggleEndpoint(endpoint)}
                   >
                     <CollapsibleTrigger asChild>
-                      <button className="w-full px-4 py-3 flex items-center justify-between hover:bg-s1/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <Icon size={18} weight="duotone" className={cn(PRIORITY_COLORS[config.priority])} />
-                          <div className="text-left">
-                            <div className="font-mono text-sm font-semibold text-t1">
+                      <button className="w-full px-3 py-3 flex items-center justify-between gap-2 hover:bg-s1/50 transition-colors min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <Icon size={16} weight="duotone" className={cn(PRIORITY_COLORS[config.priority], 'flex-shrink-0')} />
+                          <div className="text-left min-w-0">
+                            <div className="font-mono text-xs font-semibold text-t1 truncate">
                               {endpoint}
                             </div>
-                            <div className="text-xs text-t3 line-clamp-1">
+                            <div className="text-[10px] text-t3 line-clamp-1">
                               {config.description}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
                           {config.cacheable && (
-                            <Badge variant="outline" className="text-xs">
-                              📦 Cached
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              Cached
                             </Badge>
                           )}
-                          <Badge variant="secondary" className="text-xs font-mono">
+                          <Badge variant="secondary" className="text-[10px] font-mono px-1.5 py-0">
                             {config.maxRetries}x
                           </Badge>
                         </div>
