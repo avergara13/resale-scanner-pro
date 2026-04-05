@@ -99,8 +99,8 @@ function App() {
 
   const listingOptimizationService = useMemo(() => {
     const key = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
-    return createListingOptimizationService(key, settings?.preferredAiModel)
-  }, [settings?.geminiApiKey, settings?.preferredAiModel])
+    return createListingOptimizationService(key)
+  }, [settings?.geminiApiKey])
 
   const notionService = useMemo(() => {
     const key = settings?.notionApiKey || import.meta.env.VITE_NOTION_API_KEY

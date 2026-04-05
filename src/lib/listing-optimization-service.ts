@@ -29,11 +29,9 @@ export interface ListingOptimizationContext {
 
 export class ListingOptimizationService {
   private geminiApiKey?: string
-  private preferredModel: string
 
-  constructor(geminiApiKey?: string, preferredModel?: string) {
+  constructor(geminiApiKey?: string) {
     this.geminiApiKey = geminiApiKey
-    this.preferredModel = preferredModel || 'gemini-2.0-flash-exp'
   }
 
   async generateOptimizedListing(context: ListingOptimizationContext): Promise<OptimizedListing> {
@@ -44,7 +42,7 @@ export class ListingOptimizationService {
     try {
       const prompt = this.buildOptimizationPrompt(context)
       const response = await callLLM(prompt, {
-        model: this.preferredModel,
+        task: 'listing',
         geminiApiKey: this.geminiApiKey,
         jsonMode: true,
       })
@@ -301,8 +299,7 @@ Return a JSON object with this exact structure:
 }
 
 export function createListingOptimizationService(
-  geminiApiKey?: string,
-  preferredModel?: string
+  geminiApiKey?: string
 ): ListingOptimizationService {
-  return new ListingOptimizationService(geminiApiKey, preferredModel)
+  return new ListingOptimizationService(geminiApiKey)
 }

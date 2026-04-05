@@ -306,7 +306,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
       const promptText = `You are an AI assistant specialized in resale business analysis. You have access to the following app context:\n\n${contextData}\n\nUser question: ${chatInput}\n\nProvide a helpful, concise response based on the context. If analyzing an item, reference specific data from the current analysis. Be professional but conversational.`
 
       const response = await callLLM(promptText, {
-        model: settings?.preferredAiModel || 'gemini-2.0-flash-exp',
+        task: 'chat',
         geminiApiKey: settings?.geminiApiKey,
       })
 

@@ -622,8 +622,9 @@ If the queue is empty or has few items, suggest using the camera to scan more pr
 
       const fullPrompt = `${systemPrompt}\n\nUser: ${text}`
       const response = await callLLM(fullPrompt, {
-        model: settings?.preferredAiModel || 'gemini-2.0-flash-exp',
+        task: 'chat',
         geminiApiKey: settings?.geminiApiKey,
+        anthropicApiKey: settings?.anthropicApiKey,
       })
 
       const aiMessage: ChatMessage = {

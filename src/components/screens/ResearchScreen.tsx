@@ -320,7 +320,7 @@ Please provide a clear, well-formatted response following these guidelines:
 
 Format your response to be easy to read and visually scannable.`
       
-      const response = await callLLM(prompt, { geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY })
+      const response = await callLLM(prompt, { task: 'research', geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY })
       
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -421,7 +421,7 @@ Brief summary of market conditions
 
 Use bullet points, bold key terms, and include specific numbers when possible.`
       
-      const response = await callLLM(prompt, { geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY })
+      const response = await callLLM(prompt, { task: 'research', geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY })
       
       setResearchTasks((prev) =>
         (prev || []).map((t) =>
@@ -470,7 +470,7 @@ End with:
 
 Use bullet points, bold headings, and specific percentages where possible.`
       
-      const response = await callLLM(prompt, { geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY })
+      const response = await callLLM(prompt, { task: 'research', geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY })
       
       setResearchTasks((prev) =>
         (prev || []).map((t) =>
