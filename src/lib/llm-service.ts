@@ -51,6 +51,67 @@ async function callGemini(
   return text
 }
 
+// ------- Gemini with Google Search grounding (for product research) -------
+
+async function callGeminiGrounded(
+  prompt: string,
+  apiKey: string,
+  options: { model?: string; maxTokens?: number } = {}
+): Promise<string> {
+  const { model = 'gemini-2.5-flash', maxTokens = 2048 } = options
+  const url = `${GEMINI_ENDPOINT}/${model}:generateContent?key=${apiKey}`
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      tools: [{ googleSearch: {} }],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: maxTokens,
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '')
+    throw new Error(`Gemini Search ${response.status}: ${errorText.slice(0, 200)}`)
+  }
+
+  const data = await response.json()
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) throw new Error('Gemini search returned empty response')
+  return text
+}
+
+/**
+ * Research a product using Gemini with Google Search grounding.
+ * Returns real-time market data from the web.
+ */
+export async function researchProduct(
+  productName: string,
+  context: { purchasePrice?: number; category?: string },
+  geminiApiKey: string
+): Promise<string> {
+  const prompt = `Research the current resale market value for: "${productName}"
+${context.category ? `Category: ${context.category}` : ''}
+${context.purchasePrice ? `Purchase price: $${context.purchasePrice.toFixed(2)}` : ''}
+
+Search eBay sold listings, Amazon, Mercari, Poshmark, and other resale marketplaces.
+
+Provide:
+1. **Estimated resale value range** (low / average / high) based on actual sold listings
+2. **Best marketplace** to sell this item (eBay, Mercari, Poshmark, etc.)
+3. **Demand level** (high/medium/low) based on how many are selling
+4. **Profit assessment** — is this a good buy at the purchase price?
+5. **Recommended listing price** for fastest sale with good margin
+
+Be specific with dollar amounts. Reference actual marketplace data.`
+
+  return callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 1024 })
+}
+
 // ------- Anthropic Claude (secondary — complex tasks only) -------
 
 async function callClaude(
