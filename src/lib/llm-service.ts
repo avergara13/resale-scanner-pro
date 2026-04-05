@@ -20,7 +20,7 @@ async function callGemini(
   apiKey: string,
   options: { model?: string; jsonMode?: boolean; maxTokens?: number; temperature?: number } = {}
 ): Promise<string> {
-  const { model = 'gemini-2.0-flash-exp', jsonMode = false, maxTokens = 2048, temperature = 0.7 } = options
+  const { model = 'gemini-2.0-flash', jsonMode = false, maxTokens = 2048, temperature = 0.7 } = options
   const url = `${GEMINI_ENDPOINT}/${model}:generateContent?key=${apiKey}`
 
   const response = await fetch(url, {
@@ -140,7 +140,7 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
   // All other tasks (and Claude fallback) → Gemini Flash
   if (geminiApiKey && geminiApiKey.length >= 10) {
     return callGemini(prompt, geminiApiKey, {
-      model: model || 'gemini-2.0-flash-exp',
+      model: model || 'gemini-2.0-flash',
       jsonMode,
       maxTokens: maxTokens || (task === 'listing' ? 2048 : 1024),
       temperature: temperature ?? (task === 'chat' ? 0.7 : 0.4),

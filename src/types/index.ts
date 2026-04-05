@@ -247,7 +247,7 @@ export interface AppSettings {
   n8nWebhookUrl?: string
   notionApiKey?: string
   notionDatabaseId?: string
-  preferredAiModel?: 'gemini-2.0-flash-exp' | 'gemini-1.5-pro' | 'gemini-1.5-flash' | 'claude-3-5-sonnet'
+  preferredAiModel?: 'gemini-2.0-flash' | 'gemini-1.5-pro' | 'gemini-1.5-flash' | 'claude-3-5-sonnet'
   voiceEnabled: boolean
   autoCapture: boolean
   agenticMode: boolean
