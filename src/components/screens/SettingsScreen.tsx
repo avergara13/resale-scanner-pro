@@ -1,5 +1,4 @@
-import { useState, useCallback } from 'react'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -40,9 +39,6 @@ import { ThemeToggle } from '../ThemeToggle'
 import { TagPresetsManager } from '../TagPresetsManager'
 import { CompressionAnalytics } from '../CompressionAnalytics'
 import { RetryConfigPanel } from '../RetryConfigPanel'
-import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
-import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
-import { toast } from 'sonner'
 import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
@@ -109,34 +105,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   const supabaseConfigured = !!(hasKey(settings.supabaseUrl) && hasKey(settings.supabaseKey))
   const notionConfigured = !!hasKey(settings.notionApiKey)
 
-  const handleRefresh = useCallback(async () => {
-    await new Promise(resolve => setTimeout(resolve, 600))
-    // silent refresh — no toast needed
-  }, [])
-
-  const { containerRef, isPulling, isRefreshing, pullDistance, progress, shouldTrigger } = usePullToRefresh({
-    onRefresh: handleRefresh,
-    threshold: 80,
-    enabled: true,
-  })
-
   return (
     <div
       id="scr-settings"
-      ref={containerRef}
-      className="flex flex-col h-full overflow-y-auto"
-      style={{
-        paddingTop: isPulling || isRefreshing ? `${Math.max(pullDistance, 60)}px` : '0px',
-        transition: isPulling ? 'none' : 'padding-top 0.3s ease-out'
-      }}
+      className="flex flex-col h-full overflow-y-auto overflow-x-hidden"
     >
-      <PullToRefreshIndicator
-        isPulling={isPulling}
-        isRefreshing={isRefreshing}
-        pullDistance={pullDistance}
-        progress={progress}
-        shouldTrigger={shouldTrigger}
-      />
       <div className="px-4 pt-2 pb-4 border-b border-s2 bg-fg">
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -170,8 +143,8 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-2 py-6">
-        <div className="space-y-4 pb-20 overflow-hidden">
+      <div className="flex-1 px-3 py-4">
+        <div className="space-y-4 pb-24 w-full max-w-full">
           <Accordion type="multiple" defaultValue={['health']} className="space-y-4">
             <AccordionItem value="health" className="border border-green/20 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
@@ -180,7 +153,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   <span>Live API Health Status</span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-4 bg-gradient-to-br from-green-bg to-transparent border border-green/20 rounded-lg">
                   <div className="flex items-start gap-3">
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green text-fg flex-shrink-0">
@@ -203,7 +176,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 📊 Connection History & Downtime Tracking
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
@@ -221,7 +194,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🔄 Retry Configuration
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-4 bg-gradient-to-br from-b1/10 to-b1/5 border-2 border-b1/40 rounded-lg">
                   <div className="flex items-start gap-3">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-b1 text-fg flex-shrink-0">
@@ -244,7 +217,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🚨 Incident Logs & API Issues
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
@@ -264,7 +237,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   📸 Multi-Object Detection History
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
@@ -284,7 +257,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   🎯 False Positive Analysis & Optimization
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-4 bg-gradient-to-br from-amber/10 to-amber/5 border-2 border-amber/40 rounded-lg">
                   <div className="flex items-start gap-3">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber text-bg flex-shrink-0">
@@ -321,7 +294,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🤖 AI Configuration
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
@@ -407,7 +380,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   🔍 Google Cloud APIs — Enhanced Product ID
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-4 bg-gradient-to-br from-b1/10 to-b1/5 border-2 border-b1/40 rounded-lg">
                   <div className="flex items-start gap-3">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-b1 text-fg flex-shrink-0">
@@ -621,7 +594,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   💰 eBay Integration — Market Pricing
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-4 bg-gradient-to-br from-green-bg to-transparent border-2 border-green/30 rounded-lg">
                   <div className="flex items-start gap-3">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green text-fg flex-shrink-0">
@@ -868,7 +841,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🗄️ Database & Automation
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="supabase-url" className="text-xs uppercase tracking-wide text-t2">
@@ -966,7 +939,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🎛️ Feature Toggles
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="flex items-center justify-between py-2">
                   <div>
                     <Label htmlFor="agentic-mode" className="text-sm text-t1 font-medium">
@@ -1129,7 +1102,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 📸 Image Quality
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
@@ -1210,7 +1183,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 💾 Compression Analytics
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
@@ -1228,7 +1201,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 🏷️ Tag Presets
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <div className="flex items-start gap-2">
                     <Info className="text-b1 mt-0.5" size={16} />
@@ -1250,7 +1223,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 💰 Business Rules
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2">
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div>
                   <Label htmlFor="min-profit" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
                     Min. Profit Margin (%)
@@ -1394,7 +1367,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             </p>
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

@@ -790,6 +790,56 @@ function App() {
     toast.success(`Analyzed ${processedCount} items: ${goCount} GO, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
+  // Seed 3 test items so the queue cards can be verified
+  useEffect(() => {
+    if (queue && queue.length === 0) {
+      const testItems: ScannedItem[] = [
+        {
+          id: 'test-1',
+          timestamp: Date.now() - 3600000,
+          purchasePrice: 3.50,
+          productName: 'Nike Air Max 90 — Size 10',
+          description: 'Gently used Nike Air Max 90 in white/black colorway. Minor creasing on toe box, no sole wear. Original laces.',
+          category: 'Clothing & Shoes',
+          estimatedSellPrice: 45.00,
+          profitMargin: 72.3,
+          decision: 'GO',
+          inQueue: true,
+          tags: [],
+          marketData: { ebayAvgSold: 48.50, ebayMedianSold: 45.00, ebaySoldCount: 23, ebayActiveListings: 15, ebaySellThroughRate: 60.5, recommendedPrice: 45.00 },
+        },
+        {
+          id: 'test-2',
+          timestamp: Date.now() - 7200000,
+          purchasePrice: 1.00,
+          productName: 'Pyrex 4-Cup Glass Measuring Cup',
+          description: 'Vintage Pyrex measuring cup, red lettering, no chips or cracks. Dishwasher safe.',
+          category: 'Kitchen & Home',
+          estimatedSellPrice: 12.00,
+          profitMargin: 38.5,
+          decision: 'GO',
+          inQueue: true,
+          tags: [],
+          marketData: { ebayAvgSold: 14.00, ebayMedianSold: 12.00, ebaySoldCount: 45, ebayActiveListings: 30, ebaySellThroughRate: 60.0, recommendedPrice: 12.00 },
+        },
+        {
+          id: 'test-3',
+          timestamp: Date.now() - 1800000,
+          purchasePrice: 0.50,
+          productName: 'Random Paperback Novel',
+          description: 'Mass market paperback, slight yellowing on pages. Common title, low demand.',
+          category: 'Books',
+          estimatedSellPrice: 2.25,
+          profitMargin: -170.7,
+          decision: 'PASS',
+          inQueue: true,
+          tags: [],
+        },
+      ]
+      setQueue(testItems)
+    }
+  }, [])
+
   useEffect(() => {
     if (!cameraOpen) {
       reset()
