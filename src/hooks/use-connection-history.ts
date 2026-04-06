@@ -15,18 +15,30 @@ export function useConnectionHistory(
   options: UseConnectionHistoryOptions = {}
 ) {
   const { enabled = true, maxEvents = 1000 } = options
-  
+
   const [events, setEvents] = useKV<ConnectionEvent[]>('connection-events', [])
   const [incidents, setIncidents] = useKV<DowntimeIncident[]>('downtime-incidents', [])
   const prevHealthRef = useRef<ConnectionHealth | undefined>(undefined)
   const activeIncidentsRef = useRef(new Map<string, DowntimeIncident>())
 
-  const cleanOldData = useCallback(() => {
+  // Stabilize KV setters via refs to prevent infinite re-render loops.
+  // useKV setters may not be referentially stable across renders (unlike useState).
+  const setEventsRef = useRef(setEvents)
+  const setIncidentsRef = useRef(setIncidents)
+  setEventsRef.current = setEvents
+  setIncidentsRef.current = setIncidents
+
+  const cleanedRef = useRef(false)
+
+  // Run cleanup once on mount
+  useEffect(() => {
+    if (cleanedRef.current) return
+    cleanedRef.current = true
+
     const cutoffTime = Date.now() - (MAX_HISTORY_DAYS * 24 * 60 * 60 * 1000)
-    
-    setEvents((prev) => (prev || []).filter(e => e.timestamp > cutoffTime))
-    setIncidents((prev) => (prev || []).filter(i => i.startTime > cutoffTime))
-  }, [setEvents, setIncidents])
+    setEventsRef.current((prev) => (prev || []).filter(e => e.timestamp > cutoffTime))
+    setIncidentsRef.current((prev) => (prev || []).filter(i => i.startTime > cutoffTime))
+  }, [])
 
   const recordEvent = useCallback((
     service: ConnectionEvent['service'],
@@ -45,7 +57,7 @@ export function useConnectionHistory(
       error,
     }
 
-    setEvents(prev => {
+    setEventsRef.current(prev => {
       const updated = [...(prev || []), event]
       return updated.slice(-maxEvents)
     })
@@ -59,10 +71,10 @@ export function useConnectionHistory(
         error,
         impactedOperations: 0,
       }
-      
+
       activeIncidentsRef.current.set(service, incident)
-      
-      setIncidents(prev => [...(prev || []), incident])
+
+      setIncidentsRef.current(prev => [...(prev || []), incident])
     }
 
     if (newStatus !== 'offline' && previousStatus === 'offline') {
@@ -70,19 +82,19 @@ export function useConnectionHistory(
       if (activeIncident) {
         const endTime = Date.now()
         const duration = endTime - activeIncident.startTime
-        
-        setIncidents(prev => 
-          (prev || []).map(i => 
+
+        setIncidentsRef.current(prev =>
+          (prev || []).map(i =>
             i.id === activeIncident.id
               ? { ...i, endTime, duration, resolved: true }
               : i
           )
         )
-        
+
         activeIncidentsRef.current.delete(service)
       }
     }
-  }, [maxEvents, setEvents, setIncidents])
+  }, [maxEvents])
 
   useEffect(() => {
     if (!enabled || !health) return
@@ -103,7 +115,7 @@ export function useConnectionHistory(
     services.forEach(({ key, name }) => {
       const prevStatus = prevHealth[key].status
       const newStatus = health[key].status
-      
+
       if (prevStatus !== newStatus && newStatus !== 'checking') {
         recordEvent(
           name,
@@ -126,19 +138,15 @@ export function useConnectionHistory(
     prevHealthRef.current = health
   }, [health?.overall, health?.gemini?.status, health?.googleLens?.status, health?.ebay?.status, health?.anthropic?.status, enabled, recordEvent])
 
-  useEffect(() => {
-    cleanOldData()
-  }, [cleanOldData])
-
   const calculateStats = useCallback(() => {
     const eventsList = events || []
     const incidentsList = incidents || []
-    
+
     const now = Date.now()
     const last24h = now - (24 * 60 * 60 * 1000)
     const recentEvents = eventsList.filter(e => e.timestamp > last24h)
     const recentIncidents = incidentsList.filter(i => i.startTime > last24h)
-    
+
     const totalDowntime = incidentsList.reduce((sum, incident) => {
       if (incident.resolved && incident.duration) {
         return sum + incident.duration
@@ -151,7 +159,7 @@ export function useConnectionHistory(
 
     const services = ['gemini', 'googleLens', 'ebay'] as const
     const uptimePercentage: Record<string, number> = {}
-    
+
     services.forEach(service => {
       const serviceIncidents = recentIncidents.filter(i => i.service === service)
       const serviceDowntime = serviceIncidents.reduce((sum, incident) => {
@@ -163,7 +171,7 @@ export function useConnectionHistory(
         }
         return sum
       }, 0)
-      
+
       const totalTime = 24 * 60 * 60 * 1000
       uptimePercentage[service] = ((totalTime - serviceDowntime) / totalTime) * 100
     })
@@ -172,7 +180,7 @@ export function useConnectionHistory(
       service,
       count: recentIncidents.filter(i => i.service === service).length,
     }))
-    
+
     const mostUnreliable = incidentsByService.sort((a, b) => b.count - a.count)[0]
 
     return {
@@ -187,10 +195,10 @@ export function useConnectionHistory(
   }, [events, incidents])
 
   const clearHistory = useCallback(() => {
-    setEvents([])
-    setIncidents([])
+    setEventsRef.current([])
+    setIncidentsRef.current([])
     activeIncidentsRef.current.clear()
-  }, [setEvents, setIncidents])
+  }, [])
 
   return {
     events: events || [],

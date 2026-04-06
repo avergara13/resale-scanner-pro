@@ -17,6 +17,10 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
   const optimizationQueueRef = useRef<Map<string, Promise<OptimizedImage>>>(new Map())
   const { trackCompression } = useCompressionAnalytics()
 
+  // Stabilize KV setter via ref to prevent useEffect dependency loops
+  const setCacheRef = useRef(setCache)
+  setCacheRef.current = setCache
+
   const service = useMemo(() => createImageOptimizationService(qualityPreset), [qualityPreset])
 
   const getCacheKey = useCallback((imageData: string): string => {
@@ -32,27 +36,27 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
     return `${hashString(imageData)}-${qualityPreset}`
   }, [qualityPreset])
 
-  const cleanOldCache = useCallback(() => {
-    const now = Date.now()
-    setCache((prev) => {
-      if (!prev) return {}
-      
-      const entries = Object.entries(prev)
-      if (entries.length <= MAX_CACHE_SIZE) return prev
-      
-      const validEntries = entries
-        .filter(([_, img]) => now - img.lastAccessed < MAX_CACHE_AGE_MS)
-        .sort((a, b) => b[1].lastAccessed - a[1].lastAccessed)
-        .slice(0, MAX_CACHE_SIZE)
-      
-      return Object.fromEntries(validEntries)
-    })
-  }, [setCache])
-
   useEffect(() => {
+    const cleanOldCache = () => {
+      const now = Date.now()
+      setCacheRef.current((prev) => {
+        if (!prev) return {}
+
+        const entries = Object.entries(prev)
+        if (entries.length <= MAX_CACHE_SIZE) return prev
+
+        const validEntries = entries
+          .filter(([_, img]) => now - img.lastAccessed < MAX_CACHE_AGE_MS)
+          .sort((a, b) => b[1].lastAccessed - a[1].lastAccessed)
+          .slice(0, MAX_CACHE_SIZE)
+
+        return Object.fromEntries(validEntries)
+      })
+    }
+
     const interval = setInterval(cleanOldCache, 60000)
     return () => clearInterval(interval)
-  }, [cleanOldCache])
+  }, [])
 
   const optimizeAndCache = useCallback(async (
     imageData: string,
@@ -62,7 +66,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
     
     if (!forceRefresh && cache && cache[cacheKey]) {
       const cached = cache[cacheKey]
-      setCache((prev) => {
+      setCacheRef.current((prev) => {
         if (!prev) return {}
         return {
           ...prev,
@@ -92,7 +96,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
           qualityPreset,
         })
         
-        setCache((prev) => ({
+        setCacheRef.current((prev) => ({
           ...(prev || {}),
           [cacheKey]: { ...optimized, lastAccessed: Date.now() }
         }))
@@ -106,7 +110,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
 
     optimizationQueueRef.current.set(cacheKey, optimizationPromise)
     return optimizationPromise
-  }, [cache, getCacheKey, service, setCache, trackCompression, qualityPreset])
+  }, [cache, getCacheKey, service, trackCompression, qualityPreset])
 
   const batchOptimize = useCallback(async (
     images: Array<{ id: string; imageData: string }>,
@@ -147,7 +151,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
       }
 
       if (Object.keys(newCacheEntries).length > 0) {
-        setCache((prev) => ({
+        setCacheRef.current((prev) => ({
           ...(prev || {}),
           ...newCacheEntries
         }))
@@ -158,7 +162,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
       setIsOptimizing(false)
       setProgress({ current: 0, total: 0 })
     }
-  }, [cache, getCacheKey, service, setCache, trackCompression, qualityPreset])
+  }, [cache, getCacheKey, service, trackCompression, qualityPreset])
 
   const getThumbnail = useCallback(async (imageData: string): Promise<string> => {
     const cacheKey = getCacheKey(imageData)
@@ -178,8 +182,8 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
   }, [cache, getCacheKey, service])
 
   const clearCache = useCallback(() => {
-    setCache({})
-  }, [setCache])
+    setCacheRef.current({})
+  }, [])
 
   const getCacheSize = useCallback((): number => {
     if (!cache) return 0
