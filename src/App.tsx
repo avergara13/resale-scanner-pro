@@ -16,6 +16,7 @@ import { TagAnalyticsScreen } from './components/screens/TagAnalyticsScreen'
 import { LocationInsightsScreen } from './components/screens/LocationInsightsScreen'
 import { CostTrackingScreen } from './components/screens/CostTrackingScreen'
 import { ScanHistoryScreen } from './components/screens/ScanHistoryScreen'
+import { SessionDetailScreen } from './components/screens/SessionDetailScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
@@ -33,6 +34,7 @@ import { cn } from './lib/utils'
 
 function App() {
   const [screen, setScreen] = useState<Screen>('session')
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
@@ -891,6 +893,7 @@ function App() {
 
   const screenOrder: Record<Screen, number> = {
     'session': 0,
+    'session-detail': 0,
     'agent': 1,
     'ai': 2,
     'queue': 3,
@@ -954,6 +957,10 @@ function App() {
                 onEndSession={handleEndSession}
                 onNavigateToQueue={() => setScreen('queue')}
                 onNavigateToHistory={() => setScreen('scan-history')}
+                onViewSessionDetail={(id) => {
+                  setSelectedSessionId(id)
+                  setScreen('session-detail')
+                }}
               />
             </motion.div>
           )}
@@ -1123,6 +1130,23 @@ function App() {
                     return [...current, { ...item, inQueue: true }]
                   })
                 }}
+              />
+            </motion.div>
+          )}
+          {screen === 'session-detail' && selectedSessionId && (
+            <motion.div
+              key="session-detail"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="w-full h-full"
+            >
+              <SessionDetailScreen
+                sessionId={selectedSessionId}
+                onBack={() => setScreen('session')}
               />
             </motion.div>
           )}
