@@ -5,7 +5,7 @@ import type { Screen } from '@/types'
 const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   session: 'SESSION',
   agent: 'AGENT',
-  queue: 'LISTINGS',
+  queue: 'LISTING QUEUE',
   sold: 'SOLD',
 }
 

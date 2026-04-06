@@ -205,8 +205,8 @@ export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted }: SoldSc
                   <div className="text-right flex-shrink-0">
                     <div className="text-sm font-black text-t1">${(item.soldPrice || 0).toFixed(2)}</div>
                     <div className={cn('text-[10px] font-bold flex items-center gap-0.5 justify-end mt-0.5', profit >= 0 ? 'text-green' : 'text-red')}>
-                      <TrendUp size={10} />
-                      ${profit.toFixed(2)}
+                      {profit >= 0 ? <TrendUp size={10} /> : <CurrencyDollar size={10} />}
+                      {profit >= 0 ? '+' : '-'}${Math.abs(profit).toFixed(2)}
                     </div>
                   </div>
                 </div>

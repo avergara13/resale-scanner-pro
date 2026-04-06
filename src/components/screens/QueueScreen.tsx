@@ -846,8 +846,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         <div className="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-4">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-xl font-black tracking-tight text-t1">LISTING QUEUE</h1>
-              <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <p className="text-[10px] sm:text-[11px] text-t3 font-medium uppercase tracking-wider">
                   {queueItems.length} Items Total
                 </p>
@@ -1291,7 +1290,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onEditTags={(itemId, tags) => onEdit(itemId, { tags })}
                       onOpenSoldDialog={onMarkAsSold ? (soldItem) => {
                         setSoldDialogItemId(soldItem.id)
-                        setSoldPrice((soldItem.estimatedSellPrice || '').toString())
+                        setSoldPrice(soldItem.estimatedSellPrice ? soldItem.estimatedSellPrice.toString() : '')
                         setSoldMarketplace('ebay')
                       } : undefined}
                     />

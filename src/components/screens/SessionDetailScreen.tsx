@@ -208,7 +208,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
             </div>
           </div>
 
-          {/* GO / PASS card — matches active session */}
+          {/* BUY / PASS card — matches active session */}
           <Card className="p-6 mb-4">
             <div className="flex items-center justify-between mb-4">
               <Badge variant="secondary" className="bg-t3 text-white px-3 py-1 uppercase text-xs font-bold">

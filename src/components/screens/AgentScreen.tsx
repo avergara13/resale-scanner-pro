@@ -815,8 +815,9 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, onCreat
       }
 
       // Mark as sold command: "mark [item name] as sold on [marketplace] for $X"
-      if ((lowerText.includes('mark') || lowerText.includes('sold')) && lowerText.includes('sold') && onMarkAsSold) {
-        const priceMatch = text.match(/\$?(\d+(?:\.\d{2})?)/)?.[1]
+      // Require "mark" + "sold" pattern to avoid false positives on generic "sold" questions
+      if (/\bmark\b.*\bsold\b/i.test(text) && onMarkAsSold) {
+        const priceMatch = text.match(/\$(\d+(?:\.\d{2})?)|\bfor\s+(\d+(?:\.\d{2})?)\b/)?.[1] || text.match(/\$(\d+(?:\.\d{2})?)/)?.[1]
         const marketplaces = ['ebay', 'mercari', 'poshmark', 'facebook', 'whatnot', 'other'] as const
         const foundMarketplace = marketplaces.find(m => lowerText.includes(m)) || 'other'
         const soldPrice = priceMatch ? parseFloat(priceMatch) : 0
@@ -834,7 +835,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, onCreat
       }
 
       // Add tracking command: "add tracking [number] for [item]" or "mark [item] shipped"
-      if ((lowerText.includes('tracking') || lowerText.includes('shipped') || lowerText.includes('mark shipped')) && onMarkShipped) {
+      if ((/\b(add|update)\b.*\btracking\b/i.test(text) || /\bmark\b.*\bshipped\b/i.test(text)) && onMarkShipped) {
         const trackingMatch = text.match(/tracking\s+(?:number\s+)?([A-Z0-9]{6,30})/i)?.[1]
         const carrierMatch = text.match(/\b(usps|ups|fedex|dhl)\b/i)?.[1]?.toUpperCase() || ''
 

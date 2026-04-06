@@ -599,29 +599,44 @@ function App() {
     soldPrice: number,
     soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
   ) => {
+    const soldDate = Date.now()
     setQueue(prev => (prev || []).map(item =>
       item.id === itemId
-        ? { ...item, listingStatus: 'sold', soldPrice, soldDate: Date.now(), soldOn }
+        ? { ...item, listingStatus: 'sold', soldPrice, soldDate, soldOn }
         : item
     ))
+    // Sync to Notion if item was published there
+    const item = (queue || []).find(i => i.id === itemId)
+    if (item?.notionPageId && notionService) {
+      notionService.updateListingStatus(item.notionPageId, { status: 'sold', soldPrice, soldOn, soldDate }).catch(() => {})
+    }
     toast.success('Item marked as sold')
-  }, [setQueue])
+  }, [setQueue, queue, notionService])
 
   const handleMarkShipped = useCallback((itemId: string, trackingNumber: string, shippingCarrier: string) => {
+    const shippedDate = Date.now()
     setQueue(prev => (prev || []).map(item =>
       item.id === itemId
-        ? { ...item, listingStatus: 'shipped', trackingNumber, shippingCarrier, shippedDate: Date.now() }
+        ? { ...item, listingStatus: 'shipped', trackingNumber, shippingCarrier, shippedDate }
         : item
     ))
+    const item = (queue || []).find(i => i.id === itemId)
+    if (item?.notionPageId && notionService) {
+      notionService.updateListingStatus(item.notionPageId, { status: 'shipped', trackingNumber, shippingCarrier, shippedDate }).catch(() => {})
+    }
     toast.success('Item marked as shipped')
-  }, [setQueue])
+  }, [setQueue, queue, notionService])
 
   const handleMarkCompleted = useCallback((itemId: string) => {
     setQueue(prev => (prev || []).map(item =>
       item.id === itemId ? { ...item, listingStatus: 'completed' } : item
     ))
+    const item = (queue || []).find(i => i.id === itemId)
+    if (item?.notionPageId && notionService) {
+      notionService.updateListingStatus(item.notionPageId, { status: 'completed' }).catch(() => {})
+    }
     toast.success('Transaction completed')
-  }, [setQueue])
+  }, [setQueue, queue, notionService])
 
   const handleSaveDraft = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData) {
