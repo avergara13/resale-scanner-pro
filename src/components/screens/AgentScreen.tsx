@@ -168,6 +168,10 @@ interface AgentScreenProps {
   queueItems?: ScannedItem[]
   soldItems?: ScannedItem[]
   settings?: AppSettings
+  /** Message injected from external widget (e.g. AgentChatWidget on Session screen) */
+  pendingMessage?: string | null
+  onPendingMessageHandled?: () => void
+  onProcessingChange?: (processing: boolean) => void
   onCreateListing?: (itemId: string) => Promise<void>
   onOptimizeItem?: (itemId: string) => Promise<void>
   onPushToNotion?: (itemId: string) => Promise<void>
@@ -185,7 +189,7 @@ interface AgentScreenProps {
   profitGoals?: ProfitGoal[]
 }
 
-export function AgentScreen({ queueItems = [], soldItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
   const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -962,6 +966,19 @@ You can execute these commands for the user:
       setIsProcessing(false)
     }
   }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, soldItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+
+  // Broadcast processing state to parent (for external widget indicators)
+  useEffect(() => {
+    onProcessingChange?.(isProcessing)
+  }, [isProcessing, onProcessingChange])
+
+  // Handle messages injected from external widgets (e.g. AgentChatWidget)
+  useEffect(() => {
+    if (pendingMessage && !isProcessing) {
+      handleSendMessage(pendingMessage)
+      onPendingMessageHandled?.()
+    }
+  }, [pendingMessage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)
