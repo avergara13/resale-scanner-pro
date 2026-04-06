@@ -1009,6 +1009,13 @@ function App() {
                 onEdit={handleEditQueueItem}
                 onReorder={handleReorderQueue}
                 onBatchAnalyze={handleBatchAnalyze}
+                onAddManualItem={(item) => {
+                  setQueue((prev) => {
+                    const current = prev || []
+                    if (current.some(i => i.id === item.id)) return current
+                    return [...current, item]
+                  })
+                }}
                 isBatchAnalyzing={isBatchAnalyzing}
                 geminiService={geminiService}
                 onNavigateToTagAnalytics={() => setScreen('tag-analytics')}

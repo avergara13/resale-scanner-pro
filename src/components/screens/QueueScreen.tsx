@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown } from '@phosphor-icons/react'
+import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -17,6 +17,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { toast } from 'sonner'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThemeToggle } from '../ThemeToggle'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
@@ -55,6 +56,7 @@ interface QueueScreenProps {
   onEdit: (itemId: string, updates: Partial<ScannedItem>) => void
   onReorder?: (items: ScannedItem[]) => void
   onBatchAnalyze?: () => void
+  onAddManualItem?: (item: ScannedItem) => void
   isBatchAnalyzing?: boolean
   geminiService?: GeminiService | null
   onNavigateToTagAnalytics?: () => void
@@ -228,7 +230,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -238,6 +240,11 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showAddDialog, setShowAddDialog] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualPrice, setManualPrice] = useState('')
+  const [manualCategory, setManualCategory] = useState('')
+  const [manualNotes, setManualNotes] = useState('')
   const [presetsOpen, setPresetsOpen] = useState(false)
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
@@ -674,6 +681,86 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         onRemoveTags={handleBulkRemoveTags}
         onCreateTag={handleCreateTag}
       />
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-md bg-neutral-1 border-s1 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-t1">
+              <Package size={20} weight="duotone" className="text-b1" />
+              Add Item Manually
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-t2 uppercase mb-1 block">Product Name *</label>
+              <Input
+                value={manualName}
+                onChange={(e) => setManualName(e.target.value)}
+                placeholder="e.g. Nike Air Max 90"
+                className="bg-bg border-s2"
+              />
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="text-xs font-bold text-t2 uppercase mb-1 block">Buy Price ($)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={manualPrice}
+                  onChange={(e) => setManualPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="bg-bg border-s2 font-mono"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-bold text-t2 uppercase mb-1 block">Category</label>
+                <Input
+                  value={manualCategory}
+                  onChange={(e) => setManualCategory(e.target.value)}
+                  placeholder="e.g. Electronics"
+                  className="bg-bg border-s2"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-t2 uppercase mb-1 block">Notes (Optional)</label>
+              <Input
+                value={manualNotes}
+                onChange={(e) => setManualNotes(e.target.value)}
+                placeholder="Condition, details, etc."
+                className="bg-bg border-s2"
+              />
+            </div>
+            <Button
+              onClick={() => {
+                if (!manualName.trim() || !onAddManualItem) return
+                const item: ScannedItem = {
+                  id: Date.now().toString(),
+                  timestamp: Date.now(),
+                  purchasePrice: parseFloat(manualPrice) || 0,
+                  productName: manualName.trim(),
+                  description: manualNotes.trim() || undefined,
+                  category: manualCategory.trim() || 'General',
+                  decision: 'PENDING',
+                  inQueue: true,
+                }
+                onAddManualItem(item)
+                setManualName('')
+                setManualPrice('')
+                setManualCategory('')
+                setManualNotes('')
+                setShowAddDialog(false)
+              }}
+              disabled={!manualName.trim()}
+              className="w-full bg-b1 hover:bg-b2 text-white font-bold h-11"
+            >
+              <Plus size={18} weight="bold" className="mr-2" />
+              Add to Queue
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 pb-3 sm:pb-4 border-b border-s1">
         <div className="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-4">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
@@ -1058,24 +1145,33 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
 
       {filteredItems.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
-          <div className="w-20 h-20 rounded-full bg-s1 flex items-center justify-center mb-4">
-            <p className="text-3xl">
-              {searchQuery ? '🔍' : filter === 'GO' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
-            </p>
-          </div>
+          {queueItems.length === 0 && onAddManualItem ? (
+            <button
+              onClick={() => setShowAddDialog(true)}
+              className="w-24 h-24 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-4 shadow-lg active:scale-95 transition-all"
+            >
+              <Package size={40} weight="duotone" className="text-white" />
+            </button>
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-s1 flex items-center justify-center mb-4">
+              <p className="text-3xl">
+                {searchQuery ? '🔍' : filter === 'GO' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
+              </p>
+            </div>
+          )}
           <h2 className="text-lg font-semibold text-t1 mb-2">
-            {searchQuery 
-              ? 'No items found' 
-              : queueItems.length === 0 
-                ? 'Queue is empty' 
+            {searchQuery
+              ? 'No items found'
+              : queueItems.length === 0
+                ? 'Queue is empty'
                 : `No ${filter} items`
             }
           </h2>
           <p className="text-sm text-t2 max-w-xs">
-            {searchQuery 
+            {searchQuery
               ? `No items match "${searchQuery}". Try a different search term.`
-              : queueItems.length === 0 
-                ? 'Scan items and add GO decisions to your queue'
+              : queueItems.length === 0
+                ? 'Tap the icon above to add an item manually, or scan with the camera'
                 : `Try selecting a different filter to view items`
             }
           </p>
