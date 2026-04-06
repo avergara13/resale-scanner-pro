@@ -456,34 +456,18 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
       // Full agentic pipeline: analyze → optimize → push
       if (lowerText.includes('full pipeline') || lowerText.includes('auto-list') || lowerText.includes('process queue') || lowerText.includes('run pipeline')) {
-        const addAgentMessage = (content: string) => {
-          const msg: ChatMessage = {
-            id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
-            role: 'assistant',
-            content,
-            timestamp: Date.now(),
-          }
-          setChatSessions((prev) =>
-            (prev || []).map(s =>
-              s.id === sessionId
-                ? { ...s, messages: [...s.messages, msg], lastMessageAt: Date.now() }
-                : s
-            )
-          )
-        }
-
         // Step 1: Batch analyze unanalyzed items
         const drafts = queueItems.filter(i => !i.productName || i.productName === 'Quick Draft')
         if (drafts.length > 0 && onBatchAnalyze) {
-          addAgentMessage(`**Step 1/3 — Analyzing ${drafts.length} draft(s)**\nRunning AI vision, market research, and profit analysis...`)
+          addMsg(`**Step 1/3 — Analyzing ${drafts.length} draft(s)**\nRunning AI vision, market research, and profit analysis...`)
           try {
             await onBatchAnalyze()
-            addAgentMessage(`✅ Batch analysis complete.`)
+            addMsg(`✅ Batch analysis complete.`)
           } catch (error) {
-            addAgentMessage(`⚠️ Batch analysis encountered errors — continuing with available data.`)
+            addMsg(`⚠️ Batch analysis encountered errors — continuing with available data.`)
           }
         } else if (drafts.length === 0) {
-          addAgentMessage(`**Step 1/3 — Analyze:** No drafts to analyze — all items already processed.`)
+          addMsg(`**Step 1/3 — Analyze:** No drafts to analyze — all items already processed.`)
         }
 
         // Step 2: Optimize GO items that don't have listings yet
@@ -500,7 +484,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         const allCandidateIds = [...new Set([...goItemIds, ...draftIds])]
 
         if (allCandidateIds.length > 0 && onOptimizeItem) {
-          addAgentMessage(`**Step 2/3 — Optimizing up to ${allCandidateIds.length} listing(s)**\nGenerating SEO titles, descriptions, and pricing...`)
+          addMsg(`**Step 2/3 — Optimizing up to ${allCandidateIds.length} listing(s)**\nGenerating SEO titles, descriptions, and pricing...`)
           let optimized = 0
           for (const itemId of allCandidateIds) {
             try {
@@ -511,9 +495,9 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
               console.error('Optimize skipped or failed for:', itemId, error)
             }
           }
-          addAgentMessage(`✅ Optimized ${optimized} listing(s).`)
+          addMsg(`✅ Optimized ${optimized} listing(s).`)
         } else {
-          addAgentMessage(`**Step 2/3 — Optimize:** No items to optimize.`)
+          addMsg(`**Step 2/3 — Optimize:** No items to optimize.`)
         }
 
         // Step 3: Push to Notion — include both freshly processed items
@@ -526,7 +510,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         const pushCandidateIds = [...new Set([...allCandidateIds, ...preExistingReadyIds])]
 
         if (pushCandidateIds.length > 0 && onPushToNotion) {
-          addAgentMessage(`**Step 3/3 — Publishing listing(s) to Notion**`)
+          addMsg(`**Step 3/3 — Publishing listing(s) to Notion**`)
           let pushed = 0
           for (const itemId of pushCandidateIds) {
             try {
@@ -537,12 +521,12 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
               // or already pushed — not a real failure
             }
           }
-          addAgentMessage(`✅ Published ${pushed} listing(s) to Notion.`)
+          addMsg(`✅ Published ${pushed} listing(s) to Notion.`)
         } else {
-          addAgentMessage(`**Step 3/3 — Publish:** No listings to push.`)
+          addMsg(`**Step 3/3 — Publish:** No listings to push.`)
         }
 
-        addAgentMessage(`🏁 **Pipeline complete!** Check your Queue to review results. You can manually edit any listing before final publishing.`)
+        addMsg(`🏁 **Pipeline complete!** Check your Queue to review results. You can manually edit any listing before final publishing.`)
         toast.success('Full pipeline complete')
         setIsProcessing(false)
         return
@@ -751,8 +735,8 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         }
       }
 
-      // Session management commands
-      if ((lowerText.includes('start') && lowerText.includes('session')) && onStartSession) {
+      // Session management commands — use regex word boundaries to avoid false positives
+      if (/\b(start|begin)\b.*\bsession\b/i.test(text) && onStartSession) {
         if (currentSession?.active) {
           addMsg('A session is already active. End the current session first before starting a new one.')
         } else {
@@ -763,19 +747,20 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         return
       }
 
-      if ((lowerText.includes('end') && lowerText.includes('session')) && onEndSession) {
+      if (/\b(end|stop|finish)\b.*\bsession\b/i.test(text) && onEndSession) {
         if (!currentSession?.active) {
           addMsg('No active session to end. Start a new session first.')
         } else {
+          const profit = currentSession.totalPotentialProfit ?? 0
           onEndSession()
-          addMsg(`**Session ended!** Final stats: ${currentSession.itemsScanned} scans, ${currentSession.goCount} GO, ${currentSession.passCount} PASS, $${currentSession.totalPotentialProfit.toFixed(2)} potential profit.`)
+          addMsg(`**Session ended!** Final stats: ${currentSession.itemsScanned} scans, ${currentSession.goCount} GO, ${currentSession.passCount} PASS, $${profit.toFixed(2)} potential profit.`)
         }
         setIsProcessing(false)
         return
       }
 
       // Rename/edit session command
-      if ((lowerText.includes('name') || lowerText.includes('rename')) && lowerText.includes('session') && onEditSession) {
+      if (/\b(name|rename)\b.*\bsession\b/i.test(text) && onEditSession) {
         const nameMatch = text.match(/(?:name|rename)\s+(?:this\s+)?session\s+(?:to\s+)?["']?(.+?)["']?\s*$/i)
         if (nameMatch && currentSession?.active) {
           onEditSession(currentSession.id, { name: nameMatch[1].trim() })
@@ -786,19 +771,20 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
       }
 
       // Set session goal
-      if (lowerText.includes('goal') && (lowerText.includes('set') || lowerText.includes('target')) && onEditSession) {
+      if (/\b(set|target)\b.*\bgoal\b/i.test(text) && onEditSession) {
         const goalMatch = text.match(/\$?(\d+(?:\.\d{2})?)/)?.[1]
         if (goalMatch && currentSession?.active) {
           const amount = parseFloat(goalMatch)
+          const currentProfit = currentSession.totalPotentialProfit ?? 0
           onEditSession(currentSession.id, { profitGoal: amount })
-          addMsg(`**Profit goal set to $${amount.toFixed(2)}** for this session. Current progress: $${currentSession.totalPotentialProfit.toFixed(2)} (${Math.round((currentSession.totalPotentialProfit / amount) * 100)}%)`)
+          addMsg(`**Profit goal set to $${amount.toFixed(2)}** for this session. Current progress: $${currentProfit.toFixed(2)} (${amount > 0 ? Math.round((currentProfit / amount) * 100) : 0}%)`)
           setIsProcessing(false)
           return
         }
       }
 
       // Set session location
-      if (lowerText.includes('location') && (lowerText.includes('set') || lowerText.includes('at') || lowerText.includes('store')) && onEditSession && currentSession?.active) {
+      if (/\b(set|at)\b.*\b(location|store)\b/i.test(text) && onEditSession && currentSession?.active) {
         const locMatch = text.match(/(?:location|store|at)\s+(?:to\s+|is\s+)?["']?(.+?)["']?\s*$/i)
         if (locMatch) {
           const name = locMatch[1].trim()
@@ -842,7 +828,7 @@ ${currentSession?.active ? `- Name: ${currentSession.name || 'Unnamed'}
 - Started: ${new Date(currentSession.startTime).toLocaleString()}
 - Scans: ${currentSession.itemsScanned} (${currentSession.goCount} GO, ${currentSession.passCount} PASS)
 - Profit: $${currentSession.totalPotentialProfit.toFixed(2)}
-- Goal: ${currentSession.profitGoal ? `$${currentSession.profitGoal} (${Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100)}% achieved)` : 'Not set'}
+- Goal: ${currentSession.profitGoal ? `$${currentSession.profitGoal} (${currentSession.profitGoal > 0 ? Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100) : 0}% achieved)` : 'Not set'}
 - Location: ${currentSession.location?.name || 'Not set'}` : 'No active session'}
 
 ### Past Sessions (most recent)
@@ -904,7 +890,7 @@ You can execute these commands for the user:
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)

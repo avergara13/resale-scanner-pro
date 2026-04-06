@@ -134,6 +134,17 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
+
+  // Memoize combined items to avoid recreating on every render
+  const allCombinedItems = useMemo(() => {
+    const items = [...(queue || []), ...(scanHistory || [])]
+    const seen = new Set<string>()
+    return items.filter(i => {
+      if (seen.has(i.id)) return false
+      seen.add(i.id)
+      return true
+    })
+  }, [queue, scanHistory])
   const [goals, setGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   
   const formatDuration = (ms: number) => {
@@ -270,13 +281,7 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
               <h3 className="text-xs font-bold text-t3 uppercase tracking-wider mb-3">Past Sessions</h3>
               <div className="space-y-2">
                 {(allSessions || []).slice().reverse().map(pastSession => {
-                  const allItems = [...(queue || []), ...(scanHistory || [])]
-                  const seen = new Set<string>()
-                  const sessionItems = allItems.filter(i => {
-                    if (i.sessionId !== pastSession.id || seen.has(i.id)) return false
-                    seen.add(i.id)
-                    return true
-                  })
+                  const sessionItems = allCombinedItems.filter(i => i.sessionId === pastSession.id)
                   const goItems = sessionItems.filter(i => i.decision === 'GO')
                   const passItems = sessionItems.filter(i => i.decision === 'PASS')
                   const totalProfit = goItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)

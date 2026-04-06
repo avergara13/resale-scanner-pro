@@ -140,7 +140,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
   const calculateSessionGoalProgress = (goal: ProfitGoal) => {
     const goItems = sessionItems.filter(i => i.decision === 'GO' && i.profitMargin !== undefined)
     const currentAmount = goItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
-    const percentageComplete = Math.min((currentAmount / goal.targetAmount) * 100, 100)
+    const percentageComplete = goal.targetAmount > 0 ? Math.min((currentAmount / goal.targetAmount) * 100, 100) : 0
     return { currentAmount, percentageComplete }
   }
 
@@ -170,10 +170,10 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                 className="h-7 text-sm font-bold"
                 placeholder="Session name"
                 autoFocus
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setEditName('') } }}
               />
               <button onClick={handleSaveName} className="text-green"><Check size={16} /></button>
-              <button onClick={() => setEditingName(false)} className="text-red"><X size={16} /></button>
+              <button onClick={() => { setEditingName(false); setEditName('') }} className="text-red"><X size={16} /></button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -205,12 +205,14 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                 placeholder="Store name"
                 className="h-8 text-xs"
                 autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLocation(); if (e.key === 'Escape') setEditingLocation(false) }}
               />
               <Input
                 value={editLocationAddress}
                 onChange={(e) => setEditLocationAddress(e.target.value)}
                 placeholder="Address (optional)"
                 className="h-8 text-xs"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLocation(); if (e.key === 'Escape') setEditingLocation(false) }}
               />
               <div className="flex flex-wrap gap-1">
                 {locationTypes.map(lt => (
@@ -267,10 +269,10 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                   placeholder="Target amount"
                   className="h-8 text-xs flex-1"
                   autoFocus
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') setEditingGoal(false) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') { setEditingGoal(false); setEditGoalAmount('') } }}
                 />
                 <button onClick={handleSaveGoal} className="text-green"><Check size={16} /></button>
-                <button onClick={() => setEditingGoal(false)} className="text-red"><X size={16} /></button>
+                <button onClick={() => { setEditingGoal(false); setEditGoalAmount('') }} className="text-red"><X size={16} /></button>
               </div>
             </div>
           ) : (
@@ -285,9 +287,9 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                         ${session.totalPotentialProfit.toFixed(2)} / ${session.profitGoal.toFixed(2)}
                       </span>
                     </div>
-                    <Progress value={Math.min((session.totalPotentialProfit / session.profitGoal) * 100, 100)} className="h-1.5 mt-1" />
+                    <Progress value={session.profitGoal > 0 ? Math.min((session.totalPotentialProfit / session.profitGoal) * 100, 100) : 0} className="h-1.5 mt-1" />
                     <p className="text-[10px] text-t3 mt-0.5">
-                      {Math.round((session.totalPotentialProfit / session.profitGoal) * 100)}% achieved
+                      {session.profitGoal > 0 ? Math.round((session.totalPotentialProfit / session.profitGoal) * 100) : 0}% achieved
                     </p>
                   </>
                 ) : (
