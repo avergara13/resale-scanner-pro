@@ -790,9 +790,9 @@ function App() {
     toast.success(`Analyzed ${processedCount} items: ${goCount} GO, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
-  // Seed 3 test items so the queue cards can be verified
+  // Seed 3 test items so the queue cards can be verified (dev/debug only)
   useEffect(() => {
-    if (queue && queue.length === 0) {
+    if (import.meta.env.DEV && queue && queue.length === 0) {
       const testItems: ScannedItem[] = [
         {
           id: 'test-1',
