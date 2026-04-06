@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
-import { TimeBasedRecommendations } from '../TimeBasedRecommendations'
 import { LocationInsights } from '../LocationInsights'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
@@ -118,8 +117,11 @@ function PastSessionCard({
   )
 }
 
+type TrendsTab = 'trends' | 'stores' | 'goals'
+
 interface SessionScreenProps {
   session?: Session
+  showTrends?: boolean
   onStartSession: () => void
   onEndSession: () => void
   onNavigateToQueue?: (filter?: string) => void
@@ -127,10 +129,8 @@ interface SessionScreenProps {
   onViewSessionDetail?: (sessionId: string) => void
 }
 
-export function SessionScreen({ session, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
-  const [showTrends, setShowTrends] = useState(false)
-  const [showGoalTracking, setShowGoalTracking] = useState(false)
-  const [showLocations, setShowLocations] = useState(false)
+export function SessionScreen({ session, showTrends = false, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
+  const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
@@ -200,62 +200,69 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
       />
 
       <div className="px-4 py-6">
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-black tracking-tight text-t1">
-            {showLocations ? 'TOP THRIFT STORES' : showGoalTracking ? 'GOAL ACHIEVEMENT' : showTrends ? 'PERFORMANCE TRENDS' : 'TODAY\'S SESSION'}
-          </h1>
-          <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              if (showLocations) {
-                setShowLocations(false)
-              } else if (showGoalTracking) {
-                setShowGoalTracking(false)
-                setShowLocations(true)
-              } else if (showTrends) {
-                setShowTrends(false)
-                setShowGoalTracking(true)
-              } else {
-                setShowTrends(true)
-              }
-            }}
-            className="h-9 w-9"
-          >
-            {showLocations ? (
-              <MapPin size={20} weight="fill" className="text-green" />
-            ) : showGoalTracking ? (
-              <Trophy size={20} weight="fill" className="text-amber" />
-            ) : (
-              <ChartLine size={20} weight={showTrends ? 'fill' : 'regular'} className="text-b1" />
-            )}
-          </Button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-xl font-black tracking-tight text-t1">
+          {showTrends ? 'PERFORMANCE TRENDS' : 'TODAY\'S SESSION'}
+        </h1>
+        <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+        </p>
       </div>
 
-      {showLocations ? (
-        <div className="flex-1 overflow-y-auto">
-          <LocationInsights items={queue || []} />
-        </div>
-      ) : showGoalTracking ? (
-        <div className="flex-1 overflow-y-auto">
-          <GoalAchievementTracker 
-            goals={goals || []} 
-            items={queue || []}
-          />
-        </div>
-      ) : showTrends ? (
-        <div className="flex-1 overflow-y-auto">
-          <TrendVisualization 
-            items={queue || []} 
-            sessions={allSessions || []}
-          />
+      {showTrends ? (
+        <div className="flex-1 overflow-y-auto pb-24">
+          {/* Sub-tabs */}
+          <div className="flex gap-1.5 mb-4">
+            {([
+              { id: 'trends' as TrendsTab, label: 'Trends', icon: ChartLine },
+              { id: 'stores' as TrendsTab, label: 'Stores', icon: MapPin },
+              { id: 'goals' as TrendsTab, label: 'Goals', icon: Trophy },
+            ]).map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setTrendsTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${
+                  trendsTab === tab.id ? 'bg-b1 text-white' : 'bg-s1 text-t3'
+                }`}
+              >
+                <tab.icon size={14} weight={trendsTab === tab.id ? 'fill' : 'regular'} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {trendsTab === 'trends' && (
+            <div className="space-y-4">
+              {/* Summary nodes */}
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setTrendsTab('stores')} className="stat-card p-3 text-left active:scale-[0.97] transition-transform">
+                  <MapPin size={16} className="text-green mb-1" />
+                  <div className="text-sm font-bold text-t1">{(allSessions || []).filter(s => s.location?.name).map(s => s.location!.name).filter((v, i, a) => a.indexOf(v) === i).length}</div>
+                  <div className="text-[9px] text-t3 uppercase tracking-wider font-bold">Stores Visited</div>
+                </button>
+                <button onClick={() => setTrendsTab('goals')} className="stat-card p-3 text-left active:scale-[0.97] transition-transform">
+                  <Trophy size={16} className="text-amber mb-1" />
+                  <div className="text-sm font-bold text-t1">{(goals || []).filter(g => g.active).length}</div>
+                  <div className="text-[9px] text-t3 uppercase tracking-wider font-bold">Active Goals</div>
+                </button>
+              </div>
+              <TrendVisualization
+                items={queue || []}
+                sessions={allSessions || []}
+              />
+            </div>
+          )}
+
+          {trendsTab === 'stores' && (
+            <LocationInsights items={queue || []} />
+          )}
+
+          {trendsTab === 'goals' && (
+            <GoalAchievementTracker
+              goals={goals || []}
+              items={queue || []}
+            />
+          )}
         </div>
       ) : !session?.active ? (
         <div className="flex-1 overflow-y-auto space-y-5 pb-24">

@@ -37,6 +37,7 @@ import { cn } from './lib/utils'
 function App() {
   const [screen, setScreen] = useState<Screen>('session')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [showSessionTrends, setShowSessionTrends] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
@@ -1025,13 +1026,17 @@ function App() {
         compact={false}
       />
       
-      <AppHeader screen={screen} onNavigateToSettings={() => setScreen('settings')} />
+      <AppHeader
+        screen={screen}
+        onNavigateToSettings={() => setScreen('settings')}
+        onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
+        showTrends={showSessionTrends}
+      />
 
       <div
         className="flex-1 relative w-full pb-24"
         style={{
           minHeight: 'calc(100vh - 96px)',
-          paddingTop: 'env(safe-area-inset-top, 0px)'
         }}
       >
         <AnimatePresence mode="wait" custom={direction}>
@@ -1048,6 +1053,7 @@ function App() {
             >
               <SessionScreen
                 session={session}
+                showTrends={showSessionTrends}
                 onStartSession={handleStartSession}
                 onEndSession={handleEndSession}
                 onNavigateToQueue={() => setScreen('queue')}
