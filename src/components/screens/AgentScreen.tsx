@@ -45,7 +45,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session } from '@/types'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal } from '@/types'
 
 interface QuickAction {
   emoji: string
@@ -88,6 +88,16 @@ const QUICK_ACTIONS: QuickAction[] = [
     emoji: '🚀',
     label: 'Full Pipeline',
     prompt: 'Run full pipeline: analyze all drafts, optimize GO listings, and push to Notion'
+  },
+  {
+    emoji: '📊',
+    label: 'Session Status',
+    prompt: 'What\'s my current session status? Show me all stats, goals, and recent items.'
+  },
+  {
+    emoji: '🏪',
+    label: 'Start Session',
+    prompt: 'Start a new scanning session'
   },
 ]
 
@@ -165,9 +175,15 @@ interface AgentScreenProps {
   onEditItem?: (itemId: string, updates: Partial<ScannedItem>) => void
   onNavigateToQueue?: () => void
   onOpenCamera?: () => void
+  onStartSession?: () => void
+  onEndSession?: () => void
+  onEditSession?: (sessionId: string, updates: Partial<Session>) => void
+  allSessions?: Session[]
+  scanHistory?: ScannedItem[]
+  profitGoals?: ProfitGoal[]
 }
 
-export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onNavigateToQueue, onOpenCamera }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
   const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -296,23 +312,59 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
   const buildContext = useCallback(() => {
     const queueSummary = queueItems.slice(0, 10).map(item => ({
+      id: item.id,
       name: item.productName || 'Unknown',
       price: item.purchasePrice,
       estimatedSell: item.estimatedSellPrice,
       decision: item.decision,
-      profitMargin: item.profitMargin
+      profitMargin: item.profitMargin,
+      category: item.category,
+      tags: item.tags,
+      listingStatus: item.listingStatus,
+      inQueue: item.inQueue,
+    }))
+
+    const sessionsSummary = allSessions.slice(-5).map(s => ({
+      id: s.id,
+      name: s.name || new Date(s.startTime).toLocaleDateString(),
+      active: s.active,
+      itemsScanned: s.itemsScanned,
+      goCount: s.goCount,
+      passCount: s.passCount,
+      totalProfit: s.totalPotentialProfit,
+      profitGoal: s.profitGoal,
+      location: s.location?.name,
+    }))
+
+    const goalsSummary = profitGoals.filter(g => g.active).map(g => ({
+      id: g.id,
+      type: g.type,
+      target: g.targetAmount,
+      startDate: new Date(g.startDate).toLocaleDateString(),
+      endDate: new Date(g.endDate).toLocaleDateString(),
+    }))
+
+    const recentScans = scanHistory.slice(0, 5).map(i => ({
+      name: i.productName || 'Unknown',
+      decision: i.decision,
+      price: i.purchasePrice,
+      sellPrice: i.estimatedSellPrice,
+      sessionId: i.sessionId,
     }))
 
     return {
       queueStats,
       recentItems: queueSummary,
+      sessions: sessionsSummary,
+      goals: goalsSummary,
+      recentScans,
       settings: {
         minProfitMargin: settings?.minProfitMargin,
         defaultShipping: settings?.defaultShippingCost,
         ebayFeePercent: settings?.ebayFeePercent
       }
     }
-  }, [queueItems, queueStats, settings])
+  }, [queueItems, queueStats, settings, allSessions, profitGoals, scanHistory])
 
   const handleSendMessage = useCallback(async (messageText?: string) => {
     const text = messageText || input.trim()
@@ -384,7 +436,24 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
     try {
       const lowerText = text.toLowerCase()
-      
+
+      // Shared helper to add agent messages
+      const addMsg = (content: string) => {
+        const msg: ChatMessage = {
+          id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+          role: 'assistant',
+          content,
+          timestamp: Date.now(),
+        }
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === sessionId
+              ? { ...s, messages: [...s.messages, msg], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+      }
+
       // Full agentic pipeline: analyze → optimize → push
       if (lowerText.includes('full pipeline') || lowerText.includes('auto-list') || lowerText.includes('process queue') || lowerText.includes('run pipeline')) {
         const addAgentMessage = (content: string) => {
@@ -621,16 +690,6 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         ) || queueItems[queueItems.length - 1]
 
         if (recentItem?.productName) {
-          const addMsg = (content: string) => {
-            setChatSessions((prev) =>
-              (prev || []).map(s =>
-                s.id === sessionId
-                  ? { ...s, messages: [...s.messages, { id: Date.now().toString() + Math.random().toString(36).slice(2, 5), role: 'assistant' as const, content, timestamp: Date.now() }], lastMessageAt: Date.now() }
-                  : s
-              )
-            )
-          }
-
           addMsg(`Researching **${recentItem.productName}** across marketplaces...`)
 
           try {
@@ -692,29 +751,130 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         }
       }
 
+      // Session management commands
+      if ((lowerText.includes('start') && lowerText.includes('session')) && onStartSession) {
+        if (currentSession?.active) {
+          addMsg('A session is already active. End the current session first before starting a new one.')
+        } else {
+          onStartSession()
+          addMsg('**Session started!** I\'m now tracking your scans, profits, and decisions. Start scanning items and I\'ll keep you updated on progress.')
+        }
+        setIsProcessing(false)
+        return
+      }
+
+      if ((lowerText.includes('end') && lowerText.includes('session')) && onEndSession) {
+        if (!currentSession?.active) {
+          addMsg('No active session to end. Start a new session first.')
+        } else {
+          onEndSession()
+          addMsg(`**Session ended!** Final stats: ${currentSession.itemsScanned} scans, ${currentSession.goCount} GO, ${currentSession.passCount} PASS, $${currentSession.totalPotentialProfit.toFixed(2)} potential profit.`)
+        }
+        setIsProcessing(false)
+        return
+      }
+
+      // Rename/edit session command
+      if ((lowerText.includes('name') || lowerText.includes('rename')) && lowerText.includes('session') && onEditSession) {
+        const nameMatch = text.match(/(?:name|rename)\s+(?:this\s+)?session\s+(?:to\s+)?["']?(.+?)["']?\s*$/i)
+        if (nameMatch && currentSession?.active) {
+          onEditSession(currentSession.id, { name: nameMatch[1].trim() })
+          addMsg(`Session renamed to **${nameMatch[1].trim()}**`)
+          setIsProcessing(false)
+          return
+        }
+      }
+
+      // Set session goal
+      if (lowerText.includes('goal') && (lowerText.includes('set') || lowerText.includes('target')) && onEditSession) {
+        const goalMatch = text.match(/\$?(\d+(?:\.\d{2})?)/)?.[1]
+        if (goalMatch && currentSession?.active) {
+          const amount = parseFloat(goalMatch)
+          onEditSession(currentSession.id, { profitGoal: amount })
+          addMsg(`**Profit goal set to $${amount.toFixed(2)}** for this session. Current progress: $${currentSession.totalPotentialProfit.toFixed(2)} (${Math.round((currentSession.totalPotentialProfit / amount) * 100)}%)`)
+          setIsProcessing(false)
+          return
+        }
+      }
+
+      // Set session location
+      if (lowerText.includes('location') && (lowerText.includes('set') || lowerText.includes('at') || lowerText.includes('store')) && onEditSession && currentSession?.active) {
+        const locMatch = text.match(/(?:location|store|at)\s+(?:to\s+|is\s+)?["']?(.+?)["']?\s*$/i)
+        if (locMatch) {
+          const name = locMatch[1].trim()
+          const location = {
+            id: currentSession.location?.id || Date.now().toString(),
+            name,
+            type: 'thrift-store' as const,
+          }
+          onEditSession(currentSession.id, { location })
+          addMsg(`Session location set to **${name}**`)
+          setIsProcessing(false)
+          return
+        }
+      }
+
       const context = buildContext()
       const recentItems = queueItems.slice(-3).map(i =>
-        `• ${i.productName || 'Unknown'} — Buy: $${i.purchasePrice.toFixed(2)}, Sell: $${(i.estimatedSellPrice || 0).toFixed(2)}, Margin: ${(i.profitMargin || 0).toFixed(1)}%, Decision: ${i.decision}`
+        `• ${i.productName || 'Unknown'} — Buy: $${i.purchasePrice.toFixed(2)}, Sell: $${(i.estimatedSellPrice || 0).toFixed(2)}, Margin: ${(i.profitMargin || 0).toFixed(1)}%, Decision: ${i.decision}, Status: ${i.listingStatus || 'not-started'}${i.category ? `, Category: ${i.category}` : ''}`
       ).join('\n')
 
-      const systemPrompt = `You are an expert AI agent for resale business optimization. You help users research products, analyze profitability, create optimized eBay listings, and make data-driven decisions.
+      const pastSessionsSummary = allSessions.slice(-3).map(s => {
+        const dur = ((s.endTime || Date.now()) - s.startTime) / 60000
+        return `• ${s.name || new Date(s.startTime).toLocaleDateString()} — ${s.itemsScanned} scans, ${s.goCount} GO, $${s.totalPotentialProfit.toFixed(2)} profit, ${Math.round(dur)}min${s.location ? `, at ${s.location.name}` : ''}${s.profitGoal ? `, goal: $${s.profitGoal}` : ''}`
+      }).join('\n')
 
-Current Context:
-- Queue: ${queueStats.total} items (${queueStats.go} GO, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
+      const activeGoalsSummary = profitGoals.filter(g => g.active).map(g =>
+        `• ${g.type} goal: $${g.targetAmount.toFixed(2)} (${new Date(g.startDate).toLocaleDateString()} - ${new Date(g.endDate).toLocaleDateString()})`
+      ).join('\n')
+
+      const systemPrompt = `You are an expert AI agent for resale business optimization. You have FULL awareness of this app's state — every session, item, goal, and setting. You help users research products, analyze profitability, create optimized eBay listings, manage sessions, and make data-driven decisions.
+
+## Current App State
+
+### Queue
+- ${queueStats.total} items (${queueStats.go} GO, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
 - Potential profit: $${queueStats.totalProfit.toFixed(2)}
-- Settings: ${settings?.minProfitMargin}% min margin, $${settings?.defaultShippingCost} shipping, ${settings?.ebayFeePercent}% eBay fee
-${currentSession?.active ? `\nActive Session: ${currentSession.name || 'Current'} (started ${new Date(currentSession.startTime).toLocaleString()}, ${currentSession.itemsScanned} scans, ${currentSession.goCount} GO, ${currentSession.passCount} PASS, $${currentSession.totalPotentialProfit.toFixed(2)} profit)` : '\nNo active session'}
 ${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
 
-You can perform these actions:
+### Active Session
+${currentSession?.active ? `- Name: ${currentSession.name || 'Unnamed'}
+- Started: ${new Date(currentSession.startTime).toLocaleString()}
+- Scans: ${currentSession.itemsScanned} (${currentSession.goCount} GO, ${currentSession.passCount} PASS)
+- Profit: $${currentSession.totalPotentialProfit.toFixed(2)}
+- Goal: ${currentSession.profitGoal ? `$${currentSession.profitGoal} (${Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100)}% achieved)` : 'Not set'}
+- Location: ${currentSession.location?.name || 'Not set'}` : 'No active session'}
+
+### Past Sessions (most recent)
+${pastSessionsSummary || 'No past sessions'}
+
+### Profit Goals
+${activeGoalsSummary || 'No active goals'}
+
+### Settings
+- Min margin: ${settings?.minProfitMargin}%, Shipping: $${settings?.defaultShippingCost}, eBay fee: ${settings?.ebayFeePercent}%
+
+## Available Actions
+You can execute these commands for the user:
 - "Research [product]" — Search real marketplaces for current prices and demand
-- "Change price to $X" / "Update sell price to $X" — Edit item fields directly
+- "Change price to $X" / "Update sell price to $X" — Edit item fields
 - "Create listings" — Generate optimized eBay listings for GO items
 - "Push to Notion" — Publish ready listings
 - "Full pipeline" — End-to-end: analyze → optimize → publish
 - "Camera" / "Scan" — Open the AI Camera
+- "Start session" / "End session" — Manage scanning sessions
+- "Name session [name]" — Rename the active session
+- "Set goal $X" — Set a profit goal for the active session
+- "Set location [name]" — Set the location for the active session
 
-When discussing an item, reference its specific data. If the user asks about pricing or market value, use the research command to look up real marketplace data. Be specific with numbers and actionable advice. If an item has a negative margin, explain WHY (fees + shipping often exceed low sell prices) and suggest alternatives (bundle, different marketplace, higher-value items).`
+## Instructions
+- You are fully aware of ALL data in this app. Reference specific items, sessions, goals, and metrics by name and number.
+- When the user asks about sessions, items, goals, or any app data, answer from the state above — don't say you can't access it.
+- When discussing items, reference their specific prices, margins, categories, and brands.
+- If asked about profitability, calculate real numbers using the data.
+- If an item has a negative margin, explain WHY (fees + shipping) and suggest alternatives.
+- When the user asks to edit forms or data, use the available actions to do it immediately.
+- Be proactive: if a session has no goal set, suggest one. If items are unanalyzed, suggest running the pipeline.`
 
       const fullPrompt = `${systemPrompt}\n\nUser: ${text}`
       const response = await callLLM(fullPrompt, {
@@ -744,7 +904,7 @@ When discussing an item, reference its specific data. If the user asks about pri
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)

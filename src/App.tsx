@@ -29,7 +29,7 @@ import { useImageOptimization } from './hooks/use-image-optimization'
 import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal } from './types'
 import { cn } from './lib/utils'
 
 function App() {
@@ -46,6 +46,7 @@ function App() {
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
+  const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [settings, setSettings] = useKV<AppSettings>('settings', {
     voiceEnabled: true,
     autoCapture: true,
@@ -472,6 +473,17 @@ function App() {
       setAllSessions((prev) => [...(prev || []), endedSession])
       toast.success('Session ended')
     }
+  }, [session, setSession, setAllSessions])
+
+  const handleEditSession = useCallback((sessionId: string, updates: Partial<Session>) => {
+    // Update active session if it matches
+    if (session?.id === sessionId) {
+      setSession(prev => prev ? { ...prev, ...updates } : prev)
+    }
+    // Update in allSessions
+    setAllSessions(prev =>
+      (prev || []).map(s => s.id === sessionId ? { ...s, ...updates } : s)
+    )
   }, [session, setSession, setAllSessions])
 
   const handleUpdateSettings = useCallback((updates: Partial<AppSettings>) => {
@@ -984,6 +996,12 @@ function App() {
                 onEditItem={handleEditQueueItem}
                 onNavigateToQueue={() => setScreen('queue')}
                 onOpenCamera={() => setCameraOpen(true)}
+                onStartSession={handleStartSession}
+                onEndSession={handleEndSession}
+                onEditSession={handleEditSession}
+                allSessions={allSessions || []}
+                scanHistory={scanHistory || []}
+                profitGoals={profitGoals || []}
               />
             </motion.div>
           )}
