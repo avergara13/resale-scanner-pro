@@ -1,5 +1,5 @@
-import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy, MapPin } from '@phosphor-icons/react'
-import { useState, useCallback } from 'react'
+import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, Package } from '@phosphor-icons/react'
+import { useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,102 @@ import { useKV } from '@github/spark/hooks'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
 import type { Session, ScannedItem, ProfitGoal } from '@/types'
+
+function PastSessionCard({
+  session, items, goCount, passCount, totalProfit, bestFind, duration, goRate, formatDuration, onDelete
+}: {
+  session: Session
+  items: ScannedItem[]
+  goCount: number
+  passCount: number
+  totalProfit: number
+  bestFind: ScannedItem | null
+  duration: number
+  goRate: number
+  formatDuration: (ms: number) => string
+  onDelete: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const startDate = new Date(session.startTime)
+
+  return (
+    <Card className="border-s2 overflow-hidden">
+      <button onClick={() => setExpanded(!expanded)} className="w-full p-3 text-left active:bg-s1/50 transition-colors">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Clock size={14} className="text-t3 flex-shrink-0" />
+            <span className="text-xs font-bold text-t1 truncate">
+              {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-[10px] text-t3 font-mono">{formatDuration(duration)}</span>
+            {expanded ? <CaretUp size={14} className="text-t3" /> : <CaretDown size={14} className="text-t3" />}
+          </div>
+        </div>
+        <div className="flex gap-3 text-[10px]">
+          <span className="text-t2">{session.itemsScanned} scans</span>
+          <span className="text-green font-bold">{goCount} GO</span>
+          <span className="text-red font-bold">{passCount} PASS</span>
+          <span className="text-green font-mono font-bold">${totalProfit.toFixed(2)}</span>
+          <span className="text-b1 font-bold">{goRate}%</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-s2 px-3 py-2 space-y-2">
+          {/* Micro-analytics */}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="p-2 bg-s1 rounded-lg">
+              <p className="text-[9px] text-t3 uppercase">Avg Profit</p>
+              <p className="text-xs font-bold text-t1 font-mono">
+                ${goCount > 0 ? (totalProfit / goCount).toFixed(2) : '0.00'}
+              </p>
+            </div>
+            <div className="p-2 bg-s1 rounded-lg">
+              <p className="text-[9px] text-t3 uppercase">Revenue</p>
+              <p className="text-xs font-bold text-t1 font-mono">
+                ${items.filter(i => i.decision === 'GO').reduce((s, i) => s + (i.estimatedSellPrice || 0), 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="p-2 bg-s1 rounded-lg">
+              <p className="text-[9px] text-t3 uppercase">GO Rate</p>
+              <p className="text-xs font-bold text-b1">{goRate}%</p>
+            </div>
+          </div>
+
+          {bestFind && (
+            <div className="flex items-center gap-2 p-2 bg-green/5 border border-green/20 rounded-lg">
+              <TrendUp size={14} className="text-green flex-shrink-0" />
+              <span className="text-[10px] text-t2 truncate">Best: <span className="font-bold text-t1">{bestFind.productName}</span> ({bestFind.profitMargin?.toFixed(0)}%)</span>
+            </div>
+          )}
+
+          {/* Session items */}
+          {items.length > 0 && (
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {items.map(item => (
+                <div key={item.id} className="flex items-center justify-between py-1.5 px-2 bg-bg rounded text-[10px]">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Badge variant="secondary" className={`text-[8px] px-1 py-0 flex-shrink-0 ${item.decision === 'GO' ? 'bg-green/10 text-green' : item.decision === 'PASS' ? 'bg-red/10 text-red' : 'bg-amber/10 text-amber'}`}>
+                      {item.decision}
+                    </Badge>
+                    <span className="truncate text-t1">{item.productName || 'Unknown'}</span>
+                  </div>
+                  <span className="font-mono text-t2 flex-shrink-0 ml-2">${item.purchasePrice.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="w-full py-1.5 text-[10px] text-red/60 hover:text-red font-bold transition-colors">
+            Delete Session
+          </button>
+        </div>
+      )}
+    </Card>
+  )
+}
 
 interface SessionScreenProps {
   session?: Session
@@ -143,29 +239,59 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
           />
         </div>
       ) : !session?.active ? (
-        <div className="flex-1 overflow-y-auto space-y-6">
-          <TimeBasedRecommendations 
-            sessions={allSessions || []} 
-            items={queue || []}
-          />
-          
-          <div className="flex flex-col items-center justify-center space-y-4 py-8">
+        <div className="flex-1 overflow-y-auto space-y-5 pb-24">
+          {/* Start new session */}
+          <div className="flex items-center gap-4">
             <button
               onClick={onStartSession}
               aria-label="Start scanning session"
-              className="w-24 h-24 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center shadow-lg active:scale-95 transition-all hover:shadow-xl"
+              className="w-16 h-16 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0"
             >
-              <Play size={40} weight="fill" className="text-white ml-1" />
+              <Play size={28} weight="fill" className="text-white ml-0.5" />
             </button>
-            <div className="text-center space-y-1">
-              <h2 className="text-xl font-semibold text-t1">No Active Session</h2>
-              <p className="text-sm text-t3 max-w-xs">Tap to start tracking scans and profits</p>
+            <div>
+              <h2 className="text-base font-bold text-t1">Start New Session</h2>
+              <p className="text-xs text-t3">Begin tracking scans and profits</p>
             </div>
           </div>
 
-          <div className="w-full">
-            <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
-          </div>
+          {/* Past sessions */}
+          {(allSessions || []).length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold text-t3 uppercase tracking-wider mb-3">Past Sessions</h3>
+              <div className="space-y-2">
+                {(allSessions || []).slice().reverse().map(pastSession => {
+                  const sessionItems = (queue || []).filter(i => i.sessionId === pastSession.id)
+                  const goItems = sessionItems.filter(i => i.decision === 'GO')
+                  const passItems = sessionItems.filter(i => i.decision === 'PASS')
+                  const totalProfit = goItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
+                  const bestFind = goItems.length > 0 ? goItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
+                  const duration = (pastSession.endTime || Date.now()) - pastSession.startTime
+                  const goRate = pastSession.itemsScanned > 0 ? Math.round((pastSession.goCount / pastSession.itemsScanned) * 100) : 0
+
+                  return (
+                    <PastSessionCard
+                      key={pastSession.id}
+                      session={pastSession}
+                      items={sessionItems}
+                      goCount={goItems.length}
+                      passCount={passItems.length}
+                      totalProfit={totalProfit}
+                      bestFind={bestFind}
+                      duration={duration}
+                      goRate={goRate}
+                      formatDuration={formatDuration}
+                      onDelete={() => {
+                        setAllSessions(prev => (prev || []).filter(s => s.id !== pastSession.id))
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
         </div>
       ) : (
         <div className="flex-1 space-y-4">

@@ -157,6 +157,7 @@ function App() {
       decision: 'PENDING',
       inQueue: false,
       location,
+      sessionId: session?.id,
     }
     setCurrentItem(newItem)
     setScreen('ai')
@@ -601,6 +602,7 @@ function App() {
       inQueue: true,
       productName: 'Quick Draft',
       description: 'Captured in quick draft mode - analyze later',
+      sessionId: session?.id,
       location,
     }
 
@@ -1018,11 +1020,13 @@ function App() {
                 onReorder={handleReorderQueue}
                 onBatchAnalyze={handleBatchAnalyze}
                 onAddManualItem={(item) => {
+                  const stamped = { ...item, sessionId: session?.id }
                   setQueue((prev) => {
                     const current = prev || []
-                    if (current.some(i => i.id === item.id)) return current
-                    return [...current, item]
+                    if (current.some(i => i.id === stamped.id)) return current
+                    return [...current, stamped]
                   })
+                  setScanHistory(prev => [stamped, ...(prev || []).slice(0, 499)])
                 }}
                 isBatchAnalyzing={isBatchAnalyzing}
                 geminiService={geminiService}

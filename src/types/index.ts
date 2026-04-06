@@ -85,6 +85,7 @@ export interface ScannedItem {
   ebayListingId?: string
   notionPageId?: string
   notionUrl?: string
+  sessionId?: string
 }
 
 export interface OptimizedListing {
@@ -189,6 +190,7 @@ export interface MarketData {
 
 export interface Session {
   id: string
+  name?: string
   startTime: number
   endTime?: number
   itemsScanned: number
@@ -197,6 +199,7 @@ export interface Session {
   totalPotentialProfit: number
   active: boolean
   profitGoal?: number
+  location?: ThriftStoreLocation
 }
 
 export interface ProfitGoal {
