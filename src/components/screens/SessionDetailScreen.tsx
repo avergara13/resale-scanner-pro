@@ -1,14 +1,16 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { ArrowLeft, Clock, TrendUp, Target, Trophy, Package, PencilSimple, Check, X, MapPin } from '@phosphor-icons/react'
+import { ArrowLeft, CheckCircle, XCircle, TrendUp, Target, Package, PencilSimple, Check, X, MapPin } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { ProfitGoalManager } from '../ProfitGoalManager'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import type { Session, ScannedItem, ProfitGoal, ThriftStoreLocation } from '@/types'
+import type { Session, ScannedItem, ThriftStoreLocation } from '@/types'
 
 interface SessionDetailScreenProps {
   sessionId: string
@@ -19,7 +21,6 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
   const [queue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
-  const [goals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [filter, setFilter] = useState<'all' | 'GO' | 'PASS'>('all')
 
   // Editing states
@@ -53,14 +54,6 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
     if (filter === 'all') return sessionItems
     return sessionItems.filter(i => i.decision === filter)
   }, [sessionItems, filter])
-
-  const overlappingGoals = useMemo(() => {
-    if (!session) return []
-    const sessionEnd = session.endTime || Date.now()
-    return (goals || []).filter(g =>
-      g.active && g.startDate < sessionEnd && g.endDate > session.startTime
-    )
-  }, [goals, session])
 
   const updateSession = useCallback((updates: Partial<Session>) => {
     setAllSessions(prev =>
@@ -118,6 +111,12 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
     setEditingGoal(true)
   }, [session])
 
+  const handleDelete = useCallback(() => {
+    setAllSessions(prev => (prev || []).filter(s => s.id !== sessionId))
+    onBack()
+    toast.success('Session deleted')
+  }, [setAllSessions, sessionId, onBack])
+
   if (!session) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -135,14 +134,6 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
   const duration = (session.endTime || Date.now()) - session.startTime
   const startDate = new Date(session.startTime)
   const goRate = session.itemsScanned > 0 ? Math.round((session.goCount / session.itemsScanned) * 100) : 0
-  const avgProfitPerGo = session.goCount > 0 ? session.totalPotentialProfit / session.goCount : 0
-
-  const calculateSessionGoalProgress = (goal: ProfitGoal) => {
-    const goItems = sessionItems.filter(i => i.decision === 'GO' && i.profitMargin !== undefined)
-    const currentAmount = goItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
-    const percentageComplete = goal.targetAmount > 0 ? Math.min((currentAmount / goal.targetAmount) * 100, 100) : 0
-    return { currentAmount, percentageComplete }
-  }
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
@@ -156,245 +147,227 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
 
   return (
     <div className="h-full flex flex-col bg-bg">
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-s2">
-        <button onClick={onBack} className="p-1 -ml-1 active:opacity-60 transition-opacity">
-          <ArrowLeft size={20} className="text-t1" />
-        </button>
-        <div className="flex-1 min-w-0">
-          {editingName ? (
-            <div className="flex items-center gap-2">
-              <Input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="h-7 text-sm font-bold"
-                placeholder="Session name"
-                autoFocus
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setEditName('') } }}
-              />
-              <button onClick={handleSaveName} className="text-green p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><Check size={18} /></button>
-              <button onClick={() => { setEditingName(false); setEditName('') }} className="text-red p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={18} /></button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold text-t1 truncate">
-                {session.name || startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-              </h1>
-              <button onClick={startEditName} className="text-t3 hover:text-t1 transition-colors flex-shrink-0">
-                <PencilSimple size={14} />
+      <div className="flex-1 overflow-y-auto pb-28">
+        <div className="px-4 py-6">
+          {/* Header — same style as session screen */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-1">
+              <button onClick={onBack} className="p-1 -ml-2 active:opacity-60 transition-opacity">
+                <ArrowLeft size={22} className="text-t1" />
               </button>
+              {editingName ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="h-8 text-lg font-black"
+                    placeholder="Session name"
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setEditName('') } }}
+                  />
+                  <button onClick={handleSaveName} className="text-green p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><Check size={18} /></button>
+                  <button onClick={() => { setEditingName(false); setEditName('') }} className="text-red p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={18} /></button>
+                </div>
+              ) : (
+                <button onClick={startEditName} className="flex items-center gap-2 active:opacity-70 transition-opacity">
+                  <h1 className="text-xl font-black tracking-tight text-t1">
+                    {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </h1>
+                  <PencilSimple size={16} className="text-t3" />
+                </button>
+              )}
             </div>
-          )}
-          <div className="flex items-center gap-2 text-[10px] text-t3 mt-0.5">
-            <Clock size={10} />
-            <span>{formatDuration(duration)}</span>
-            <span>{startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+            <div className="flex items-center gap-2 text-[11px] text-t3 font-medium uppercase tracking-wider ml-9">
+              <span>{startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+              <span>·</span>
+              <span>{startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+              {session.location && (
+                <>
+                  <span>·</span>
+                  <span>{session.location.name}</span>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="flex-1 overflow-y-auto p-4 pb-28 space-y-4">
-        {/* Location (editable) */}
-        <Card className="p-3">
-          {editingLocation ? (
-            <div className="space-y-2">
-              <Label className="text-[10px] text-t3 uppercase">Location</Label>
-              <Input
-                value={editLocationName}
-                onChange={(e) => setEditLocationName(e.target.value)}
-                placeholder="Store name"
-                className="h-8 text-xs"
-                autoFocus
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLocation(); if (e.key === 'Escape') setEditingLocation(false) }}
-              />
-              <Input
-                value={editLocationAddress}
-                onChange={(e) => setEditLocationAddress(e.target.value)}
-                placeholder="Address (optional)"
-                className="h-8 text-xs"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLocation(); if (e.key === 'Escape') setEditingLocation(false) }}
-              />
-              <div className="flex flex-wrap gap-1">
-                {locationTypes.map(lt => (
-                  <button
-                    key={lt.value}
-                    onClick={() => setEditLocationType(lt.value)}
-                    className={cn(
-                      'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
-                      editLocationType === lt.value ? 'bg-b1 text-white' : 'bg-s1 text-t3'
-                    )}
-                  >
-                    {lt.label}
-                  </button>
-                ))}
+          {/* Stats row — matches active session layout */}
+          <div className="flex gap-2 mb-4">
+            <div className="stat-card flex-1 p-3">
+              <div className="text-base font-bold text-green leading-tight">
+                ${session.totalPotentialProfit.toFixed(2)}
               </div>
-              <div className="flex gap-2">
-                <button onClick={handleSaveLocation} className="flex items-center gap-1 text-xs text-green font-bold">
-                  <Check size={12} /> Save
-                </button>
-                <button onClick={() => setEditingLocation(false)} className="flex items-center gap-1 text-xs text-t3">
-                  <X size={12} /> Cancel
-                </button>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Est. Profit</div>
+            </div>
+            <div className="stat-card flex-1 p-3">
+              <div className="text-base font-bold text-t1 leading-tight">{session.itemsScanned}</div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
+            </div>
+            <div className="stat-card flex-1 p-3">
+              <div className="text-base font-bold text-b1 leading-tight">{goRate}%</div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">GO Rate</div>
+            </div>
+          </div>
+
+          {/* GO / PASS card — matches active session */}
+          <Card className="p-6 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <Badge variant="secondary" className="bg-t3 text-white px-3 py-1 uppercase text-xs font-bold">
+                Completed
+              </Badge>
+              <span className="text-sm mono text-t3">{formatDuration(duration)}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">GO</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold mono text-green">{session.goCount}</p>
+                  <CheckCircle size={20} weight="fill" className="text-green" />
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">PASS</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold mono text-red">{session.passCount}</p>
+                  <XCircle size={20} weight="fill" className="text-red" />
+                </div>
               </div>
             </div>
-          ) : (
-            <button onClick={startEditLocation} className="flex items-center gap-2 w-full text-left">
-              <MapPin size={14} className={session.location ? 'text-b1' : 'text-t3'} />
-              <span className="text-xs text-t1 flex-1 truncate">
-                {session.location ? (
-                  <>
-                    {session.location.name}
-                    {session.location.address && <span className="text-t3 ml-1">· {session.location.address}</span>}
-                  </>
-                ) : (
-                  <span className="text-t3 italic">Tap to add location</span>
-                )}
-              </span>
-              <PencilSimple size={12} className="text-t3 flex-shrink-0" />
-            </button>
-          )}
-        </Card>
+          </Card>
 
-        {/* Profit Goal (editable) */}
-        <Card className="p-3">
-          {editingGoal ? (
-            <div className="space-y-2">
-              <Label className="text-[10px] text-t3 uppercase">Session Profit Goal</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-t1 font-bold">$</span>
+          {/* Potential Profit card — matches active session */}
+          <Card className="p-6 mb-4">
+            <h3 className="text-sm font-semibold text-t3 uppercase tracking-wide mb-3">Potential Profit</h3>
+            <p className="text-4xl font-bold mono text-t1">
+              ${session.totalPotentialProfit.toFixed(2)}
+            </p>
+            <p className="text-sm text-t3 mt-2">
+              From {session.goCount} items{' '}
+              {session.goCount > 0 && (
+                <span className="mono">
+                  (${(session.totalPotentialProfit / session.goCount).toFixed(2)} avg)
+                </span>
+              )}
+            </p>
+          </Card>
+
+          {/* Location — editable */}
+          <Card className="p-4 mb-4">
+            {editingLocation ? (
+              <div className="space-y-2">
+                <Label className="text-[10px] text-t3 uppercase">Location</Label>
                 <Input
-                  type="number"
-                  value={editGoalAmount}
-                  onChange={(e) => setEditGoalAmount(e.target.value)}
-                  placeholder="Target amount"
-                  className="h-8 text-xs flex-1"
+                  value={editLocationName}
+                  onChange={(e) => setEditLocationName(e.target.value)}
+                  placeholder="Store name"
+                  className="h-9 text-sm"
                   autoFocus
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') { setEditingGoal(false); setEditGoalAmount('') } }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLocation(); if (e.key === 'Escape') setEditingLocation(false) }}
                 />
-                <button onClick={handleSaveGoal} className="text-green p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><Check size={18} /></button>
-                <button onClick={() => { setEditingGoal(false); setEditGoalAmount('') }} className="text-red p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={18} /></button>
+                <Input
+                  value={editLocationAddress}
+                  onChange={(e) => setEditLocationAddress(e.target.value)}
+                  placeholder="Address (optional)"
+                  className="h-9 text-sm"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLocation(); if (e.key === 'Escape') setEditingLocation(false) }}
+                />
+                <div className="flex flex-wrap gap-1">
+                  {locationTypes.map(lt => (
+                    <button
+                      key={lt.value}
+                      onClick={() => setEditLocationType(lt.value)}
+                      className={cn(
+                        'px-2 py-1 rounded text-[11px] font-medium transition-colors',
+                        editLocationType === lt.value ? 'bg-b1 text-white' : 'bg-s1 text-t3'
+                      )}
+                    >
+                      {lt.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" onClick={handleSaveLocation} className="bg-b1 text-white text-xs h-9">Save</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingLocation(false)} className="text-xs h-9">Cancel</Button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <button onClick={startEditGoal} className="flex items-center gap-2 w-full text-left">
-              <Target size={14} className={session.profitGoal ? 'text-b1' : 'text-t3'} />
-              <div className="flex-1">
-                {session.profitGoal ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-t1">Session Goal: ${session.profitGoal.toFixed(2)}</span>
-                      <span className="text-[10px] font-mono text-t3">
-                        ${session.totalPotentialProfit.toFixed(2)} / ${session.profitGoal.toFixed(2)}
-                      </span>
-                    </div>
-                    <Progress value={session.profitGoal > 0 ? Math.min((session.totalPotentialProfit / session.profitGoal) * 100, 100) : 0} className="h-1.5 mt-1" />
-                    <p className="text-[10px] text-t3 mt-0.5">
-                      {session.profitGoal > 0 ? Math.round((session.totalPotentialProfit / session.profitGoal) * 100) : 0}% achieved
-                    </p>
-                  </>
-                ) : (
-                  <span className="text-xs text-t3 italic">Tap to set a profit goal</span>
-                )}
+            ) : (
+              <button onClick={startEditLocation} className="flex items-center gap-3 w-full text-left min-h-[44px]">
+                <MapPin size={18} className={session.location ? 'text-b1' : 'text-t3'} />
+                <span className="text-sm text-t1 flex-1">
+                  {session.location ? session.location.name : <span className="text-t3 italic">Tap to add location</span>}
+                </span>
+                <PencilSimple size={14} className="text-t3" />
+              </button>
+            )}
+          </Card>
+
+          {/* Profit Goal — editable */}
+          <Card className="p-4 mb-4">
+            {editingGoal ? (
+              <div className="space-y-2">
+                <Label className="text-[10px] text-t3 uppercase">Session Profit Goal</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-t1 font-bold">$</span>
+                  <Input
+                    type="number"
+                    value={editGoalAmount}
+                    onChange={(e) => setEditGoalAmount(e.target.value)}
+                    placeholder="Target amount"
+                    className="h-9 text-sm flex-1"
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') { setEditingGoal(false); setEditGoalAmount('') } }}
+                  />
+                  <Button size="sm" onClick={handleSaveGoal} className="bg-b1 text-white text-xs h-9">Save</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditingGoal(false); setEditGoalAmount('') }} className="text-xs h-9">Cancel</Button>
+                </div>
               </div>
-              <PencilSimple size={12} className="text-t3 flex-shrink-0" />
-            </button>
-          )}
-        </Card>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-3 gap-2">
-          <Card className="p-3 text-center">
-            <p className="text-[9px] text-t3 uppercase tracking-wider">Scans</p>
-            <p className="text-lg font-bold text-t1 font-mono">{session.itemsScanned}</p>
-          </Card>
-          <Card className="p-3 text-center">
-            <p className="text-[9px] text-t3 uppercase tracking-wider">GO</p>
-            <p className="text-lg font-bold text-green font-mono">{session.goCount}</p>
-          </Card>
-          <Card className="p-3 text-center">
-            <p className="text-[9px] text-t3 uppercase tracking-wider">PASS</p>
-            <p className="text-lg font-bold text-red font-mono">{session.passCount}</p>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <Card className="p-3 text-center">
-            <p className="text-[9px] text-t3 uppercase tracking-wider">Profit</p>
-            <p className="text-base font-bold text-green font-mono">${session.totalPotentialProfit.toFixed(2)}</p>
-          </Card>
-          <Card className="p-3 text-center">
-            <p className="text-[9px] text-t3 uppercase tracking-wider">GO Rate</p>
-            <p className="text-base font-bold text-b1 font-mono">{goRate}%</p>
-          </Card>
-          <Card className="p-3 text-center">
-            <p className="text-[9px] text-t3 uppercase tracking-wider">Avg/GO</p>
-            <p className="text-base font-bold text-t1 font-mono">${avgProfitPerGo.toFixed(2)}</p>
-          </Card>
-        </div>
-
-        {/* Goals Progress */}
-        {overlappingGoals.length > 0 && (
-          <div>
-            <h3 className="text-xs font-bold text-t3 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Target size={12} />
-              Goals
-            </h3>
-            <div className="space-y-2">
-              {overlappingGoals.map(goal => {
-                const { currentAmount, percentageComplete } = calculateSessionGoalProgress(goal)
-                const achieved = percentageComplete >= 100
-                return (
-                  <Card key={goal.id} className="p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {achieved ? <Trophy size={14} className="text-amber" /> : <Target size={14} className="text-b1" />}
-                        <span className="text-xs font-bold text-t1 capitalize">{goal.type} Goal</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-t3">
-                        ${currentAmount.toFixed(2)} / ${goal.targetAmount.toFixed(2)}
+            ) : (
+              <button onClick={startEditGoal} className="flex items-center gap-3 w-full text-left min-h-[44px]">
+                <Target size={18} className={session.profitGoal ? 'text-b1' : 'text-t3'} />
+                <div className="flex-1">
+                  {session.profitGoal ? (
+                    <>
+                      <span className="text-sm font-bold text-t1">Goal: ${session.profitGoal.toFixed(2)}</span>
+                      <Progress value={session.profitGoal > 0 ? Math.min((session.totalPotentialProfit / session.profitGoal) * 100, 100) : 0} className="h-1.5 mt-1.5" />
+                      <span className="text-[10px] text-t3 mt-0.5 block">
+                        {session.profitGoal > 0 ? Math.round((session.totalPotentialProfit / session.profitGoal) * 100) : 0}% achieved
                       </span>
-                    </div>
-                    <Progress value={percentageComplete} className="h-1.5" />
-                    <p className="text-[10px] text-t3 mt-1">{Math.round(percentageComplete)}% from this session</p>
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Items List */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold text-t3 uppercase tracking-wider flex items-center gap-1.5">
-              <Package size={12} />
-              Items ({sessionItems.length})
-            </h3>
-            <div className="flex gap-1">
-              {(['all', 'GO', 'PASS'] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={cn(
-                    'px-2 py-0.5 rounded text-[10px] font-bold transition-colors',
-                    filter === f ? 'bg-b1 text-white' : 'bg-s1 text-t3 hover:bg-s2'
+                    </>
+                  ) : (
+                    <span className="text-sm text-t3 italic">Tap to set a profit goal</span>
                   )}
-                >
-                  {f === 'all' ? 'All' : f}
-                </button>
-              ))}
-            </div>
-          </div>
+                </div>
+                <PencilSimple size={14} className="text-t3" />
+              </button>
+            )}
+          </Card>
 
-          {filteredItems.length === 0 ? (
-            <Card className="p-6 text-center">
-              <p className="text-xs text-t3">No items found</p>
-            </Card>
-          ) : (
-            <div className="space-y-1.5">
-              {filteredItems.map(item => (
-                <Card key={item.id} className="p-3">
-                  <div className="flex items-center justify-between">
+          {/* Items from this session */}
+          {sessionItems.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold text-t3 uppercase tracking-wider flex items-center gap-1.5">
+                  <Package size={14} />
+                  Items ({sessionItems.length})
+                </h3>
+                <div className="flex gap-1">
+                  {(['all', 'GO', 'PASS'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={cn(
+                        'px-2.5 py-1 rounded text-[11px] font-bold transition-colors',
+                        filter === f ? 'bg-b1 text-white' : 'bg-s1 text-t3 hover:bg-s2'
+                      )}
+                    >
+                      {f === 'all' ? 'All' : f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                {filteredItems.map(item => (
+                  <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-s1 rounded-lg">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Badge
                         variant="secondary"
@@ -409,7 +382,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                       </Badge>
                       <span className="text-xs text-t1 truncate font-medium">{item.productName || 'Unknown'}</span>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                       <span className="text-[10px] font-mono text-t3">${item.purchasePrice.toFixed(2)}</span>
                       {item.estimatedSellPrice != null && (
                         <>
@@ -419,16 +392,22 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                       )}
                     </div>
                   </div>
-                  {item.decision === 'GO' && item.profitMargin != null && (
-                    <p className="text-[10px] text-t3 mt-1">
-                      Profit: <span className="font-mono text-green">${((item.estimatedSellPrice || 0) - item.purchasePrice).toFixed(2)}</span>
-                      <span className="ml-2">({item.profitMargin.toFixed(0)}% margin)</span>
-                    </p>
-                  )}
-                </Card>
-              ))}
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Profit Goals */}
+          <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
+
+          {/* Delete */}
+          <Button
+            onClick={handleDelete}
+            variant="outline"
+            className="w-full h-12 border-red text-red hover:bg-red/10 font-medium mt-4"
+          >
+            Delete Session
+          </Button>
         </div>
       </div>
     </div>
