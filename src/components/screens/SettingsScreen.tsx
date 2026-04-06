@@ -1239,7 +1239,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     onChange={(e) => onUpdate({ minProfitMargin: parseInt(e.target.value) || 0 })}
                     className="font-mono"
                   />
-                  <p className="text-xs text-t2 mt-1">Minimum margin for GO decision</p>
+                  <p className="text-xs text-t2 mt-1">Minimum margin for BUY decision</p>
                 </div>
 
                 <div>

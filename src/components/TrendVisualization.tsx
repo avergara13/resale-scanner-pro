@@ -16,11 +16,11 @@ interface DailyMetrics {
   date: string
   timestamp: number
   itemsScanned: number
-  goCount: number
+  buyCount: number
   passCount: number
   totalProfit: number
   avgProfit: number
-  goRate: number
+  buyRate: number
 }
 
 interface TrendMetrics {
@@ -61,11 +61,11 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
         date: dateStr,
         timestamp: dayTimestamp,
         itemsScanned: 0,
-        goCount: 0,
+        buyCount: 0,
         passCount: 0,
         totalProfit: 0,
         avgProfit: 0,
-        goRate: 0,
+        buyRate: 0,
       })
     }
 
@@ -75,10 +75,10 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
       
       if (existing) {
         existing.itemsScanned++
-        if (item.decision === 'GO') existing.goCount++
+        if (item.decision === 'BUY') existing.buyCount++
         if (item.decision === 'PASS') existing.passCount++
         
-        if (item.decision === 'GO' && item.estimatedSellPrice && item.purchasePrice) {
+        if (item.decision === 'BUY' && item.estimatedSellPrice && item.purchasePrice) {
           existing.totalProfit += (item.estimatedSellPrice - item.purchasePrice)
         }
       }
@@ -86,8 +86,8 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
 
     metricsByDay.forEach(metrics => {
       if (metrics.itemsScanned > 0) {
-        metrics.avgProfit = metrics.goCount > 0 ? metrics.totalProfit / metrics.goCount : 0
-        metrics.goRate = (metrics.goCount / metrics.itemsScanned) * 100
+        metrics.avgProfit = metrics.buyCount > 0 ? metrics.totalProfit / metrics.buyCount : 0
+        metrics.buyRate = (metrics.buyCount / metrics.itemsScanned) * 100
       }
     })
 
@@ -122,8 +122,8 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
     calculateTrend(dailyMetrics.map(m => m.totalProfit)), [dailyMetrics]
   )
 
-  const goRateTrend = useMemo(() => 
-    calculateTrend(dailyMetrics.map(m => m.goRate)), [dailyMetrics]
+  const buyRateTrend = useMemo(() =>
+    calculateTrend(dailyMetrics.map(m => m.buyRate)), [dailyMetrics]
   )
 
   const volumeTrend = useMemo(() => 
@@ -195,12 +195,12 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
             <div className="w-8 h-8 rounded-lg bg-b1/10 flex items-center justify-center">
               <CheckCircle size={16} weight="bold" className="text-b1" />
             </div>
-            <TrendIndicator trend={goRateTrend} />
+            <TrendIndicator trend={buyRateTrend} />
           </div>
-          <p className="text-xs uppercase tracking-wide text-t3 mb-1">GO Rate</p>
+          <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY Rate</p>
           <p className="text-xl font-bold mono text-t1">
-            {dailyMetrics.reduce((sum, m) => sum + m.goRate, 0) / dailyMetrics.filter(m => m.itemsScanned > 0).length || 0 ? 
-              (dailyMetrics.reduce((sum, m) => sum + m.goRate, 0) / dailyMetrics.filter(m => m.itemsScanned > 0).length).toFixed(1) : 
+            {dailyMetrics.reduce((sum, m) => sum + m.buyRate, 0) / dailyMetrics.filter(m => m.itemsScanned > 0).length || 0 ?
+              (dailyMetrics.reduce((sum, m) => sum + m.buyRate, 0) / dailyMetrics.filter(m => m.itemsScanned > 0).length).toFixed(1) :
               '0'}%
           </p>
         </Card>
@@ -299,7 +299,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
                   <div className="bg-t1 text-fg px-2 py-1.5 rounded-lg shadow-lg text-xs whitespace-nowrap">
                     <p className="font-bold mb-0.5">{day.date}</p>
                     <p className="text-b1 font-mono">{day.itemsScanned} scans</p>
-                    <p className="text-green">{day.goCount} GO</p>
+                    <p className="text-green">{day.buyCount} BUY</p>
                     <p className="text-red">{day.passCount} PASS</p>
                   </div>
                 </div>
@@ -314,11 +314,11 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
       </Card>
 
       <Card className="p-4">
-        <h3 className="text-sm font-bold text-t1 uppercase tracking-wide mb-3">GO Rate Trend</h3>
+        <h3 className="text-sm font-bold text-t1 uppercase tracking-wide mb-3">BUY Rate Trend</h3>
         <div className="h-20 relative">
           <svg className="w-full h-full" preserveAspectRatio="none" viewBox={`0 0 ${dailyMetrics.length} 100`}>
             <defs>
-              <linearGradient id="goRateGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <linearGradient id="buyRateGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stopColor="oklch(0.52 0.20 145)" stopOpacity="0.3" />
                 <stop offset="100%" stopColor="oklch(0.52 0.20 145)" stopOpacity="0.05" />
               </linearGradient>
@@ -327,7 +327,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
             <path
               d={dailyMetrics.map((day, idx) => {
                 const x = idx
-                const y = 100 - (day.goRate || 0)
+                const y = 100 - (day.buyRate || 0)
                 return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`
               }).join(' ')}
               fill="none"
@@ -340,14 +340,14 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
               d={[
                 ...dailyMetrics.map((day, idx) => {
                   const x = idx
-                  const y = 100 - (day.goRate || 0)
+                  const y = 100 - (day.buyRate || 0)
                   return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`
                 }),
                 `L ${dailyMetrics.length - 1} 100`,
                 'L 0 100',
                 'Z'
               ].join(' ')}
-              fill="url(#goRateGradient)"
+              fill="url(#buyRateGradient)"
               className="transition-all duration-300"
             />
           </svg>
@@ -428,13 +428,13 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
           </div>
           
           <div className="p-3 bg-s1 rounded-lg">
-            <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">GO Rate Change</p>
+            <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">BUY Rate Change</p>
             <div className="flex items-baseline gap-1">
               <p className={cn(
                 'text-lg font-bold mono',
-                goRateTrend.trend === 'up' ? 'text-green' : goRateTrend.trend === 'down' ? 'text-red' : 'text-t3'
+                buyRateTrend.trend === 'up' ? 'text-green' : buyRateTrend.trend === 'down' ? 'text-red' : 'text-t3'
               )}>
-                {goRateTrend.changePercent >= 0 ? '+' : ''}{goRateTrend.changePercent.toFixed(1)}%
+                {buyRateTrend.changePercent >= 0 ? '+' : ''}{buyRateTrend.changePercent.toFixed(1)}%
               </p>
             </div>
             <p className="text-[9px] text-t4 mt-0.5">
@@ -532,7 +532,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
                   <div className="flex items-center justify-between text-[10px]">
                     <div className="flex items-center gap-3 text-t3">
                       <span>{session.itemsScanned} scans</span>
-                      <span className="text-green">{session.goCount} GO</span>
+                      <span className="text-green">{session.buyCount} BUY</span>
                       <span className="text-red">{session.passCount} PASS</span>
                     </div>
                     <span className="text-t4 mono">${profitPerHour}/hr</span>
@@ -570,9 +570,9 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
                 ? (volumeChange / previousSession.itemsScanned) * 100 
                 : 0
               
-              const goRateChange = (
-                (lastSession.itemsScanned > 0 ? (lastSession.goCount / lastSession.itemsScanned) * 100 : 0) -
-                (previousSession.itemsScanned > 0 ? (previousSession.goCount / previousSession.itemsScanned) * 100 : 0)
+              const buyRateChange = (
+                (lastSession.itemsScanned > 0 ? (lastSession.buyCount / lastSession.itemsScanned) * 100 : 0) -
+                (previousSession.itemsScanned > 0 ? (previousSession.buyCount / previousSession.itemsScanned) * 100 : 0)
               )
               
               return (
@@ -628,13 +628,13 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
                     </div>
                     
                     <div className="flex items-center justify-between p-2 bg-fg rounded-lg">
-                      <span className="text-xs text-t2">GO Rate Change</span>
+                      <span className="text-xs text-t2">BUY Rate Change</span>
                       <div className="flex items-center gap-2">
                         <span className={cn(
                           'text-sm font-bold mono',
-                          goRateChange >= 0 ? 'text-green' : 'text-red'
+                          buyRateChange >= 0 ? 'text-green' : 'text-red'
                         )}>
-                          {goRateChange >= 0 ? '+' : ''}{goRateChange.toFixed(1)}%
+                          {buyRateChange >= 0 ? '+' : ''}{buyRateChange.toFixed(1)}%
                         </span>
                       </div>
                     </div>

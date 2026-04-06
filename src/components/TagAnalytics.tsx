@@ -13,10 +13,10 @@ interface TagAnalytics {
   tagName: string
   tagColor: string
   totalItems: number
-  goItems: number
+  buyItems: number
   passItems: number
   pendingItems: number
-  goRate: number
+  buyRate: number
   avgProfit: number
   totalProfit: number
   avgMargin: number
@@ -80,10 +80,10 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
           tagName: tag.name,
           tagColor: tag.color,
           totalItems: 0,
-          goItems: 0,
+          buyItems: 0,
           passItems: 0,
           pendingItems: 0,
-          goRate: 0,
+          buyRate: 0,
           avgProfit: 0,
           totalProfit: 0,
           avgMargin: 0,
@@ -98,42 +98,42 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
         return
       }
 
-      const goItems = taggedItems.filter(item => item.decision === 'GO')
+      const buyItems = taggedItems.filter(item => item.decision === 'BUY')
       const passItems = taggedItems.filter(item => item.decision === 'PASS')
       const pendingItems = taggedItems.filter(item => item.decision === 'PENDING')
 
-      const profits = goItems.map(item => 
+      const profits = buyItems.map(item =>
         (item.estimatedSellPrice || 0) - item.purchasePrice
       )
-      const margins = goItems.map(item => item.profitMargin || 0).filter(m => m > 0)
-      const rois = goItems.map(item => {
+      const margins = buyItems.map(item => item.profitMargin || 0).filter(m => m > 0)
+      const rois = buyItems.map(item => {
         const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
         return item.purchasePrice > 0 ? (profit / item.purchasePrice) * 100 : 0
       }).filter(r => r > 0)
-      
+
       const totalProfit = profits.reduce((sum, p) => sum + p, 0)
       const avgProfit = profits.length > 0 ? totalProfit / profits.length : 0
       const avgMargin = margins.length > 0 ? margins.reduce((sum, m) => sum + m, 0) / margins.length : 0
       const avgROI = rois.length > 0 ? rois.reduce((sum, r) => sum + r, 0) / rois.length : 0
-      
-      const sortedProfits = [...profits].sort((a, b) => a - b)
-      const medianProfit = sortedProfits.length > 0 
-        ? sortedProfits[Math.floor(sortedProfits.length / 2)] 
-        : 0
-      
-      const avgPurchasePrice = taggedItems.reduce((sum, item) => sum + item.purchasePrice, 0) / taggedItems.length
-      const avgSellPrice = goItems.reduce((sum, item) => sum + (item.estimatedSellPrice || 0), 0) / (goItems.length || 1)
-      const profitPerItem = totalProfit / taggedItems.length
-      const successRate = taggedItems.length > 0 ? (goItems.length / taggedItems.length) * 100 : 0
 
-      const sortedByProfit = [...goItems].sort((a, b) => {
+      const sortedProfits = [...profits].sort((a, b) => a - b)
+      const medianProfit = sortedProfits.length > 0
+        ? sortedProfits[Math.floor(sortedProfits.length / 2)]
+        : 0
+
+      const avgPurchasePrice = taggedItems.reduce((sum, item) => sum + item.purchasePrice, 0) / taggedItems.length
+      const avgSellPrice = buyItems.reduce((sum, item) => sum + (item.estimatedSellPrice || 0), 0) / (buyItems.length || 1)
+      const profitPerItem = totalProfit / taggedItems.length
+      const successRate = taggedItems.length > 0 ? (buyItems.length / taggedItems.length) * 100 : 0
+
+      const sortedByProfit = [...buyItems].sort((a, b) => {
         const profitA = (a.estimatedSellPrice || 0) - a.purchasePrice
         const profitB = (b.estimatedSellPrice || 0) - b.purchasePrice
         return profitB - profitA
       })
 
-      const velocityScore = taggedItems.length > 0 
-        ? (goItems.length / taggedItems.length) * (totalProfit / taggedItems.length)
+      const velocityScore = taggedItems.length > 0
+        ? (buyItems.length / taggedItems.length) * (totalProfit / taggedItems.length)
         : 0
 
       tagMap.set(tag.id, {
@@ -141,10 +141,10 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
         tagName: tag.name,
         tagColor: tag.color,
         totalItems: taggedItems.length,
-        goItems: goItems.length,
+        buyItems: buyItems.length,
         passItems: passItems.length,
         pendingItems: pendingItems.length,
-        goRate: taggedItems.length > 0 ? (goItems.length / taggedItems.length) * 100 : 0,
+        buyRate: taggedItems.length > 0 ? (buyItems.length / taggedItems.length) * 100 : 0,
         avgProfit,
         totalProfit,
         avgMargin,
@@ -183,10 +183,10 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
           tagName: tag.name,
           tagColor: tag.color,
           totalItems: 0,
-          goItems: 0,
+          buyItems: 0,
           passItems: 0,
           pendingItems: 0,
-          goRate: 0,
+          buyRate: 0,
           avgProfit: 0,
           totalProfit: 0,
           avgMargin: 0,
@@ -208,35 +208,35 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
         return
       }
 
-      const goItems = taggedItems.filter(item => item.decision === 'GO')
+      const buyItems = taggedItems.filter(item => item.decision === 'BUY')
       const passItems = taggedItems.filter(item => item.decision === 'PASS')
       const pendingItems = taggedItems.filter(item => item.decision === 'PENDING')
 
-      const profits = goItems.map(item => 
+      const profits = buyItems.map(item =>
         (item.estimatedSellPrice || 0) - item.purchasePrice
       )
-      const margins = goItems.map(item => item.profitMargin || 0).filter(m => m > 0)
-      const rois = goItems.map(item => {
+      const margins = buyItems.map(item => item.profitMargin || 0).filter(m => m > 0)
+      const rois = buyItems.map(item => {
         const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
         return item.purchasePrice > 0 ? (profit / item.purchasePrice) * 100 : 0
       }).filter(r => r > 0)
-      
+
       const totalProfit = profits.reduce((sum, p) => sum + p, 0)
       const avgProfit = profits.length > 0 ? totalProfit / profits.length : 0
       const avgMargin = margins.length > 0 ? margins.reduce((sum, m) => sum + m, 0) / margins.length : 0
       const avgROI = rois.length > 0 ? rois.reduce((sum, r) => sum + r, 0) / rois.length : 0
-      
-      const sortedProfits = [...profits].sort((a, b) => a - b)
-      const medianProfit = sortedProfits.length > 0 
-        ? sortedProfits[Math.floor(sortedProfits.length / 2)] 
-        : 0
-      
-      const avgPurchasePrice = taggedItems.reduce((sum, item) => sum + item.purchasePrice, 0) / taggedItems.length
-      const avgSellPrice = goItems.reduce((sum, item) => sum + (item.estimatedSellPrice || 0), 0) / (goItems.length || 1)
-      const profitPerItem = totalProfit / taggedItems.length
-      const successRate = taggedItems.length > 0 ? (goItems.length / taggedItems.length) * 100 : 0
 
-      const sortedByProfit = [...goItems].sort((a, b) => {
+      const sortedProfits = [...profits].sort((a, b) => a - b)
+      const medianProfit = sortedProfits.length > 0
+        ? sortedProfits[Math.floor(sortedProfits.length / 2)]
+        : 0
+
+      const avgPurchasePrice = taggedItems.reduce((sum, item) => sum + item.purchasePrice, 0) / taggedItems.length
+      const avgSellPrice = buyItems.reduce((sum, item) => sum + (item.estimatedSellPrice || 0), 0) / (buyItems.length || 1)
+      const profitPerItem = totalProfit / taggedItems.length
+      const successRate = taggedItems.length > 0 ? (buyItems.length / taggedItems.length) * 100 : 0
+
+      const sortedByProfit = [...buyItems].sort((a, b) => {
         const profitA = (a.estimatedSellPrice || 0) - a.purchasePrice
         const profitB = (b.estimatedSellPrice || 0) - b.purchasePrice
         return profitB - profitA
@@ -244,13 +244,13 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
 
       const last7Days = allTaggedItems.filter(item => item.timestamp > now - 7 * 24 * 60 * 60 * 1000)
       const last30Days = allTaggedItems.filter(item => item.timestamp > now - 30 * 24 * 60 * 60 * 1000)
-      const last7DaysGo = last7Days.filter(item => item.decision === 'GO')
-      const last30DaysGo = last30Days.filter(item => item.decision === 'GO')
-      
-      const last7DaysProfit = last7DaysGo.reduce((sum, item) => 
+      const last7DaysBuy = last7Days.filter(item => item.decision === 'BUY')
+      const last30DaysBuy = last30Days.filter(item => item.decision === 'BUY')
+
+      const last7DaysProfit = last7DaysBuy.reduce((sum, item) =>
         sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0
       )
-      const last30DaysProfit = last30DaysGo.reduce((sum, item) => 
+      const last30DaysProfit = last30DaysBuy.reduce((sum, item) =>
         sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0
       )
 
@@ -258,7 +258,7 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
         const weekStart = now - ((weekOffset + 1) * 7 * 24 * 60 * 60 * 1000)
         const weekEnd = now - (weekOffset * 7 * 24 * 60 * 60 * 1000)
         const weekItems = allTaggedItems.filter(item => 
-          item.timestamp >= weekStart && item.timestamp < weekEnd && item.decision === 'GO'
+          item.timestamp >= weekStart && item.timestamp < weekEnd && item.decision === 'BUY'
         )
         return weekItems.reduce((sum, item) => 
           sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0
@@ -274,20 +274,20 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
       let trendPercentage = 0
       
       if (prev7Days.length > 0 && last7Days.length > 0) {
-        const lastGoRate = last7DaysGo.length / last7Days.length
-        const prevGoRate = prev7Days.filter(i => i.decision === 'GO').length / prev7Days.length
-        
-        if (lastGoRate > prevGoRate * 1.05) {
+        const lastBuyRate = last7DaysBuy.length / last7Days.length
+        const prevBuyRate = prev7Days.filter(i => i.decision === 'BUY').length / prev7Days.length
+
+        if (lastBuyRate > prevBuyRate * 1.05) {
           trend = 'up'
-          trendPercentage = ((lastGoRate - prevGoRate) / prevGoRate) * 100
-        } else if (lastGoRate < prevGoRate * 0.95) {
+          trendPercentage = ((lastBuyRate - prevBuyRate) / prevBuyRate) * 100
+        } else if (lastBuyRate < prevBuyRate * 0.95) {
           trend = 'down'
-          trendPercentage = ((prevGoRate - lastGoRate) / prevGoRate) * 100
+          trendPercentage = ((prevBuyRate - lastBuyRate) / prevBuyRate) * 100
         }
       }
 
-      const velocityScore = last7Days.length > 0 
-        ? (last7DaysGo.length / last7Days.length) * (last7DaysProfit / (last7Days.length || 1))
+      const velocityScore = last7Days.length > 0
+        ? (last7DaysBuy.length / last7Days.length) * (last7DaysProfit / (last7Days.length || 1))
         : 0
 
       tagMap.set(tag.id, {
@@ -295,10 +295,10 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
         tagName: tag.name,
         tagColor: tag.color,
         totalItems: taggedItems.length,
-        goItems: goItems.length,
+        buyItems: buyItems.length,
         passItems: passItems.length,
         pendingItems: pendingItems.length,
-        goRate: taggedItems.length > 0 ? (goItems.length / taggedItems.length) * 100 : 0,
+        buyRate: taggedItems.length > 0 ? (buyItems.length / taggedItems.length) * 100 : 0,
         avgProfit,
         totalProfit,
         avgMargin,
@@ -336,7 +336,7 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
   const period2Analytics = useMemo(() => calculatePeriodAnalytics(comparePeriod2), [items, tags, comparePeriod2])
 
   const topPerformers = analytics.slice(0, 3).filter(a => a.totalItems > 0)
-  const needsAttention = analytics.filter(a => a.totalItems > 0 && a.goRate < 50).slice(0, 3)
+  const needsAttention = analytics.filter(a => a.totalItems > 0 && a.buyRate < 50).slice(0, 3)
 
   const overallStats = useMemo(() => {
     const activeAnalytics = analytics.filter(a => a.totalItems > 0)
@@ -344,15 +344,15 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
 
     const totalProfit = activeAnalytics.reduce((sum, a) => sum + a.totalProfit, 0)
     const totalItems = activeAnalytics.reduce((sum, a) => sum + a.totalItems, 0)
-    const totalGoItems = activeAnalytics.reduce((sum, a) => sum + a.goItems, 0)
+    const totalBuyItems = activeAnalytics.reduce((sum, a) => sum + a.buyItems, 0)
     const avgROI = activeAnalytics.reduce((sum, a) => sum + a.avgROI, 0) / activeAnalytics.length
 
     return {
       totalProfit,
       totalItems,
-      totalGoItems,
+      totalBuyItems,
       avgROI,
-      overallGoRate: (totalGoItems / totalItems) * 100,
+      overallBuyRate: (totalBuyItems / totalItems) * 100,
     }
   }, [analytics])
 
@@ -500,7 +500,7 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                 : (p2.totalProfit > 0 ? 100 : 0)
               
               const roiChange = p2.avgROI - p1.avgROI
-              const goRateChange = p2.goRate - p1.goRate
+              const buyRateChange = p2.buyRate - p1.buyRate
               const itemsChange = p2.totalItems - p1.totalItems
 
               return (
@@ -540,8 +540,8 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                             <div className="font-bold text-[var(--t1)]">{p1.totalItems}</div>
                           </div>
                           <div>
-                            <div className="text-[var(--t4)]">GO Rate</div>
-                            <div className="font-bold text-[var(--t1)]">{p1.goRate.toFixed(0)}%</div>
+                            <div className="text-[var(--t4)]">BUY Rate</div>
+                            <div className="font-bold text-[var(--t1)]">{p1.buyRate.toFixed(0)}%</div>
                           </div>
                           <div>
                             <div className="text-[var(--t4)]">Avg ROI</div>
@@ -573,8 +573,8 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                             <div className="font-bold text-[var(--t1)]">{p2.totalItems}</div>
                           </div>
                           <div>
-                            <div className="text-[var(--t4)]">GO Rate</div>
-                            <div className="font-bold text-[var(--t1)]">{p2.goRate.toFixed(0)}%</div>
+                            <div className="text-[var(--t4)]">BUY Rate</div>
+                            <div className="font-bold text-[var(--t1)]">{p2.buyRate.toFixed(0)}%</div>
                           </div>
                           <div>
                             <div className="text-[var(--t4)]">Avg ROI</div>
@@ -617,13 +617,13 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                       </div>
                       <div className="text-center p-2 bg-[var(--bg)] rounded-lg">
                         <div className={`text-xs font-bold flex items-center justify-center gap-1 ${
-                          goRateChange > 0 ? 'text-[var(--green)]' : goRateChange < 0 ? 'text-[var(--red)]' : 'text-[var(--t3)]'
+                          buyRateChange > 0 ? 'text-[var(--green)]' : buyRateChange < 0 ? 'text-[var(--red)]' : 'text-[var(--t3)]'
                         }`}>
-                          {goRateChange > 0 && <CaretUp size={10} weight="bold" />}
-                          {goRateChange < 0 && <CaretDown size={10} weight="bold" />}
-                          {Math.abs(goRateChange).toFixed(0)}%
+                          {buyRateChange > 0 && <CaretUp size={10} weight="bold" />}
+                          {buyRateChange < 0 && <CaretDown size={10} weight="bold" />}
+                          {Math.abs(buyRateChange).toFixed(0)}%
                         </div>
-                        <div className="text-[8px] text-[var(--t4)] mt-0.5">GO Rate</div>
+                        <div className="text-[8px] text-[var(--t4)] mt-0.5">BUY Rate</div>
                       </div>
                       <div className="text-center p-2 bg-[var(--bg)] rounded-lg">
                         <div className={`text-xs font-bold flex items-center justify-center gap-1 ${
@@ -662,9 +662,9 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
             </div>
             <div className="text-center p-2 bg-[var(--fg)] rounded-lg border border-[var(--s1)]">
               <div className="text-sm font-bold text-[var(--t1)]">
-                {overallStats.overallGoRate.toFixed(0)}%
+                {overallStats.overallBuyRate.toFixed(0)}%
               </div>
-              <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">GO Rate</div>
+              <div className="text-[8px] text-[var(--t4)] font-bold uppercase mt-0.5">BUY Rate</div>
             </div>
             <div className="text-center p-2 bg-[var(--fg)] rounded-lg border border-[var(--s1)]">
               <div className="text-sm font-bold text-[var(--b1)]">
@@ -719,8 +719,8 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                 {/* Enhanced Metrics Grid */}
                 <div className="grid grid-cols-5 gap-2 mb-3">
                   <div className="text-center p-2 bg-[var(--s1)] rounded-lg">
-                    <div className="text-xs font-bold text-[var(--t1)]">{tag.goRate.toFixed(0)}%</div>
-                    <div className="text-[8px] text-[var(--t4)] font-medium uppercase">GO Rate</div>
+                    <div className="text-xs font-bold text-[var(--t1)]">{tag.buyRate.toFixed(0)}%</div>
+                    <div className="text-[8px] text-[var(--t4)] font-medium uppercase">BUY Rate</div>
                   </div>
                   <div className="text-center p-2 bg-[var(--s1)] rounded-lg">
                     <div className="text-xs font-bold text-[var(--green)] mono">
@@ -798,8 +798,8 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
 
                 <div className="flex items-center gap-2 mb-2">
                   <div className="flex-1">
-                    <Progress 
-                      value={tag.goRate} 
+                    <Progress
+                      value={tag.buyRate}
                       className="h-2"
                       style={{
                         '--progress-color': tag.tagColor,
@@ -828,8 +828,8 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                 <div className="grid grid-cols-3 gap-2 text-[10px]">
                   <div className="flex items-center gap-1 text-[var(--green)]">
                     <CheckCircle size={12} weight="fill" />
-                    <span className="font-bold">{tag.goItems}</span>
-                    <span className="text-[var(--t4)]">GO</span>
+                    <span className="font-bold">{tag.buyItems}</span>
+                    <span className="text-[var(--t4)]">BUY</span>
                   </div>
                   <div className="flex items-center gap-1 text-[var(--red)]">
                     <XCircle size={12} weight="fill" />
@@ -869,7 +869,7 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                       {tag.tagName}
                     </Badge>
                     <span className="text-xs text-[var(--t3)]">
-                      {tag.totalItems} items · {tag.goRate.toFixed(0)}% GO rate
+                      {tag.totalItems} items · {tag.buyRate.toFixed(0)}% BUY rate
                     </span>
                     {tag.trend === 'down' && (
                       <Badge 
@@ -968,14 +968,14 @@ export function TagAnalytics({ items, tags }: TagAnalyticsProps) {
                     </div>
                     <div className="text-right">
                       <div className="text-xs font-bold text-[var(--t1)]">
-                        {tag.goRate.toFixed(0)}%
+                        {tag.buyRate.toFixed(0)}%
                       </div>
-                      <div className="text-[8px] text-[var(--t4)]">GO</div>
+                      <div className="text-[8px] text-[var(--t4)]">BUY</div>
                     </div>
                   </div>
                 </div>
-                <Progress 
-                  value={tag.goRate} 
+                <Progress
+                  value={tag.buyRate}
                   className="h-1.5"
                   style={{
                     '--progress-color': tag.tagColor,

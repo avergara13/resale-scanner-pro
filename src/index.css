@@ -836,7 +836,7 @@ input, textarea, select {
   opacity: 1;
 }
 
-.decision-signal.go {
+.decision-signal.buy {
   background: linear-gradient(135deg, var(--green), oklch(0.55 0.15 145));
   color: white;
   border-color: var(--green);

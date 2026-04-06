@@ -1,8 +1,8 @@
-export type Screen = 'session' | 'session-detail' | 'agent' | 'ai' | 'queue' | 'settings' | 'listing' | 'chat' | 'history' | 'incidents' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
+export type Screen = 'session' | 'session-detail' | 'agent' | 'ai' | 'queue' | 'sold' | 'settings' | 'listing' | 'chat' | 'history' | 'incidents' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
 
 export type PipelinePhase = 'vision' | 'lens' | 'market' | 'profit' | 'decision'
 
-export type Decision = 'GO' | 'PASS' | 'PENDING'
+export type Decision = 'BUY' | 'PASS' | 'PENDING'
 
 export interface PipelineStep {
   id: PipelinePhase
@@ -81,11 +81,18 @@ export interface ScannedItem {
   parentItemId?: string
   location?: ThriftStoreLocation
   optimizedListing?: OptimizedListing
-  listingStatus?: 'not-started' | 'optimizing' | 'ready' | 'published'
+  listingStatus?: 'not-started' | 'optimizing' | 'ready' | 'published' | 'sold' | 'shipped' | 'completed'
   ebayListingId?: string
   notionPageId?: string
   notionUrl?: string
   sessionId?: string
+  soldPrice?: number
+  soldDate?: number
+  soldOn?: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
+  soldBuyerName?: string
+  trackingNumber?: string
+  shippedDate?: number
+  shippingCarrier?: string
 }
 
 export interface OptimizedListing {
@@ -118,11 +125,11 @@ export interface ThriftStoreLocation {
 export interface LocationPerformance {
   location: ThriftStoreLocation
   totalScans: number
-  goCount: number
+  buyCount: number
   passCount: number
   totalProfit: number
   averageProfit: number
-  goRate: number
+  buyRate: number
   lastVisit?: number
   bestCategories: Array<{
     category: string
@@ -135,7 +142,7 @@ export interface LocationPerformance {
     weekEnd: number
     scans: number
     profit: number
-    goCount: number
+    buyCount: number
     passCount: number
   }>
 }
@@ -194,7 +201,7 @@ export interface Session {
   startTime: number
   endTime?: number
   itemsScanned: number
-  goCount: number
+  buyCount: number
   passCount: number
   totalPotentialProfit: number
   active: boolean

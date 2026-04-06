@@ -35,7 +35,7 @@ export function ProfitGoalManager({ sessions = [], items = [] }: ProfitGoalManag
     const relevantItems = items.filter(item => 
       item.timestamp >= goalStart && 
       item.timestamp <= now &&
-      item.decision === 'GO' &&
+      item.decision === 'BUY' &&
       item.profitMargin !== undefined
     )
 

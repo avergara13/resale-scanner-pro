@@ -3,6 +3,7 @@ import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BottomNav } from './components/BottomNav'
+import { AppHeader } from './components/AppHeader'
 import { CameraOverlay } from './components/CameraOverlay'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
@@ -16,6 +17,7 @@ import { TagAnalyticsScreen } from './components/screens/TagAnalyticsScreen'
 import { LocationInsightsScreen } from './components/screens/LocationInsightsScreen'
 import { CostTrackingScreen } from './components/screens/CostTrackingScreen'
 import { ScanHistoryScreen } from './components/screens/ScanHistoryScreen'
+import { SoldScreen } from './components/screens/SoldScreen'
 import { SessionDetailScreen } from './components/screens/SessionDetailScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
@@ -370,9 +372,9 @@ function App() {
       )
 
       const minMargin = settings?.minProfitMargin || 30
-      const decision = profitMetrics.profitMargin > minMargin ? 'GO' : 'PASS'
+      const decision = profitMetrics.profitMargin > minMargin ? 'BUY' : 'PASS'
 
-      if (decision === 'GO') {
+      if (decision === 'BUY') {
         triggerSuccess()
       } else {
         triggerFail()
@@ -418,14 +420,14 @@ function App() {
           return {
             ...prev,
             itemsScanned: prev.itemsScanned + 1,
-            goCount: decision === 'GO' ? prev.goCount + 1 : prev.goCount,
+            buyCount: decision === 'BUY' ? prev.buyCount + 1 : prev.buyCount,
             passCount: decision === 'PASS' ? prev.passCount + 1 : prev.passCount,
-            totalPotentialProfit: decision === 'GO' ? prev.totalPotentialProfit + profitMetrics.netProfit : prev.totalPotentialProfit,
+            totalPotentialProfit: decision === 'BUY' ? prev.totalPotentialProfit + profitMetrics.netProfit : prev.totalPotentialProfit,
           }
         })
       }
       
-      toast.success(decision === 'GO' ? '✅ GO Decision!' : '❌ PASS Decision')
+      toast.success(decision === 'BUY' ? '✅ BUY Decision!' : '❌ PASS Decision')
     } catch (error) {
       console.error('Pipeline error:', error)
       setPipeline(prev => prev.map(s => ({ 
@@ -444,7 +446,7 @@ function App() {
   }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, simulateProgress, completeStep, tagSuggestionService, setScanHistory])
 
   const handleAddToQueue = useCallback(() => {
-    if (currentItem && currentItem.decision === 'GO') {
+    if (currentItem && currentItem.decision === 'BUY') {
       setQueue((prev) => {
         const current = prev || []
         if (current.some(i => i.id === currentItem.id)) return current
@@ -464,7 +466,7 @@ function App() {
       id: Date.now().toString(),
       startTime: Date.now(),
       itemsScanned: 0,
-      goCount: 0,
+      buyCount: 0,
       passCount: 0,
       totalPotentialProfit: 0,
       active: true,
@@ -532,14 +534,19 @@ function App() {
 
   const handleOptimizeItem = useCallback(async (itemId: string) => {
     const item = (queue || []).find(i => i.id === itemId)
-    if (!item || item.decision !== 'GO' || item.optimizedListing) return
+    if (!item || item.decision !== 'BUY' || item.optimizedListing) return
     const optimized = await listingOptimizationService.generateOptimizedListing({
       item,
       marketData: item.marketData,
     })
+    // Merge suggestedTags back onto item.tags (deduplicated)
+    const mergedTags = Array.from(new Set([
+      ...(item.tags || []),
+      ...(optimized.suggestedTags || []),
+    ]))
     setQueue((prev) => (prev || []).map(i =>
       i.id === itemId
-        ? { ...i, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
+        ? { ...i, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
         : i
     ))
   }, [queue, setQueue, listingOptimizationService])
@@ -586,6 +593,35 @@ function App() {
       toast.error(`Notion error: ${result.error}`)
     }
   }, [queue, setQueue, notionService])
+
+  const handleMarkAsSold = useCallback((
+    itemId: string,
+    soldPrice: number,
+    soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
+  ) => {
+    setQueue(prev => (prev || []).map(item =>
+      item.id === itemId
+        ? { ...item, listingStatus: 'sold', soldPrice, soldDate: Date.now(), soldOn }
+        : item
+    ))
+    toast.success('Item marked as sold')
+  }, [setQueue])
+
+  const handleMarkShipped = useCallback((itemId: string, trackingNumber: string, shippingCarrier: string) => {
+    setQueue(prev => (prev || []).map(item =>
+      item.id === itemId
+        ? { ...item, listingStatus: 'shipped', trackingNumber, shippingCarrier, shippedDate: Date.now() }
+        : item
+    ))
+    toast.success('Item marked as shipped')
+  }, [setQueue])
+
+  const handleMarkCompleted = useCallback((itemId: string) => {
+    setQueue(prev => (prev || []).map(item =>
+      item.id === itemId ? { ...item, listingStatus: 'completed' } : item
+    ))
+    toast.success('Transaction completed')
+  }, [setQueue])
 
   const handleSaveDraft = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData) {
@@ -666,7 +702,7 @@ function App() {
     toast.info(`Analyzing ${unanalyzedItems.length} item${unanalyzedItems.length !== 1 ? 's' : ''}...`)
 
     let processedCount = 0
-    let goCount = 0
+    let buyCount = 0
     let passCount = 0
     let totalNewProfit = 0
     const failedItems: string[] = []
@@ -755,7 +791,7 @@ function App() {
         )
         
         const minMargin = settings?.minProfitMargin || 30
-        const decision = profitMetrics.profitMargin > minMargin ? 'GO' : 'PASS'
+        const decision = profitMetrics.profitMargin > minMargin ? 'BUY' : 'PASS'
 
         const updatedItem: ScannedItem = {
           ...item,
@@ -773,8 +809,8 @@ function App() {
         updatedItemsMap.set(item.id, updatedItem)
 
         processedCount++
-        if (decision === 'GO') {
-          goCount++
+        if (decision === 'BUY') {
+          buyCount++
           totalNewProfit += profitMetrics.netProfit
         }
         if (decision === 'PASS') passCount++
@@ -794,12 +830,12 @@ function App() {
       })
     }
 
-    if (session?.active && (goCount > 0 || passCount > 0)) {
+    if (session?.active && (buyCount > 0 || passCount > 0)) {
       setSession((prev) => {
         if (!prev) return prev
         return {
           ...prev,
-          goCount: prev.goCount + goCount,
+          buyCount: prev.buyCount + buyCount,
           passCount: prev.passCount + passCount,
           totalPotentialProfit: prev.totalPotentialProfit + totalNewProfit,
         }
@@ -815,7 +851,7 @@ function App() {
     if (skippedItems.length > 0) {
       toast.info(`${skippedItems.length} item(s) skipped (no image)`)
     }
-    toast.success(`Analyzed ${processedCount} items: ${goCount} GO, ${passCount} PASS`)
+    toast.success(`Analyzed ${processedCount} items: ${buyCount} BUY, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
   // Seed 3 test items so the queue cards can be verified (dev/debug only)
@@ -831,7 +867,7 @@ function App() {
           category: 'Clothing & Shoes',
           estimatedSellPrice: 45.00,
           profitMargin: 72.3,
-          decision: 'GO',
+          decision: 'BUY',
           inQueue: true,
           tags: [],
           marketData: { ebayAvgSold: 48.50, ebayMedianSold: 45.00, ebaySoldCount: 23, ebayActiveListings: 15, ebaySellThroughRate: 60.5, recommendedPrice: 45.00 },
@@ -845,7 +881,7 @@ function App() {
           category: 'Kitchen & Home',
           estimatedSellPrice: 12.00,
           profitMargin: 38.5,
-          decision: 'GO',
+          decision: 'BUY',
           inQueue: true,
           tags: [],
           marketData: { ebayAvgSold: 14.00, ebayMedianSold: 12.00, ebaySoldCount: 45, ebayActiveListings: 30, ebaySellThroughRate: 60.0, recommendedPrice: 12.00 },
@@ -889,6 +925,28 @@ function App() {
     }
   }, [])
 
+  // Migrate legacy GO → BUY decision labels
+  useEffect(() => {
+    if (queue && queue.some(item => (item.decision as string) === 'GO')) {
+      setQueue(prev => (prev || []).map(item =>
+        (item.decision as string) === 'GO' ? { ...item, decision: 'BUY' as const } : item
+      ))
+    }
+  }, []) // intentionally empty deps — runs once on mount
+
+  useEffect(() => {
+    if (allSessions && allSessions.some(s => (s as any).goCount !== undefined && s.buyCount === undefined)) {
+      setAllSessions(prev => (prev || []).map(s => {
+        const legacy = s as any
+        if (legacy.goCount !== undefined && s.buyCount === undefined) {
+          const { goCount, ...rest } = legacy
+          return { ...rest, buyCount: goCount }
+        }
+        return s
+      }))
+    }
+  }, []) // intentionally empty deps — runs once on mount
+
   const screenVariants = {
     initial: (direction: number) => ({
       opacity: 0,
@@ -916,15 +974,16 @@ function App() {
     'agent': 1,
     'ai': 2,
     'queue': 3,
-    'incidents': 4,
-    'settings': 5,
-    'listing': 6,
-    'chat': 7,
-    'history': 8,
-    'tag-analytics': 9,
-    'location-insights': 10,
-    'cost-tracking': 11,
-    'scan-history': 12
+    'sold': 4,
+    'incidents': 5,
+    'settings': 6,
+    'listing': 7,
+    'chat': 8,
+    'history': 9,
+    'tag-analytics': 10,
+    'location-insights': 11,
+    'cost-tracking': 12,
+    'scan-history': 13
   }
 
   const [prevScreen, setPrevScreen] = useState<Screen>(screen)
@@ -951,6 +1010,8 @@ function App() {
         compact={false}
       />
       
+      <AppHeader screen={screen} onNavigateToSettings={() => setScreen('settings')} />
+
       <div
         className="flex-1 relative w-full pb-24"
         style={{
@@ -996,11 +1057,16 @@ function App() {
             >
               <AgentScreen
                 queueItems={queue || []}
+                soldItems={(queue || []).filter(i =>
+                  i.listingStatus === 'sold' || i.listingStatus === 'shipped' || i.listingStatus === 'completed'
+                )}
                 settings={settings}
                 onOptimizeItem={handleOptimizeItem}
                 onPushToNotion={handlePushToNotion}
                 onBatchAnalyze={handleBatchAnalyze}
                 onEditItem={handleEditQueueItem}
+                onMarkAsSold={handleMarkAsSold}
+                onMarkShipped={handleMarkShipped}
                 onNavigateToQueue={() => setScreen('queue')}
                 onOpenCamera={() => setCameraOpen(true)}
                 onStartSession={handleStartSession}
@@ -1047,7 +1113,7 @@ function App() {
               <QueueScreen
                 queueItems={queue || []}
                 onRemove={handleRemoveFromQueue}
-                onCreateListing={() => toast.info('Listing creation coming soon')}
+                onCreateListing={handleOptimizeItem}
                 onEdit={handleEditQueueItem}
                 onReorder={handleReorderQueue}
                 onBatchAnalyze={handleBatchAnalyze}
@@ -1064,6 +1130,27 @@ function App() {
                 geminiService={geminiService}
                 onNavigateToTagAnalytics={() => setScreen('tag-analytics')}
                 onNavigateToLocationInsights={() => setScreen('location-insights')}
+                onMarkAsSold={handleMarkAsSold}
+              />
+            </motion.div>
+          )}
+          {screen === 'sold' && (
+            <motion.div
+              key="sold"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="w-full h-full"
+            >
+              <SoldScreen
+                soldItems={(queue || []).filter(i =>
+                  i.listingStatus === 'sold' || i.listingStatus === 'shipped' || i.listingStatus === 'completed'
+                )}
+                onMarkShipped={handleMarkShipped}
+                onMarkCompleted={handleMarkCompleted}
               />
             </motion.div>
           )}

@@ -41,7 +41,7 @@ function getWeekEnd(weekStart: number): number {
 }
 
 export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreenProps) {
-  const [sortBy, setSortBy] = useState<'profit' | 'goRate' | 'scans'>('profit')
+  const [sortBy, setSortBy] = useState<'profit' | 'buyRate' | 'scans'>('profit')
   const [showWeeklyTrends, setShowWeeklyTrends] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
 
@@ -58,11 +58,11 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
         perf = {
           location: item.location,
           totalScans: 0,
-          goCount: 0,
+          buyCount: 0,
           passCount: 0,
           totalProfit: 0,
           averageProfit: 0,
-          goRate: 0,
+          buyRate: 0,
           bestCategories: [],
           recentFinds: [],
         }
@@ -70,11 +70,11 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
       }
 
       perf.totalScans++
-      if (item.decision === 'GO') perf.goCount++
+      if (item.decision === 'BUY') perf.buyCount++
       if (item.decision === 'PASS') perf.passCount++
 
       const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
-      if (item.decision === 'GO' && profit > 0) {
+      if (item.decision === 'BUY' && profit > 0) {
         perf.totalProfit += profit
       }
 
@@ -88,13 +88,13 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
     })
 
     locationMap.forEach(perf => {
-      perf.averageProfit = perf.goCount > 0 ? perf.totalProfit / perf.goCount : 0
-      perf.goRate = perf.totalScans > 0 ? (perf.goCount / perf.totalScans) * 100 : 0
+      perf.averageProfit = perf.buyCount > 0 ? perf.totalProfit / perf.buyCount : 0
+      perf.buyRate = perf.totalScans > 0 ? (perf.buyCount / perf.totalScans) * 100 : 0
 
       const categoryMap = new Map<string, { count: number; totalProfit: number }>()
-      
+
       items
-        .filter(item => item.location?.id === perf.location.id && item.category && item.decision === 'GO')
+        .filter(item => item.location?.id === perf.location.id && item.category && item.decision === 'BUY')
         .forEach(item => {
           const cat = item.category!
           const existing = categoryMap.get(cat) || { count: 0, totalProfit: 0 }
@@ -112,23 +112,23 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
         .sort((a, b) => b.avgProfit - a.avgProfit)
         .slice(0, 3)
 
-      const weeklyMap = new Map<number, { scans: number; profit: number; goCount: number; passCount: number }>()
-      
+      const weeklyMap = new Map<number, { scans: number; profit: number; buyCount: number; passCount: number }>()
+
       items
         .filter(item => item.location?.id === perf.location.id)
         .forEach(item => {
           const weekStart = getWeekStart(item.timestamp)
-          const existing = weeklyMap.get(weekStart) || { scans: 0, profit: 0, goCount: 0, passCount: 0 }
-          
+          const existing = weeklyMap.get(weekStart) || { scans: 0, profit: 0, buyCount: 0, passCount: 0 }
+
           existing.scans++
-          if (item.decision === 'GO') {
-            existing.goCount++
+          if (item.decision === 'BUY') {
+            existing.buyCount++
             existing.profit += (item.estimatedSellPrice || 0) - item.purchasePrice
           }
           if (item.decision === 'PASS') {
             existing.passCount++
           }
-          
+
           weeklyMap.set(weekStart, existing)
         })
 
@@ -138,7 +138,7 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
           weekEnd: getWeekEnd(weekStart),
           scans: data.scans,
           profit: data.profit,
-          goCount: data.goCount,
+          buyCount: data.buyCount,
           passCount: data.passCount,
         }))
         .sort((a, b) => a.weekStart - b.weekStart)
@@ -152,8 +152,8 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
       switch (sortBy) {
         case 'profit':
           return b.totalProfit - a.totalProfit
-        case 'goRate':
-          return b.goRate - a.goRate
+        case 'buyRate':
+          return b.buyRate - a.buyRate
         case 'scans':
           return b.totalScans - a.totalScans
         default:
@@ -166,7 +166,7 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
   const totalProfitAllLocations = locationPerformance.reduce((sum, loc) => sum + loc.totalProfit, 0)
   const totalScansAllLocations = locationPerformance.reduce((sum, loc) => sum + loc.totalScans, 0)
   const avgGoRateAllLocations = locationPerformance.length > 0
-    ? locationPerformance.reduce((sum, loc) => sum + loc.goRate, 0) / locationPerformance.length
+    ? locationPerformance.reduce((sum, loc) => sum + loc.buyRate, 0) / locationPerformance.length
     : 0
 
   if (locationPerformance.length === 0) {
@@ -236,7 +236,7 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
               {avgGoRateAllLocations.toFixed(0)}%
             </div>
             <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">
-              Avg GO Rate
+              Avg BUY Rate
             </div>
           </div>
         </div>
@@ -326,14 +326,14 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                               {recentWeeks.map((week, idx) => {
                                 const weekDate = new Date(week.weekStart)
                                 const weekLabel = weekDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                const goRate = week.scans > 0 ? (week.goCount / week.scans) * 100 : 0
+                                const buyRate = week.scans > 0 ? (week.buyCount / week.scans) * 100 : 0
                                 
                                 return (
                                   <div key={idx} className="text-center p-2 bg-fg rounded-lg border border-s1">
                                     <div className="text-[9px] text-t4 font-bold uppercase mb-1">{weekLabel}</div>
                                     <div className="text-sm font-bold text-green">${week.profit.toFixed(0)}</div>
                                     <div className="text-[8px] text-t3 mt-0.5">{week.scans} scans</div>
-                                    <div className="text-[8px] text-b1 font-bold mt-0.5">{goRate.toFixed(0)}%</div>
+                                    <div className="text-[8px] text-b1 font-bold mt-0.5">{buyRate.toFixed(0)}%</div>
                                   </div>
                                 )
                               })}
@@ -393,8 +393,8 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                 <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">Scans</div>
               </div>
               <div className="bg-fg p-2 rounded-lg border border-s1">
-                <div className="text-xs font-bold text-b1 leading-tight">{topLocation.goRate.toFixed(0)}%</div>
-                <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">GO Rate</div>
+                <div className="text-xs font-bold text-b1 leading-tight">{topLocation.buyRate.toFixed(0)}%</div>
+                <div className="text-[8px] text-t4 font-bold uppercase mt-0.5">BUY Rate</div>
               </div>
             </div>
 
@@ -436,15 +436,15 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
               Profit
             </button>
             <button
-              onClick={() => setSortBy('goRate')}
+              onClick={() => setSortBy('buyRate')}
               className={cn(
                 "px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all",
-                sortBy === 'goRate' 
+                sortBy === 'buyRate'
                   ? "bg-fg text-b1 shadow-sm" 
                   : "text-t3 hover:text-t2"
               )}
             >
-              GO Rate
+              BUY Rate
             </button>
             <button
               onClick={() => setSortBy('scans')}
@@ -468,9 +468,9 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
             const profitDiff = loc.totalProfit - avgProfit
             const profitDiffPercent = avgProfit > 0 ? (Math.abs(profitDiff) / avgProfit) * 100 : 0
             
-            const avgGoRate = locationPerformance.reduce((sum, l) => sum + l.goRate, 0) / locationPerformance.length
-            const goRateTrend = loc.goRate > avgGoRate
-            const goRateDiff = loc.goRate - avgGoRate
+            const avgBuyRate = locationPerformance.reduce((sum, l) => sum + l.buyRate, 0) / locationPerformance.length
+            const buyRateTrend = loc.buyRate > avgBuyRate
+            const buyRateDiff = loc.buyRate - avgBuyRate
             
             return (
               <motion.div
@@ -551,14 +551,14 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                   <div className="text-center p-1.5 bg-bg rounded-lg border border-s1 relative">
                     <div className="flex items-center justify-center gap-0.5">
                       <div className="text-xs font-bold text-b1 leading-tight">
-                        {loc.goRate.toFixed(0)}%
+                        {loc.buyRate.toFixed(0)}%
                       </div>
-                      {Math.abs(goRateDiff) > 5 && (
+                      {Math.abs(buyRateDiff) > 5 && (
                         <div className={cn(
                           "flex items-center",
-                          goRateTrend ? "text-green" : "text-red"
+                          buyRateTrend ? "text-green" : "text-red"
                         )}>
-                          {goRateTrend ? (
+                          {buyRateTrend ? (
                             <TrendUp size={10} weight="bold" />
                           ) : (
                             <TrendDown size={10} weight="bold" />
@@ -566,7 +566,7 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                         </div>
                       )}
                     </div>
-                    <div className="text-[7px] text-t4 font-bold uppercase mt-0.5">GO</div>
+                    <div className="text-[7px] text-t4 font-bold uppercase mt-0.5">BUY</div>
                   </div>
                 </div>
 
@@ -619,7 +619,7 @@ export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreen
                             <span 
                               className={cn(
                                 "text-[8px] font-bold px-1 py-0.5 rounded",
-                                item.decision === 'GO' 
+                                item.decision === 'BUY' 
                                   ? "bg-green-bg text-green" 
                                   : "bg-red-bg text-red"
                               )}

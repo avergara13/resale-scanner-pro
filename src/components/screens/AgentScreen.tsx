@@ -24,7 +24,6 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ThemeToggle } from '../ThemeToggle'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
@@ -67,7 +66,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   {
     emoji: '📦',
     label: 'Create Listings',
-    prompt: 'Create optimized eBay listings for all GO items in my queue'
+    prompt: 'Create optimized eBay listings for all BUY items in my queue'
   },
   {
     emoji: '📤',
@@ -87,7 +86,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   {
     emoji: '🚀',
     label: 'Full Pipeline',
-    prompt: 'Run full pipeline: analyze all drafts, optimize GO listings, and push to Notion'
+    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion'
   },
   {
     emoji: '📊',
@@ -167,12 +166,15 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
 
 interface AgentScreenProps {
   queueItems?: ScannedItem[]
+  soldItems?: ScannedItem[]
   settings?: AppSettings
   onCreateListing?: (itemId: string) => Promise<void>
   onOptimizeItem?: (itemId: string) => Promise<void>
   onPushToNotion?: (itemId: string) => Promise<void>
   onBatchAnalyze?: () => Promise<void>
   onEditItem?: (itemId: string, updates: Partial<ScannedItem>) => void
+  onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
+  onMarkShipped?: (itemId: string, trackingNumber: string, shippingCarrier: string) => void
   onNavigateToQueue?: () => void
   onOpenCamera?: () => void
   onStartSession?: () => void
@@ -183,7 +185,7 @@ interface AgentScreenProps {
   profitGoals?: ProfitGoal[]
 }
 
-export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
   const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -212,17 +214,17 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
   const queueStats = useMemo(() => {
     const total = queueItems.length
-    const go = queueItems.filter(item => item.decision === 'GO').length
+    const buy = queueItems.filter(item => item.decision === 'BUY').length
     const pass = queueItems.filter(item => item.decision === 'PASS').length
     const pending = queueItems.filter(item => item.decision === 'PENDING').length
     const totalProfit = queueItems
-      .filter(item => item.decision === 'GO' && item.profitMargin)
+      .filter(item => item.decision === 'BUY' && item.profitMargin)
       .reduce((sum, item) => {
         const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
         return sum + profit
       }, 0)
     
-    return { total, go, pass, pending, totalProfit }
+    return { total, buy, pass, pending, totalProfit }
   }, [queueItems])
 
   useEffect(() => {
@@ -329,7 +331,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
       name: s.name || new Date(s.startTime).toLocaleDateString(),
       active: s.active,
       itemsScanned: s.itemsScanned,
-      goCount: s.goCount,
+      buyCount: s.buyCount,
       passCount: s.passCount,
       totalProfit: s.totalPotentialProfit,
       profitGoal: s.profitGoal,
@@ -352,9 +354,21 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
       sessionId: i.sessionId,
     }))
 
+    const soldSummary = soldItems.slice(0, 10).map(item => ({
+      id: item.id,
+      name: item.productName || 'Unknown',
+      soldPrice: item.soldPrice,
+      soldOn: item.soldOn,
+      soldDate: item.soldDate,
+      profit: (item.soldPrice || 0) - item.purchasePrice,
+      status: item.listingStatus,
+      trackingNumber: item.trackingNumber,
+    }))
+
     return {
       queueStats,
       recentItems: queueSummary,
+      soldItems: soldSummary,
       sessions: sessionsSummary,
       goals: goalsSummary,
       recentScans,
@@ -364,7 +378,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         ebayFeePercent: settings?.ebayFeePercent
       }
     }
-  }, [queueItems, queueStats, settings, allSessions, profitGoals, scanHistory])
+  }, [queueItems, soldItems, queueStats, settings, allSessions, profitGoals, scanHistory])
 
   const handleSendMessage = useCallback(async (messageText?: string) => {
     const text = messageText || input.trim()
@@ -470,16 +484,16 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
           addMsg(`**Step 1/3 — Analyze:** No drafts to analyze — all items already processed.`)
         }
 
-        // Step 2: Optimize GO items that don't have listings yet
+        // Step 2: Optimize BUY items that don't have listings yet
         // Note: After batch analysis, queueItems from props may be stale.
         // onOptimizeItem reads fresh queue state from App.tsx internally,
         // so we collect candidate IDs from current props but the actual
         // optimization operates on up-to-date data in the parent.
         const goItemIds = queueItems
-          .filter(i => i.decision === 'GO' && !i.optimizedListing)
+          .filter(i => i.decision === 'BUY' && !i.optimizedListing)
           .map(i => i.id)
         // Also include items that were drafts (just analyzed in step 1) —
-        // they may now be GO but our stale queueItems still shows them as PENDING.
+        // they may now be BUY but our stale queueItems still shows them as PENDING.
         const draftIds = drafts.map(i => i.id)
         const allCandidateIds = [...new Set([...goItemIds, ...draftIds])]
 
@@ -491,7 +505,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
               await onOptimizeItem(itemId)
               optimized++
             } catch (error) {
-              // onOptimizeItem returns early for non-GO or already-optimized items
+              // onOptimizeItem returns early for non-BUY or already-optimized items
               console.error('Optimize skipped or failed for:', itemId, error)
             }
           }
@@ -533,13 +547,13 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
       }
 
       if (lowerText.includes('create listing') || lowerText.includes('optimize listing')) {
-        const goItems = queueItems.filter(item => item.decision === 'GO' && !item.optimizedListing)
+        const buyItems = queueItems.filter(item => item.decision === 'BUY' && !item.optimizedListing)
         
-        if (goItems.length === 0) {
+        if (buyItems.length === 0) {
           const aiMessage: ChatMessage = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: 'I don\'t see any GO items in your queue that need listing optimization. Would you like me to analyze your current queue items?',
+            content: 'I don\'t see any BUY items in your queue that need listing optimization. Would you like me to analyze your current queue items?',
             timestamp: Date.now(),
           }
           setChatSessions((prev) =>
@@ -553,7 +567,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
           return
         }
 
-        const responseText = `I'll create optimized eBay listings for ${goItems.length} item${goItems.length !== 1 ? 's' : ''} in your queue. This will include:\n\n- SEO-optimized titles (80 chars max)\n- Detailed product descriptions\n- Competitive pricing analysis\n- Item-specific keywords\n- Recommended shipping costs\n\nStarting optimization now...`
+        const responseText = `I'll create optimized eBay listings for ${buyItems.length} item${buyItems.length !== 1 ? 's' : ''} in your queue. This will include:\n\n- SEO-optimized titles (80 chars max)\n- Detailed product descriptions\n- Competitive pricing analysis\n- Item-specific keywords\n- Recommended shipping costs\n\nStarting optimization now...`
         
         const aiMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -570,7 +584,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
           )
         )
 
-        for (const item of goItems) {
+        for (const item of buyItems) {
           if (onOptimizeItem) {
             await onOptimizeItem(item.id)
           }
@@ -579,7 +593,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         const completionMessage: ChatMessage = {
           id: (Date.now() + 2).toString(),
           role: 'assistant',
-          content: `✅ Successfully optimized ${goItems.length} listing${goItems.length !== 1 ? 's' : ''}! They're now ready to publish to eBay or push to Notion. Check the Queue to review them.`,
+          content: `✅ Successfully optimized ${buyItems.length} listing${buyItems.length !== 1 ? 's' : ''}! They're now ready to publish to eBay or push to Notion. Check the Queue to review them.`,
           timestamp: Date.now(),
         }
 
@@ -591,7 +605,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
           )
         )
         
-        toast.success(`Optimized ${goItems.length} listings`)
+        toast.success(`Optimized ${buyItems.length} listings`)
         setIsProcessing(false)
         return
       }
@@ -753,7 +767,7 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         } else {
           const profit = currentSession.totalPotentialProfit ?? 0
           onEndSession()
-          addMsg(`**Session ended!** Final stats: ${currentSession.itemsScanned} scans, ${currentSession.goCount} GO, ${currentSession.passCount} PASS, $${profit.toFixed(2)} potential profit.`)
+          addMsg(`**Session ended!** Final stats: ${currentSession.itemsScanned} scans, ${currentSession.buyCount} BUY, ${currentSession.passCount} PASS, $${profit.toFixed(2)} potential profit.`)
         }
         setIsProcessing(false)
         return
@@ -800,6 +814,42 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
         }
       }
 
+      // Mark as sold command: "mark [item name] as sold on [marketplace] for $X"
+      if ((lowerText.includes('mark') || lowerText.includes('sold')) && lowerText.includes('sold') && onMarkAsSold) {
+        const priceMatch = text.match(/\$?(\d+(?:\.\d{2})?)/)?.[1]
+        const marketplaces = ['ebay', 'mercari', 'poshmark', 'facebook', 'whatnot', 'other'] as const
+        const foundMarketplace = marketplaces.find(m => lowerText.includes(m)) || 'other'
+        const soldPrice = priceMatch ? parseFloat(priceMatch) : 0
+
+        const matchedItem = queueItems.find(i =>
+          i.listingStatus === 'published' && i.productName && lowerText.includes(i.productName.toLowerCase())
+        ) || queueItems.filter(i => i.listingStatus === 'published').slice(-1)[0]
+
+        if (matchedItem) {
+          onMarkAsSold(matchedItem.id, soldPrice, foundMarketplace)
+          addMsg(`✅ Marked **${matchedItem.productName || 'item'}** as sold on **${foundMarketplace}** for **$${soldPrice.toFixed(2)}**. It's now in your Sold tab.`)
+          setIsProcessing(false)
+          return
+        }
+      }
+
+      // Add tracking command: "add tracking [number] for [item]" or "mark [item] shipped"
+      if ((lowerText.includes('tracking') || lowerText.includes('shipped') || lowerText.includes('mark shipped')) && onMarkShipped) {
+        const trackingMatch = text.match(/tracking\s+(?:number\s+)?([A-Z0-9]{6,30})/i)?.[1]
+        const carrierMatch = text.match(/\b(usps|ups|fedex|dhl)\b/i)?.[1]?.toUpperCase() || ''
+
+        const matchedSoldItem = soldItems.find(i =>
+          i.listingStatus === 'sold' && i.productName && lowerText.includes(i.productName.toLowerCase())
+        ) || soldItems.filter(i => i.listingStatus === 'sold').slice(-1)[0]
+
+        if (matchedSoldItem) {
+          onMarkShipped(matchedSoldItem.id, trackingMatch || '', carrierMatch)
+          addMsg(`✅ Marked **${matchedSoldItem.productName || 'item'}** as shipped${trackingMatch ? ` with tracking **${trackingMatch}**` : ''}${carrierMatch ? ` via ${carrierMatch}` : ''}.`)
+          setIsProcessing(false)
+          return
+        }
+      }
+
       const context = buildContext()
       const recentItems = queueItems.slice(-3).map(i =>
         `• ${i.productName || 'Unknown'} — Buy: $${i.purchasePrice.toFixed(2)}, Sell: $${(i.estimatedSellPrice || 0).toFixed(2)}, Margin: ${(i.profitMargin || 0).toFixed(1)}%, Decision: ${i.decision}, Status: ${i.listingStatus || 'not-started'}${i.category ? `, Category: ${i.category}` : ''}`
@@ -807,26 +857,44 @@ export function AgentScreen({ queueItems = [], settings, onCreateListing, onOpti
 
       const pastSessionsSummary = allSessions.slice(-3).map(s => {
         const dur = ((s.endTime || Date.now()) - s.startTime) / 60000
-        return `• ${s.name || new Date(s.startTime).toLocaleDateString()} — ${s.itemsScanned} scans, ${s.goCount} GO, $${s.totalPotentialProfit.toFixed(2)} profit, ${Math.round(dur)}min${s.location ? `, at ${s.location.name}` : ''}${s.profitGoal ? `, goal: $${s.profitGoal}` : ''}`
+        return `• ${s.name || new Date(s.startTime).toLocaleDateString()} — ${s.itemsScanned} scans, ${s.buyCount} BUY, $${s.totalPotentialProfit.toFixed(2)} profit, ${Math.round(dur)}min${s.location ? `, at ${s.location.name}` : ''}${s.profitGoal ? `, goal: $${s.profitGoal}` : ''}`
       }).join('\n')
 
       const activeGoalsSummary = profitGoals.filter(g => g.active).map(g =>
         `• ${g.type} goal: $${g.targetAmount.toFixed(2)} (${new Date(g.startDate).toLocaleDateString()} - ${new Date(g.endDate).toLocaleDateString()})`
       ).join('\n')
 
-      const systemPrompt = `You are an expert AI agent for resale business optimization. You have FULL awareness of this app's state — every session, item, goal, and setting. You help users research products, analyze profitability, create optimized eBay listings, manage sessions, and make data-driven decisions.
+      const soldSummaryText = soldItems.length > 0
+        ? soldItems.slice(0, 5).map(i => {
+            const profit = (i.soldPrice || 0) - i.purchasePrice
+            return `• ${i.productName || 'Unknown'} — Sold $${(i.soldPrice || 0).toFixed(2)} on ${i.soldOn || '?'}, Profit: $${profit.toFixed(2)}, Status: ${i.listingStatus}`
+          }).join('\n')
+        : 'No sold items yet'
+
+      const soldStats = {
+        total: soldItems.length,
+        revenue: soldItems.reduce((s, i) => s + (i.soldPrice || 0), 0),
+        profit: soldItems.reduce((s, i) => s + ((i.soldPrice || 0) - i.purchasePrice), 0),
+        needsShipping: soldItems.filter(i => i.listingStatus === 'sold').length,
+      }
+
+      const systemPrompt = `You are an expert AI agent for resale business optimization. You have FULL awareness of this app's state — every session, item, goal, and setting. You help users research products, analyze profitability, create optimized eBay listings, manage sessions, track sold items, and make data-driven decisions.
 
 ## Current App State
 
-### Queue
-- ${queueStats.total} items (${queueStats.go} GO, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
+### Listings Queue
+- ${queueStats.total} items (${queueStats.buy} BUY, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
 - Potential profit: $${queueStats.totalProfit.toFixed(2)}
 ${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
+
+### Sold Items
+- ${soldStats.total} total sold | Revenue: $${soldStats.revenue.toFixed(2)} | Profit: $${soldStats.profit.toFixed(2)} | Needs Shipping: ${soldStats.needsShipping}
+${soldSummaryText !== 'No sold items yet' ? `\nRecent Sold:\n${soldSummaryText}` : '\nNo sold items yet'}
 
 ### Active Session
 ${currentSession?.active ? `- Name: ${currentSession.name || 'Unnamed'}
 - Started: ${new Date(currentSession.startTime).toLocaleString()}
-- Scans: ${currentSession.itemsScanned} (${currentSession.goCount} GO, ${currentSession.passCount} PASS)
+- Scans: ${currentSession.itemsScanned} (${currentSession.buyCount} BUY, ${currentSession.passCount} PASS)
 - Profit: $${currentSession.totalPotentialProfit.toFixed(2)}
 - Goal: ${currentSession.profitGoal ? `$${currentSession.profitGoal} (${currentSession.profitGoal > 0 ? Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100) : 0}% achieved)` : 'Not set'}
 - Location: ${currentSession.location?.name || 'Not set'}` : 'No active session'}
@@ -844,7 +912,7 @@ ${activeGoalsSummary || 'No active goals'}
 You can execute these commands for the user:
 - "Research [product]" — Search real marketplaces for current prices and demand
 - "Change price to $X" / "Update sell price to $X" — Edit item fields
-- "Create listings" — Generate optimized eBay listings for GO items
+- "Create listings" — Generate optimized eBay listings for BUY items
 - "Push to Notion" — Publish ready listings
 - "Full pipeline" — End-to-end: analyze → optimize → publish
 - "Camera" / "Scan" — Open the AI Camera
@@ -852,6 +920,8 @@ You can execute these commands for the user:
 - "Name session [name]" — Rename the active session
 - "Set goal $X" — Set a profit goal for the active session
 - "Set location [name]" — Set the location for the active session
+- "Mark [item] as sold on [marketplace] for $X" — Move a published item to the Sold tab
+- "Add tracking [number] for [item]" / "Mark [item] shipped" — Update shipping status
 
 ## Instructions
 - You are fully aware of ALL data in this app. Reference specific items, sessions, goals, and metrics by name and number.
@@ -890,7 +960,7 @@ You can execute these commands for the user:
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, soldItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)
@@ -927,7 +997,6 @@ You can execute these commands for the user:
           >
             <Plus size={18} weight="bold" />
           </Button>
-          <ThemeToggle />
         </div>
       </div>
 
@@ -990,9 +1059,9 @@ You can execute these commands for the user:
           <Card className="p-2 flex flex-col items-center justify-center">
             <div className="text-[9px] text-green font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
               <CheckCircle size={10} weight="fill" />
-              GO
+              BUY
             </div>
-            <div className="text-base font-black text-green">{queueStats.go}</div>
+            <div className="text-base font-black text-green">{queueStats.buy}</div>
           </Card>
           <Card className="p-2 flex flex-col items-center justify-center">
             <div className="text-[9px] text-red font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">

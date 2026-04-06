@@ -112,8 +112,8 @@ export const createPatternRecommendationService = () => {
     const bestPriceRange = priceRangePatterns.sort((a, b) => b.avgROI - a.avgROI)[0]
 
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    const goItems = items.filter(i => i.decision === 'GO')
-    const avgSuccessRate = items.length > 0 ? (goItems.length / items.length) * 100 : 0
+    const buyItems = items.filter(i => i.decision === 'BUY')
+    const avgSuccessRate = items.length > 0 ? (buyItems.length / items.length) * 100 : 0
 
     return {
       bestTimes: timePatterns.sort((a, b) => b.avgProfit - a.avgProfit).slice(0, 5),
@@ -136,7 +136,7 @@ export const createPatternRecommendationService = () => {
   const analyzeTimePatterns = (sessions: Session[], items: ScannedItem[]): TimePattern[] => {
     const patterns = new Map<string, {
       items: ScannedItem[]
-      goCount: number
+      buyCount: number
       totalProfit: number
     }>()
 
@@ -147,13 +147,13 @@ export const createPatternRecommendationService = () => {
       const key = `${dayOfWeek}-${hourOfDay}`
 
       if (!patterns.has(key)) {
-        patterns.set(key, { items: [], goCount: 0, totalProfit: 0 })
+        patterns.set(key, { items: [], buyCount: 0, totalProfit: 0 })
       }
 
       const pattern = patterns.get(key)!
       pattern.items.push(item)
-      if (item.decision === 'GO') {
-        pattern.goCount++
+      if (item.decision === 'BUY') {
+        pattern.buyCount++
         pattern.totalProfit += (item.estimatedSellPrice || 0) - item.purchasePrice
       }
     })
@@ -165,7 +165,7 @@ export const createPatternRecommendationService = () => {
         return {
           dayOfWeek,
           hourOfDay,
-          successRate: (data.goCount / data.items.length) * 100,
+          successRate: (data.buyCount / data.items.length) * 100,
           avgProfit: data.totalProfit / data.items.length,
           itemCount: data.items.length
         }
@@ -186,11 +186,11 @@ export const createPatternRecommendationService = () => {
     return Array.from(categoryMap.entries())
       .filter(([_, items]) => items.length >= 2)
       .map(([category, categoryItems]) => {
-        const goItems = categoryItems.filter(i => i.decision === 'GO')
-        const totalProfit = goItems.reduce((sum, i) => 
+        const buyItems = categoryItems.filter(i => i.decision === 'BUY')
+        const totalProfit = buyItems.reduce((sum, i) =>
           sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0
         )
-        const totalMargin = goItems.reduce((sum, i) => sum + (i.profitMargin || 0), 0)
+        const totalMargin = buyItems.reduce((sum, i) => sum + (i.profitMargin || 0), 0)
 
         const dayMap = new Map<number, number>()
         const hourMap = new Map<number, number>()
@@ -215,9 +215,9 @@ export const createPatternRecommendationService = () => {
 
         return {
           category,
-          successRate: (goItems.length / categoryItems.length) * 100,
+          successRate: (buyItems.length / categoryItems.length) * 100,
           avgProfit: totalProfit / categoryItems.length,
-          avgMargin: goItems.length > 0 ? totalMargin / goItems.length : 0,
+          avgMargin: buyItems.length > 0 ? totalMargin / buyItems.length : 0,
           itemCount: categoryItems.length,
           bestDays,
           bestHours
@@ -243,11 +243,11 @@ export const createPatternRecommendationService = () => {
 
         if (rangeItems.length < 2) return null
 
-        const goItems = rangeItems.filter(i => i.decision === 'GO')
-        const totalProfit = goItems.reduce((sum, i) => 
+        const buyItems = rangeItems.filter(i => i.decision === 'BUY')
+        const totalProfit = buyItems.reduce((sum, i) =>
           sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0
         )
-        const totalROI = goItems.reduce((sum, i) => {
+        const totalROI = buyItems.reduce((sum, i) => {
           const profit = (i.estimatedSellPrice || 0) - i.purchasePrice
           return sum + ((profit / i.purchasePrice) * 100)
         }, 0)
@@ -255,9 +255,9 @@ export const createPatternRecommendationService = () => {
         return {
           minPrice: range.min,
           maxPrice: range.max === Infinity ? 999 : range.max,
-          successRate: (goItems.length / rangeItems.length) * 100,
+          successRate: (buyItems.length / rangeItems.length) * 100,
           avgProfit: totalProfit / rangeItems.length,
-          avgROI: goItems.length > 0 ? totalROI / goItems.length : 0,
+          avgROI: buyItems.length > 0 ? totalROI / buyItems.length : 0,
           itemCount: rangeItems.length
         }
       })
@@ -367,15 +367,15 @@ export const createPatternRecommendationService = () => {
       })
     }
 
-    const goRate = items.length > 0 ? (items.filter(i => i.decision === 'GO').length / items.length) * 100 : 0
-    
-    if (goRate < 30 && items.length > 10) {
+    const buyRate = items.length > 0 ? (items.filter(i => i.decision === 'BUY').length / items.length) * 100 : 0
+
+    if (buyRate < 30 && items.length > 10) {
       recommendations.push({
         id: `strategy-selective-${Date.now()}`,
         type: 'strategy',
         priority: 'medium',
         title: 'Be More Selective',
-        description: `Your GO rate is ${goRate.toFixed(1)}% - focus on higher quality finds`,
+        description: `Your BUY rate is ${buyRate.toFixed(1)}% - focus on higher quality finds`,
         reasoning: 'Low success rate suggests spending time on unprofitable items',
         confidence: 75,
         potentialImpact: 'Improved profit per hour',

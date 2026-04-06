@@ -27,7 +27,7 @@ const DEFAULT_PRESETS: CategoryPreset[] = [
     tags: [],
     filters: {
       minProfit: 50,
-      decision: ['GO'],
+      decision: ['BUY'],
     },
     sortBy: 'profit',
     sortOrder: 'desc',
@@ -56,12 +56,12 @@ const DEFAULT_PRESETS: CategoryPreset[] = [
     isDefault: true,
   },
   {
-    id: 'preset-go-decisions',
-    name: 'GO Decisions',
+    id: 'preset-buy-decisions',
+    name: 'BUY Decisions',
     description: 'All profitable items',
     tags: [],
     filters: {
-      decision: ['GO'],
+      decision: ['BUY'],
     },
     sortBy: 'profit',
     sortOrder: 'desc',
@@ -407,7 +407,7 @@ export function FilterPresetsManager({ isOpen, onClose, onApplyPreset }: FilterP
                   Decision
                 </label>
                 <div className="flex gap-2">
-                  {(['GO', 'PASS', 'PENDING'] as Decision[]).map((decision) => (
+                  {(['BUY', 'PASS', 'PENDING'] as Decision[]).map((decision) => (
                     <Button
                       key={decision}
                       variant={selectedDecisions.includes(decision) ? 'default' : 'outline'}

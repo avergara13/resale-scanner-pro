@@ -1,4 +1,4 @@
-import { ChartBar, Stack, Gear, Robot, Camera } from '@phosphor-icons/react'
+import { ChartBar, Stack, Tag, Robot, Camera } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import type { Screen } from '@/types'
 import type { CaptureState } from '@/hooks/use-capture-state'
@@ -14,8 +14,8 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
   const items: Array<{ id: Screen; icon: any; label: string }> = [
     { id: 'session', icon: ChartBar, label: 'Session' },
     { id: 'agent', icon: Robot, label: 'Agent' },
-    { id: 'queue', icon: Stack, label: 'Queue' },
-    { id: 'settings', icon: Gear, label: 'Settings' },
+    { id: 'queue', icon: Stack, label: 'Listings' },
+    { id: 'sold', icon: Tag, label: 'Sold' },
   ]
 
   return (

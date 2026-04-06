@@ -15,7 +15,7 @@ interface ScanHistoryScreenProps {
 export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenProps) {
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [filter, setFilter] = useState<'all' | 'GO' | 'PASS' | 'PENDING'>('all')
+  const [filter, setFilter] = useState<'all' | 'BUY' | 'PASS' | 'PENDING'>('all')
 
   const filteredHistory = useMemo(() => {
     const items = scanHistory || []
@@ -77,7 +77,7 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
 
         {/* Filter tabs */}
         <div className="flex gap-1.5">
-          {(['all', 'GO', 'PASS', 'PENDING'] as const).map(f => (
+          {(['all', 'BUY', 'PASS', 'PENDING'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -156,7 +156,7 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
                         variant="secondary"
                         className={cn(
                           'text-[9px] font-bold flex-shrink-0',
-                          item.decision === 'GO' ? 'bg-green/10 text-green' :
+                          item.decision === 'BUY' ? 'bg-green/10 text-green' :
                           item.decision === 'PASS' ? 'bg-red/10 text-red' :
                           'bg-amber/10 text-amber'
                         )}
