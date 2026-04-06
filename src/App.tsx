@@ -15,6 +15,7 @@ import { SettingsScreen } from './components/screens/SettingsScreen'
 import { TagAnalyticsScreen } from './components/screens/TagAnalyticsScreen'
 import { LocationInsightsScreen } from './components/screens/LocationInsightsScreen'
 import { CostTrackingScreen } from './components/screens/CostTrackingScreen'
+import { ScanHistoryScreen } from './components/screens/ScanHistoryScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
@@ -39,6 +40,7 @@ function App() {
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
+  const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
@@ -401,7 +403,10 @@ function App() {
       updatedItem.tags = autoTags
       
       setCurrentItem(updatedItem)
-      
+
+      // Log to scan history
+      setScanHistory(prev => [updatedItem, ...(prev || []).slice(0, 499)])
+
       if (session?.active) {
         setSession((prev) => {
           if (!prev) return prev
@@ -894,7 +899,8 @@ function App() {
     'history': 8,
     'tag-analytics': 9,
     'location-insights': 10,
-    'cost-tracking': 11
+    'cost-tracking': 11,
+    'scan-history': 12
   }
 
   const [prevScreen, setPrevScreen] = useState<Screen>(screen)
@@ -944,6 +950,8 @@ function App() {
                 session={session}
                 onStartSession={handleStartSession}
                 onEndSession={handleEndSession}
+                onNavigateToQueue={() => setScreen('queue')}
+                onNavigateToHistory={() => setScreen('scan-history')}
               />
             </motion.div>
           )}
@@ -1088,6 +1096,29 @@ function App() {
             >
               <CostTrackingScreen
                 onBack={() => setScreen('settings')}
+              />
+            </motion.div>
+          )}
+          {screen === 'scan-history' && (
+            <motion.div
+              key="scan-history"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="w-full h-full"
+            >
+              <ScanHistoryScreen
+                onBack={() => setScreen('session')}
+                onSaveAsDraft={(item) => {
+                  setQueue(prev => {
+                    const current = prev || []
+                    if (current.some(i => i.id === item.id)) return current
+                    return [...current, { ...item, inQueue: true }]
+                  })
+                }}
               />
             </motion.div>
           )}

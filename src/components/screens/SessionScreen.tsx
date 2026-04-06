@@ -19,9 +19,11 @@ interface SessionScreenProps {
   session?: Session
   onStartSession: () => void
   onEndSession: () => void
+  onNavigateToQueue?: (filter?: string) => void
+  onNavigateToHistory?: () => void
 }
 
-export function SessionScreen({ session, onStartSession, onEndSession }: SessionScreenProps) {
+export function SessionScreen({ session, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory }: SessionScreenProps) {
   const [showTrends, setShowTrends] = useState(false)
   const [showGoalTracking, setShowGoalTracking] = useState(false)
   const [showLocations, setShowLocations] = useState(false)
@@ -168,22 +170,22 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
       ) : (
         <div className="flex-1 space-y-4">
           <div className="flex gap-2">
-            <div className="stat-card flex-1 p-3">
+            <button onClick={() => onNavigateToQueue?.()} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
               <div className="text-base font-bold text-green leading-tight">
                 ${session.totalPotentialProfit.toFixed(2)}
               </div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Est. Profit</div>
-            </div>
-            <div className="stat-card flex-1 p-3">
+            </button>
+            <button onClick={() => onNavigateToHistory?.()} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
               <div className="text-base font-bold text-t1 leading-tight">{session.itemsScanned}</div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
-            </div>
-            <div className="stat-card flex-1 p-3">
+            </button>
+            <button onClick={() => onNavigateToQueue?.('GO')} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
               <div className="text-base font-bold text-b1 leading-tight">
                 {session.itemsScanned > 0 ? Math.round((session.goCount / session.itemsScanned) * 100) : 0}%
               </div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">GO Rate</div>
-            </div>
+            </button>
           </div>
 
           <Card className="p-6">
@@ -196,20 +198,20 @@ export function SessionScreen({ session, onStartSession, onEndSession }: Session
               </span>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div>
+              <button onClick={() => onNavigateToQueue?.('GO')} className="text-left active:opacity-80 transition-opacity">
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">GO</p>
                 <div className="flex items-baseline gap-2">
                   <p className="text-2xl font-bold mono text-green">{session.goCount}</p>
                   <CheckCircle size={20} weight="fill" className="text-green" />
                 </div>
-              </div>
-              <div>
+              </button>
+              <button onClick={() => onNavigateToQueue?.('PASS')} className="text-left active:opacity-80 transition-opacity">
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">PASS</p>
                 <div className="flex items-baseline gap-2">
                   <p className="text-2xl font-bold mono text-red">{session.passCount}</p>
                   <XCircle size={20} weight="fill" className="text-red" />
                 </div>
-              </div>
+              </button>
             </div>
           </Card>
 
