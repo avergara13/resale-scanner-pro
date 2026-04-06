@@ -26,8 +26,8 @@ export function LocationInsights({ items }: LocationInsightsProps) {
 
       if (existing) {
         existing.totalScans++
-        if (item.decision === 'GO') {
-          existing.goCount++
+        if (item.decision === 'BUY') {
+          existing.buyCount++
           const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
           existing.totalProfit += profit
         } else if (item.decision === 'PASS') {
@@ -56,15 +56,15 @@ export function LocationInsights({ items }: LocationInsightsProps) {
 
         existing.recentFinds.push(item)
       } else {
-        const profit = item.decision === 'GO' ? (item.estimatedSellPrice || 0) - item.purchasePrice : 0
+        const profit = item.decision === 'BUY' ? (item.estimatedSellPrice || 0) - item.purchasePrice : 0
         locationMap.set(locationId, {
           location: item.location,
           totalScans: 1,
-          goCount: item.decision === 'GO' ? 1 : 0,
+          buyCount: item.decision === 'BUY' ? 1 : 0,
           passCount: item.decision === 'PASS' ? 1 : 0,
           totalProfit: profit,
           averageProfit: profit,
-          goRate: item.decision === 'GO' ? 100 : 0,
+          buyRate: item.decision === 'BUY' ? 100 : 0,
           lastVisit: item.timestamp,
           bestCategories: item.category ? [{
             category: item.category,
@@ -77,12 +77,12 @@ export function LocationInsights({ items }: LocationInsightsProps) {
     })
 
     locationMap.forEach(location => {
-      location.averageProfit = location.goCount > 0 ? location.totalProfit / location.goCount : 0
-      location.goRate = location.totalScans > 0 ? (location.goCount / location.totalScans) * 100 : 0
+      location.averageProfit = location.buyCount > 0 ? location.totalProfit / location.buyCount : 0
+      location.buyRate = location.totalScans > 0 ? (location.buyCount / location.totalScans) * 100 : 0
       location.bestCategories.sort((a, b) => b.avgProfit - a.avgProfit)
       location.bestCategories = location.bestCategories.slice(0, 3)
       location.recentFinds = location.recentFinds
-        .filter(f => f.decision === 'GO')
+        .filter(f => f.decision === 'BUY')
         .sort((a, b) => b.timestamp - a.timestamp)
         .slice(0, 5)
     })
@@ -197,8 +197,8 @@ export function LocationInsights({ items }: LocationInsightsProps) {
 
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-bg rounded-lg p-2 border border-s2">
-                <div className="text-xs font-bold text-t1">{location.goRate.toFixed(0)}%</div>
-                <div className="text-[9px] text-t4 font-medium uppercase">GO Rate</div>
+                <div className="text-xs font-bold text-t1">{location.buyRate.toFixed(0)}%</div>
+                <div className="text-[9px] text-t4 font-medium uppercase">BUY Rate</div>
               </div>
               <div className="bg-bg rounded-lg p-2 border border-s2">
                 <div className="text-xs font-bold text-t1">{location.totalScans}</div>
@@ -269,10 +269,10 @@ export function LocationInsights({ items }: LocationInsightsProps) {
                   </Card>
                   <Card className="p-3 bg-blue-bg border-b1/20">
                     <div className="text-2xl font-bold text-b1">
-                      {selectedLocation.goRate.toFixed(0)}%
+                      {selectedLocation.buyRate.toFixed(0)}%
                     </div>
                     <div className="text-[10px] text-b1 font-bold uppercase tracking-wider mt-1">
-                      GO Rate
+                      BUY Rate
                     </div>
                   </Card>
                 </div>
@@ -288,8 +288,8 @@ export function LocationInsights({ items }: LocationInsightsProps) {
                       <div className="text-[10px] text-t3 font-medium uppercase">Total Scans</div>
                     </div>
                     <div>
-                      <div className="text-lg font-bold text-green">{selectedLocation.goCount}</div>
-                      <div className="text-[10px] text-t3 font-medium uppercase">GO Items</div>
+                      <div className="text-lg font-bold text-green">{selectedLocation.buyCount}</div>
+                      <div className="text-[10px] text-t3 font-medium uppercase">BUY Items</div>
                     </div>
                     <div>
                       <div className="text-lg font-bold text-red">{selectedLocation.passCount}</div>

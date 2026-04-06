@@ -8,10 +8,10 @@ interface DecisionSignalProps {
 }
 
 export function DecisionSignal({ decision, item }: DecisionSignalProps) {
-  const isGo = decision === 'GO'
+  const isBuy = decision === 'BUY'
   const isPass = decision === 'PASS'
 
-  if (!isGo && !isPass) return null
+  if (!isBuy && !isPass) return null
 
   return (
     <motion.div
@@ -21,7 +21,7 @@ export function DecisionSignal({ decision, item }: DecisionSignalProps) {
       id="decision-signal"
       className={cn(
         'mt-4 py-6 rounded-2xl flex flex-col items-center justify-center font-black border-4 shadow-xl',
-        isGo && 'bg-gradient-to-br from-green/20 to-green/10 text-green border-green',
+        isBuy && 'bg-gradient-to-br from-green/20 to-green/10 text-green border-green',
         isPass && 'bg-gradient-to-br from-red/20 to-red/10 text-red border-red'
       )}
     >

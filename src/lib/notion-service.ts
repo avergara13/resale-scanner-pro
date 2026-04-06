@@ -166,6 +166,58 @@ export class NotionService {
     }
   }
 
+  async updateListingStatus(pageId: string, update: {
+    status: 'sold' | 'shipped' | 'completed'
+    soldPrice?: number
+    soldOn?: string
+    trackingNumber?: string
+    shippingCarrier?: string
+    soldDate?: number
+    shippedDate?: number
+  }): Promise<NotionPushResponse> {
+    if (!this.isConfigured()) {
+      return { success: false, error: 'Notion API not configured.' }
+    }
+
+    try {
+      const properties: Record<string, unknown> = {
+        'Status': { select: { name: update.status } },
+      }
+      if (update.soldPrice !== undefined) {
+        properties['Sold Price'] = { number: update.soldPrice }
+      }
+      if (update.soldOn) {
+        properties['Sold On'] = { select: { name: update.soldOn } }
+      }
+      if (update.trackingNumber) {
+        properties['Tracking Number'] = { rich_text: [{ text: { content: update.trackingNumber } }] }
+      }
+      if (update.shippingCarrier) {
+        properties['Shipping Carrier'] = { rich_text: [{ text: { content: update.shippingCarrier } }] }
+      }
+      if (update.soldDate) {
+        properties['Sold Date'] = { date: { start: new Date(update.soldDate).toISOString() } }
+      }
+
+      await retryFetch(`https://api.notion.com/v1/pages/${pageId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          'Notion-Version': '2022-06-28',
+        },
+        body: JSON.stringify({ properties }),
+      }, { maxRetries: 2, initialDelay: 1000, timeout: 15000 })
+
+      return { success: true, pageId }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
+  }
+
   async pushMultipleListings(listings: NotionListingData[]): Promise<{
     successful: number
     failed: number

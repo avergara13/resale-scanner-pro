@@ -51,20 +51,20 @@ export function TimeBasedRecommendations({ sessions, items }: TimeBasedRecommend
       else timeSlot = 'evening'
       
       if (!acc[timeSlot]) {
-        acc[timeSlot] = { count: 0, totalProfit: 0, totalScans: 0, goRate: 0 }
+        acc[timeSlot] = { count: 0, totalProfit: 0, totalScans: 0, buyRate: 0 }
       }
-      
+
       acc[timeSlot].count++
       acc[timeSlot].totalProfit += session.totalPotentialProfit
       acc[timeSlot].totalScans += session.itemsScanned
-      acc[timeSlot].goRate += session.itemsScanned > 0 ? (session.goCount / session.itemsScanned) : 0
-      
+      acc[timeSlot].buyRate += session.itemsScanned > 0 ? (session.buyCount / session.itemsScanned) : 0
+
       return acc
-    }, {} as Record<string, { count: number; totalProfit: number; totalScans: number; goRate: number }>)
+    }, {} as Record<string, { count: number; totalProfit: number; totalScans: number; buyRate: number }>)
 
     Object.keys(timeOfDayData).forEach(slot => {
       const data = timeOfDayData[slot]
-      data.goRate = data.goRate / data.count
+      data.buyRate = data.buyRate / data.count
     })
 
     const bestTimeSlot = Object.entries(timeOfDayData).reduce((best, [slot, data]) => {
@@ -85,7 +85,7 @@ export function TimeBasedRecommendations({ sessions, items }: TimeBasedRecommend
           id: 'peak-time',
           type: 'time',
           title: `Prime Time for Scanning`,
-          description: `Your ${bestTimeSlot.slot} sessions average $${(bestTimeSlot.data.totalProfit / bestTimeSlot.data.count).toFixed(2)} profit with a ${(bestTimeSlot.data.goRate * 100).toFixed(0)}% GO rate. Great time to be scanning!`,
+          description: `Your ${bestTimeSlot.slot} sessions average $${(bestTimeSlot.data.totalProfit / bestTimeSlot.data.count).toFixed(2)} profit with a ${(bestTimeSlot.data.buyRate * 100).toFixed(0)}% BUY rate. Great time to be scanning!`,
           confidence: 'high',
           icon: TrendUp,
           color: 'text-green'
@@ -129,7 +129,7 @@ export function TimeBasedRecommendations({ sessions, items }: TimeBasedRecommend
     }
 
     const categoryData = items.reduce((acc, item) => {
-      if (item.decision !== 'GO' || !item.category) return acc
+      if (item.decision !== 'BUY' || !item.category) return acc
       
       const cat = item.category
       if (!acc[cat]) {

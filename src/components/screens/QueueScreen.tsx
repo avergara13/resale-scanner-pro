@@ -18,7 +18,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { toast } from 'sonner'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ThemeToggle } from '../ThemeToggle'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
 import { FilterPresetsManager } from '../FilterPresetsManager'
@@ -61,9 +60,10 @@ interface QueueScreenProps {
   geminiService?: GeminiService | null
   onNavigateToTagAnalytics?: () => void
   onNavigateToLocationInsights?: () => void
+  onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
 }
 
-type FilterOption = 'ALL' | 'GO' | 'PASS' | 'PENDING'
+type FilterOption = 'ALL' | 'BUY' | 'PASS' | 'PENDING'
 type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc' | 'tag-count-desc' | 'tag-count-asc' | 'tag-name-asc' | 'tag-name-desc' | 'manual'
 
 interface SortableItemProps {
@@ -75,17 +75,19 @@ interface SortableItemProps {
   onRemove: (id: string) => void
   onCreateListing: (id: string) => void
   onEditTags: (itemId: string, tags: string[]) => void
+  onOpenSoldDialog?: (item: ScannedItem) => void
 }
 
-function SortableItem({ 
-  item, 
-  isSelected, 
-  allTags, 
-  onToggleSelect, 
-  onEdit, 
-  onRemove, 
+function SortableItem({
+  item,
+  isSelected,
+  allTags,
+  onToggleSelect,
+  onEdit,
+  onRemove,
   onCreateListing,
-  onEditTags 
+  onEditTags,
+  onOpenSoldDialog,
 }: SortableItemProps) {
   const {
     attributes,
@@ -207,14 +209,25 @@ function SortableItem({
               <PencilSimple size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
               Edit
             </Button>
-            <Button
-              size="sm"
-              onClick={() => onCreateListing(item.id)}
-              className="flex-1 bg-b1 hover:bg-b2 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
-            >
-              <ArrowRight size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
-              List
-            </Button>
+            {item.listingStatus === 'published' && onOpenSoldDialog ? (
+              <Button
+                size="sm"
+                onClick={() => onOpenSoldDialog(item)}
+                className="flex-1 bg-green hover:bg-green/90 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
+              >
+                <Tag size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
+                Mark Sold
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => onCreateListing(item.id)}
+                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
+              >
+                <ArrowRight size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
+                List
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -230,7 +243,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -250,6 +263,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
   const [previousItemCount, setPreviousItemCount] = useState<number>(queueItems.length)
   const [previousFilteredCount, setPreviousFilteredCount] = useState<number | null>(null)
+  const [soldDialogItemId, setSoldDialogItemId] = useState<string | null>(null)
+  const [soldPrice, setSoldPrice] = useState('')
+  const [soldMarketplace, setSoldMarketplace] = useState<'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'>('ebay')
   const [showTrendIndicator, setShowTrendIndicator] = useState(false)
   const [locationInsightsOpen, setLocationInsightsOpen] = useState(false)
 
@@ -345,9 +361,14 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   }, [queueItems])
   
   const filteredItems = queueItems.filter(item => {
-    const matchesFilter = 
+    // Exclude items that have moved to the Sold tab
+    if (item.listingStatus === 'sold' || item.listingStatus === 'shipped' || item.listingStatus === 'completed') {
+      return false
+    }
+
+    const matchesFilter =
       filter === 'ALL' ||
-      (filter === 'GO' && item.decision === 'GO') ||
+      (filter === 'BUY' && item.decision === 'BUY') ||
       (filter === 'PASS' && item.decision === 'PASS') ||
       (filter === 'PENDING' && item.decision === 'PENDING')
     
@@ -445,7 +466,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
   const analyzedItems = queueItems.filter(item => item.productName && item.productName !== 'Quick Draft')
   
-  const goCount = queueItems.filter(item => item.decision === 'GO').length
+  const buyCount = queueItems.filter(item => item.decision === 'BUY').length
   const passCount = queueItems.filter(item => item.decision === 'PASS').length
   const pendingCount = queueItems.filter(item => item.decision === 'PENDING').length
 
@@ -682,6 +703,66 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         onCreateTag={handleCreateTag}
       />
 
+      {/* Mark as Sold Dialog */}
+      <Dialog open={soldDialogItemId !== null} onOpenChange={(open) => { if (!open) setSoldDialogItemId(null) }}>
+        <DialogContent className="max-w-sm bg-card border-s1 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-t1">
+              <Tag size={20} weight="duotone" className="text-green" />
+              Mark as Sold
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <label className="text-[10px] font-bold text-t3 uppercase tracking-wide block mb-1.5">Sold Price</label>
+              <Input
+                type="number"
+                value={soldPrice}
+                onChange={e => setSoldPrice(e.target.value)}
+                placeholder="0.00"
+                className="h-10 text-base font-mono"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-t3 uppercase tracking-wide block mb-1.5">Marketplace</label>
+              <div className="flex flex-wrap gap-1.5">
+                {(['ebay', 'mercari', 'poshmark', 'facebook', 'whatnot', 'other'] as const).map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setSoldMarketplace(m)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-[11px] font-bold capitalize transition-all',
+                      soldMarketplace === m ? 'bg-b1 text-white' : 'bg-s1 text-t3 hover:bg-s2'
+                    )}
+                  >
+                    {m === 'ebay' ? 'eBay' : m}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                className="flex-1 bg-green hover:bg-green/90 text-white h-10"
+                onClick={() => {
+                  if (soldDialogItemId && onMarkAsSold) {
+                    const price = parseFloat(soldPrice) || 0
+                    onMarkAsSold(soldDialogItemId, price, soldMarketplace)
+                    setSoldDialogItemId(null)
+                    setSoldPrice('')
+                  }
+                }}
+              >
+                Confirm Sale
+              </Button>
+              <Button variant="outline" className="h-10" onClick={() => setSoldDialogItemId(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-md bg-card border-s1 shadow-2xl">
           <DialogHeader>
@@ -765,8 +846,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         <div className="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-4">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-xl font-black tracking-tight text-t1">LISTING QUEUE</h1>
-              <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <p className="text-[10px] sm:text-[11px] text-t3 font-medium uppercase tracking-wider">
                   {queueItems.length} Items Total
                 </p>
@@ -832,7 +912,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 )}
               </div>
             </div>
-            <ThemeToggle />
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {onNavigateToLocationInsights && queueItems.some(item => item.location) && (
@@ -877,10 +956,10 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               ALL
             </button>
             <button 
-              onClick={() => setFilter('GO')}
-              className={cn('tab-btn', filter === 'GO' && 'active')}
+              onClick={() => setFilter('BUY')}
+              className={cn('tab-btn', filter === 'BUY' && 'active')}
             >
-              GO {goCount > 0 && `(${goCount})`}
+              BUY {buyCount > 0 && `(${buyCount})`}
             </button>
             <button 
               onClick={() => setFilter('PASS')}
@@ -1155,7 +1234,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           ) : (
             <div className="w-20 h-20 rounded-full bg-s1 flex items-center justify-center mb-4">
               <p className="text-3xl">
-                {searchQuery ? '🔍' : filter === 'GO' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
+                {searchQuery ? '🔍' : filter === 'BUY' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
               </p>
             </div>
           )}
@@ -1209,6 +1288,11 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onRemove={onRemove}
                       onCreateListing={onCreateListing}
                       onEditTags={(itemId, tags) => onEdit(itemId, { tags })}
+                      onOpenSoldDialog={onMarkAsSold ? (soldItem) => {
+                        setSoldDialogItemId(soldItem.id)
+                        setSoldPrice(soldItem.estimatedSellPrice ? soldItem.estimatedSellPrice.toString() : '')
+                        setSoldMarketplace('ebay')
+                      } : undefined}
                     />
                   ))}
                 </div>
@@ -1339,7 +1423,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
 
           {availableLocations.length > 0 && (() => {
             const totalProfit = queueItems
-              .filter(item => item.location && item.decision === 'GO')
+              .filter(item => item.location && item.decision === 'BUY')
               .reduce((sum, item) => sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0)
             
             const avgProfitPerStore = availableLocations.length > 0 

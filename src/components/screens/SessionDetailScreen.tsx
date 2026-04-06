@@ -21,7 +21,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
   const [queue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
-  const [filter, setFilter] = useState<'all' | 'GO' | 'PASS'>('all')
+  const [filter, setFilter] = useState<'all' | 'BUY' | 'PASS'>('all')
 
   // Editing states
   const [editingName, setEditingName] = useState(false)
@@ -133,7 +133,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
 
   const duration = (session.endTime || Date.now()) - session.startTime
   const startDate = new Date(session.startTime)
-  const goRate = session.itemsScanned > 0 ? Math.round((session.goCount / session.itemsScanned) * 100) : 0
+  const buyRate = session.itemsScanned > 0 ? Math.round((session.buyCount / session.itemsScanned) * 100) : 0
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
@@ -203,12 +203,12 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
             <div className="stat-card flex-1 p-3">
-              <div className="text-base font-bold text-b1 leading-tight">{goRate}%</div>
-              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">GO Rate</div>
+              <div className="text-base font-bold text-b1 leading-tight">{buyRate}%</div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">BUY Rate</div>
             </div>
           </div>
 
-          {/* GO / PASS card — matches active session */}
+          {/* BUY / PASS card — matches active session */}
           <Card className="p-6 mb-4">
             <div className="flex items-center justify-between mb-4">
               <Badge variant="secondary" className="bg-t3 text-white px-3 py-1 uppercase text-xs font-bold">
@@ -218,9 +218,9 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-t3 mb-1">GO</p>
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold mono text-green">{session.goCount}</p>
+                  <p className="text-2xl font-bold mono text-green">{session.buyCount}</p>
                   <CheckCircle size={20} weight="fill" className="text-green" />
                 </div>
               </div>
@@ -241,10 +241,10 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
               ${session.totalPotentialProfit.toFixed(2)}
             </p>
             <p className="text-sm text-t3 mt-2">
-              From {session.goCount} items{' '}
-              {session.goCount > 0 && (
+              From {session.buyCount} items{' '}
+              {session.buyCount > 0 && (
                 <span className="mono">
-                  (${(session.totalPotentialProfit / session.goCount).toFixed(2)} avg)
+                  (${(session.totalPotentialProfit / session.buyCount).toFixed(2)} avg)
                 </span>
               )}
             </p>
@@ -350,7 +350,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                   Items ({sessionItems.length})
                 </h3>
                 <div className="flex gap-1">
-                  {(['all', 'GO', 'PASS'] as const).map(f => (
+                  {(['all', 'BUY', 'PASS'] as const).map(f => (
                     <button
                       key={f}
                       onClick={() => setFilter(f)}
@@ -373,7 +373,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                         variant="secondary"
                         className={cn(
                           'text-[9px] px-1.5 py-0 flex-shrink-0',
-                          item.decision === 'GO' ? 'bg-green/10 text-green' :
+                          item.decision === 'BUY' ? 'bg-green/10 text-green' :
                           item.decision === 'PASS' ? 'bg-red/10 text-red' :
                           'bg-amber/10 text-amber'
                         )}

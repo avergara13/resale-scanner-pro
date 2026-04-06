@@ -36,7 +36,7 @@ export function GoalAchievementTracker({ goals, items }: GoalAchievementTrackerP
     const relevantItems = items.filter(item => 
       item.timestamp >= goal.startDate && 
       item.timestamp <= goal.endDate &&
-      item.decision === 'GO' &&
+      item.decision === 'BUY' &&
       item.profitMargin !== undefined
     )
 
@@ -88,7 +88,7 @@ export function GoalAchievementTracker({ goals, items }: GoalAchievementTrackerP
         const relevantItems = items.filter(item => 
           item.timestamp >= c.goal.startDate && 
           item.timestamp <= c.goal.endDate &&
-          item.decision === 'GO'
+          item.decision === 'BUY'
         )
         const profit = relevantItems.reduce((pSum, item) => 
           pSum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0

@@ -417,7 +417,7 @@ Brief summary of market conditions
 
 ### Profit Potential
 - Expected profit margin percentage
-- **Final Verdict**: GO or PASS with brief justification
+- **Final Verdict**: BUY or PASS with brief justification
 
 Use bullet points, bold key terms, and include specific numbers when possible.`
       

@@ -3,7 +3,6 @@ import { useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ThemeToggle } from '../ThemeToggle'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
@@ -16,20 +15,21 @@ import { toast } from 'sonner'
 import type { Session, ScannedItem, ProfitGoal } from '@/types'
 
 function PastSessionCard({
-  session, items, goCount, passCount, totalProfit, bestFind, duration, goRate, formatDuration, onDelete, onViewDetail
+  session, items, buyCount, passCount, totalProfit, bestFind, duration, buyRate, formatDuration, onDelete, onViewDetail
 }: {
   session: Session
   items: ScannedItem[]
-  goCount: number
+  buyCount: number
   passCount: number
   totalProfit: number
   bestFind: ScannedItem | null
   duration: number
-  goRate: number
+  buyRate: number
   formatDuration: (ms: number) => string
   onDelete: () => void
   onViewDetail: () => void
-}) {
+})
+ {
   const [expanded, setExpanded] = useState(false)
   const startDate = new Date(session.startTime)
 
@@ -50,10 +50,10 @@ function PastSessionCard({
         </div>
         <div className="flex gap-3 text-[10px]">
           <span className="text-t2">{session.itemsScanned} scans</span>
-          <span className="text-green font-bold">{goCount} GO</span>
+          <span className="text-green font-bold">{buyCount} BUY</span>
           <span className="text-red font-bold">{passCount} PASS</span>
           <span className="text-green font-mono font-bold">${totalProfit.toFixed(2)}</span>
-          <span className="text-b1 font-bold">{goRate}%</span>
+          <span className="text-b1 font-bold">{buyRate}%</span>
         </div>
       </button>
 
@@ -64,18 +64,18 @@ function PastSessionCard({
             <div className="p-2 bg-s1 rounded-lg">
               <p className="text-[9px] text-t3 uppercase">Avg Profit</p>
               <p className="text-xs font-bold text-t1 font-mono">
-                ${goCount > 0 ? (totalProfit / goCount).toFixed(2) : '0.00'}
+                ${buyCount > 0 ? (totalProfit / buyCount).toFixed(2) : '0.00'}
               </p>
             </div>
             <div className="p-2 bg-s1 rounded-lg">
               <p className="text-[9px] text-t3 uppercase">Revenue</p>
               <p className="text-xs font-bold text-t1 font-mono">
-                ${items.filter(i => i.decision === 'GO').reduce((s, i) => s + (i.estimatedSellPrice || 0), 0).toFixed(2)}
+                ${items.filter(i => i.decision === 'BUY').reduce((s, i) => s + (i.estimatedSellPrice || 0), 0).toFixed(2)}
               </p>
             </div>
             <div className="p-2 bg-s1 rounded-lg">
-              <p className="text-[9px] text-t3 uppercase">GO Rate</p>
-              <p className="text-xs font-bold text-b1">{goRate}%</p>
+              <p className="text-[9px] text-t3 uppercase">BUY Rate</p>
+              <p className="text-xs font-bold text-b1">{buyRate}%</p>
             </div>
           </div>
 
@@ -92,7 +92,7 @@ function PastSessionCard({
               {items.map(item => (
                 <div key={item.id} className="flex items-center justify-between py-1.5 px-2 bg-bg rounded text-[10px]">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <Badge variant="secondary" className={`text-[8px] px-1 py-0 flex-shrink-0 ${item.decision === 'GO' ? 'bg-green/10 text-green' : item.decision === 'PASS' ? 'bg-red/10 text-red' : 'bg-amber/10 text-amber'}`}>
+                    <Badge variant="secondary" className={`text-[8px] px-1 py-0 flex-shrink-0 ${item.decision === 'BUY' ? 'bg-green/10 text-green' : item.decision === 'PASS' ? 'bg-red/10 text-red' : 'bg-amber/10 text-amber'}`}>
                       {item.decision}
                     </Badge>
                     <span className="truncate text-t1">{item.productName || 'Unknown'}</span>
@@ -236,7 +236,6 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
               <ChartLine size={20} weight={showTrends ? 'fill' : 'regular'} className="text-b1" />
             )}
           </Button>
-          <ThemeToggle />
         </div>
       </div>
 
@@ -282,24 +281,24 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
               <div className="space-y-2">
                 {(allSessions || []).slice().reverse().map(pastSession => {
                   const sessionItems = allCombinedItems.filter(i => i.sessionId === pastSession.id)
-                  const goItems = sessionItems.filter(i => i.decision === 'GO')
+                  const buyItems = sessionItems.filter(i => i.decision === 'BUY')
                   const passItems = sessionItems.filter(i => i.decision === 'PASS')
-                  const totalProfit = goItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
-                  const bestFind = goItems.length > 0 ? goItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
+                  const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
+                  const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
                   const duration = (pastSession.endTime || Date.now()) - pastSession.startTime
-                  const goRate = pastSession.itemsScanned > 0 ? Math.round((pastSession.goCount / pastSession.itemsScanned) * 100) : 0
+                  const buyRate = pastSession.itemsScanned > 0 ? Math.round((pastSession.buyCount / pastSession.itemsScanned) * 100) : 0
 
                   return (
                     <PastSessionCard
                       key={pastSession.id}
                       session={pastSession}
                       items={sessionItems}
-                      goCount={goItems.length}
+                      buyCount={buyItems.length}
                       passCount={passItems.length}
                       totalProfit={totalProfit}
                       bestFind={bestFind}
                       duration={duration}
-                      goRate={goRate}
+                      buyRate={buyRate}
                       formatDuration={formatDuration}
                       onDelete={() => {
                         setAllSessions(prev => (prev || []).filter(s => s.id !== pastSession.id))
@@ -327,11 +326,11 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
               <div className="text-base font-bold text-t1 leading-tight">{session.itemsScanned}</div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </button>
-            <button onClick={() => onNavigateToQueue?.('GO')} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
+            <button onClick={() => onNavigateToQueue?.('BUY')} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
               <div className="text-base font-bold text-b1 leading-tight">
-                {session.itemsScanned > 0 ? Math.round((session.goCount / session.itemsScanned) * 100) : 0}%
+                {session.itemsScanned > 0 ? Math.round((session.buyCount / session.itemsScanned) * 100) : 0}%
               </div>
-              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">GO Rate</div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">BUY Rate</div>
             </button>
           </div>
 
@@ -345,10 +344,10 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
               </span>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => onNavigateToQueue?.('GO')} className="text-left active:opacity-80 transition-opacity">
-                <p className="text-xs uppercase tracking-wide text-t3 mb-1">GO</p>
+              <button onClick={() => onNavigateToQueue?.('BUY')} className="text-left active:opacity-80 transition-opacity">
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold mono text-green">{session.goCount}</p>
+                  <p className="text-2xl font-bold mono text-green">{session.buyCount}</p>
                   <CheckCircle size={20} weight="fill" className="text-green" />
                 </div>
               </button>
@@ -368,10 +367,10 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
               ${session.totalPotentialProfit.toFixed(2)}
             </p>
             <p className="text-sm text-t3 mt-2">
-              From {session.goCount} items{' '}
-              {session.goCount > 0 && (
+              From {session.buyCount} items{' '}
+              {session.buyCount > 0 && (
                 <span className="mono">
-                  (${(session.totalPotentialProfit / session.goCount).toFixed(2)} avg)
+                  (${(session.totalPotentialProfit / session.buyCount).toFixed(2)} avg)
                 </span>
               )}
             </p>

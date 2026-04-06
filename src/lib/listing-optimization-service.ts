@@ -76,11 +76,11 @@ Market Data:
 - Sell-through rate: ${marketData.ebaySellThroughRate?.toFixed(1) || 'N/A'}%
 - Active listings: ${marketData.ebayActiveListings || 0}
 - Recent sales: ${marketData.ebaySoldCount || 0}
-${marketData.ebayRecentSales?.slice(0, 3).map(sale => `  - "${sale.title}" sold for $${sale.price}`).join('\n') || ''}
+${marketData.ebayRecentSales?.slice(0, 8).map(sale => `  - "${sale.title}" sold for $${sale.price}`).join('\n') || ''}
 ` : ''
 
     const competitorContext = competitorTitles && competitorTitles.length > 0 ? `
-Competitor Titles:
+Competitor Titles (use for SEO inspiration):
 ${competitorTitles.slice(0, 5).map((t, i) => `${i + 1}. ${t}`).join('\n')}
 ` : ''
 
@@ -91,6 +91,31 @@ ${brandInfo.model ? `- Model: ${brandInfo.model}` : ''}
 ${brandInfo.year ? `- Year: ${brandInfo.year}` : ''}
 ` : ''
 
+    // Google Lens results for product identification
+    const lensContext = item.lensResults && item.lensResults.length > 0 ? `
+Google Lens Product Matches (top results identifying this item):
+${item.lensResults.slice(0, 5).map((r, i) => `${i + 1}. "${r.title}" — ${r.source}${r.price ? ` (${r.price})` : ''}`).join('\n')}
+` : ''
+
+    // Existing tags from scan-time tag suggestion
+    const existingTagsContext = item.tags && item.tags.length > 0 ? `
+Existing Item Tags (MUST include all of these in suggestedTags):
+${item.tags.join(', ')}
+` : ''
+
+    // Auto-detected item specifics from lens/vision
+    const detectedSpecifics: Record<string, string> = {}
+    if (item.lensAnalysis?.bestMatch?.title) {
+      const title = item.lensAnalysis.bestMatch.title
+      // Try to extract brand from lens best match title (first word often is brand)
+      const firstWord = title.split(/\s+/)[0]
+      if (firstWord && firstWord.length > 2) detectedSpecifics['Brand'] = firstWord
+    }
+    const specificsSeedContext = Object.keys(detectedSpecifics).length > 0 ? `
+Pre-detected Item Specifics (use as starting point, expand with more):
+${Object.entries(detectedSpecifics).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+` : ''
+
     const promptText = `You are an expert eBay listing optimizer specializing in creating high-converting, SEO-optimized product listings.
 
 Product Information:
@@ -98,24 +123,28 @@ Product Information:
 - Category: ${item.category || 'General'}
 - Purchase Price: $${item.purchasePrice}
 - Estimated Sell Price: $${item.estimatedSellPrice || item.purchasePrice * 3}
-- Description: ${item.description || 'No description available'}
+- Vision Analysis: ${item.description || 'No description available'}
 ${item.notes ? `- Notes: ${item.notes}` : ''}
 
 ${marketContext}
 ${competitorContext}
+${lensContext}
+${existingTagsContext}
+${specificsSeedContext}
 ${brandContext}
 
 Create an optimized eBay listing following these best practices:
 
 TITLE OPTIMIZATION (80 characters max):
-- Front-load with brand name and model
-- Include key searchable terms (brand, model, size, color, condition, type)
+- Front-load with brand name and model (use Google Lens results to identify the brand)
+- Include key searchable terms from competitor titles above
 - Use power words (NWT, Vintage, Rare, Limited, etc.)
-- Add relevant specifications
+- Add relevant specifications (size, color, model number)
 - Avoid special characters and ALL CAPS
 - Use vertical bars | to separate key features
 
 DESCRIPTION OPTIMIZATION:
+- Base the description on the Vision Analysis above, expanding with selling points
 - Start with a compelling hook highlighting the item's best feature
 - Include detailed condition description
 - List all features and specifications in bullet points
@@ -127,8 +156,16 @@ DESCRIPTION OPTIMIZATION:
 - Include relevant keywords naturally (no keyword stuffing)
 - Professional, friendly tone
 
+TAGS:
+- You MUST include ALL existing item tags (listed above) in your suggestedTags output
+- Add additional relevant tags based on the product, category, and keywords
+
+ITEM SPECIFICS:
+- Pre-fill as many item specifics as possible from the Vision Analysis, Google Lens results, and competitor titles
+- At minimum include: Brand, Model/Style, Condition, Color, Size (if applicable), Material (if applicable)
+
 PRICING:
-- Competitive based on market data
+- Competitive based on market data and recent sold prices above
 - Consider sell-through rate
 - Account for eBay fees (12.9%) and PayPal fees (3.49%)
 - Ensure minimum ${context.item.profitMargin || 30}% profit margin
