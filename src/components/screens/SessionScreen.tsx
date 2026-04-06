@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import type { Session, ScannedItem, ProfitGoal } from '@/types'
 
 function PastSessionCard({
-  session, items, goCount, passCount, totalProfit, bestFind, duration, goRate, formatDuration, onDelete
+  session, items, goCount, passCount, totalProfit, bestFind, duration, goRate, formatDuration, onDelete, onViewDetail
 }: {
   session: Session
   items: ScannedItem[]
@@ -28,6 +28,7 @@ function PastSessionCard({
   goRate: number
   formatDuration: (ms: number) => string
   onDelete: () => void
+  onViewDetail: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const startDate = new Date(session.startTime)
@@ -102,6 +103,12 @@ function PastSessionCard({
             </div>
           )}
 
+          <button
+            onClick={(e) => { e.stopPropagation(); onViewDetail() }}
+            className="w-full py-2 text-xs text-b1 font-bold bg-b1/10 rounded-lg hover:bg-b1/20 transition-colors"
+          >
+            View Full Session
+          </button>
           <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="w-full py-1.5 text-[10px] text-red/60 hover:text-red font-bold transition-colors">
             Delete Session
           </button>
@@ -117,14 +124,27 @@ interface SessionScreenProps {
   onEndSession: () => void
   onNavigateToQueue?: (filter?: string) => void
   onNavigateToHistory?: () => void
+  onViewSessionDetail?: (sessionId: string) => void
 }
 
-export function SessionScreen({ session, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory }: SessionScreenProps) {
+export function SessionScreen({ session, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
   const [showTrends, setShowTrends] = useState(false)
   const [showGoalTracking, setShowGoalTracking] = useState(false)
   const [showLocations, setShowLocations] = useState(false)
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
+  const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
+
+  // Memoize combined items to avoid recreating on every render
+  const allCombinedItems = useMemo(() => {
+    const items = [...(queue || []), ...(scanHistory || [])]
+    const seen = new Set<string>()
+    return items.filter(i => {
+      if (seen.has(i.id)) return false
+      seen.add(i.id)
+      return true
+    })
+  }, [queue, scanHistory])
   const [goals, setGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   
   const formatDuration = (ms: number) => {
@@ -261,7 +281,7 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
               <h3 className="text-xs font-bold text-t3 uppercase tracking-wider mb-3">Past Sessions</h3>
               <div className="space-y-2">
                 {(allSessions || []).slice().reverse().map(pastSession => {
-                  const sessionItems = (queue || []).filter(i => i.sessionId === pastSession.id)
+                  const sessionItems = allCombinedItems.filter(i => i.sessionId === pastSession.id)
                   const goItems = sessionItems.filter(i => i.decision === 'GO')
                   const passItems = sessionItems.filter(i => i.decision === 'PASS')
                   const totalProfit = goItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
@@ -284,6 +304,7 @@ export function SessionScreen({ session, onStartSession, onEndSession, onNavigat
                       onDelete={() => {
                         setAllSessions(prev => (prev || []).filter(s => s.id !== pastSession.id))
                       }}
+                      onViewDetail={() => onViewSessionDetail?.(pastSession.id)}
                     />
                   )
                 })}

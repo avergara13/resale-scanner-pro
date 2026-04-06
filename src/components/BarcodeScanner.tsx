@@ -105,7 +105,7 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
 
               setScanHistory(prev => [{
                 code: decodedText,
-                type: 'barcode',
+                type: 'barcode' as const,
                 product: product || undefined,
                 timestamp: Date.now(),
               }, ...prev].slice(0, 20))
@@ -119,7 +119,7 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
 
               setScanHistory(prev => [{
                 code: decodedText,
-                type: 'qr',
+                type: 'qr' as const,
                 data: parsed,
                 timestamp: Date.now(),
               }, ...prev].slice(0, 20))

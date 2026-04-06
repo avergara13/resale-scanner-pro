@@ -16,6 +16,7 @@ import { TagAnalyticsScreen } from './components/screens/TagAnalyticsScreen'
 import { LocationInsightsScreen } from './components/screens/LocationInsightsScreen'
 import { CostTrackingScreen } from './components/screens/CostTrackingScreen'
 import { ScanHistoryScreen } from './components/screens/ScanHistoryScreen'
+import { SessionDetailScreen } from './components/screens/SessionDetailScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
@@ -28,11 +29,12 @@ import { useImageOptimization } from './hooks/use-image-optimization'
 import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal } from './types'
 import { cn } from './lib/utils'
 
 function App() {
   const [screen, setScreen] = useState<Screen>('session')
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
@@ -44,6 +46,7 @@ function App() {
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
+  const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [settings, setSettings] = useKV<AppSettings>('settings', {
     voiceEnabled: true,
     autoCapture: true,
@@ -472,6 +475,17 @@ function App() {
     }
   }, [session, setSession, setAllSessions])
 
+  const handleEditSession = useCallback((sessionId: string, updates: Partial<Session>) => {
+    // Update active session if it matches
+    if (session?.id === sessionId) {
+      setSession(prev => prev ? { ...prev, ...updates } : prev)
+    }
+    // Update in allSessions
+    setAllSessions(prev =>
+      (prev || []).map(s => s.id === sessionId ? { ...s, ...updates } : s)
+    )
+  }, [session, setSession, setAllSessions])
+
   const handleUpdateSettings = useCallback((updates: Partial<AppSettings>) => {
     setSettings((prev) => {
       const defaults: AppSettings = {
@@ -891,6 +905,7 @@ function App() {
 
   const screenOrder: Record<Screen, number> = {
     'session': 0,
+    'session-detail': 0,
     'agent': 1,
     'ai': 2,
     'queue': 3,
@@ -954,6 +969,10 @@ function App() {
                 onEndSession={handleEndSession}
                 onNavigateToQueue={() => setScreen('queue')}
                 onNavigateToHistory={() => setScreen('scan-history')}
+                onViewSessionDetail={(id) => {
+                  setSelectedSessionId(id)
+                  setScreen('session-detail')
+                }}
               />
             </motion.div>
           )}
@@ -977,6 +996,12 @@ function App() {
                 onEditItem={handleEditQueueItem}
                 onNavigateToQueue={() => setScreen('queue')}
                 onOpenCamera={() => setCameraOpen(true)}
+                onStartSession={handleStartSession}
+                onEndSession={handleEndSession}
+                onEditSession={handleEditSession}
+                allSessions={allSessions || []}
+                scanHistory={scanHistory || []}
+                profitGoals={profitGoals || []}
               />
             </motion.div>
           )}
@@ -1123,6 +1148,23 @@ function App() {
                     return [...current, { ...item, inQueue: true }]
                   })
                 }}
+              />
+            </motion.div>
+          )}
+          {screen === 'session-detail' && selectedSessionId && (
+            <motion.div
+              key="session-detail"
+              custom={direction}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="w-full h-full"
+            >
+              <SessionDetailScreen
+                sessionId={selectedSessionId}
+                onBack={() => setScreen('session')}
               />
             </motion.div>
           )}
