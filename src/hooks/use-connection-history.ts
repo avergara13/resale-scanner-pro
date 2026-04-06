@@ -124,7 +124,7 @@ export function useConnectionHistory(
     }
 
     prevHealthRef.current = health
-  }, [health, enabled, recordEvent])
+  }, [health?.overall, health?.gemini?.status, health?.googleLens?.status, health?.ebay?.status, health?.anthropic?.status, enabled, recordEvent])
 
   useEffect(() => {
     cleanOldData()
