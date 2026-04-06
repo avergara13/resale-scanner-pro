@@ -11,7 +11,7 @@ interface TagAnalyticsScreenProps {
 
 export function TagAnalyticsScreen({ items, tags, onBack }: TagAnalyticsScreenProps) {
   return (
-    <div className="flex-1 flex flex-col bg-bg pb-6">
+    <div className="flex-1 flex flex-col bg-bg pb-24">
       <header className="sticky top-0 z-10 bg-fg border-b border-s1 p-4">
         <div className="flex items-center gap-3 mb-2">
           <Button

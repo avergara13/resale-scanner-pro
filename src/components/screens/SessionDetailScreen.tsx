@@ -172,8 +172,8 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                 autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setEditName('') } }}
               />
-              <button onClick={handleSaveName} className="text-green"><Check size={16} /></button>
-              <button onClick={() => { setEditingName(false); setEditName('') }} className="text-red"><X size={16} /></button>
+              <button onClick={handleSaveName} className="text-green p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><Check size={18} /></button>
+              <button onClick={() => { setEditingName(false); setEditName('') }} className="text-red p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={18} /></button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -193,7 +193,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 pb-28 space-y-4">
         {/* Location (editable) */}
         <Card className="p-3">
           {editingLocation ? (
@@ -271,8 +271,8 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                   autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') { setEditingGoal(false); setEditGoalAmount('') } }}
                 />
-                <button onClick={handleSaveGoal} className="text-green"><Check size={16} /></button>
-                <button onClick={() => { setEditingGoal(false); setEditGoalAmount('') }} className="text-red"><X size={16} /></button>
+                <button onClick={handleSaveGoal} className="text-green p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><Check size={18} /></button>
+                <button onClick={() => { setEditingGoal(false); setEditGoalAmount('') }} className="text-red p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={18} /></button>
               </div>
             </div>
           ) : (
