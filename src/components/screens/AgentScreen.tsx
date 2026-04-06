@@ -45,7 +45,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { ChatSession, ChatMessage, ScannedItem, AppSettings } from '@/types'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session } from '@/types'
 
 interface QuickAction {
   emoji: string
@@ -170,6 +170,7 @@ interface AgentScreenProps {
 export function AgentScreen({ queueItems = [], settings, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onNavigateToQueue, onOpenCamera }: AgentScreenProps) {
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
   const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
+  const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [showNewSessionDialog, setShowNewSessionDialog] = useState(false)
@@ -702,6 +703,7 @@ Current Context:
 - Queue: ${queueStats.total} items (${queueStats.go} GO, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
 - Potential profit: $${queueStats.totalProfit.toFixed(2)}
 - Settings: ${settings?.minProfitMargin}% min margin, $${settings?.defaultShippingCost} shipping, ${settings?.ebayFeePercent}% eBay fee
+${currentSession?.active ? `\nActive Session: ${currentSession.name || 'Current'} (started ${new Date(currentSession.startTime).toLocaleString()}, ${currentSession.itemsScanned} scans, ${currentSession.goCount} GO, ${currentSession.passCount} PASS, $${currentSession.totalPotentialProfit.toFixed(2)} profit)` : '\nNo active session'}
 ${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
 
 You can perform these actions:

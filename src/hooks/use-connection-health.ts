@@ -296,13 +296,22 @@ export function useConnectionHealth({
     lastUpdate: Date.now(),
   })
 
+  // Extract individual keys as stable primitives to avoid re-render loops
+  // when the settings object reference changes
+  const geminiKey = settings?.geminiApiKey
+  const googleKey = settings?.googleApiKey
+  const googleEngineId = settings?.googleSearchEngineId
+  const ebayKey = settings?.ebayApiKey
+  const ebayAppId = settings?.ebayAppId
+  const anthropicKey = settings?.anthropicApiKey
+
   const checkHealth = useCallback(async () => {
     if (!enabled) return
 
-    const geminiConfigured = !!settings?.geminiApiKey
-    const googleLensConfigured = !!settings?.googleApiKey
-    const ebayConfigured = !!(settings?.ebayApiKey && settings?.ebayAppId)
-    const anthropicConfigured = !!settings?.anthropicApiKey
+    const geminiConfigured = !!geminiKey
+    const googleLensConfigured = !!googleKey
+    const ebayConfigured = !!(ebayKey && ebayAppId)
+    const anthropicConfigured = !!anthropicKey
 
     setHealth(prev => ({
       ...prev,
@@ -314,10 +323,10 @@ export function useConnectionHealth({
     }))
 
     const [geminiHealth, googleLensHealth, ebayHealth, anthropicHealth] = await Promise.all([
-      checkGeminiHealth(settings?.geminiApiKey),
-      checkGoogleLensHealth(settings?.googleApiKey, settings?.googleSearchEngineId),
-      checkEbayHealth(settings?.ebayApiKey, settings?.ebayAppId),
-      checkAnthropicHealth(settings?.anthropicApiKey),
+      checkGeminiHealth(geminiKey),
+      checkGoogleLensHealth(googleKey, googleEngineId),
+      checkEbayHealth(ebayKey, ebayAppId),
+      checkAnthropicHealth(anthropicKey),
     ])
 
     const newHealth: ConnectionHealth = {
@@ -357,7 +366,7 @@ export function useConnectionHealth({
     ])
 
     setHealth(newHealth)
-  }, [settings, enabled])
+  }, [geminiKey, googleKey, googleEngineId, ebayKey, ebayAppId, anthropicKey, enabled])
 
   useEffect(() => {
     if (!enabled) return
