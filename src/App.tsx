@@ -147,8 +147,9 @@ function App() {
   const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation) => {
     triggerCapture()
     setCameraOpen(false)
-    
-    const optimized = await optimizeAndCache(imageData)
+
+    try {
+      const optimized = await optimizeAndCache(imageData)
     
     const newItem: ScannedItem = {
       id: Date.now().toString(),
@@ -433,8 +434,14 @@ function App() {
         error: 'Analysis failed'
       })))
       toast.error('Analysis failed. Please try again.')
+      }
+    } catch (outerError) {
+      // Catch errors from optimizeAndCache or any unhandled rejection
+      const msg = outerError instanceof Error ? outerError.message : 'Unknown error'
+      console.error('Capture failed:', msg)
+      toast.error(msg.toLowerCase().includes('quota') ? 'API quota exceeded — try again later or check your API key limits' : `Capture failed: ${msg}`)
     }
-  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, simulateProgress, completeStep, tagSuggestionService])
+  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, simulateProgress, completeStep, tagSuggestionService, setScanHistory])
 
   const handleAddToQueue = useCallback(() => {
     if (currentItem && currentItem.decision === 'GO') {
