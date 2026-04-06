@@ -1,11 +1,12 @@
-import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, Package } from '@phosphor-icons/react'
+import { Play, Stop, CheckCircle, XCircle, ChartLine, Robot, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, Package } from '@phosphor-icons/react'
 import { useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
-import { GoalAchievementTracker } from '../GoalAchievementTracker'
+import { AgentChatWidget } from '../AgentChatWidget'
+import { SharedTodoList } from '../SharedTodoList'
 import { LocationInsights } from '../LocationInsights'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
@@ -117,11 +118,13 @@ function PastSessionCard({
   )
 }
 
-type TrendsTab = 'trends' | 'stores' | 'goals'
+type TrendsTab = 'trends' | 'stores' | 'agent'
 
 interface SessionScreenProps {
   session?: Session
   showTrends?: boolean
+  onAgentMessage?: (text: string) => void
+  isAgentProcessing?: boolean
   onStartSession: () => void
   onEndSession: () => void
   onNavigateToQueue?: (filter?: string) => void
@@ -129,7 +132,7 @@ interface SessionScreenProps {
   onViewSessionDetail?: (sessionId: string) => void
 }
 
-export function SessionScreen({ session, showTrends = false, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
+export function SessionScreen({ session, showTrends = false, onAgentMessage, isAgentProcessing = false, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
@@ -216,7 +219,7 @@ export function SessionScreen({ session, showTrends = false, onStartSession, onE
             {([
               { id: 'trends' as TrendsTab, label: 'Trends', icon: ChartLine },
               { id: 'stores' as TrendsTab, label: 'Stores', icon: MapPin },
-              { id: 'goals' as TrendsTab, label: 'Goals', icon: Trophy },
+              { id: 'agent' as TrendsTab, label: 'Agent', icon: Robot },
             ]).map(tab => (
               <button
                 key={tab.id}
@@ -240,8 +243,8 @@ export function SessionScreen({ session, showTrends = false, onStartSession, onE
                   <div className="text-sm font-bold text-t1">{(allSessions || []).filter(s => s.location?.name).map(s => s.location!.name).filter((v, i, a) => a.indexOf(v) === i).length}</div>
                   <div className="text-[9px] text-t3 uppercase tracking-wider font-bold">Stores Visited</div>
                 </button>
-                <button onClick={() => setTrendsTab('goals')} className="stat-card p-3 text-left active:scale-[0.97] transition-transform">
-                  <Trophy size={16} className="text-amber mb-1" />
+                <button onClick={() => setTrendsTab('agent')} className="stat-card p-3 text-left active:scale-[0.97] transition-transform">
+                  <Robot size={16} className="text-b1 mb-1" />
                   <div className="text-sm font-bold text-t1">{(goals || []).filter(g => g.active).length}</div>
                   <div className="text-[9px] text-t3 uppercase tracking-wider font-bold">Active Goals</div>
                 </button>
@@ -257,11 +260,15 @@ export function SessionScreen({ session, showTrends = false, onStartSession, onE
             <LocationInsights items={queue || []} />
           )}
 
-          {trendsTab === 'goals' && (
-            <GoalAchievementTracker
-              goals={goals || []}
-              items={queue || []}
-            />
+          {trendsTab === 'agent' && (
+            <div className="space-y-3">
+              <AgentChatWidget
+                onSendMessage={onAgentMessage}
+                isProcessing={isAgentProcessing}
+                compact
+              />
+              <SharedTodoList />
+            </div>
           )}
         </div>
       ) : !session?.active ? (

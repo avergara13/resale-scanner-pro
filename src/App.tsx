@@ -38,6 +38,8 @@ function App() {
   const [screen, setScreen] = useState<Screen>('session')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [showSessionTrends, setShowSessionTrends] = useState(false)
+  const [agentPendingMessage, setAgentPendingMessage] = useState<string | null>(null)
+  const [agentProcessing, setAgentProcessing] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
@@ -1054,6 +1056,8 @@ function App() {
               <SessionScreen
                 session={session}
                 showTrends={showSessionTrends}
+                onAgentMessage={(text) => setAgentPendingMessage(text)}
+                isAgentProcessing={agentProcessing}
                 onStartSession={handleStartSession}
                 onEndSession={handleEndSession}
                 onNavigateToQueue={() => setScreen('queue')}
@@ -1082,6 +1086,9 @@ function App() {
                   i.listingStatus === 'sold' || i.listingStatus === 'shipped' || i.listingStatus === 'completed'
                 )}
                 settings={settings}
+                pendingMessage={agentPendingMessage}
+                onPendingMessageHandled={() => setAgentPendingMessage(null)}
+                onProcessingChange={setAgentProcessing}
                 onOptimizeItem={handleOptimizeItem}
                 onPushToNotion={handlePushToNotion}
                 onBatchAnalyze={handleBatchAnalyze}
