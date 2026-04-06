@@ -138,7 +138,7 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
       <div
         ref={contentRef}
         className={cn(
-          "text-sm overflow-hidden transition-all duration-300 prose prose-sm max-w-none",
+          "text-sm overflow-hidden transition-all duration-300 max-w-none",
           !isExpanded && needsCollapse && "line-clamp-6"
         )}
         dangerouslySetInnerHTML={{ __html: formattedHTML }}
@@ -1088,7 +1088,7 @@ You can execute these commands for the user:
                       "max-w-[80%] rounded-2xl px-4 py-3",
                       msg.role === 'user'
                         ? "bg-gradient-to-br from-b1 to-b2 text-white"
-                        : "bg-fg border border-s1"
+                        : "bg-s1 border border-s2 text-t1"
                     )}
                   >
                     {msg.role === 'user' ? (
@@ -1111,7 +1111,7 @@ You can execute these commands for the user:
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
                 <Robot size={18} weight="bold" className="text-white" />
               </div>
-              <div className="bg-fg border border-s1 rounded-2xl px-4 py-3">
+              <div className="bg-s1 border border-s2 rounded-2xl px-4 py-3">
                 <div className="flex gap-1">
                   <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
