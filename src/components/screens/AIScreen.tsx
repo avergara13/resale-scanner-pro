@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash } from '@phosphor-icons/react'
+import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash, ArrowClockwise, ArrowCounterClockwise, XCircle, ShoppingCart, ArrowLeft } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
@@ -31,6 +31,10 @@ interface AIScreenProps {
   onAddToQueue: () => void
   onDeepSearch: () => void
   onSaveDraft: (price: number, notes: string) => void
+  onCreateListing: (price: number, notes: string) => void
+  onPassItem: (price: number, notes: string) => void
+  onRecalculate?: (price: number) => void
+  onRescan?: () => void
   onOpenCamera?: () => void
   pendingMessage?: string | null
   onPendingMessageHandled?: () => void
@@ -277,7 +281,7 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
   )
 }
 
-export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQueue, onDeepSearch, onSaveDraft, onOpenCamera, pendingMessage, onPendingMessageHandled }: AIScreenProps) {
+export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQueue, onDeepSearch, onSaveDraft, onCreateListing, onPassItem, onRecalculate, onRescan, onOpenCamera, pendingMessage, onPendingMessageHandled }: AIScreenProps) {
   const [tab, setTab] = useTabPreference<'chat' | 'scans' | 'tasks'>('ai-screen-v2', 'chat')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -329,6 +333,13 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
     setChatInput(msg)
     setTab('chat')
   }, [setTab])
+
+  // Pre-fill buy price when currentItem changes (only if field is empty or unchanged)
+  useEffect(() => {
+    if (currentItem?.purchasePrice != null && buyPrice === '') {
+      setBuyPrice(String(currentItem.purchasePrice))
+    }
+  }, [currentItem?.purchasePrice])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Receive messages sent from SessionScreen's AgentPanel and route them into chat
   useEffect(() => {
@@ -791,17 +802,6 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
       </div>
 
       <div className="fixed bottom-[80px] left-0 right-0 max-w-[480px] mx-auto border-t border-s2 bg-fg/95 backdrop-blur-md z-20 safe-bottom">
-        {tab === 'scans' && hasDecision && currentItem?.decision === 'BUY' && (
-          <div className="p-2.5 sm:p-3 border-b border-s2">
-            <Button
-              onClick={onAddToQueue}
-              className="w-full bg-gradient-to-r from-green to-green hover:opacity-90 text-white h-10 sm:h-11 font-semibold shadow-lg text-sm"
-            >
-              <Plus size={18} weight="bold" className="mr-1.5 sm:mr-2" />
-              Add to Queue
-            </Button>
-          </div>
-        )}
 
         {tab === 'chat' && (
           <div className="p-2.5 sm:p-3">
@@ -830,7 +830,88 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
           </div>
         )}
 
-        {tab === 'scans' && (
+        {tab === 'scans' && hasDecision && (
+          /* Post-pipeline CTA bar: Recalculate / Rescan / Pass / Create Listing */
+          <div className="p-2.5 sm:p-3 space-y-2">
+            {/* Price + Notes row */}
+            <div className="flex gap-2">
+              <Input
+                id="ai-price"
+                type="number"
+                step="0.01"
+                placeholder="Buy $"
+                value={buyPrice}
+                onChange={(e) => setBuyPrice(e.target.value)}
+                className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
+              />
+              <div className="flex-1 relative">
+                <Input
+                  id="ai-describe"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Notes..."
+                  className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
+                />
+                {isSupported && (
+                  <button
+                    onClick={() => startListening((text) => setDescription(text))}
+                    className={cn(
+                      "absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-colors",
+                      isListening
+                        ? "bg-red text-white animate-pulse"
+                        : "bg-s1 hover:bg-s2 text-t3 hover:text-t1"
+                    )}
+                  >
+                    <Microphone size={14} weight="bold" className="sm:w-4 sm:h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Recalculate — only visible when buy price changed */}
+            {buyPrice !== '' && parseFloat(buyPrice) !== currentItem?.purchasePrice && (
+              <Button
+                onClick={() => onRecalculate?.(parseFloat(buyPrice) || 0)}
+                className="w-full bg-amber hover:opacity-90 text-white h-9 sm:h-10 font-semibold text-xs sm:text-sm"
+              >
+                <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
+                ♻️ Recalculate with new price
+              </Button>
+            )}
+
+            {/* Rescan / Pass / Create Listing */}
+            <div className="flex gap-2">
+              <Button
+                onClick={() => onRescan?.()}
+                variant="outline"
+                className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
+              >
+                <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
+                Rescan
+              </Button>
+              <Button
+                onClick={() => onPassItem(parseFloat(buyPrice) || 0, description)}
+                disabled={!canSaveDraft}
+                variant="outline"
+                className="flex-1 h-9 sm:h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+              >
+                <XCircle size={15} weight="bold" className="mr-1" />
+                Pass
+              </Button>
+              <Button
+                onClick={() => onCreateListing(parseFloat(buyPrice) || 0, description)}
+                disabled={!canSaveDraft}
+                className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+              >
+                <ShoppingCart size={15} weight="bold" className="mr-1" />
+                Create Listing
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {tab === 'scans' && !hasDecision && (
+          /* Pre-pipeline or in-progress: Save Draft */
           <div className="p-2.5 sm:p-3 space-y-2">
             <div className="flex gap-2">
               <Input
@@ -865,20 +946,32 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
                 )}
               </div>
             </div>
-
-            <Button
-              onClick={() => {
-                const price = parseFloat(buyPrice) || 0
-                onSaveDraft(price, description)
-              }}
-              disabled={!canSaveDraft}
-              className="w-full bg-t1 hover:bg-t2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
-            >
-              <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
-              SAVE DRAFT TO QUEUE
-            </Button>
+            <div className="flex gap-2">
+              {currentItem && (
+                <Button
+                  onClick={() => onRescan?.()}
+                  variant="outline"
+                  className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
+                >
+                  <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
+                  Rescan
+                </Button>
+              )}
+              <Button
+                onClick={() => {
+                  const price = parseFloat(buyPrice) || 0
+                  onSaveDraft(price, description)
+                }}
+                disabled={!canSaveDraft}
+                className="flex-1 bg-b1 hover:bg-b2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
+              >
+                <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
+                SAVE DRAFT TO QUEUE
+              </Button>
+            </div>
           </div>
         )}
+
         {tab === 'tasks' && (
           <div className="p-2.5 sm:p-3">
             <div className="flex gap-2">

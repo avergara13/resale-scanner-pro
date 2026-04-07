@@ -476,9 +476,18 @@ function App() {
       )
 
       const minMargin = settings?.minProfitMargin || 30
-      const decision = ebayAvgPrice <= 0
+      const decision: 'BUY' | 'PASS' | 'PENDING' = ebayAvgPrice <= 0
         ? 'PENDING'
-        : profitMetrics.profitMargin > minMargin ? 'BUY' : 'PASS'
+        : (price === 0
+            ? profitMetrics.netProfit > 0      // free item: only needs to cover fees
+            : profitMetrics.profitMargin > minMargin)
+          ? 'BUY' : 'PASS'
+
+      // Free item on standard platforms: if fees eat all profit, recommend fee-free local platform
+      const freeItemPlatformHint =
+        price === 0 && decision === 'PASS'
+          ? 'Facebook Marketplace (local, no fees)'
+          : undefined
 
       if (decision === 'BUY') {
         triggerSuccess()
@@ -512,6 +521,8 @@ function App() {
           ...marketData,
           // Preserve barcode lookup data for listing generation context
           ...(barcodeProduct ? { barcodeProduct } : {}),
+          // Free-item platform recommendation when standard platform fees eat all profit
+          ...(freeItemPlatformHint ? { recommendedPlatform: freeItemPlatformHint } : {}),
         },
       }
 
@@ -665,6 +676,14 @@ function App() {
 
   const handleEndSession = useCallback(() => {
     if (session) {
+      // Strip heavy blobs from PASS items that belong to this session
+      setQueue(prev => (prev || []).map(item => {
+        if (item.decision !== 'PASS' || item.sessionId !== session.id) return item
+        const { imageData: _i, imageThumbnail: _t, imageOptimized: _o,
+                marketData: _m, lensAnalysis: _la, lensResults: _lr,
+                detectedProducts: _dp, ...lean } = item as ScannedItem & { detectedProducts?: unknown }
+        return lean as ScannedItem
+      }))
       const endedSession = { ...session, endTime: Date.now(), active: false }
       // Update in allSessions
       setAllSessions((prev) =>
@@ -673,7 +692,7 @@ function App() {
       setSession(undefined)
       toast.success('Session ended')
     }
-  }, [session, setSession, setAllSessions])
+  }, [session, setSession, setAllSessions, setQueue])
 
   // Keep allSessions in sync with the current active session (scan counts, profit, etc.)
   // Only sync if the session still exists in allSessions (hasn't been deleted)
@@ -914,6 +933,116 @@ function App() {
     })
     toast.success('Draft saved to queue')
     setScreen('queue')
+  }, [currentItem, setQueue])
+
+  const handleRescan = useCallback(() => {
+    setCurrentItem(undefined)
+    setPipeline([])
+    setCameraOpen(true)
+  }, [])
+
+  const handleRecalculate = useCallback((newPrice: number) => {
+    if (!currentItem?.estimatedSellPrice) {
+      toast.error('No sell price available — scan an item first')
+      return
+    }
+    const shipping = settings?.defaultShippingCost || 5.0
+    const feePercent = settings?.ebayFeePercent || 12.9
+    const minMargin = settings?.minProfitMargin || 30
+    const profitMetrics = calculateProfitFallback(newPrice, currentItem.estimatedSellPrice, shipping, feePercent)
+
+    const decision: 'BUY' | 'PASS' | 'PENDING' = currentItem.estimatedSellPrice <= 0
+      ? 'PENDING'
+      : (newPrice === 0
+          ? profitMetrics.netProfit > 0
+          : profitMetrics.profitMargin > minMargin)
+        ? 'BUY' : 'PASS'
+
+    const freeItemPlatformHint =
+      newPrice === 0 && decision === 'PASS'
+        ? 'Facebook Marketplace (local, no fees)'
+        : undefined
+
+    if (decision === 'BUY') {
+      triggerSuccess()
+    } else {
+      triggerFail()
+    }
+
+    const updatedMarketData = {
+      ...currentItem.marketData,
+      ...(freeItemPlatformHint ? { recommendedPlatform: freeItemPlatformHint } : { recommendedPlatform: undefined }),
+    }
+
+    setCurrentItem(prev => prev ? {
+      ...prev,
+      purchasePrice: newPrice,
+      profitMargin: profitMetrics.profitMargin,
+      decision,
+      marketData: updatedMarketData,
+    } : prev)
+
+    setPipeline(prev => prev.map((s, i) => {
+      if (i === 3) return { ...s, data: `Margin: ${profitMetrics.profitMargin.toFixed(1)}%, ROI: ${profitMetrics.roi.toFixed(0)}%` }
+      if (i === 4) return { ...s, data: `Decision: ${decision} (recalculated)` }
+      return s
+    }))
+
+    toast.success(`Recalculated: ${decision} — ${profitMetrics.profitMargin.toFixed(1)}% margin`)
+  }, [currentItem, settings, triggerSuccess, triggerFail])
+
+  const handleCreateListingFromScan = useCallback(async (price: number, notes: string) => {
+    if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
+      toast.error('No image to save')
+      return
+    }
+    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const listingItem: ScannedItem = {
+      ...lightweight,
+      purchasePrice: price > 0 ? price : currentItem!.purchasePrice,
+      notes: notes || currentItem!.notes,
+      inQueue: true,
+      decision: 'BUY',
+      listingStatus: 'active',
+    }
+    setQueue(prev => {
+      const current = prev || []
+      if (current.some(i => i.id === listingItem.id)) {
+        return current.map(i => i.id === listingItem.id ? listingItem : i)
+      }
+      return [...current, listingItem]
+    })
+    setDetailItemId(listingItem.id)
+    setScreen('queue')
+    toast.loading('Creating listing...')
+    // Optimize after navigating so the detail screen opens immediately
+    setTimeout(() => handleOptimizeItem(listingItem.id), 50)
+  }, [currentItem, setQueue, handleOptimizeItem])
+
+  const handlePassFromScan = useCallback((price: number, notes: string) => {
+    if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
+      toast.error('No image to save')
+      return
+    }
+    // Keep imageThumbnail for queue display; strip heavy blobs
+    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const passItem: ScannedItem = {
+      ...lightweight,
+      purchasePrice: price > 0 ? price : currentItem!.purchasePrice,
+      notes: notes || currentItem!.notes,
+      inQueue: true,
+      decision: 'PASS',
+    }
+    setQueue(prev => {
+      const current = prev || []
+      if (current.some(i => i.id === passItem.id)) {
+        return current.map(i => i.id === passItem.id ? passItem : i)
+      }
+      return [...current, passItem]
+    })
+    setCurrentItem(undefined)
+    setPipeline([])
+    toast.success('Passed — heavy image data will be removed at session end')
   }, [currentItem, setQueue])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
@@ -1356,6 +1485,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <SessionScreen
@@ -1387,6 +1517,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <AIScreen
@@ -1397,6 +1528,10 @@ function App() {
                 onAddToQueue={handleAddToQueue}
                 onDeepSearch={() => toast.info('Deep search feature coming soon')}
                 onSaveDraft={handleSaveDraft}
+                onCreateListing={handleCreateListingFromScan}
+                onPassItem={handlePassFromScan}
+                onRecalculate={handleRecalculate}
+                onRescan={handleRescan}
                 onOpenCamera={() => setCameraOpen(true)}
                 pendingMessage={agentPendingMessage}
                 onPendingMessageHandled={() => setAgentPendingMessage(null)}
@@ -1411,6 +1546,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <QueueScreen
@@ -1462,6 +1598,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <SoldScreen
@@ -1485,6 +1622,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <SettingsScreen
@@ -1502,6 +1640,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <TagAnalyticsScreen
@@ -1519,6 +1658,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <LocationInsightsScreen
@@ -1535,6 +1675,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <CostTrackingScreen
@@ -1550,6 +1691,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <ScanHistoryScreen
@@ -1572,6 +1714,7 @@ function App() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
               <SessionDetailScreen

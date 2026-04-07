@@ -212,6 +212,7 @@ export interface MarketData {
   competitorCount?: number
   sellThroughRate?: number
   recommendedPrice?: number
+  recommendedPlatform?: string
   researchSummary?: string
   barcodeProduct?: import('../lib/barcode-service').BarcodeProduct
 }
