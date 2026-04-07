@@ -916,7 +916,7 @@ function App() {
     const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
     const draftItem: ScannedItem = {
       ...lightweight,
-      purchasePrice: price > 0 ? price : currentItem!.purchasePrice,
+      purchasePrice: Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice,
       notes: notes || currentItem!.notes,
       inQueue: true,
     }
@@ -937,6 +937,10 @@ function App() {
   }, [])
 
   const handleRecalculate = useCallback((newPrice: number) => {
+    if (!Number.isFinite(newPrice) || newPrice < 0) {
+      toast.error('Enter a valid price (0 or more)')
+      return
+    }
     if (!currentItem?.estimatedSellPrice) {
       toast.error('No sell price available — scan an item first')
       return
@@ -987,12 +991,27 @@ function App() {
       return
     }
     const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    // NaN means the field was left empty — fall back to the analyzed price
+    const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
+    // If the user changed the buy price without tapping Recalculate, recompute metrics inline
+    // so stored profitMargin/decision are never stale relative to purchasePrice
+    let resolvedMargin = currentItem!.profitMargin
+    let resolvedDecision: 'BUY' | 'PASS' | 'PENDING' = currentItem!.decision as 'BUY' | 'PASS' | 'PENDING' ?? 'BUY'
+    if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
+      const freshMetrics = calculateProfitFallback(
+        effectivePrice, currentItem!.estimatedSellPrice,
+        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+      )
+      resolvedMargin = freshMetrics.profitMargin
+      resolvedDecision = makeDecision(currentItem!.estimatedSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
+    }
     const listingItem: ScannedItem = {
       ...lightweight,
-      purchasePrice: price > 0 ? price : currentItem!.purchasePrice,
+      purchasePrice: effectivePrice,
+      profitMargin: resolvedMargin,
+      decision: resolvedDecision === 'PASS' ? 'BUY' : resolvedDecision, // user chose Create Listing — treat as BUY intent
       notes: notes || currentItem!.notes,
       inQueue: true,
-      decision: 'BUY',
     }
     setQueue(prev => {
       const current = prev || []
@@ -1035,9 +1054,20 @@ function App() {
     }
     // Keep imageThumbnail for queue display; strip heavy blobs
     const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
+    // Recompute metrics if price changed — keeps stored profitMargin accurate
+    let resolvedMargin = currentItem!.profitMargin
+    if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
+      const freshMetrics = calculateProfitFallback(
+        effectivePrice, currentItem!.estimatedSellPrice,
+        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+      )
+      resolvedMargin = freshMetrics.profitMargin
+    }
     const passItem: ScannedItem = {
       ...lightweight,
-      purchasePrice: price > 0 ? price : currentItem!.purchasePrice,
+      purchasePrice: effectivePrice,
+      profitMargin: resolvedMargin,
       notes: notes || currentItem!.notes,
       inQueue: true,
       decision: 'PASS',

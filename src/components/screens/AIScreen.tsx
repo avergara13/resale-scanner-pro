@@ -834,6 +834,8 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
               <Input
                 id="ai-price"
                 type="number"
+                inputMode="decimal"
+                min="0"
                 step="0.01"
                 placeholder="Buy $"
                 value={buyPrice}
@@ -867,7 +869,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
             {/* Recalculate — only visible when buy price changed */}
             {buyPrice !== '' && parseFloat(buyPrice) !== currentItem?.purchasePrice && (
               <Button
-                onClick={() => onRecalculate?.(parseFloat(buyPrice) || 0)}
+                onClick={() => onRecalculate?.(parseFloat(buyPrice))}
                 className="w-full bg-amber hover:opacity-90 text-white h-9 sm:h-10 font-semibold text-xs sm:text-sm"
               >
                 <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
@@ -886,7 +888,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 Rescan
               </Button>
               <Button
-                onClick={() => onPassItem(parseFloat(buyPrice) || 0, description)}
+                onClick={() => onPassItem(parseFloat(buyPrice), description)}
                 disabled={!canSaveDraft}
                 variant="outline"
                 className="flex-1 h-9 sm:h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
@@ -895,7 +897,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 Pass
               </Button>
               <Button
-                onClick={() => onCreateListing(parseFloat(buyPrice) || 0, description)}
+                onClick={() => onCreateListing(parseFloat(buyPrice), description)}
                 disabled={!canSaveDraft}
                 className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
               >
@@ -913,6 +915,8 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
               <Input
                 id="ai-price"
                 type="number"
+                inputMode="decimal"
+                min="0"
                 step="0.01"
                 placeholder="Buy $"
                 value={buyPrice}
@@ -954,10 +958,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 </Button>
               )}
               <Button
-                onClick={() => {
-                  const price = parseFloat(buyPrice) || 0
-                  onSaveDraft(price, description)
-                }}
+                onClick={() => onSaveDraft(parseFloat(buyPrice), description)}
                 disabled={!canSaveDraft}
                 className="flex-1 bg-b1 hover:bg-b2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
               >
