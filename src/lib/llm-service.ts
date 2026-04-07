@@ -148,13 +148,21 @@ async function callGeminiGrounded(
  * Returns 0 if no price can be parsed.
  */
 export function parseResearchPrice(text: string): number {
+  // Tier 1 — anchored structured line we force Gemini to emit
+  const anchored = text.match(/RECOMMENDED_SELL_PRICE:\s*\$?([\d,]+(?:\.\d{1,2})?)/)
+  if (anchored) {
+    const p = parseFloat(anchored[1].replace(/,/g, ''))
+    if (p > 0 && p < 50000) return Math.round(p * 100) / 100
+  }
+
+  // Tier 2 — specific semantic patterns in the prose
   const patterns: Array<[RegExp, 'single' | 'range']> = [
-    [/recommended\s+(?:list\s+)?price[:\s]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
-    [/(?:list|sell)\s+(?:at|for)[:\s]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
-    [/ebay[:\s*]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
-    [/resale\s+value[:\s]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
-    [/average\s+(?:sold\s+)?(?:price\s*)?[:\s]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
-    [/\$(\d[\d,]*(?:\.\d{2})?)\s*[-–—to]+\s*\$(\d[\d,]*(?:\.\d{2})?)/i, 'range'],
+    [/recommended\s+(?:list\s+)?price[:\s]+\$?([\d,]+(?:\.\d{1,2})?)/i, 'single'],
+    [/(?:list|sell)\s+(?:at|for)[:\s]+\$?([\d,]+(?:\.\d{1,2})?)/i, 'single'],
+    [/resale\s+value[:\s]+\$?([\d,]+(?:\.\d{1,2})?)/i, 'single'],
+    [/average\s+(?:sold\s+)?(?:price\s*)?[:\s]+\$?([\d,]+(?:\.\d{1,2})?)/i, 'single'],
+    [/avg(?:erage)?\s*[:\-–]\s*\$?([\d,]+(?:\.\d{1,2})?)/i, 'single'],
+    [/\$(\d[\d,]*(?:\.\d{1,2})?)\s*[-–—to]+\s*\$(\d[\d,]*(?:\.\d{1,2})?)/i, 'range'],
   ]
   for (const [pattern, type] of patterns) {
     const m = text.match(pattern)
@@ -165,10 +173,28 @@ export function parseResearchPrice(text: string): number {
       const mid = (lo + hi) / 2
       if (mid > 0 && mid < 50000) return Math.round(mid * 100) / 100
     } else {
-      const price = parseFloat(m[1].replace(/,/g, ''))
-      if (price > 0 && price < 50000) return price
+      const p = parseFloat(m[1].replace(/,/g, ''))
+      if (p > 0 && p < 50000) return p
     }
   }
+
+  // Tier 3 — broad sweep: collect ALL dollar amounts, return median of plausible resale values
+  const dollarRe = /\$\s*(\d[\d,]*(?:\.\d{1,2})?)/g
+  const amounts: number[] = []
+  let m: RegExpExecArray | null
+  while ((m = dollarRe.exec(text)) !== null) {
+    const v = parseFloat(m[1].replace(/,/g, ''))
+    if (v >= 2 && v <= 2000) amounts.push(v)  // filter out retail-tag noise & extremely high values
+  }
+  if (amounts.length > 0) {
+    amounts.sort((a, b) => a - b)
+    const mid = Math.floor(amounts.length / 2)
+    const median = amounts.length % 2 === 0
+      ? (amounts[mid - 1] + amounts[mid]) / 2
+      : amounts[mid]
+    return Math.round(median * 100) / 100
+  }
+
   return 0
 }
 
@@ -214,7 +240,10 @@ Provide a concise analysis with:
 6. **Recommended list price** for best margin + speed
 ${context.purchasePrice ? `7. **Verdict**: BUY or PASS at $${context.purchasePrice.toFixed(2)} — with margin estimate` : ''}
 
-Be specific with dollar amounts. Cite actual marketplace data found.`
+Be specific with dollar amounts. Cite actual marketplace data found.
+
+REQUIRED — always end your response with this exact line (replace XX.XX with the average resale price you found):
+RECOMMENDED_SELL_PRICE: $XX.XX`
 
   return callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 1500 })
 }

@@ -10,8 +10,7 @@ interface DecisionSignalProps {
 export function DecisionSignal({ decision, item }: DecisionSignalProps) {
   const isBuy = decision === 'BUY'
   const isPass = decision === 'PASS'
-
-  if (!isBuy && !isPass) return null
+  const isPending = !isBuy && !isPass
 
   return (
     <motion.div
@@ -20,16 +19,23 @@ export function DecisionSignal({ decision, item }: DecisionSignalProps) {
       transition={{ type: 'spring', bounce: 0.4 }}
       id="decision-signal"
       className={cn(
-        'mt-4 py-6 rounded-2xl flex flex-col items-center justify-center font-black border-4 shadow-xl',
+        'mt-4 py-5 rounded-2xl flex flex-col items-center justify-center font-black border-4 shadow-xl',
         isBuy && 'bg-gradient-to-br from-green/20 to-green/10 text-green border-green',
-        isPass && 'bg-gradient-to-br from-red/20 to-red/10 text-red border-red'
+        isPass && 'bg-gradient-to-br from-red/20 to-red/10 text-red border-red',
+        isPending && 'bg-gradient-to-br from-amber/10 to-amber/5 text-amber border-amber/60'
       )}
     >
-      <div className="text-5xl tracking-tight mb-2">{decision}</div>
-      {item?.profitMargin != null && isFinite(item.profitMargin) && (
-        <div className="text-base font-bold opacity-80">
-          Margin: {item.profitMargin.toFixed(1)}%
+      <div className="text-4xl tracking-tight mb-1">{isPending ? '⏳ NEEDS PRICE' : decision}</div>
+      {isPending ? (
+        <div className="text-xs font-semibold opacity-70 text-center px-4">
+          Enter buy price + tap Re-analyze, or use Chat to get a market estimate
         </div>
+      ) : (
+        item?.profitMargin != null && isFinite(item.profitMargin) && (
+          <div className="text-base font-bold opacity-80">
+            Margin: {item.profitMargin.toFixed(1)}%
+          </div>
+        )
       )}
     </motion.div>
   )
