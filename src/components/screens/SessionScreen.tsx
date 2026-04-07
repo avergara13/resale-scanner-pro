@@ -208,12 +208,7 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
         shouldTrigger={shouldTrigger}
       />
 
-      <div className="px-4 pt-4 pb-6">
-      <div className="mb-5">
-        <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-        </p>
-      </div>
+      <div className="px-4 pt-3 pb-6">
 
       {showTrends ? (
         <div className="flex-1 overflow-y-auto pb-24">
@@ -283,21 +278,25 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
           )}
         </div>
       ) : !session?.active ? (
-        <div className="flex-1 overflow-y-auto space-y-5 pb-24">
+        <div className="flex-1 overflow-y-auto space-y-4 pb-24">
+          {/* Date */}
+          <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+          </p>
+
           {/* Start new session */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={onStartSession}
-              aria-label="Start scanning session"
-              className="w-16 h-16 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center shadow-lg active:scale-95 transition-all flex-shrink-0"
-            >
-              <Play size={28} weight="fill" className="text-white ml-0.5" />
-            </button>
-            <div>
-              <h2 className="text-base font-bold text-t1">Start New Session</h2>
-              <p className="text-xs text-t3">Begin tracking scans and profits</p>
+          <button
+            onClick={onStartSession}
+            className="w-full flex items-center gap-4 p-4 bg-fg rounded-xl border border-s1 active:scale-[0.98] transition-all"
+          >
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center shadow-lg flex-shrink-0">
+              <Play size={22} weight="fill" className="text-white ml-0.5" />
             </div>
-          </div>
+            <div className="text-left">
+              <h2 className="text-sm font-bold text-t1">Start New Session</h2>
+              <p className="text-[11px] text-t3">Begin tracking scans and profits</p>
+            </div>
+          </button>
 
           {/* Past sessions */}
           {(allSessions || []).length > 0 && (
@@ -345,6 +344,22 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
         </div>
       ) : (
         <div className="flex-1 space-y-3 pb-24">
+          {/* Same date line as inactive view */}
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </p>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-green text-white px-2 py-0.5 uppercase text-[9px] font-bold">
+                Active
+              </Badge>
+              <span className="text-[10px] mono text-t3">
+                {formatDuration(Date.now() - session.startTime)}
+              </span>
+            </div>
+          </div>
+
+          {/* Stat row */}
           <div className="flex gap-2">
             <button onClick={() => onNavigateToQueue?.()} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
               <div className="text-base font-bold text-green leading-tight">
@@ -364,33 +379,21 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
             </button>
           </div>
 
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <Badge variant="secondary" className="bg-green text-white px-3 py-1 uppercase text-xs font-bold">
-                Active
-              </Badge>
-              <span className="text-sm mono text-t3">
-                {formatDuration(Date.now() - session.startTime)}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => onNavigateToQueue?.('BUY')} className="text-left active:opacity-80 transition-opacity">
-                <p className="text-[10px] uppercase tracking-wide text-t3 mb-0.5">BUY</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-xl font-bold mono text-green">{session.buyCount}</p>
-                  <CheckCircle size={16} weight="fill" className="text-green" />
-                </div>
-              </button>
-              <button onClick={() => onNavigateToQueue?.('PASS')} className="text-left active:opacity-80 transition-opacity">
-                <p className="text-[10px] uppercase tracking-wide text-t3 mb-0.5">PASS</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-xl font-bold mono text-red">{session.passCount}</p>
-                  <XCircle size={16} weight="fill" className="text-red" />
-                </div>
-              </button>
-            </div>
-          </Card>
+          {/* BUY / PASS compact row */}
+          <div className="flex gap-2">
+            <button onClick={() => onNavigateToQueue?.('BUY')} className="stat-card flex-1 p-3 flex items-center gap-2 active:scale-[0.97] transition-transform">
+              <CheckCircle size={16} weight="fill" className="text-green" />
+              <span className="text-lg font-bold mono text-green">{session.buyCount}</span>
+              <span className="text-[9px] text-t3 font-bold uppercase">BUY</span>
+            </button>
+            <button onClick={() => onNavigateToQueue?.('PASS')} className="stat-card flex-1 p-3 flex items-center gap-2 active:scale-[0.97] transition-transform">
+              <XCircle size={16} weight="fill" className="text-red" />
+              <span className="text-lg font-bold mono text-red">{session.passCount}</span>
+              <span className="text-[9px] text-t3 font-bold uppercase">PASS</span>
+            </button>
+          </div>
 
+          {/* Agent + Tasks */}
           <AgentChatWidget
             onSendMessage={onAgentMessage}
             isProcessing={isAgentProcessing}
@@ -398,6 +401,7 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
           />
           <SharedTodoList />
 
+          {/* End Session */}
           <Button
             onClick={onEndSession}
             variant="outline"
