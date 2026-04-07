@@ -207,6 +207,7 @@ export interface Session {
   active: boolean
   profitGoal?: number
   location?: ThriftStoreLocation
+  sessionType?: 'business' | 'personal'
 }
 
 export interface ProfitGoal {

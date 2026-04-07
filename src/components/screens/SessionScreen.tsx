@@ -36,19 +36,31 @@ function PastSessionCard({
   return (
     <Card className="border-s2 overflow-hidden">
       <button onClick={() => setExpanded(!expanded)} className="w-full p-3 text-left active:bg-s1/50 transition-colors">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Clock size={14} className="text-t3 flex-shrink-0" />
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Clock size={14} className={session.active ? 'text-green flex-shrink-0' : 'text-t3 flex-shrink-0'} />
             <span className="text-xs font-bold text-t1 truncate">
               {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </span>
+            {session.active && (
+              <span className="text-[8px] font-bold bg-green/15 text-green px-1.5 py-0.5 rounded-md uppercase">Open</span>
+            )}
+            {session.sessionType === 'personal' && (
+              <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase">Personal</span>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-[10px] text-t3 font-mono">{formatDuration(duration)}</span>
             {expanded ? <CaretUp size={14} className="text-t3" /> : <CaretDown size={14} className="text-t3" />}
           </div>
         </div>
-        <div className="flex gap-3 text-[10px]">
+        <div className="text-[10px] text-t3 mb-1.5 ml-6">
+          {startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+          {' · '}
+          {startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+          {session.location && ` · ${session.location.name}`}
+        </div>
+        <div className="flex gap-3 text-[10px] ml-6">
           <span className="text-t2">{session.itemsScanned} scans</span>
           <span className="text-green font-bold">{buyCount} BUY</span>
           <span className="text-red font-bold">{passCount} PASS</span>

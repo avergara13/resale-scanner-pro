@@ -464,8 +464,8 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
-    const now = new Date()
-    const name = now.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    const sessionNumber = (allSessions || []).length + 1
+    const name = `Session ${sessionNumber}`
     const id = Date.now().toString()
     const newSession: Session = {
       id,
@@ -476,6 +476,7 @@ function App() {
       passCount: 0,
       totalPotentialProfit: 0,
       active: true,
+      sessionType: 'business',
     }
     setAllSessions((prev) => [...(prev || []), newSession])
     setSession(newSession)

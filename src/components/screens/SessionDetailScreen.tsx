@@ -205,9 +205,21 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                 </button>
               )}
 
-              {/* Compact location + goal buttons */}
+              {/* Compact action buttons: type, location, goal */}
               {!editingName && (
                 <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      const next = session.sessionType === 'personal' ? 'business' : 'personal'
+                      updateSession({ sessionType: next })
+                    }}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95',
+                      session.sessionType === 'personal' ? 'bg-purple-500/10 text-purple-500' : 'bg-b1/10 text-b1'
+                    )}
+                  >
+                    {session.sessionType === 'personal' ? '👤' : '💼'}
+                  </button>
                   <button
                     onClick={handleAutoLocation}
                     disabled={geoLoading}
