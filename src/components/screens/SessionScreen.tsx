@@ -1,4 +1,4 @@
-import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, Package, ArrowLeft, Robot } from '@phosphor-icons/react'
+import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, Package, ArrowLeft } from '@phosphor-icons/react'
 import { useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
