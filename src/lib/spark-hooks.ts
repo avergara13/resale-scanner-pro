@@ -28,12 +28,16 @@ export function useKV<T>(key: string, initialValue: T): [T, Dispatch<SetStateAct
   const initialValueRef = useRef(initialValue)
   const [value, setValue] = useState<T>(() => readStoredValue(storageKey, initialValue))
 
-  useEffect(() => {
-    initialValueRef.current = initialValue
-  }, [initialValue])
+  // Keep initialValueRef updated without depending on initialValue identity
+  initialValueRef.current = initialValue
 
   useEffect(() => {
-    setValue(readStoredValue(storageKey, initialValueRef.current))
+    const stored = readStoredValue(storageKey, initialValueRef.current)
+    setValue(prev => {
+      // Avoid unnecessary re-renders when the stored value is structurally equal
+      if (JSON.stringify(prev) === JSON.stringify(stored)) return prev
+      return stored
+    })
   }, [storageKey])
 
   useEffect(() => {
@@ -46,7 +50,23 @@ export function useKV<T>(key: string, initialValue: T): [T, Dispatch<SetStateAct
       return
     }
 
-    window.localStorage.setItem(storageKey, JSON.stringify(value))
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(value))
+    } catch (e) {
+      if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+        // Clear heavy caches first, then retry
+        const cacheKeys = Object.keys(window.localStorage).filter(k =>
+          k.startsWith('resale-scanner:image-optimization-cache') ||
+          k.startsWith('resale-scanner:compression-analytics')
+        )
+        cacheKeys.forEach(k => window.localStorage.removeItem(k))
+        try {
+          window.localStorage.setItem(storageKey, JSON.stringify(value))
+        } catch {
+          console.error(`[useKV] Storage quota exceeded for key "${storageKey}" even after cleanup`)
+        }
+      }
+    }
   }, [storageKey, value])
 
   useEffect(() => {

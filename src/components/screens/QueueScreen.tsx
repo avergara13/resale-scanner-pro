@@ -129,9 +129,9 @@ function SortableItem({
             onCheckedChange={() => onToggleSelect(item.id)}
             className="w-4 h-4 sm:w-5 sm:h-5 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
           />
-          {item.imageData && (
+          {(item.imageThumbnail || item.imageData) && (
             <img
-              src={item.imageData}
+              src={item.imageThumbnail || item.imageData}
               alt={item.productName || 'Item'}
               className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md border border-s2 flex-shrink-0"
             />
@@ -168,7 +168,7 @@ function SortableItem({
             <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 mb-2 sm:mb-2.5">
               <Tag size={10} weight="bold" className="text-s4 flex-shrink-0 sm:w-[11px] sm:h-[11px]" />
               {item.tags.map((tagId) => {
-                const tag = allTags.find(t => t.id === tagId)
+                const tag = (allTags || []).find(t => t.id === tagId)
                 if (!tag) return null
                 return (
                   <Badge
@@ -1321,9 +1321,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           onCheckedChange={() => handleToggleSelect(item.id)}
                           className="w-5 h-5 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
                         />
-                        {item.imageData && (
+                        {(item.imageThumbnail || item.imageData) && (
                           <img
-                            src={item.imageData}
+                            src={item.imageThumbnail || item.imageData}
                             alt={item.productName || 'Item'}
                             className="w-20 h-20 object-cover rounded-md border border-s2 flex-shrink-0"
                           />

@@ -292,18 +292,6 @@ export interface ChatSession {
   isActive: boolean
 }
 
-export interface EbayListing {
-  itemId: string
-  title: string
-  description: string
-  price: number
-  shippingCost: number
-  images: string[]
-  category: string
-  condition: string
-  status: 'draft' | 'published'
-}
-
 export interface ConnectionEvent {
   id: string
   timestamp: number

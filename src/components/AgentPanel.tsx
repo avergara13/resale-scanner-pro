@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { PaperPlaneRight, Robot, User, CircleNotch, ListChecks, ChatCircle, Plus, Check, Trash, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
@@ -32,12 +32,15 @@ interface AgentPanelProps {
   sessionId?: string
 }
 
+const EMPTY_PANEL_CHATS: ChatSession[] = []
+const EMPTY_PANEL_TODOS: SharedTodo[] = []
+
 export function AgentPanel({ onSendMessage, isProcessing = false, sessionId }: AgentPanelProps) {
-  const chatKey = sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global'
-  const activeKey = sessionId ? `active-chat-session-${sessionId}` : 'active-chat-session-global'
-  const [chatSessions] = useKV<ChatSession[]>(chatKey, [])
+  const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])
+  const activeKey = useMemo(() => sessionId ? `active-chat-session-${sessionId}` : 'active-chat-session-global', [sessionId])
+  const [chatSessions] = useKV<ChatSession[]>(chatKey, EMPTY_PANEL_CHATS)
   const [activeSessionId] = useKV<string | null>(activeKey, null)
-  const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', [])
+  const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', EMPTY_PANEL_TODOS)
   const [collapsed, setCollapsed] = useState(true)
   const [tab, setTab] = useState<PanelTab>('chat')
   const [input, setInput] = useState('')

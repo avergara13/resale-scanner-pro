@@ -136,7 +136,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
 
   if (!item) return null
 
-  const displayImage = editedImage || item.imageData
+  const displayImage = editedImage || item.imageThumbnail || item.imageData
 
   return (
     <>

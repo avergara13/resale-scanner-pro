@@ -413,8 +413,12 @@ function App() {
       
       setCurrentItem(updatedItem)
 
-      // Log to scan history
-      setScanHistory(prev => [updatedItem, ...(prev || []).slice(0, 499)])
+      // Log to scan history — strip large base64 images to avoid localStorage quota issues
+      // Only persist the thumbnail; full images are only needed during the AI pipeline (in memory)
+      const persistableItem = { ...updatedItem }
+      delete persistableItem.imageData
+      delete persistableItem.imageOptimized
+      setScanHistory(prev => [persistableItem, ...(prev || []).slice(0, 499)])
 
       if (session?.active) {
         setSession((prev) => {
@@ -443,7 +447,7 @@ function App() {
       // Catch errors from optimizeAndCache or any unhandled rejection
       const msg = outerError instanceof Error ? outerError.message : 'Unknown error'
       console.error('Capture failed:', msg)
-      toast.error(msg.toLowerCase().includes('quota') ? 'API quota exceeded — try again later or check your API key limits' : `Capture failed: ${msg}`)
+      toast.error(msg.toLowerCase().includes('quota') ? 'Storage full — clearing cache and retrying. Please try again.' : `Capture failed: ${msg}`)
     }
   }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, simulateProgress, completeStep, tagSuggestionService, setScanHistory])
 
@@ -452,7 +456,8 @@ function App() {
       setQueue((prev) => {
         const current = prev || []
         if (current.some(i => i.id === currentItem.id)) return current
-        return [...current, { ...currentItem, inQueue: true }]
+        const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem
+        return [...current, { ...lightweight, inQueue: true }]
       })
       // silent — queue tab badge shows the update
     }
@@ -687,15 +692,16 @@ function App() {
   }, [setQueue, queue, notionService])
 
   const handleSaveDraft = useCallback((price: number, notes: string) => {
-    if (!currentItem?.imageData) {
+    if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
       toast.error('No image to save')
       return
     }
 
+    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
     const draftItem: ScannedItem = {
-      ...currentItem,
-      purchasePrice: price > 0 ? price : currentItem.purchasePrice,
-      notes: notes || currentItem.notes,
+      ...lightweight,
+      purchasePrice: price > 0 ? price : currentItem!.purchasePrice,
+      notes: notes || currentItem!.notes,
       inQueue: true,
     }
 
@@ -714,9 +720,7 @@ function App() {
     const draftItem: ScannedItem = {
       id: Date.now().toString(),
       timestamp: Date.now(),
-      imageData: optimized.original,
       imageThumbnail: optimized.thumbnail,
-      imageOptimized: optimized.original,
       purchasePrice: price,
       decision: 'PENDING',
       inQueue: true,

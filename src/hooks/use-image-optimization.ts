@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useKV } from '@github/spark/hooks'
 import { createImageOptimizationService, type OptimizedImage, type ImageQualityPreset } from '@/lib/image-optimization-service'
 import { useCompressionAnalytics } from './use-compression-analytics'
 
@@ -7,11 +6,18 @@ interface ImageCache {
   [key: string]: OptimizedImage & { lastAccessed: number }
 }
 
-const MAX_CACHE_SIZE = 100
-const MAX_CACHE_AGE_MS = 7 * 24 * 60 * 60 * 1000
+const MAX_CACHE_SIZE = 20
+const MAX_CACHE_AGE_MS = 30 * 60 * 1000 // 30 minutes — in-memory only
 
 export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanced') {
-  const [cache, setCache] = useKV<ImageCache>('image-optimization-cache', {})
+  // Use in-memory cache only — localStorage can't hold base64 images without quota issues
+  const cacheRef = useRef<ImageCache>({})
+  const [, forceUpdate] = useState(0)
+  const cache = cacheRef.current
+  const setCache = useCallback((updater: ImageCache | ((prev: ImageCache) => ImageCache)) => {
+    cacheRef.current = typeof updater === 'function' ? updater(cacheRef.current) : updater
+    forceUpdate(n => n + 1)
+  }, [])
   const [isOptimizing, setIsOptimizing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const optimizationQueueRef = useRef<Map<string, Promise<OptimizedImage>>>(new Map())

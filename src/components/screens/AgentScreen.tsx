@@ -189,11 +189,14 @@ interface AgentScreenProps {
   profitGoals?: ProfitGoal[]
 }
 
+const EMPTY_CHAT_SESSIONS: ChatSession[] = []
+
 export function AgentScreen({ queueItems = [], soldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
-  const chatKey = currentSession?.id ? `chat-sessions-${currentSession.id}` : 'chat-sessions-global'
-  const activeKey = currentSession?.id ? `active-chat-session-${currentSession.id}` : 'active-chat-session-global'
-  const [chatSessions, setChatSessions] = useKV<ChatSession[]>(chatKey, [])
+  const sessionId = currentSession?.id
+  const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])
+  const activeKey = useMemo(() => sessionId ? `active-chat-session-${sessionId}` : 'active-chat-session-global', [sessionId])
+  const [chatSessions, setChatSessions] = useKV<ChatSession[]>(chatKey, EMPTY_CHAT_SESSIONS)
   const [activeSessionId, setActiveSessionId] = useKV<string | null>(activeKey, null)
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)

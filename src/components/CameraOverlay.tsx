@@ -27,6 +27,7 @@ interface CameraOverlayProps {
 export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: CameraOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const isMountedRef = useRef(true)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [mode, setMode] = useState<'lens' | 'listing' | 'barcode'>('lens')
   const [price, setPrice] = useState('')
@@ -44,6 +45,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
   const barcodeService = useMemo(() => createBarcodeService(), [])
 
   useEffect(() => {
+    isMountedRef.current = true
     if (isOpen) {
       startCamera()
       setDraftCount(0)
@@ -54,28 +56,33 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
       setSelectedLocation(undefined)
     }
     return () => {
+      isMountedRef.current = false
       stopCamera()
     }
   }, [isOpen])
 
   const startCamera = async () => {
+    const applyStream = (mediaStream: MediaStream) => {
+      if (!isMountedRef.current) {
+        mediaStream.getTracks().forEach(t => t.stop())
+        return
+      }
+      setStream(mediaStream)
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream
+      }
+    }
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       })
-      setStream(mediaStream)
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream
-      }
+      applyStream(mediaStream)
     } catch (err) {
       console.warn('Environment camera not found, falling back to default camera', err)
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true })
-        setStream(mediaStream)
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream
-        }
+        applyStream(mediaStream)
       } catch (fallbackErr) {
         console.error('Camera error:', fallbackErr)
       }
