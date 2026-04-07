@@ -1371,6 +1371,8 @@ function App() {
                 onDeepSearch={() => toast.info('Deep search feature coming soon')}
                 onSaveDraft={handleSaveDraft}
                 onOpenCamera={() => setCameraOpen(true)}
+                pendingMessage={agentPendingMessage}
+                onPendingMessageHandled={() => setAgentPendingMessage(null)}
               />
             </motion.div>
           )}

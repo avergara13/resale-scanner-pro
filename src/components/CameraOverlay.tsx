@@ -85,6 +85,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, gemini
       console.warn('Environment camera not found, falling back to default camera', err)
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true })
+        setCameraError(null)
         applyStream(mediaStream)
       } catch (fallbackErr) {
         console.error('Camera error:', fallbackErr)

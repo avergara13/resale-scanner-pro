@@ -32,6 +32,8 @@ interface AIScreenProps {
   onDeepSearch: () => void
   onSaveDraft: (price: number, notes: string) => void
   onOpenCamera?: () => void
+  pendingMessage?: string | null
+  onPendingMessageHandled?: () => void
 }
 
 function CelebrationParticle({ delay, index }: { delay: number; index: number }) {
@@ -275,7 +277,7 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
   )
 }
 
-export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQueue, onDeepSearch, onSaveDraft, onOpenCamera }: AIScreenProps) {
+export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQueue, onDeepSearch, onSaveDraft, onOpenCamera, pendingMessage, onPendingMessageHandled }: AIScreenProps) {
   const [tab, setTab] = useTabPreference<'chat' | 'scans' | 'tasks'>('ai-screen-v2', 'chat')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -327,6 +329,14 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
     setChatInput(msg)
     setTab('chat')
   }, [setTab])
+
+  // Receive messages sent from SessionScreen's AgentPanel and route them into chat
+  useEffect(() => {
+    if (!pendingMessage) return
+    setChatInput(pendingMessage)
+    setTab('chat')
+    onPendingMessageHandled?.()
+  }, [pendingMessage, onPendingMessageHandled, setTab])
 
   const pullToRefresh = usePullToRefresh({
     onRefresh: handleRefresh,
