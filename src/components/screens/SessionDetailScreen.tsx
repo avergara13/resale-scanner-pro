@@ -15,12 +15,19 @@ import type { Session, ScannedItem, ThriftStoreLocation } from '@/types'
 interface SessionDetailScreenProps {
   sessionId: string
   onBack: () => void
+  onDeleteSession?: (sessionId: string) => void
+  allSessions?: Session[]
+  onUpdateSessions?: (updater: (prev: Session[]) => Session[]) => void
+  queueItems?: ScannedItem[]
+  scanHistory?: ScannedItem[]
 }
 
-export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenProps) {
-  const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
-  const [queue] = useKV<ScannedItem[]>('queue', [])
-  const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
+export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp }: SessionDetailScreenProps) {
+  const [allSessionsFallback, setAllSessionsFallback] = useKV<Session[]>('all-sessions', [])
+  const allSessions = allSessionsProp ?? allSessionsFallback
+  const setAllSessions = onUpdateSessions ?? setAllSessionsFallback
+  const queue = queueItems
+  const scanHistory = scanHistoryProp
   const [filter, setFilter] = useState<'all' | 'BUY' | 'PASS'>('all')
 
   // Editing states
@@ -112,10 +119,14 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
   }, [session])
 
   const handleDelete = useCallback(() => {
-    setAllSessions(prev => (prev || []).filter(s => s.id !== sessionId))
+    if (onDeleteSession) {
+      onDeleteSession(sessionId)
+    } else {
+      setAllSessions(prev => (prev || []).filter(s => s.id !== sessionId))
+    }
     onBack()
     toast.success('Session deleted')
-  }, [setAllSessions, sessionId, onBack])
+  }, [onDeleteSession, setAllSessions, sessionId, onBack])
 
   if (!session) {
     return (

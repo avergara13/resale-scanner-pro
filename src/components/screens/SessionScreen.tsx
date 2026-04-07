@@ -141,15 +141,20 @@ interface SessionScreenProps {
   onResumeSession?: (sessionId: string) => void
   onDeleteSession?: (sessionId: string) => void
   onViewSessionDetail?: (sessionId: string) => void
+  allSessions?: Session[]
+  queueItems?: ScannedItem[]
+  scanHistory?: ScannedItem[]
 }
 
-export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail }: SessionScreenProps) {
+export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, queueItems: queueProp, scanHistory: scanHistoryProp }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
-  const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
-  const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
-  const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
+  // Use props from App.tsx (single source of truth) instead of local useKV
+  // This ensures deletes/updates propagate immediately
+  const queue = queueProp
+  const allSessions = allSessionsProp
 
   // Memoize combined items to avoid recreating on every render
+  const scanHistory = scanHistoryProp
   const allCombinedItems = useMemo(() => {
     const items = [...(queue || []), ...(scanHistory || [])]
     const seen = new Set<string>()
@@ -159,7 +164,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
       return true
     })
   }, [queue, scanHistory])
-  const [goals, setGoals] = useKV<ProfitGoal[]>('profit-goals', [])
+  const [goals] = useKV<ProfitGoal[]>('profit-goals', [])
 
   const personalSessionIds = useMemo(() => {
     const ids = new Set<string>()
@@ -174,22 +179,8 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
   }
 
   const handleRefresh = useCallback(async () => {
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    try {
-      const currentQueue = await window.spark?.kv?.get<ScannedItem[]>('queue')
-      const currentSessions = await window.spark?.kv?.get<Session[]>('all-sessions')
-      const currentGoals = await window.spark?.kv?.get<ProfitGoal[]>('profit-goals')
-
-      if (currentQueue) setQueue(currentQueue)
-      if (currentSessions) setAllSessions(currentSessions)
-      if (currentGoals) setGoals(currentGoals)
-    } catch {
-      // Spark runtime not available — silently ignore
-    }
-    
-    // silent refresh
-  }, [setQueue, setAllSessions, setGoals])
+    await new Promise(resolve => setTimeout(resolve, 600))
+  }, [])
 
   const {
     containerRef,

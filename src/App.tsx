@@ -476,8 +476,12 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
-    const sessionNumber = (allSessions || []).length + 1
-    const name = `Session ${sessionNumber}`
+    const now = new Date()
+    const hour = now.getHours()
+    const timeOfDay = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
+    const dayName = now.toLocaleDateString('en-US', { weekday: 'short' })
+    const monthDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const name = `${dayName} ${timeOfDay} — ${monthDay}`
     const id = Date.now().toString()
     const newSession: Session = {
       id,
@@ -492,7 +496,6 @@ function App() {
     }
     setAllSessions((prev) => [...(prev || []), newSession])
     setSession(newSession)
-    // Navigate to session detail screen
     setSelectedSessionId(id)
     setScreen('session-detail')
     toast.success('Session started')
@@ -1112,6 +1115,9 @@ function App() {
                   setSelectedSessionId(id)
                   setScreen('session-detail')
                 }}
+                allSessions={allSessions || []}
+                queueItems={queue || []}
+                scanHistory={scanHistory || []}
               />
             </motion.div>
           )}
@@ -1326,6 +1332,11 @@ function App() {
               <SessionDetailScreen
                 sessionId={selectedSessionId}
                 onBack={() => setScreen('session')}
+                onDeleteSession={handleDeleteSession}
+                allSessions={allSessions || []}
+                onUpdateSessions={setAllSessions}
+                queueItems={queue || []}
+                scanHistory={scanHistory || []}
               />
             </motion.div>
           )}
