@@ -1,12 +1,10 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash, ArrowClockwise, ArrowCounterClockwise, XCircle, ShoppingCart, ArrowLeft } from '@phosphor-icons/react'
+import { Robot, Plus, Microphone, Scan, FloppyDisk, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash, ArrowClockwise, ArrowCounterClockwise, XCircle, ShoppingCart } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
 import { useKV } from '@github/spark/hooks'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Card } from '@/components/ui/card'
@@ -28,8 +26,6 @@ interface AIScreenProps {
   pipeline: PipelineStep[]
   settings?: AppSettings
   queueItems?: ScannedItem[]
-  onAddToQueue: () => void
-  onDeepSearch: () => void
   onSaveDraft: (price: number, notes: string) => void
   onCreateListing: (price: number, notes: string) => void
   onPassItem: (price: number, notes: string) => void
@@ -281,7 +277,7 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
   )
 }
 
-export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQueue, onDeepSearch, onSaveDraft, onCreateListing, onPassItem, onRecalculate, onRescan, onOpenCamera, pendingMessage, onPendingMessageHandled }: AIScreenProps) {
+export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDraft, onCreateListing, onPassItem, onRecalculate, onRescan, onOpenCamera, pendingMessage, onPendingMessageHandled }: AIScreenProps) {
   const [tab, setTab] = useTabPreference<'chat' | 'scans' | 'tasks'>('ai-screen-v2', 'chat')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -334,12 +330,12 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
     setTab('chat')
   }, [setTab])
 
-  // Pre-fill buy price when currentItem changes (only if field is empty or unchanged)
+  // Pre-fill buy price when currentItem changes (only if field is empty — never override user input)
   useEffect(() => {
     if (currentItem?.purchasePrice != null && buyPrice === '') {
       setBuyPrice(String(currentItem.purchasePrice))
     }
-  }, [currentItem?.purchasePrice])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentItem?.purchasePrice, buyPrice])
 
   // Receive messages sent from SessionScreen's AgentPanel and route them into chat
   useEffect(() => {

@@ -37,12 +37,24 @@ import type { BarcodeProduct } from './lib/barcode-service'
 import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform } from './types'
 import { cn } from './lib/utils'
 
+/** Pure helper — determines BUY/PASS/PENDING from profit metrics */
+function makeDecision(
+  sellPrice: number,
+  buyPrice: number,
+  profitMargin: number,
+  netProfit: number,
+  minMargin: number
+): 'BUY' | 'PASS' | 'PENDING' {
+  if (sellPrice <= 0) return 'PENDING'
+  if (buyPrice === 0) return netProfit > 0 ? 'BUY' : 'PASS'
+  return profitMargin > minMargin ? 'BUY' : 'PASS'
+}
+
 function App() {
   const [screen, setScreen] = useState<Screen>('session')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [showSessionTrends, setShowSessionTrends] = useState(false)
   const [agentPendingMessage, setAgentPendingMessage] = useState<string | null>(null)
-  const [agentProcessing, setAgentProcessing] = useState(false)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
@@ -476,12 +488,7 @@ function App() {
       )
 
       const minMargin = settings?.minProfitMargin || 30
-      const decision: 'BUY' | 'PASS' | 'PENDING' = ebayAvgPrice <= 0
-        ? 'PENDING'
-        : (price === 0
-            ? profitMetrics.netProfit > 0      // free item: only needs to cover fees
-            : profitMetrics.profitMargin > minMargin)
-          ? 'BUY' : 'PASS'
+      const decision = makeDecision(ebayAvgPrice, price, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
 
       // Free item on standard platforms: if fees eat all profit, recommend fee-free local platform
       const freeItemPlatformHint =
@@ -586,18 +593,6 @@ function App() {
       toast.error(msg.toLowerCase().includes('quota') ? 'Storage full — clearing cache and retrying. Please try again.' : `Capture failed: ${msg}`)
     }
   }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, simulateProgress, completeStep, tagSuggestionService, setScanHistory])
-
-  const handleAddToQueue = useCallback(() => {
-    if (currentItem && currentItem.decision === 'BUY') {
-      setQueue((prev) => {
-        const current = prev || []
-        if (current.some(i => i.id === currentItem.id)) return current
-        const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem
-        return [...current, { ...lightweight, inQueue: true }]
-      })
-      // silent — queue tab badge shows the update
-    }
-  }, [currentItem, setQueue])
 
   const handleRemoveFromQueue = useCallback((id: string) => {
     setQueue((prev) => (prev || []).filter(item => item.id !== id))
@@ -951,12 +946,7 @@ function App() {
     const minMargin = settings?.minProfitMargin || 30
     const profitMetrics = calculateProfitFallback(newPrice, currentItem.estimatedSellPrice, shipping, feePercent)
 
-    const decision: 'BUY' | 'PASS' | 'PENDING' = currentItem.estimatedSellPrice <= 0
-      ? 'PENDING'
-      : (newPrice === 0
-          ? profitMetrics.netProfit > 0
-          : profitMetrics.profitMargin > minMargin)
-        ? 'BUY' : 'PASS'
+    const decision = makeDecision(currentItem.estimatedSellPrice, newPrice, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
 
     const freeItemPlatformHint =
       newPrice === 0 && decision === 'PASS'
@@ -1003,7 +993,6 @@ function App() {
       notes: notes || currentItem!.notes,
       inQueue: true,
       decision: 'BUY',
-      listingStatus: 'active',
     }
     setQueue(prev => {
       const current = prev || []
@@ -1201,9 +1190,7 @@ function App() {
         )
 
         const minMargin = settings?.minProfitMargin || 30
-        const decision = sellPrice <= 0
-          ? 'PENDING'
-          : profitMetrics.profitMargin > minMargin ? 'BUY' : 'PASS'
+        const decision = makeDecision(sellPrice, item.purchasePrice, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
 
         const updatedItem: ScannedItem = {
           ...item,
@@ -1492,7 +1479,6 @@ function App() {
                 showTrends={showSessionTrends}
                 onCloseTrends={() => setShowSessionTrends(false)}
                 onAgentMessage={(text) => setAgentPendingMessage(text)}
-                isAgentProcessing={agentProcessing}
                 onStartSession={handleStartSession}
                 onResumeSession={handleResumeSession}
                 onDeleteSession={handleDeleteSession}
@@ -1525,8 +1511,6 @@ function App() {
                 pipeline={pipeline}
                 settings={settings}
                 queueItems={queue || []}
-                onAddToQueue={handleAddToQueue}
-                onDeepSearch={() => toast.info('Deep search feature coming soon')}
                 onSaveDraft={handleSaveDraft}
                 onCreateListing={handleCreateListingFromScan}
                 onPassItem={handlePassFromScan}
