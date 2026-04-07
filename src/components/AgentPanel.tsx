@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { PaperPlaneRight, Robot, User, CircleNotch, ListChecks, ChatCircle, Plus, Check, Trash } from '@phosphor-icons/react'
+import { PaperPlaneRight, Robot, User, CircleNotch, ListChecks, ChatCircle, Plus, Check, Trash, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import type { ChatSession, ChatMessage } from '@/types'
 
@@ -35,6 +35,7 @@ export function AgentPanel({ onSendMessage, isProcessing = false }: AgentPanelPr
   const [chatSessions] = useKV<ChatSession[]>('chat-sessions', [])
   const [activeSessionId] = useKV<string | null>('active-chat-session', null)
   const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', [])
+  const [collapsed, setCollapsed] = useState(false)
   const [tab, setTab] = useState<PanelTab>('chat')
   const [input, setInput] = useState('')
   const [taskInput, setTaskInput] = useState('')
@@ -80,35 +81,55 @@ export function AgentPanel({ onSendMessage, isProcessing = false }: AgentPanelPr
   }
 
   return (
-    <div className="flex flex-col bg-fg rounded-xl border border-s1 overflow-hidden" style={{ height: 380 }}>
-      {/* Tab bar */}
-      <div className="flex border-b border-s1 bg-fg flex-shrink-0">
-        <button
-          onClick={() => setTab('chat')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-bold uppercase tracking-wide transition-all border-b-2',
-            tab === 'chat' ? 'text-b1 border-b1' : 'text-t3 border-transparent'
-          )}
-        >
-          <Robot size={14} weight={tab === 'chat' ? 'fill' : 'regular'} />
-          Agent
-          {isProcessing && <CircleNotch size={10} className="animate-spin" />}
-        </button>
-        <button
-          onClick={() => setTab('tasks')}
-          className={cn(
-            'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-bold uppercase tracking-wide transition-all border-b-2',
-            tab === 'tasks' ? 'text-b1 border-b1' : 'text-t3 border-transparent'
-          )}
-        >
-          <ListChecks size={14} weight={tab === 'tasks' ? 'fill' : 'regular'} />
-          Tasks
+    <div className="flex flex-col bg-fg rounded-xl border border-s1 overflow-hidden">
+      {/* Collapsible header */}
+      <button
+        onClick={() => setCollapsed(prev => !prev)}
+        className="flex items-center justify-between px-3 py-2.5 bg-fg active:bg-s1/50 transition-colors flex-shrink-0"
+      >
+        <div className="flex items-center gap-2">
+          <div className="p-1 bg-gradient-to-br from-b1 to-b2 rounded-lg">
+            <Robot size={12} weight="bold" className="text-white" />
+          </div>
+          <span className="text-[11px] font-bold text-t1">Agent</span>
+          {isProcessing && <CircleNotch size={10} className="text-b1 animate-spin" />}
           {pendingTasks.length > 0 && (
-            <span className="text-[8px] bg-b1/15 text-b1 px-1 py-0.5 rounded-md font-bold">{pendingTasks.length}</span>
+            <span className="text-[8px] bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md font-bold">{pendingTasks.length} task{pendingTasks.length !== 1 ? 's' : ''}</span>
           )}
-        </button>
-      </div>
+        </div>
+        {collapsed ? <CaretDown size={14} className="text-t3" /> : <CaretUp size={14} className="text-t3" />}
+      </button>
 
+      {!collapsed && (
+        <>
+          {/* Tab bar */}
+          <div className="flex border-t border-b border-s1 bg-fg flex-shrink-0">
+            <button
+              onClick={() => setTab('chat')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-all border-b-2',
+                tab === 'chat' ? 'text-b1 border-b1' : 'text-t3 border-transparent'
+              )}
+            >
+              <Robot size={13} weight={tab === 'chat' ? 'fill' : 'regular'} />
+              Chat
+            </button>
+            <button
+              onClick={() => setTab('tasks')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-wide transition-all border-b-2',
+                tab === 'tasks' ? 'text-b1 border-b1' : 'text-t3 border-transparent'
+              )}
+            >
+              <ListChecks size={13} weight={tab === 'tasks' ? 'fill' : 'regular'} />
+              Tasks
+              {pendingTasks.length > 0 && (
+                <span className="text-[8px] bg-b1/15 text-b1 px-1 py-0.5 rounded-md font-bold">{pendingTasks.length}</span>
+              )}
+            </button>
+          </div>
+
+          <div style={{ height: 320 }} className="flex flex-col">
       {/* Chat tab */}
       {tab === 'chat' && (
         <>
@@ -261,6 +282,9 @@ export function AgentPanel({ onSendMessage, isProcessing = false }: AgentPanelPr
             >
               <Plus size={14} weight="bold" />
             </button>
+          </div>
+        </>
+      )}
           </div>
         </>
       )}

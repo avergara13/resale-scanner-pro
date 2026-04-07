@@ -1009,6 +1009,9 @@ function App() {
 
   useEffect(() => {
     setPrevScreen(screen)
+    // Scroll to top on every screen change
+    window.scrollTo(0, 0)
+    document.getElementById('app-container')?.scrollTo(0, 0)
   }, [screen])
 
   return (
