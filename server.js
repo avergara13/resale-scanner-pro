@@ -47,6 +47,29 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // Debug endpoint — diagnose dist/ availability at runtime
+  if (req.url === '/debug') {
+    const distExists = fs.existsSync(distDir)
+    let distFiles = null
+    if (distExists) {
+      try {
+        distFiles = fs.readdirSync(distDir)
+      } catch (e) {
+        distFiles = `error reading dir: ${e.message}`
+      }
+    }
+    const payload = {
+      cwd: process.cwd(),
+      __dirname,
+      distDir,
+      distExists,
+      distFiles,
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify(payload, null, 2))
+    return
+  }
+
   // Serve static file or fall back to index.html (SPA routing)
   const safePath = req.url === '/' ? '/index.html' : req.url
   const filePath = path.join(distDir, safePath.replace(/^\/+/, '').split('?')[0])
@@ -63,10 +86,27 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // dist/ not found — log for diagnosis
+  if (!fs.existsSync(distDir)) {
+    console.error(`[ERROR] dist/ directory not found at ${distDir}. Build output may not have been preserved in the runtime image.`)
+  } else {
+    console.error(`[ERROR] index.html not found inside ${distDir}. dist/ exists but may be empty or malformed.`)
+  }
+
   res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
   res.end('not found')
 })
 
 server.listen(port, '0.0.0.0', () => {
-  console.log(`🔍 Resale Scanner Pro · http://localhost:${port}`)
+  // Startup check — confirm dist/ is present before accepting traffic
+  const distExists = fs.existsSync(distDir)
+  if (distExists) {
+    let fileCount = 0
+    try { fileCount = fs.readdirSync(distDir).length } catch (_) {}
+    console.log(`🔍 Resale Scanner Pro · http://localhost:${port}`)
+    console.log(`✅ dist/ found at ${distDir} (${fileCount} entries)`)
+  } else {
+    console.error(`🔍 Resale Scanner Pro · http://localhost:${port}`)
+    console.error(`❌ dist/ NOT found at ${distDir} — app will serve 404. Check that the build step ran and the output was preserved in the runtime image.`)
+  }
 })
