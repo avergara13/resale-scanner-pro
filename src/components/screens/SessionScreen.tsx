@@ -3,6 +3,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
@@ -381,12 +382,19 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
         </div>
       ) : (
         <div className="flex-1 space-y-3 pb-24">
-          {/* Same date line as inactive view */}
+          {/* Session name + location/goal buttons */}
           <div className="flex items-center justify-between">
-            <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-            </p>
-            <div className="flex items-center gap-2">
+            <div>
+              <h2 className="text-lg font-black tracking-tight text-t1">
+                {session.name || new Date(session.startTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+              </h2>
+              <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
+                {new Date(session.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                {' · '}
+                {new Date(session.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
               <Badge variant="secondary" className="bg-green text-white px-2 py-0.5 uppercase text-[9px] font-bold">
                 Active
               </Badge>
@@ -429,6 +437,40 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
               <span className="text-[9px] text-t3 font-bold uppercase">PASS</span>
             </button>
           </div>
+
+          {/* Session items */}
+          {(() => {
+            const sessionItems = allCombinedItems.filter(i => i.sessionId === session.id)
+            if (sessionItems.length === 0) return null
+            return (
+              <div>
+                <h3 className="text-xs font-bold text-t3 uppercase tracking-wider mb-2">Session Items</h3>
+                <div className="space-y-1.5">
+                  {sessionItems.map(item => (
+                    <div key={item.id} className="stat-card p-3 flex items-center gap-3">
+                      {item.imageThumbnail || item.imageData ? (
+                        <img src={item.imageThumbnail || item.imageData} alt="" className="w-10 h-10 rounded-lg object-cover bg-s1 flex-shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-s1 flex items-center justify-center flex-shrink-0">
+                          <Package size={16} className="text-t3" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold text-t1 truncate">{item.productName || 'Unknown'}</p>
+                        <p className="text-[10px] text-t3">${item.purchasePrice.toFixed(2)} → ${(item.estimatedSellPrice || 0).toFixed(2)}</p>
+                      </div>
+                      <Badge className={cn(
+                        'text-[9px] border-0 px-1.5',
+                        item.decision === 'BUY' ? 'bg-green/10 text-green' : item.decision === 'PASS' ? 'bg-red/10 text-red' : 'bg-s1 text-t3'
+                      )}>
+                        {item.decision}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Agent + Tasks */}
           <AgentPanel

@@ -465,8 +465,11 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
+    const now = new Date()
+    const name = now.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     const newSession: Session = {
       id: Date.now().toString(),
+      name,
       startTime: Date.now(),
       itemsScanned: 0,
       buyCount: 0,
