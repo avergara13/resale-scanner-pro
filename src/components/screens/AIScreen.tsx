@@ -21,7 +21,7 @@ import { useCollapsePreference } from '@/hooks/use-collapse-preference'
 import { useTabPreference } from '@/hooks/use-tab-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
-import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
+import type { ScannedItem, PipelineStep, AppSettings, ChatMessage } from '@/types'
 
 interface AIScreenProps {
   currentItem?: ScannedItem
@@ -30,13 +30,6 @@ interface AIScreenProps {
   onAddToQueue: () => void
   onDeepSearch: () => void
   onSaveDraft: (price: number, notes: string) => void
-}
-
-interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: number
 }
 
 function CelebrationParticle({ delay, index }: { delay: number; index: number }) {

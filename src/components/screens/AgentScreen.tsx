@@ -941,7 +941,28 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error'
       console.error('Agent AI error:', msg)
-      toast.error(msg.includes('API key') ? msg : `AI error: ${msg}`)
+      // Only show error toast for actionable issues (API key missing, safety block)
+      // Transient failures (network, timeout) are silently absorbed — user can just retry
+      if (msg.includes('API key') || msg.includes('configure')) {
+        toast.error(msg)
+      } else if (msg.includes('safety filter') || msg.includes('blocked')) {
+        toast.error('Message couldn\'t be processed. Try rephrasing.')
+      } else {
+        // Transient error — add a subtle inline message instead of a loud toast
+        const errorMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: 'I had trouble processing that. Please try again.',
+          timestamp: Date.now(),
+        }
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === activeSessionId
+              ? { ...s, messages: [...s.messages, errorMessage], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+      }
     } finally {
       setIsProcessing(false)
     }

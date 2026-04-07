@@ -191,14 +191,6 @@ export function getRetryOptions(endpoint: APIEndpoint): RetryOptions {
   }
 }
 
-export function shouldCacheResponse(endpoint: APIEndpoint): boolean {
-  return ENDPOINT_RETRY_CONFIGS[endpoint].cacheable
-}
-
-export function getCacheTimeout(endpoint: APIEndpoint): number | undefined {
-  return ENDPOINT_RETRY_CONFIGS[endpoint].cacheTimeout
-}
-
 export function getEndpointPriority(endpoint: APIEndpoint): 'critical' | 'high' | 'medium' | 'low' {
   return ENDPOINT_RETRY_CONFIGS[endpoint].priority
 }
@@ -234,16 +226,6 @@ export function adjustRetryConfigByPriority(
     initialDelay: (baseConfig.initialDelay || 1000) / multiplier,
     maxDelay: (baseConfig.maxDelay || 10000) * multiplier,
   }
-}
-
-export function getEndpointsByPriority(priority: 'critical' | 'high' | 'medium' | 'low'): APIEndpoint[] {
-  return Object.entries(ENDPOINT_RETRY_CONFIGS)
-    .filter(([_, config]) => config.priority === priority)
-    .map(([endpoint, _]) => endpoint as APIEndpoint)
-}
-
-export function getAllEndpoints(): APIEndpoint[] {
-  return Object.keys(ENDPOINT_RETRY_CONFIGS) as APIEndpoint[]
 }
 
 export function formatRetryConfig(endpoint: APIEndpoint): string {

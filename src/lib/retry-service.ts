@@ -233,26 +233,10 @@ export function createRetryWrapper(defaultOptions: RetryOptions = {}) {
   }
 }
 
-export const defaultRetry = createRetryWrapper({
-  maxRetries: 3,
-  initialDelay: 1000,
-  maxDelay: 10000,
-  backoffMultiplier: 2,
-  timeout: 30000,
-})
-
 export const aggressiveRetry = createRetryWrapper({
   maxRetries: 5,
   initialDelay: 500,
   maxDelay: 15000,
   backoffMultiplier: 2.5,
   timeout: 45000,
-})
-
-export const conservativeRetry = createRetryWrapper({
-  maxRetries: 2,
-  initialDelay: 2000,
-  maxDelay: 8000,
-  backoffMultiplier: 2,
-  timeout: 20000,
 })
