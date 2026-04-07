@@ -140,6 +140,10 @@ function App() {
     toast.success('Session restored')
   }, [setAllSessions])
 
+  const handlePermanentDeleteSession = useCallback((sessionId: string) => {
+    setAllSessions((prev) => (prev || []).filter(s => s.id !== sessionId))
+  }, [setAllSessions])
+
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
     const updateInterval = 80
     const totalUpdates = Math.floor(duration / updateInterval)
@@ -1213,6 +1217,7 @@ function App() {
                 allSessions={visibleSessions}
                 deletedSessions={deletedSessions}
                 onRestoreSession={handleRestoreSession}
+                onPermanentDeleteSession={handlePermanentDeleteSession}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
               />

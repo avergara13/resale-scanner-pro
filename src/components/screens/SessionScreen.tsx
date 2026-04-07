@@ -144,11 +144,12 @@ interface SessionScreenProps {
   allSessions?: Session[]
   deletedSessions?: Session[]
   onRestoreSession?: (sessionId: string) => void
+  onPermanentDeleteSession?: (sessionId: string) => void
   queueItems?: ScannedItem[]
   scanHistory?: ScannedItem[]
 }
 
-export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, queueItems: queueProp, scanHistory: scanHistoryProp }: SessionScreenProps) {
+export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   // Use props from App.tsx (single source of truth) instead of local useKV
   // This ensures deletes/updates propagate immediately
@@ -320,12 +321,20 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
               {deletedSessions.map(s => (
                 <div key={s.id} className="flex items-center justify-between py-1.5">
                   <span className="text-xs text-t2 truncate flex-1">{s.name || 'Unnamed session'}</span>
-                  <button
-                    onClick={() => onRestoreSession?.(s.id)}
-                    className="text-[10px] font-bold text-b1 px-2 py-1 bg-b1/10 rounded-lg active:scale-95 transition-transform flex-shrink-0 ml-2"
-                  >
-                    Restore
-                  </button>
+                  <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                    <button
+                      onClick={() => onRestoreSession?.(s.id)}
+                      className="text-[10px] font-bold text-b1 px-2 py-1 bg-b1/10 rounded-lg active:scale-95 transition-transform"
+                    >
+                      Restore
+                    </button>
+                    <button
+                      onClick={() => onPermanentDeleteSession?.(s.id)}
+                      className="p-1.5 rounded-lg text-red/50 hover:text-red hover:bg-red/10 active:scale-95 transition-all"
+                    >
+                      <Trash size={14} weight="bold" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
