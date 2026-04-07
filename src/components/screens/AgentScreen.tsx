@@ -886,7 +886,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
 
 ### ${currentSession?.active ? `Session: ${currentSession.name || 'Active'} — Listings` : 'All Listings (Global)'}
 - ${queueStats.total} items (${queueStats.buy} BUY, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
-- Potential profit: $${queueStats.totalProfit.toFixed(2)}
+- Potential profit: $${(queueStats.totalProfit || 0).toFixed(2)}
 ${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
 
 ### Sold Items
@@ -903,10 +903,10 @@ ${pastSessionsSummary || 'None'}
 ${activeGoalsSummary || 'None'}
 
 ### Tasks
-${pendingTodos.length > 0 ? pendingTodos.map(t => `- [ ] ${t.text} (${t.createdBy})`).join('\n') : 'No pending tasks'}
+${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} (${t.createdBy})`).join('\n') : 'No pending tasks'}
 
 ### Settings
-- Min margin: ${settings?.minProfitMargin}%, Shipping: $${settings?.defaultShippingCost}, eBay fee: ${settings?.ebayFeePercent}%`
+- Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%`
 
       // Include last 4 messages for conversational continuity
       const recentHistory = chatMessages.slice(-4).map(m =>

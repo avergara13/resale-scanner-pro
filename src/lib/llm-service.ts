@@ -35,7 +35,7 @@ async function callGemini(
   }
   // Gemini caches systemInstruction across requests with identical prefixes,
   // reducing per-request token billing for the static instruction portion
-  if (systemInstruction) {
+  if (systemInstruction && systemInstruction.trim().length > 10) {
     body.systemInstruction = { parts: [{ text: systemInstruction }] }
   }
 
@@ -51,9 +51,18 @@ async function callGemini(
   }
 
   const data = await response.json()
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+  // Inspect block/safety reasons before extracting text
+  const candidate = data?.candidates?.[0]
+  const blockReason = candidate?.blockReason || data?.promptFeedback?.blockReason
+  if (blockReason) {
+    throw new Error(`Gemini blocked: ${blockReason}. Try rephrasing your message.`)
+  }
+  if (candidate?.finishReason === 'SAFETY') {
+    throw new Error('Response blocked by safety filter. Try rephrasing.')
+  }
+  const text = candidate?.content?.parts?.[0]?.text
   if (!text) {
-    throw new Error('Gemini returned empty or blocked response')
+    throw new Error('Gemini returned empty response — the model may not have received proper context')
   }
   return text
 }
@@ -139,7 +148,7 @@ async function callClaude(
     body: JSON.stringify({
       model,
       max_tokens: maxTokens,
-      ...(systemPrompt ? { system: systemPrompt } : {}),
+      ...(systemPrompt && systemPrompt.trim().length > 10 ? { system: systemPrompt } : {}),
       messages: [{ role: 'user', content: prompt }],
     }),
   })
@@ -216,5 +225,8 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
     })
   }
 
-  throw new Error('AI unavailable — configure Gemini API key in Settings')
+  const tried: string[] = []
+  if (task === 'complex' && anthropicApiKey) tried.push('Claude (failed)')
+  if (!geminiApiKey || geminiApiKey.length < 10) tried.push('Gemini (no API key)')
+  throw new Error(`AI unavailable${tried.length ? ` — ${tried.join(', ')}` : ''} — configure API keys in Settings`)
 }
