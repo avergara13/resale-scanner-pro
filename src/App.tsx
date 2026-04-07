@@ -467,8 +467,9 @@ function App() {
   const handleStartSession = useCallback(() => {
     const now = new Date()
     const name = now.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    const id = Date.now().toString()
     const newSession: Session = {
-      id: Date.now().toString(),
+      id,
       name,
       startTime: Date.now(),
       itemsScanned: 0,
@@ -477,11 +478,13 @@ function App() {
       totalPotentialProfit: 0,
       active: true,
     }
-    // Save to allSessions immediately so it persists
     setAllSessions((prev) => [...(prev || []), newSession])
     setSession(newSession)
+    // Navigate to session detail screen
+    setSelectedSessionId(id)
+    setScreen('session-detail')
     toast.success('Session started')
-  }, [setSession, setAllSessions])
+  }, [setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Close the active session view without ending it — go back to session list
   // Sync current session state to allSessions before clearing the view
@@ -494,13 +497,15 @@ function App() {
     setSession(undefined)
   }, [session, setSession, setAllSessions])
 
-  // Resume an existing open session
+  // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
     const found = (allSessions || []).find(s => s.id === sessionId)
     if (found && found.active) {
       setSession(found)
+      setSelectedSessionId(sessionId)
+      setScreen('session-detail')
     }
-  }, [allSessions, setSession])
+  }, [allSessions, setSession, setSelectedSessionId, setScreen])
 
   // Delete a session — remove from allSessions and clear currentSession if it matches
   const handleDeleteSession = useCallback((sessionId: string) => {
@@ -993,6 +998,11 @@ function App() {
       }
     }
   }, [])
+
+  // Always start on the session list — clear currentSession view on app load
+  useEffect(() => {
+    setSession(undefined)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Migrate legacy GO → BUY decision labels
   useEffect(() => {

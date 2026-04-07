@@ -1,6 +1,5 @@
-import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, Package, ArrowLeft } from '@phosphor-icons/react'
+import { Play, CheckCircle, XCircle, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, ArrowLeft } from '@phosphor-icons/react'
 import { useState, useCallback, useMemo } from 'react'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -280,7 +279,7 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
             </div>
           )}
         </div>
-      ) : !session?.active ? (
+      ) : (
         <div className="flex-1 overflow-y-auto space-y-4 pb-24">
           {/* Date */}
           <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
@@ -382,123 +381,6 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
               </div>
             )
           })()}
-        </div>
-      ) : (
-        <div className="flex-1 space-y-3 pb-24">
-          {/* Back to session list */}
-          <button
-            onClick={onCloseSessionView}
-            className="flex items-center gap-1.5 text-b1 active:opacity-60 transition-opacity"
-          >
-            <ArrowLeft size={14} weight="bold" />
-            <span className="text-[11px] font-bold uppercase tracking-wide">All Sessions</span>
-          </button>
-
-          {/* Session name + location/goal buttons */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-black tracking-tight text-t1">
-                {session.name || new Date(session.startTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-              </h2>
-              <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
-                {new Date(session.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                {' · '}
-                {new Date(session.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Badge variant="secondary" className="bg-green text-white px-2 py-0.5 uppercase text-[9px] font-bold">
-                Active
-              </Badge>
-              <span className="text-[10px] mono text-t3">
-                {formatDuration(Date.now() - session.startTime)}
-              </span>
-            </div>
-          </div>
-
-          {/* Stat row */}
-          <div className="flex gap-2">
-            <button onClick={() => onNavigateToQueue?.()} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
-              <div className="text-base font-bold text-green leading-tight">
-                ${session.totalPotentialProfit.toFixed(2)}
-              </div>
-              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Est. Profit</div>
-            </button>
-            <button onClick={() => onNavigateToHistory?.()} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
-              <div className="text-base font-bold text-t1 leading-tight">{session.itemsScanned}</div>
-              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
-            </button>
-            <button onClick={() => onNavigateToQueue?.('BUY')} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
-              <div className="text-base font-bold text-b1 leading-tight">
-                {session.itemsScanned > 0 ? Math.round((session.buyCount / session.itemsScanned) * 100) : 0}%
-              </div>
-              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">BUY Rate</div>
-            </button>
-          </div>
-
-          {/* BUY / PASS compact row */}
-          <div className="flex gap-2">
-            <button onClick={() => onNavigateToQueue?.('BUY')} className="stat-card flex-1 p-3 flex items-center gap-2 active:scale-[0.97] transition-transform">
-              <CheckCircle size={16} weight="fill" className="text-green" />
-              <span className="text-lg font-bold mono text-green">{session.buyCount}</span>
-              <span className="text-[9px] text-t3 font-bold uppercase">BUY</span>
-            </button>
-            <button onClick={() => onNavigateToQueue?.('PASS')} className="stat-card flex-1 p-3 flex items-center gap-2 active:scale-[0.97] transition-transform">
-              <XCircle size={16} weight="fill" className="text-red" />
-              <span className="text-lg font-bold mono text-red">{session.passCount}</span>
-              <span className="text-[9px] text-t3 font-bold uppercase">PASS</span>
-            </button>
-          </div>
-
-          {/* Session items */}
-          {(() => {
-            const sessionItems = allCombinedItems.filter(i => i.sessionId === session.id)
-            if (sessionItems.length === 0) return null
-            return (
-              <div>
-                <h3 className="text-xs font-bold text-t3 uppercase tracking-wider mb-2">Session Items</h3>
-                <div className="space-y-1.5">
-                  {sessionItems.map(item => (
-                    <div key={item.id} className="stat-card p-3 flex items-center gap-3">
-                      {item.imageThumbnail || item.imageData ? (
-                        <img src={item.imageThumbnail || item.imageData} alt="" className="w-10 h-10 rounded-lg object-cover bg-s1 flex-shrink-0" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-s1 flex items-center justify-center flex-shrink-0">
-                          <Package size={16} className="text-t3" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-bold text-t1 truncate">{item.productName || 'Unknown'}</p>
-                        <p className="text-[10px] text-t3">${item.purchasePrice.toFixed(2)} → ${(item.estimatedSellPrice || 0).toFixed(2)}</p>
-                      </div>
-                      <Badge className={cn(
-                        'text-[9px] border-0 px-1.5',
-                        item.decision === 'BUY' ? 'bg-green/10 text-green' : item.decision === 'PASS' ? 'bg-red/10 text-red' : 'bg-s1 text-t3'
-                      )}>
-                        {item.decision}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Agent + Tasks */}
-          <AgentPanel
-            onSendMessage={onAgentMessage}
-            isProcessing={isAgentProcessing}
-          />
-
-          {/* End Session */}
-          <Button
-            onClick={onEndSession}
-            variant="outline"
-            className="w-full h-10 border-red text-red hover:bg-red/10 font-medium text-sm"
-          >
-            <Stop size={18} weight="bold" className="mr-2" />
-            End Session
-          </Button>
         </div>
       )}
       </div>
