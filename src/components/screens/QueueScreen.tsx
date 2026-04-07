@@ -61,6 +61,7 @@ interface QueueScreenProps {
   onNavigateToTagAnalytics?: () => void
   onNavigateToLocationInsights?: () => void
   onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
+  onDelist?: (itemId: string) => void
   personalSessionIds?: Set<string>
 }
 
@@ -78,6 +79,7 @@ interface SortableItemProps {
   onCreateListing: (id: string) => void
   onEditTags: (itemId: string, tags: string[]) => void
   onOpenSoldDialog?: (item: ScannedItem) => void
+  onDelist?: (itemId: string) => void
 }
 
 function SortableItem({
@@ -91,6 +93,7 @@ function SortableItem({
   onCreateListing,
   onEditTags,
   onOpenSoldDialog,
+  onDelist,
 }: SortableItemProps) {
   const {
     attributes,
@@ -218,14 +221,26 @@ function SortableItem({
               Edit
             </Button>
             {item.listingStatus === 'published' && onOpenSoldDialog ? (
-              <Button
-                size="sm"
-                onClick={() => onOpenSoldDialog(item)}
-                className="flex-1 bg-green hover:bg-green/90 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
-              >
-                <Tag size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
-                Mark Sold
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => onOpenSoldDialog(item)}
+                  className="flex-1 bg-green hover:bg-green/90 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
+                >
+                  <Tag size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
+                  Mark Sold
+                </Button>
+                {onDelist && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onDelist(item.id)}
+                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-[11px] text-t3 hover:text-red"
+                  >
+                    Delist
+                  </Button>
+                )}
+              </>
             ) : (
               <Button
                 size="sm"
@@ -251,7 +266,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, personalSessionIds }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -1306,6 +1321,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                         setSoldPrice(soldItem.estimatedSellPrice ? soldItem.estimatedSellPrice.toString() : '')
                         setSoldMarketplace('ebay')
                       } : undefined}
+                      onDelist={onDelist}
                     />
                   ))}
                 </div>

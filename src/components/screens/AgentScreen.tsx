@@ -28,6 +28,7 @@ import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { getNetProfit } from '@/lib/profit-utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -74,6 +75,35 @@ const QUICK_ACTIONS: QuickAction[] = [
     prompt: 'What\'s my current session status? Show me all stats, goals, and recent items.'
   },
 ]
+
+// Static system instructions — extracted to module level so they're allocated once
+// and can benefit from LLM prompt caching (stable prefix)
+const AGENT_SYSTEM_INSTRUCTIONS = `You are an expert AI agent for resale business optimization. You have FULL awareness of this app's state — every session, item, goal, and setting. You help users research products, analyze profitability, create optimized eBay listings, manage sessions, track sold items, and make data-driven decisions.
+
+## Available Actions
+You can execute these commands for the user:
+- "Research [product]" — Search real marketplaces for current prices and demand
+- "Change price to $X" / "Update sell price to $X" — Edit item fields
+- "Create listings" — Generate optimized eBay listings for BUY items
+- "Push to Notion" — Publish ready listings
+- "Full pipeline" — End-to-end: analyze → optimize → publish
+- "Camera" / "Scan" — Open the AI Camera
+- "Start session" / "End session" — Manage scanning sessions
+- "Name session [name]" — Rename the active session
+- "Set goal $X" — Set a profit goal for the active session
+- "Set location [name]" — Set the location for the active session
+- "Mark [item] as sold on [marketplace] for $X" — Move a published item to the Sold tab
+- "Add tracking [number] for [item]" / "Mark [item] shipped" — Update shipping status
+
+## Instructions
+- You are fully aware of ALL data in this app. Reference specific items, sessions, goals, and metrics by name and number.
+- When the user asks about sessions, items, goals, or any app data, answer from the state above — don't say you can't access it.
+- When discussing items, reference their specific prices, margins, categories, and brands.
+- If asked about profitability, calculate real numbers using the data. Profit figures are NET (after marketplace fees and shipping).
+- If an item has a negative margin, explain WHY (fees + shipping) and suggest alternatives.
+- When the user asks to edit forms or data, use the available actions to do it immediately.
+- Be proactive: if a session has no goal set, suggest one. If items are unanalyzed, suggest running the pipeline.
+- Items needing shipping are urgent (1-day shipping policy). Flag any items overdue for shipping.` as const
 
 function formatMessage(text: string): string {
   let formatted = text
@@ -360,7 +390,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       soldPrice: item.soldPrice,
       soldOn: item.soldOn,
       soldDate: item.soldDate,
-      profit: (item.soldPrice || 0) - item.purchasePrice,
+      netProfit: settings ? getNetProfit(item, settings).netProfit : (item.soldPrice || 0) - item.purchasePrice,
       status: item.listingStatus,
       trackingNumber: item.trackingNumber,
     }))
@@ -867,15 +897,16 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
 
       const soldSummaryText = soldItems.length > 0
         ? soldItems.slice(0, 5).map(i => {
-            const profit = (i.soldPrice || 0) - i.purchasePrice
-            return `• ${i.productName || 'Unknown'} — Sold $${(i.soldPrice || 0).toFixed(2)} on ${i.soldOn || '?'}, Profit: $${profit.toFixed(2)}, Status: ${i.listingStatus}`
+            const { netProfit } = settings ? getNetProfit(i, settings) : { netProfit: (i.soldPrice || 0) - i.purchasePrice }
+            return `• ${i.productName || 'Unknown'} — Sold $${(i.soldPrice || 0).toFixed(2)} on ${i.soldOn || '?'}, Net Profit: $${netProfit.toFixed(2)}, Status: ${i.listingStatus}`
           }).join('\n')
         : 'No sold items yet'
 
+      const activeSold = soldItems.filter(i => i.listingStatus !== 'returned')
       const soldStats = {
-        total: soldItems.length,
-        revenue: soldItems.reduce((s, i) => s + (i.soldPrice || 0), 0),
-        profit: soldItems.reduce((s, i) => s + ((i.soldPrice || 0) - i.purchasePrice), 0),
+        total: activeSold.length,
+        revenue: activeSold.reduce((s, i) => s + (i.soldPrice || 0), 0),
+        netProfit: settings ? activeSold.reduce((s, i) => s + getNetProfit(i, settings).netProfit, 0) : activeSold.reduce((s, i) => s + ((i.soldPrice || 0) - i.purchasePrice), 0),
         needsShipping: soldItems.filter(i => i.listingStatus === 'sold').length,
       }
 
@@ -888,7 +919,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
           }`
         : 'No scanning session is active. You are showing all-time global stats across all sessions.'
 
-      const systemPrompt = `You are an expert AI agent for resale business optimization. You have FULL awareness of this app's state — every session, item, goal, and setting. You help users research products, analyze profitability, create optimized eBay listings, manage sessions, track sold items, and make data-driven decisions.
+      const systemPrompt = `${AGENT_SYSTEM_INSTRUCTIONS}
 
 ${sessionScope}
 
@@ -900,7 +931,7 @@ ${sessionScope}
 ${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
 
 ### Sold Items
-- ${soldStats.total} total sold | Revenue: $${soldStats.revenue.toFixed(2)} | Profit: $${soldStats.profit.toFixed(2)} | Needs Shipping: ${soldStats.needsShipping}
+- ${soldStats.total} total sold | Revenue: $${soldStats.revenue.toFixed(2)} | Net Profit: $${soldStats.netProfit.toFixed(2)} | Needs Shipping: ${soldStats.needsShipping}
 ${soldSummaryText !== 'No sold items yet' ? `\nRecent Sold:\n${soldSummaryText}` : '\nNo sold items yet'}
 
 ### Active Session
@@ -918,31 +949,7 @@ ${pastSessionsSummary || 'No past sessions'}
 ${activeGoalsSummary || 'No active goals'}
 
 ### Settings
-- Min margin: ${settings?.minProfitMargin}%, Shipping: $${settings?.defaultShippingCost}, eBay fee: ${settings?.ebayFeePercent}%
-
-## Available Actions
-You can execute these commands for the user:
-- "Research [product]" — Search real marketplaces for current prices and demand
-- "Change price to $X" / "Update sell price to $X" — Edit item fields
-- "Create listings" — Generate optimized eBay listings for BUY items
-- "Push to Notion" — Publish ready listings
-- "Full pipeline" — End-to-end: analyze → optimize → publish
-- "Camera" / "Scan" — Open the AI Camera
-- "Start session" / "End session" — Manage scanning sessions
-- "Name session [name]" — Rename the active session
-- "Set goal $X" — Set a profit goal for the active session
-- "Set location [name]" — Set the location for the active session
-- "Mark [item] as sold on [marketplace] for $X" — Move a published item to the Sold tab
-- "Add tracking [number] for [item]" / "Mark [item] shipped" — Update shipping status
-
-## Instructions
-- You are fully aware of ALL data in this app. Reference specific items, sessions, goals, and metrics by name and number.
-- When the user asks about sessions, items, goals, or any app data, answer from the state above — don't say you can't access it.
-- When discussing items, reference their specific prices, margins, categories, and brands.
-- If asked about profitability, calculate real numbers using the data.
-- If an item has a negative margin, explain WHY (fees + shipping) and suggest alternatives.
-- When the user asks to edit forms or data, use the available actions to do it immediately.
-- Be proactive: if a session has no goal set, suggest one. If items are unanalyzed, suggest running the pipeline.`
+- Min margin: ${settings?.minProfitMargin}%, Shipping: $${settings?.defaultShippingCost}, eBay fee: ${settings?.ebayFeePercent}%`
 
       const fullPrompt = `${systemPrompt}\n\nUser: ${text}`
       const response = await callLLM(fullPrompt, {

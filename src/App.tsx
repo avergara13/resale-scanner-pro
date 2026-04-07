@@ -648,7 +648,7 @@ function App() {
     if (result.success) {
       setQueue((prev) => (prev || []).map(i =>
         i.id === itemId
-          ? { ...i, notionPageId: result.pageId, notionUrl: result.url, listingStatus: 'published' }
+          ? { ...i, notionPageId: result.pageId, notionUrl: result.url, listingStatus: 'published', publishedDate: Date.now() }
           : i
       ))
       toast.success('Pushed to Notion ✓')
@@ -699,6 +699,60 @@ function App() {
       notionService.updateListingStatus(item.notionPageId, { status: 'completed' }).catch(() => {})
     }
     toast.success('Transaction completed')
+  }, [setQueue, queue, notionService])
+
+  const handleMarkReturned = useCallback((itemId: string, reason?: string) => {
+    const returnedDate = Date.now()
+    setQueue(prev => (prev || []).map(item =>
+      item.id === itemId
+        ? { ...item, listingStatus: 'returned' as const, returnedDate, returnReason: reason }
+        : item
+    ))
+    const item = (queue || []).find(i => i.id === itemId)
+    if (item?.notionPageId && notionService) {
+      notionService.updateListingStatus(item.notionPageId, { status: 'returned', returnedDate, returnReason: reason }).catch(() => {})
+    }
+    toast.success('Item marked as returned')
+  }, [setQueue, queue, notionService])
+
+  const handleDelist = useCallback((itemId: string) => {
+    const delistedDate = Date.now()
+    setQueue(prev => (prev || []).map(item =>
+      item.id === itemId
+        ? { ...item, listingStatus: 'delisted' as const, delistedDate }
+        : item
+    ))
+    const item = (queue || []).find(i => i.id === itemId)
+    if (item?.notionPageId && notionService) {
+      notionService.updateListingStatus(item.notionPageId, { status: 'delisted', delistedDate }).catch(() => {})
+    }
+    toast.success('Item delisted')
+  }, [setQueue, queue, notionService])
+
+  const handleRelistItem = useCallback((itemId: string) => {
+    setQueue(prev => (prev || []).map(item =>
+      item.id === itemId
+        ? {
+            ...item,
+            listingStatus: 'ready' as const,
+            soldPrice: undefined,
+            soldDate: undefined,
+            soldOn: undefined,
+            soldBuyerName: undefined,
+            trackingNumber: undefined,
+            shippedDate: undefined,
+            shippingCarrier: undefined,
+            returnedDate: undefined,
+            returnReason: undefined,
+            delistedDate: undefined,
+          }
+        : item
+    ))
+    const item = (queue || []).find(i => i.id === itemId)
+    if (item?.notionPageId && notionService) {
+      notionService.updateListingStatus(item.notionPageId, { status: 'ready' }).catch(() => {})
+    }
+    toast.success('Item re-listed')
   }, [setQueue, queue, notionService])
 
   const handleSaveDraft = useCallback((price: number, notes: string) => {
@@ -1208,6 +1262,7 @@ function App() {
                 onNavigateToTagAnalytics={() => setScreen('tag-analytics')}
                 onNavigateToLocationInsights={() => setScreen('location-insights')}
                 onMarkAsSold={handleMarkAsSold}
+                onDelist={handleDelist}
                 personalSessionIds={personalSessionIds}
               />
             </motion.div>
@@ -1224,11 +1279,14 @@ function App() {
             >
               <SoldScreen
                 soldItems={(queue || []).filter(i =>
-                  i.listingStatus === 'sold' || i.listingStatus === 'shipped' || i.listingStatus === 'completed'
+                  i.listingStatus === 'sold' || i.listingStatus === 'shipped' || i.listingStatus === 'completed' || i.listingStatus === 'returned'
                 )}
                 onMarkShipped={handleMarkShipped}
                 onMarkCompleted={handleMarkCompleted}
+                onMarkReturned={handleMarkReturned}
+                onRelistItem={handleRelistItem}
                 personalSessionIds={personalSessionIds}
+                settings={settings}
               />
             </motion.div>
           )}

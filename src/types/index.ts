@@ -81,11 +81,12 @@ export interface ScannedItem {
   parentItemId?: string
   location?: ThriftStoreLocation
   optimizedListing?: OptimizedListing
-  listingStatus?: 'not-started' | 'optimizing' | 'ready' | 'published' | 'sold' | 'shipped' | 'completed'
+  listingStatus?: 'not-started' | 'optimizing' | 'ready' | 'published' | 'sold' | 'shipped' | 'completed' | 'returned' | 'delisted'
   ebayListingId?: string
   notionPageId?: string
   notionUrl?: string
   sessionId?: string
+  publishedDate?: number
   soldPrice?: number
   soldDate?: number
   soldOn?: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
@@ -93,6 +94,10 @@ export interface ScannedItem {
   trackingNumber?: string
   shippedDate?: number
   shippingCarrier?: string
+  returnedDate?: number
+  returnReason?: string
+  delistedDate?: number
+  actualShippingCost?: number
 }
 
 export interface OptimizedListing {

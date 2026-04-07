@@ -167,13 +167,16 @@ export class NotionService {
   }
 
   async updateListingStatus(pageId: string, update: {
-    status: 'sold' | 'shipped' | 'completed'
+    status: 'sold' | 'shipped' | 'completed' | 'returned' | 'delisted' | 'ready'
     soldPrice?: number
     soldOn?: string
     trackingNumber?: string
     shippingCarrier?: string
     soldDate?: number
     shippedDate?: number
+    returnedDate?: number
+    returnReason?: string
+    delistedDate?: number
   }): Promise<NotionPushResponse> {
     if (!this.isConfigured()) {
       return { success: false, error: 'Notion API not configured.' }
@@ -197,6 +200,15 @@ export class NotionService {
       }
       if (update.soldDate) {
         properties['Sold Date'] = { date: { start: new Date(update.soldDate).toISOString() } }
+      }
+      if (update.returnedDate) {
+        properties['Returned Date'] = { date: { start: new Date(update.returnedDate).toISOString() } }
+      }
+      if (update.returnReason) {
+        properties['Return Reason'] = { rich_text: [{ text: { content: update.returnReason } }] }
+      }
+      if (update.delistedDate) {
+        properties['Delisted Date'] = { date: { start: new Date(update.delistedDate).toISOString() } }
       }
 
       await retryFetch(`https://api.notion.com/v1/pages/${pageId}`, {
