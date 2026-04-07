@@ -125,7 +125,6 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, allSes
       setAllSessions(prev => (prev || []).filter(s => s.id !== sessionId))
     }
     onBack()
-    toast.success('Session deleted')
   }, [onDeleteSession, setAllSessions, sessionId, onBack])
 
   if (!session) {

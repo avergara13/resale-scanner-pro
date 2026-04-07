@@ -213,6 +213,7 @@ export interface Session {
   profitGoal?: number
   location?: ThriftStoreLocation
   sessionType?: 'business' | 'personal'
+  deletedAt?: number
 }
 
 export interface ProfitGoal {

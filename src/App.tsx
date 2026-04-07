@@ -124,6 +124,11 @@ function App() {
     return ids
   }, [allSessions])
 
+  // Filter out soft-deleted sessions from all UI consumers
+  const visibleSessions = useMemo(() =>
+    (allSessions || []).filter(s => !s.deletedAt),
+  [allSessions])
+
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
     const updateInterval = 80
     const totalUpdates = Math.floor(duration / updateInterval)
@@ -511,13 +516,38 @@ function App() {
     }
   }, [allSessions, setSession, setSelectedSessionId, setScreen])
 
-  // Delete a session — remove from allSessions and clear currentSession if it matches
+  // Soft-delete a session with undo toast (5s window to restore)
   const handleDeleteSession = useCallback((sessionId: string) => {
-    setAllSessions((prev) => (prev || []).filter(s => s.id !== sessionId))
+    // Soft-delete: mark with deletedAt timestamp
+    setAllSessions((prev) => (prev || []).map(s =>
+      s.id === sessionId ? { ...s, deletedAt: Date.now() } : s
+    ))
     if (session?.id === sessionId) {
       setSession(undefined)
       lastSyncedSession.current = ''
     }
+    toast('Session moved to trash', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setAllSessions((prev) => (prev || []).map(s =>
+            s.id === sessionId ? { ...s, deletedAt: undefined } : s
+          ))
+          toast.success('Session restored')
+        },
+      },
+      duration: 5000,
+    })
+    // Hard-delete after 30 seconds if not restored
+    setTimeout(() => {
+      setAllSessions((prev) => {
+        const sess = (prev || []).find(s => s.id === sessionId)
+        if (sess?.deletedAt) {
+          return (prev || []).filter(s => s.id !== sessionId)
+        }
+        return prev || []
+      })
+    }, 30000)
   }, [session, setSession, setAllSessions])
 
   const handleEndSession = useCallback(() => {
@@ -1169,7 +1199,7 @@ function App() {
                   setSelectedSessionId(id)
                   setScreen('session-detail')
                 }}
-                allSessions={allSessions || []}
+                allSessions={visibleSessions}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
               />
@@ -1205,7 +1235,7 @@ function App() {
                 onStartSession={handleStartSession}
                 onEndSession={handleEndSession}
                 onEditSession={handleEditSession}
-                allSessions={allSessions || []}
+                allSessions={visibleSessions}
                 scanHistory={scanHistory || []}
                 profitGoals={profitGoals || []}
               />
@@ -1391,7 +1421,7 @@ function App() {
                 sessionId={selectedSessionId}
                 onBack={() => setScreen('session')}
                 onDeleteSession={handleDeleteSession}
-                allSessions={allSessions || []}
+                allSessions={visibleSessions}
                 onUpdateSessions={setAllSessions}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
