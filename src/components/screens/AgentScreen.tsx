@@ -1116,12 +1116,15 @@ You can execute these commands for the user:
               className="space-y-6"
             >
               <div className="text-center py-8">
-                <div className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4">
+                <button
+                  onClick={() => inputRef.current?.focus()}
+                  className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
+                >
                   <Sparkle size={32} weight="fill" className="text-white" />
-                </div>
+                </button>
                 <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
                 <p className="text-sm text-t3 max-w-xs mx-auto">
-                  Your AI assistant for research, insights, and automated listing creation
+                  Tap the icon or type below to start a chat
                 </p>
               </div>
 
