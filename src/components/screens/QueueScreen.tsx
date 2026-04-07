@@ -384,8 +384,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   }, [queueItems])
   
   const filteredItems = queueItems.filter(item => {
-    // Exclude items that have moved to the Sold tab
-    if (item.listingStatus === 'sold' || item.listingStatus === 'shipped' || item.listingStatus === 'completed') {
+    // Exclude items that have moved to the Sold tab (including returned — visible there)
+    if (item.listingStatus === 'sold' || item.listingStatus === 'shipped' || item.listingStatus === 'completed' || item.listingStatus === 'returned') {
       return false
     }
 

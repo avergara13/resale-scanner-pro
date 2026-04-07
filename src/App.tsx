@@ -1188,7 +1188,7 @@ function App() {
               <AgentScreen
                 queueItems={queue || []}
                 soldItems={(queue || []).filter(i =>
-                  i.listingStatus === 'sold' || i.listingStatus === 'shipped' || i.listingStatus === 'completed'
+                  i.listingStatus === 'sold' || i.listingStatus === 'shipped' || i.listingStatus === 'completed' || i.listingStatus === 'returned'
                 )}
                 settings={settings}
                 pendingMessage={agentPendingMessage}
