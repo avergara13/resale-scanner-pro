@@ -42,6 +42,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, gemini
   const [selectedLocation, setSelectedLocation] = useState<ThriftStoreLocation | undefined>(undefined)
   const [showLocationDialog, setShowLocationDialog] = useState(false)
   const [barcodeProduct, setBarcodeProduct] = useState<BarcodeProduct | null>(null)
+  const [cameraError, setCameraError] = useState<string | null>(null)
   
   const barcodeService = useMemo(() => createBarcodeService(geminiApiKey), [geminiApiKey])
 
@@ -78,14 +79,22 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, gemini
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       })
+      setCameraError(null)
       applyStream(mediaStream)
     } catch (err) {
       console.warn('Environment camera not found, falling back to default camera', err)
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true })
+        setCameraError(null)
         applyStream(mediaStream)
       } catch (fallbackErr) {
         console.error('Camera error:', fallbackErr)
+        if (isMountedRef.current) {
+          const msg = fallbackErr instanceof Error && fallbackErr.name === 'NotAllowedError'
+            ? 'Camera access denied. Please allow camera permission in your browser settings.'
+            : 'Camera unavailable. Check that no other app is using it and try again.'
+          setCameraError(msg)
+        }
       }
     }
   }
@@ -204,6 +213,19 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, gemini
                 muted
                 className="w-full h-full object-cover opacity-80"
               />
+
+              {cameraError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 bg-neutral-900/95 z-10">
+                  <div className="text-3xl mb-3">📷</div>
+                  <p className="text-white text-sm font-medium leading-snug">{cameraError}</p>
+                  <button
+                    onClick={onClose}
+                    className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-bold transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
 
               <AnimatePresence>
                 {showCaptureFlash && (

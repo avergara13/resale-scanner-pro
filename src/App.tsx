@@ -8,7 +8,6 @@ import { CameraOverlay } from './components/CameraOverlay'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { AIScreen } from './components/screens/AIScreen'
-import { AgentScreen } from './components/screens/AgentScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -203,7 +202,7 @@ function App() {
       productName: barcodeProduct?.title || undefined,
     }
     setCurrentItem(newItem)
-    setScreen('ai')
+    setScreen('agent')
     
     const steps: PipelineStep[] = [
       { id: 'vision', label: 'Vision Analysis', status: 'processing', progress: 0 },
@@ -1286,7 +1285,7 @@ function App() {
     <div 
       id="app-container" 
       className={cn(
-        "relative transition-colors duration-300 flex flex-col min-h-screen w-full max-w-full sm:max-w-[744px] md:max-w-[834px] lg:max-w-[1024px] xl:max-w-[1366px] mx-auto overflow-x-hidden",
+        "relative transition-colors duration-300 flex flex-col h-screen overflow-hidden w-full max-w-full sm:max-w-[744px] md:max-w-[834px] lg:max-w-[1024px] xl:max-w-[1366px] mx-auto overflow-x-hidden",
         captureState === 'capturing' && "capture-flash",
         captureState === 'analyzing' && "analyzing-flash",
         captureState === 'success' && "success-flash",
@@ -1311,8 +1310,6 @@ function App() {
             ? () => setScreen('queue')
             : screen === 'cost-tracking'
             ? () => setScreen('settings')
-            : screen === 'ai'
-            ? () => setScreen('session')
             : undefined
         }
       />
@@ -1365,49 +1362,17 @@ function App() {
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
-              <AgentScreen
-                queueItems={queue || []}
-                soldItems={(queue || []).filter(i =>
-                  i.listingStatus === 'sold' || i.listingStatus === 'shipped' || i.listingStatus === 'completed' || i.listingStatus === 'returned'
-                )}
-                settings={settings}
-                pendingMessage={agentPendingMessage}
-                onPendingMessageHandled={() => setAgentPendingMessage(null)}
-                onProcessingChange={setAgentProcessing}
-                onOptimizeItem={handleOptimizeItem}
-                onPushToNotion={handlePushToNotion}
-                onBatchAnalyze={handleBatchAnalyze}
-                onEditItem={handleEditQueueItem}
-                onMarkAsSold={handleMarkAsSold}
-                onMarkShipped={handleMarkShipped}
-                onNavigateToQueue={() => setScreen('queue')}
-                onOpenCamera={() => setCameraOpen(true)}
-                onStartSession={handleStartSession}
-                onEndSession={handleEndSession}
-                onEditSession={handleEditSession}
-                allSessions={visibleSessions}
-                scanHistory={scanHistory || []}
-                profitGoals={profitGoals || []}
-              />
-            </motion.div>
-          )}
-          {screen === 'ai' && (
-            <motion.div
-              key="ai"
-              variants={screenVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
-              className="w-full h-full"
-            >
               <AIScreen
                 currentItem={currentItem}
                 pipeline={pipeline}
                 settings={settings}
+                queueItems={queue || []}
                 onAddToQueue={handleAddToQueue}
                 onDeepSearch={() => toast.info('Deep search feature coming soon')}
                 onSaveDraft={handleSaveDraft}
+                onOpenCamera={() => setCameraOpen(true)}
+                pendingMessage={agentPendingMessage}
+                onPendingMessageHandled={() => setAgentPendingMessage(null)}
               />
             </motion.div>
           )}
@@ -1456,7 +1421,6 @@ function App() {
               <ListingDetailScreen
                 item={detailItem}
                 onClose={() => setDetailItemId(null)}
-                onSave={handleEditQueueItem}
                 onOptimize={handleOptimizeItem}
                 onOptimizeForPlatform={handleOptimizeForPlatform}
                 settings={settings}

@@ -44,8 +44,18 @@ interface ChatMsg {
   content: string
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function formatMsg(text: string): string {
-  let f = text
+  // Escape HTML entities first so AI-generated markup/scripts cannot execute
+  let f = escapeHtml(text)
   f = f.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-t1">$1</strong>')
   f = f.replace(/^[-•]\s+(.+)$/gm, '<li class="ml-3 mb-1 leading-relaxed">$1</li>')
   f = f.replace(/(<li.*<\/li>\s*)+/g, m => `<ul class="space-y-0.5 my-2">${m}</ul>`)
@@ -269,7 +279,6 @@ function PlatformTab({ platform, item, onGenerate, isGenerating }: PlatformTabPr
 interface ListingDetailScreenProps {
   item: ScannedItem
   onClose: () => void
-  onSave: (itemId: string, updates: Partial<ScannedItem>) => void
   onOptimize: (itemId: string) => Promise<void>
   onOptimizeForPlatform: (itemId: string, platform: ResalePlatform) => Promise<void>
   settings?: AppSettings
