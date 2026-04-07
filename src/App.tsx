@@ -129,6 +129,17 @@ function App() {
     (allSessions || []).filter(s => !s.deletedAt),
   [allSessions])
 
+  const deletedSessions = useMemo(() =>
+    (allSessions || []).filter(s => s.deletedAt),
+  [allSessions])
+
+  const handleRestoreSession = useCallback((sessionId: string) => {
+    setAllSessions((prev) => (prev || []).map(s =>
+      s.id === sessionId ? { ...s, deletedAt: undefined } : s
+    ))
+    toast.success('Session restored')
+  }, [setAllSessions])
+
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
     const updateInterval = 80
     const totalUpdates = Math.floor(duration / updateInterval)
@@ -516,9 +527,8 @@ function App() {
     }
   }, [allSessions, setSession, setSelectedSessionId, setScreen])
 
-  // Soft-delete a session with undo toast (5s window to restore)
+  // Soft-delete: 10s undo toast, recoverable for 60s, then permanently deleted
   const handleDeleteSession = useCallback((sessionId: string) => {
-    // Soft-delete: mark with deletedAt timestamp
     setAllSessions((prev) => (prev || []).map(s =>
       s.id === sessionId ? { ...s, deletedAt: Date.now() } : s
     ))
@@ -526,7 +536,8 @@ function App() {
       setSession(undefined)
       lastSyncedSession.current = ''
     }
-    toast('Session moved to trash', {
+    toast('Session deleted', {
+      description: 'You have 60 seconds to recover it from the Session tab.',
       action: {
         label: 'Undo',
         onClick: () => {
@@ -536,9 +547,9 @@ function App() {
           toast.success('Session restored')
         },
       },
-      duration: 5000,
+      duration: 10000,
     })
-    // Hard-delete after 30 seconds if not restored
+    // Hard-delete after 60 seconds if not restored
     setTimeout(() => {
       setAllSessions((prev) => {
         const sess = (prev || []).find(s => s.id === sessionId)
@@ -547,7 +558,7 @@ function App() {
         }
         return prev || []
       })
-    }, 30000)
+    }, 60000)
   }, [session, setSession, setAllSessions])
 
   const handleEndSession = useCallback(() => {
@@ -1200,6 +1211,8 @@ function App() {
                   setScreen('session-detail')
                 }}
                 allSessions={visibleSessions}
+                deletedSessions={deletedSessions}
+                onRestoreSession={handleRestoreSession}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
               />
@@ -1456,9 +1469,9 @@ function App() {
       )}
 
       <Toaster
-        position="top-center"
+        position="bottom-center"
         richColors
-        offset="70px"
+        offset="80px"
         toastOptions={{
           style: {
             borderRadius: '14px',
