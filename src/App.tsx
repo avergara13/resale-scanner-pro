@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -509,12 +509,16 @@ function App() {
   }, [session, setSession, setAllSessions])
 
   // Keep allSessions in sync with the current active session (scan counts, profit, etc.)
+  const lastSyncedSession = useRef<string>('')
   useEffect(() => {
-    if (session?.active && session.id) {
-      setAllSessions((prev) =>
-        (prev || []).map(s => s.id === session.id ? session : s)
-      )
-    }
+    if (!session?.active || !session.id) return
+    // Only sync when meaningful data changes (not on every render)
+    const fingerprint = `${session.id}:${session.itemsScanned}:${session.buyCount}:${session.passCount}:${session.totalPotentialProfit}:${session.name}:${session.location?.name}:${session.profitGoal}`
+    if (fingerprint === lastSyncedSession.current) return
+    lastSyncedSession.current = fingerprint
+    setAllSessions((prev) =>
+      (prev || []).map(s => s.id === session.id ? session : s)
+    )
   }, [session, setAllSessions])
 
   const handleEditSession = useCallback((sessionId: string, updates: Partial<Session>) => {
