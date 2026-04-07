@@ -972,14 +972,19 @@ function App() {
   }
 
   useEffect(() => {
-    // Scroll all containers to top after the new screen mounts
-    requestAnimationFrame(() => {
+    // Scroll all containers to top — immediate + delayed to catch late renders
+    const resetScroll = () => {
       window.scrollTo(0, 0)
       document.getElementById('app-container')?.scrollTo(0, 0)
       document.querySelectorAll('.scrollable-content, [class*="overflow-y-auto"]').forEach(el => {
         el.scrollTop = 0
       })
-    })
+    }
+    resetScroll()
+    requestAnimationFrame(resetScroll)
+    // Final catch after transition completes (150ms fade)
+    const timer = setTimeout(resetScroll, 200)
+    return () => clearTimeout(timer)
   }, [screen])
 
   return (
