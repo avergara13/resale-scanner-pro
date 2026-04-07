@@ -119,7 +119,7 @@ export interface ThriftStoreLocation {
   zipCode?: string
   latitude?: number
   longitude?: number
-  type?: 'goodwill' | 'salvation-army' | 'thrift-store' | 'estate-sale' | 'garage-sale' | 'flea-market' | 'other'
+  type?: 'goodwill' | 'salvation-army' | 'ross' | 'tjmaxx' | 'marshalls' | 'homegoods' | 'ollies' | 'burlington' | 'thrift-store' | 'estate-sale' | 'garage-sale' | 'flea-market' | 'other'
 }
 
 export interface LocationPerformance {

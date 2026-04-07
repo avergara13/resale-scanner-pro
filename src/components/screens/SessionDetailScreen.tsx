@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { ArrowLeft, CheckCircle, XCircle, TrendUp, Target, Package, PencilSimple, Check, X, MapPin } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, TrendUp, Target, Package, PencilSimple, Check, X, MapPin } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -138,6 +138,12 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
     { value: 'salvation-army', label: 'Salvation Army' },
+    { value: 'ross', label: 'Ross' },
+    { value: 'tjmaxx', label: 'TJ Maxx' },
+    { value: 'marshalls', label: "Marshall's" },
+    { value: 'homegoods', label: 'HomeGoods' },
+    { value: 'ollies', label: "Ollie's" },
+    { value: 'burlington', label: 'Burlington' },
     { value: 'thrift-store', label: 'Thrift Store' },
     { value: 'estate-sale', label: 'Estate Sale' },
     { value: 'garage-sale', label: 'Garage Sale' },
@@ -145,16 +151,38 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
     { value: 'other', label: 'Other' },
   ]
 
+  // Geolocation: detect nearby stores
+  const [geoLoading, setGeoLoading] = useState(false)
+  const handleAutoLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error('Location not supported on this device')
+      return
+    }
+    setGeoLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoLoading(false)
+        setEditLocationAddress(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`)
+        setEditingLocation(true)
+        toast.success('Location detected — pick a store')
+      },
+      () => {
+        setGeoLoading(false)
+        // Fallback: just open the location editor
+        startEditLocation()
+        toast.info('Could not detect location — enter manually')
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+  }, [startEditLocation])
+
   return (
     <div className="h-full flex flex-col bg-bg">
       <div className="flex-1 overflow-y-auto pb-28">
-        <div className="px-4 py-6">
-          {/* Header — same style as session screen */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-1">
-              <button onClick={onBack} className="p-1 -ml-2 active:opacity-60 transition-opacity">
-                <ArrowLeft size={22} className="text-t1" />
-              </button>
+        <div className="px-4 pt-3 pb-6">
+          {/* Header — session name + compact action buttons */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-1">
               {editingName ? (
                 <div className="flex items-center gap-2 flex-1">
                   <Input
@@ -165,19 +193,46 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                     autoFocus
                     onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setEditName('') } }}
                   />
-                  <button onClick={handleSaveName} className="text-green p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><Check size={18} /></button>
-                  <button onClick={() => { setEditingName(false); setEditName('') }} className="text-red p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"><X size={18} /></button>
+                  <button onClick={handleSaveName} className="text-green p-2"><Check size={18} /></button>
+                  <button onClick={() => { setEditingName(false); setEditName('') }} className="text-red p-2"><X size={18} /></button>
                 </div>
               ) : (
                 <button onClick={startEditName} className="flex items-center gap-2 active:opacity-70 transition-opacity">
-                  <h1 className="text-xl font-black tracking-tight text-t1">
+                  <h1 className="text-lg font-black tracking-tight text-t1">
                     {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                   </h1>
-                  <PencilSimple size={16} className="text-t3" />
+                  <PencilSimple size={14} className="text-t3" />
                 </button>
               )}
+
+              {/* Compact location + goal buttons */}
+              {!editingName && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleAutoLocation}
+                    disabled={geoLoading}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95',
+                      session.location ? 'bg-green/10 text-green' : 'bg-s1 text-t3'
+                    )}
+                  >
+                    <MapPin size={13} weight={session.location ? 'fill' : 'regular'} />
+                    {geoLoading ? '...' : session.location?.name?.split(' ')[0] || '📍'}
+                  </button>
+                  <button
+                    onClick={startEditGoal}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95',
+                      session.profitGoal ? 'bg-amber/10 text-amber' : 'bg-s1 text-t3'
+                    )}
+                  >
+                    <Target size={13} weight={session.profitGoal ? 'fill' : 'regular'} />
+                    {session.profitGoal ? `$${session.profitGoal}` : '🎯'}
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-t3 font-medium uppercase tracking-wider ml-9">
+            <div className="flex items-center gap-2 text-[11px] text-t3 font-medium uppercase tracking-wider">
               <span>{startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
               <span>·</span>
               <span>{startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
@@ -189,6 +244,61 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
               )}
             </div>
           </div>
+
+          {/* Expandable location editor */}
+          {editingLocation && (
+            <Card className="p-3 mb-3">
+              <Label className="text-[10px] text-t3 uppercase mb-2 block">Pick a Store</Label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {locationTypes.map(lt => (
+                  <button
+                    key={lt.value}
+                    onClick={() => {
+                      setEditLocationType(lt.value!)
+                      setEditLocationName(lt.label)
+                    }}
+                    className={cn(
+                      'px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-colors',
+                      editLocationType === lt.value && editLocationName === lt.label ? 'bg-b1 text-white' : 'bg-s1 text-t3'
+                    )}
+                  >
+                    {lt.label}
+                  </button>
+                ))}
+              </div>
+              <Input
+                value={editLocationName}
+                onChange={(e) => setEditLocationName(e.target.value)}
+                placeholder="Store name"
+                className="h-8 text-sm mb-2"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleSaveLocation} className="bg-b1 text-white text-xs h-8 flex-1">Save Location</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditingLocation(false)} className="text-xs h-8">Cancel</Button>
+              </div>
+            </Card>
+          )}
+
+          {/* Expandable goal editor */}
+          {editingGoal && (
+            <Card className="p-3 mb-3">
+              <Label className="text-[10px] text-t3 uppercase mb-2 block">Session Profit Goal</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-t1 font-bold">$</span>
+                <Input
+                  type="number"
+                  value={editGoalAmount}
+                  onChange={(e) => setEditGoalAmount(e.target.value)}
+                  placeholder="Target amount"
+                  className="h-8 text-sm flex-1"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') { setEditingGoal(false); setEditGoalAmount('') } }}
+                />
+                <Button size="sm" onClick={handleSaveGoal} className="bg-b1 text-white text-xs h-8">Save</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setEditingGoal(false); setEditGoalAmount('') }} className="text-xs h-8">Cancel</Button>
+              </div>
+            </Card>
+          )}
 
           {/* Stats row — matches active session layout */}
           <div className="flex gap-2 mb-4">
@@ -248,97 +358,6 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                 </span>
               )}
             </p>
-          </Card>
-
-          {/* Location — editable */}
-          <Card className="p-4 mb-4">
-            {editingLocation ? (
-              <div className="space-y-2">
-                <Label className="text-[10px] text-t3 uppercase">Location</Label>
-                <Input
-                  value={editLocationName}
-                  onChange={(e) => setEditLocationName(e.target.value)}
-                  placeholder="Store name"
-                  className="h-9 text-sm"
-                  autoFocus
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLocation(); if (e.key === 'Escape') setEditingLocation(false) }}
-                />
-                <Input
-                  value={editLocationAddress}
-                  onChange={(e) => setEditLocationAddress(e.target.value)}
-                  placeholder="Address (optional)"
-                  className="h-9 text-sm"
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveLocation(); if (e.key === 'Escape') setEditingLocation(false) }}
-                />
-                <div className="flex flex-wrap gap-1">
-                  {locationTypes.map(lt => (
-                    <button
-                      key={lt.value}
-                      onClick={() => setEditLocationType(lt.value)}
-                      className={cn(
-                        'px-2 py-1 rounded text-[11px] font-medium transition-colors',
-                        editLocationType === lt.value ? 'bg-b1 text-white' : 'bg-s1 text-t3'
-                      )}
-                    >
-                      {lt.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Button size="sm" onClick={handleSaveLocation} className="bg-b1 text-white text-xs h-9">Save</Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditingLocation(false)} className="text-xs h-9">Cancel</Button>
-                </div>
-              </div>
-            ) : (
-              <button onClick={startEditLocation} className="flex items-center gap-3 w-full text-left min-h-[44px]">
-                <MapPin size={18} className={session.location ? 'text-b1' : 'text-t3'} />
-                <span className="text-sm text-t1 flex-1">
-                  {session.location ? session.location.name : <span className="text-t3 italic">Tap to add location</span>}
-                </span>
-                <PencilSimple size={14} className="text-t3" />
-              </button>
-            )}
-          </Card>
-
-          {/* Profit Goal — editable */}
-          <Card className="p-4 mb-4">
-            {editingGoal ? (
-              <div className="space-y-2">
-                <Label className="text-[10px] text-t3 uppercase">Session Profit Goal</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-t1 font-bold">$</span>
-                  <Input
-                    type="number"
-                    value={editGoalAmount}
-                    onChange={(e) => setEditGoalAmount(e.target.value)}
-                    placeholder="Target amount"
-                    className="h-9 text-sm flex-1"
-                    autoFocus
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveGoal(); if (e.key === 'Escape') { setEditingGoal(false); setEditGoalAmount('') } }}
-                  />
-                  <Button size="sm" onClick={handleSaveGoal} className="bg-b1 text-white text-xs h-9">Save</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setEditingGoal(false); setEditGoalAmount('') }} className="text-xs h-9">Cancel</Button>
-                </div>
-              </div>
-            ) : (
-              <button onClick={startEditGoal} className="flex items-center gap-3 w-full text-left min-h-[44px]">
-                <Target size={18} className={session.profitGoal ? 'text-b1' : 'text-t3'} />
-                <div className="flex-1">
-                  {session.profitGoal ? (
-                    <>
-                      <span className="text-sm font-bold text-t1">Goal: ${session.profitGoal.toFixed(2)}</span>
-                      <Progress value={session.profitGoal > 0 ? Math.min((session.totalPotentialProfit / session.profitGoal) * 100, 100) : 0} className="h-1.5 mt-1.5" />
-                      <span className="text-[10px] text-t3 mt-0.5 block">
-                        {session.profitGoal > 0 ? Math.round((session.totalPotentialProfit / session.profitGoal) * 100) : 0}% achieved
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-sm text-t3 italic">Tap to set a profit goal</span>
-                  )}
-                </div>
-                <PencilSimple size={14} className="text-t3" />
-              </button>
-            )}
           </Card>
 
           {/* Items from this session */}
