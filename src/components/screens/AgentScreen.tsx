@@ -1227,9 +1227,9 @@ You can execute these commands for the user:
           <Button
             type="submit"
             disabled={!input.trim() || isProcessing}
-            className="px-4"
+            className="w-10 h-10 flex items-center justify-center p-0"
           >
-            <PaperPlaneRight size={20} weight="bold" />
+            <PaperPlaneRight size={18} weight="bold" />
           </Button>
         </form>
       </div>

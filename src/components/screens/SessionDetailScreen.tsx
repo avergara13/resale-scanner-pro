@@ -207,15 +207,15 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
 
               {/* Compact action buttons: type, location, goal */}
               {!editingName && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() => {
                       const next = session.sessionType === 'personal' ? 'business' : 'personal'
                       updateSession({ sessionType: next })
                     }}
                     className={cn(
-                      'flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95',
-                      session.sessionType === 'personal' ? 'bg-purple-500/10 text-purple-500' : 'bg-b1/10 text-b1'
+                      'w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all active:scale-95',
+                      session.sessionType === 'personal' ? 'bg-purple-500/10' : 'bg-b1/10'
                     )}
                   >
                     {session.sessionType === 'personal' ? '👤' : '💼'}
@@ -224,22 +224,22 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
                     onClick={handleAutoLocation}
                     disabled={geoLoading}
                     className={cn(
-                      'flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95',
+                      'h-8 flex items-center justify-center gap-1 px-2 rounded-lg text-[10px] font-bold transition-all active:scale-95',
                       session.location ? 'bg-green/10 text-green' : 'bg-s1 text-t3'
                     )}
                   >
-                    <MapPin size={13} weight={session.location ? 'fill' : 'regular'} />
-                    {geoLoading ? '...' : session.location?.name?.split(' ')[0] || '📍'}
+                    <MapPin size={14} weight={session.location ? 'fill' : 'regular'} />
+                    <span>{geoLoading ? '...' : session.location?.name?.split(' ')[0] || 'Location'}</span>
                   </button>
                   <button
                     onClick={startEditGoal}
                     className={cn(
-                      'flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all active:scale-95',
+                      'h-8 flex items-center justify-center gap-1 px-2 rounded-lg text-[10px] font-bold transition-all active:scale-95',
                       session.profitGoal ? 'bg-amber/10 text-amber' : 'bg-s1 text-t3'
                     )}
                   >
-                    <Target size={13} weight={session.profitGoal ? 'fill' : 'regular'} />
-                    {session.profitGoal ? `$${session.profitGoal}` : '🎯'}
+                    <Target size={14} weight={session.profitGoal ? 'fill' : 'regular'} />
+                    <span>{session.profitGoal ? `$${session.profitGoal}` : 'Goal'}</span>
                   </button>
                 </div>
               )}

@@ -207,9 +207,9 @@ export function AgentPanel({ onSendMessage, isProcessing = false }: AgentPanelPr
             <button
               onClick={handleSend}
               disabled={!input.trim() || isProcessing}
-              className="p-2 rounded-lg bg-b1 text-white disabled:opacity-30 transition-opacity active:scale-95"
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-b1 text-white disabled:opacity-30 transition-opacity active:scale-95"
             >
-              <PaperPlaneRight size={14} weight="bold" />
+              <PaperPlaneRight size={16} weight="bold" />
             </button>
           </div>
         </>
@@ -287,9 +287,9 @@ export function AgentPanel({ onSendMessage, isProcessing = false }: AgentPanelPr
             <button
               onClick={handleAddTask}
               disabled={!taskInput.trim()}
-              className="p-2 rounded-lg bg-b1 text-white disabled:opacity-30 transition-opacity active:scale-95"
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-b1 text-white disabled:opacity-30 transition-opacity active:scale-95"
             >
-              <Plus size={14} weight="bold" />
+              <Plus size={16} weight="bold" />
             </button>
           </div>
         </>

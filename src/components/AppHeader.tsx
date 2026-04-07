@@ -32,31 +32,29 @@ export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, on
     <header className="sticky top-0 z-30 flex items-center justify-between px-4 h-11 bg-fg border-b border-s1 flex-shrink-0">
       <div className="flex items-center gap-2">
         {isSubScreen && onBack && (
-          <button onClick={onBack} className="p-1 -ml-1 rounded-lg text-t1 hover:bg-s1 transition-colors active:opacity-60">
+          <button onClick={onBack} className="w-8 h-8 flex items-center justify-center rounded-lg text-t1 hover:bg-s1 transition-colors active:opacity-60 -ml-1">
             <ArrowLeft size={18} weight="bold" />
           </button>
         )}
         <span className="text-[11px] font-black tracking-widest text-t1 uppercase">{title}</span>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {onNavigateToTrends && (
           <button
             onClick={onNavigateToTrends}
-            className="p-2 rounded-lg text-t3 hover:text-t1 hover:bg-s1 transition-colors"
-            style={{ minWidth: 36, minHeight: 36 }}
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-t3 hover:text-t1 hover:bg-s1 transition-colors"
             aria-label="Trends"
           >
-            <ChartLine size={20} weight={showTrends ? 'fill' : 'bold'} className={showTrends ? 'text-b1' : ''} />
+            <ChartLine size={18} weight={showTrends ? 'fill' : 'bold'} className={showTrends ? 'text-b1' : ''} />
           </button>
         )}
         <ThemeToggle />
         <button
           onClick={onNavigateToSettings}
-          className="p-2 rounded-lg text-t3 hover:text-t1 hover:bg-s1 transition-colors"
-          style={{ minWidth: 36, minHeight: 36 }}
+          className="w-9 h-9 flex items-center justify-center rounded-lg text-t3 hover:text-t1 hover:bg-s1 transition-colors"
           aria-label="Settings"
         >
-          <GearSix size={20} weight="bold" />
+          <GearSix size={18} weight="bold" />
         </button>
       </div>
     </header>

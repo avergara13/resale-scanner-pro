@@ -1,6 +1,5 @@
 import { Sun, Moon, CircleHalf } from '@phosphor-icons/react'
 import { useTheme } from '@/hooks/use-theme'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -9,12 +8,12 @@ export function ThemeToggle({ className }: { className?: string }) {
 
   const getIcon = () => {
     if (themeMode === 'auto') {
-      return <CircleHalf weight="fill" />
+      return <CircleHalf size={18} weight="fill" />
     }
     if (theme === 'dark') {
-      return <Moon weight="fill" />
+      return <Moon size={18} weight="fill" />
     }
-    return <Sun weight="fill" />
+    return <Sun size={18} weight="fill" />
   }
 
   const getLabel = () => {
@@ -25,21 +24,13 @@ export function ThemeToggle({ className }: { className?: string }) {
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
+    <button
       onClick={toggleTheme}
       className={cn(
-        "gap-2 text-t2 hover:text-t1 hover:bg-s1 transition-all duration-300 relative overflow-hidden touch-target",
+        "w-9 h-9 flex items-center justify-center rounded-lg text-t2 hover:text-t1 hover:bg-s1 transition-all duration-300",
         className
       )}
       title={getLabel()}
-      style={{
-        minWidth: '48px',
-        minHeight: '48px',
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent'
-      }}
     >
       <AnimatePresence mode="wait">
         <motion.div
@@ -48,11 +39,11 @@ export function ThemeToggle({ className }: { className?: string }) {
           animate={{ scale: 1, rotate: 0, opacity: 1 }}
           exit={{ scale: 0.5, rotate: 180, opacity: 0 }}
           transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          className="flex items-center justify-center"
         >
           {getIcon()}
         </motion.div>
       </AnimatePresence>
-      <span className="text-xs font-medium hidden sm:inline">{getLabel()}</span>
-    </Button>
+    </button>
   )
 }
