@@ -46,10 +46,12 @@ export function AgentPanel({ onSendMessage, isProcessing = false }: AgentPanelPr
   const pendingTasks = (todos || []).filter(t => !t.completed)
   const completedTasks = (todos || []).filter(t => t.completed)
 
+  const prevMsgCount = useRef(messages.length)
   useEffect(() => {
-    if (tab === 'chat') {
+    if (tab === 'chat' && messages.length > prevMsgCount.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
+    prevMsgCount.current = messages.length
   }, [messages.length, tab])
 
   const handleSend = () => {
