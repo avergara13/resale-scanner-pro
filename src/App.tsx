@@ -966,55 +966,19 @@ function App() {
   }, []) // intentionally empty deps — runs once on mount
 
   const screenVariants = {
-    initial: (direction: number) => ({
-      opacity: 0,
-      x: direction > 0 ? 60 : -60,
-      scale: 0.96,
-      filter: 'blur(4px)'
-    }),
-    animate: {
-      opacity: 1,
-      x: 0,
-      scale: 1,
-      filter: 'blur(0px)'
-    },
-    exit: (direction: number) => ({
-      opacity: 0,
-      x: direction > 0 ? -60 : 60,
-      scale: 0.96,
-      filter: 'blur(4px)'
-    })
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
   }
-
-  const screenOrder: Record<Screen, number> = {
-    'session': 0,
-    'session-detail': 0,
-    'agent': 1,
-    'ai': 2,
-    'queue': 3,
-    'sold': 4,
-    'incidents': 5,
-    'settings': 6,
-    'listing': 7,
-    'chat': 8,
-    'history': 9,
-    'tag-analytics': 10,
-    'location-insights': 11,
-    'cost-tracking': 12,
-    'scan-history': 13
-  }
-
-  const [prevScreen, setPrevScreen] = useState<Screen>(screen)
-  const direction = screenOrder[screen] - screenOrder[prevScreen]
 
   useEffect(() => {
-    setPrevScreen(screen)
-    // Scroll all containers to top on every screen change
-    window.scrollTo(0, 0)
-    document.getElementById('app-container')?.scrollTo(0, 0)
-    // Reset any inner scrollable content areas
-    document.querySelectorAll('.scrollable-content, [class*="overflow-y-auto"]').forEach(el => {
-      el.scrollTop = 0
+    // Scroll all containers to top after the new screen mounts
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 0)
+      document.getElementById('app-container')?.scrollTo(0, 0)
+      document.querySelectorAll('.scrollable-content, [class*="overflow-y-auto"]').forEach(el => {
+        el.scrollTop = 0
+      })
     })
   }, [screen])
 
@@ -1048,16 +1012,15 @@ function App() {
           minHeight: 'calc(100vh - 96px)',
         }}
       >
-        <AnimatePresence mode="wait" custom={direction}>
+        <AnimatePresence mode="wait">
           {screen === 'session' && (
             <motion.div
               key="session"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <SessionScreen
@@ -1080,12 +1043,11 @@ function App() {
           {screen === 'agent' && (
             <motion.div
               key="agent"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <AgentScreen
@@ -1117,12 +1079,11 @@ function App() {
           {screen === 'ai' && (
             <motion.div
               key="ai"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <AIScreen
@@ -1138,12 +1099,11 @@ function App() {
           {screen === 'queue' && (
             <motion.div
               key="queue"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <QueueScreen
@@ -1173,12 +1133,11 @@ function App() {
           {screen === 'sold' && (
             <motion.div
               key="sold"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <SoldScreen
@@ -1193,12 +1152,11 @@ function App() {
           {screen === 'settings' && settings && (
             <motion.div
               key="settings"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <SettingsScreen
@@ -1211,12 +1169,11 @@ function App() {
           {screen === 'tag-analytics' && (
             <motion.div
               key="tag-analytics"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <TagAnalyticsScreen
@@ -1229,12 +1186,11 @@ function App() {
           {screen === 'location-insights' && (
             <motion.div
               key="location-insights"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <LocationInsightsScreen
@@ -1246,12 +1202,11 @@ function App() {
           {screen === 'cost-tracking' && (
             <motion.div
               key="cost-tracking"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <CostTrackingScreen
@@ -1262,12 +1217,11 @@ function App() {
           {screen === 'scan-history' && (
             <motion.div
               key="scan-history"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <ScanHistoryScreen
@@ -1285,12 +1239,11 @@ function App() {
           {screen === 'session-detail' && selectedSessionId && (
             <motion.div
               key="session-detail"
-              custom={direction}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
               className="w-full h-full"
             >
               <SessionDetailScreen

@@ -194,9 +194,9 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
       ref={containerRef}
       id="scr-session" 
       className="flex flex-col h-full overflow-y-auto scrollable-content"
-      style={{ 
-        paddingTop: isPulling || isRefreshing ? `${Math.max(pullDistance, 60)}px` : '0px',
-        transition: isPulling ? 'none' : 'padding-top 0.3s ease-out'
+      style={{
+        paddingTop: isPulling ? `${pullDistance}px` : isRefreshing ? '60px' : '0px',
+        transition: isPulling ? 'none' : 'padding-top 0.2s ease-out'
       }}
     >
       <PullToRefreshIndicator

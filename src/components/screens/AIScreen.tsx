@@ -1,7 +1,6 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
-import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -253,10 +252,12 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
     enabled: true,
   })
 
+  const prevAIChatCount = useRef(chatMessages.length)
   useEffect(() => {
-    if (chatScrollRef.current) {
+    if (chatMessages.length > prevAIChatCount.current && chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
     }
+    prevAIChatCount.current = chatMessages.length
   }, [chatMessages])
 
   const buildAIContext = useCallback(() => {
