@@ -232,8 +232,13 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   }, [queueItems])
 
   const prevMessageCount = useRef(chatMessages.length)
+  const agentHasMounted = useRef(false)
   useEffect(() => {
-    // Only auto-scroll when new messages are added, not on initial mount
+    if (!agentHasMounted.current) {
+      agentHasMounted.current = true
+      prevMessageCount.current = chatMessages.length
+      return
+    }
     if (chatMessages.length > prevMessageCount.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }

@@ -47,7 +47,14 @@ export function AgentPanel({ onSendMessage, isProcessing = false }: AgentPanelPr
   const completedTasks = (todos || []).filter(t => t.completed)
 
   const prevMsgCount = useRef(messages.length)
+  const hasMounted = useRef(false)
   useEffect(() => {
+    if (!hasMounted.current) {
+      // Skip the initial load (KV hydration) — don't scroll
+      hasMounted.current = true
+      prevMsgCount.current = messages.length
+      return
+    }
     if (tab === 'chat' && messages.length > prevMsgCount.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }

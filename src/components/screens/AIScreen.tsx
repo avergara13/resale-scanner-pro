@@ -253,7 +253,13 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
   })
 
   const prevAIChatCount = useRef(chatMessages.length)
+  const aiHasMounted = useRef(false)
   useEffect(() => {
+    if (!aiHasMounted.current) {
+      aiHasMounted.current = true
+      prevAIChatCount.current = chatMessages.length
+      return
+    }
     if (chatMessages.length > prevAIChatCount.current && chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
     }
