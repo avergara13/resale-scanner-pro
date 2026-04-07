@@ -3,7 +3,7 @@ import { ThemeToggle } from './ThemeToggle'
 import type { Screen } from '@/types'
 
 const SCREEN_TITLES: Partial<Record<Screen, string>> = {
-  session: 'SESSION',
+  session: 'RESALE SCANNER PRO',
   agent: 'AGENT',
   queue: 'LISTING QUEUE',
   sold: 'SOLD',

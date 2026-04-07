@@ -6,8 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
-import { AgentChatWidget } from '../AgentChatWidget'
-import { SharedTodoList } from '../SharedTodoList'
+import { AgentPanel } from '../AgentPanel'
 import { LocationInsights } from '../LocationInsights'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
@@ -335,12 +334,10 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
             </div>
           )}
 
-          <AgentChatWidget
+          <AgentPanel
             onSendMessage={onAgentMessage}
             isProcessing={isAgentProcessing}
-            compact
           />
-          <SharedTodoList />
         </div>
       ) : (
         <div className="flex-1 space-y-3 pb-24">
@@ -394,12 +391,10 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
           </div>
 
           {/* Agent + Tasks */}
-          <AgentChatWidget
+          <AgentPanel
             onSendMessage={onAgentMessage}
             isProcessing={isAgentProcessing}
-            compact
           />
-          <SharedTodoList />
 
           {/* End Session */}
           <Button
