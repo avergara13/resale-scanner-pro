@@ -54,14 +54,9 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    emoji: '🔍',
-    label: 'Market Research',
-    prompt: 'What are the most profitable items to resell right now?'
-  },
-  {
-    emoji: '💰',
-    label: 'Pricing Strategy',
-    prompt: 'How should I price items for maximum profit?'
+    emoji: '🚀',
+    label: 'Full Pipeline',
+    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion'
   },
   {
     emoji: '📦',
@@ -69,34 +64,14 @@ const QUICK_ACTIONS: QuickAction[] = [
     prompt: 'Create optimized eBay listings for all BUY items in my queue'
   },
   {
-    emoji: '📤',
-    label: 'Push to Notion',
-    prompt: 'Push all ready listings to Notion'
-  },
-  {
     emoji: '🔎',
     label: 'Research Item',
     prompt: 'Research the market value of my most recent item'
   },
   {
-    emoji: '✨',
-    label: 'Optimize Queue',
-    prompt: 'Review my queue and suggest which items to prioritize'
-  },
-  {
-    emoji: '🚀',
-    label: 'Full Pipeline',
-    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion'
-  },
-  {
     emoji: '📊',
     label: 'Session Status',
     prompt: 'What\'s my current session status? Show me all stats, goals, and recent items.'
-  },
-  {
-    emoji: '🏪',
-    label: 'Start Session',
-    prompt: 'Start a new scanning session'
   },
 ]
 
