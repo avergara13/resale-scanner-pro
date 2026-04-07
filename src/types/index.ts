@@ -1,5 +1,18 @@
 export type Screen = 'session' | 'session-detail' | 'agent' | 'ai' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
 
+export type ResalePlatform = 'ebay' | 'mercari' | 'poshmark' | 'whatnot' | 'facebook'
+
+export interface PlatformListing {
+  title: string
+  description: string
+  price: number
+  category: string
+  condition: string
+  shippingCost: number
+  platformNotes?: string
+  generatedAt: number
+}
+
 export type PipelinePhase = 'vision' | 'lens' | 'market' | 'profit' | 'decision'
 
 export type Decision = 'BUY' | 'PASS' | 'PENDING'
@@ -113,6 +126,7 @@ export interface OptimizedListing {
   seoScore: number
   recommendations: string[]
   optimizedAt: number
+  platformListings?: Partial<Record<ResalePlatform, PlatformListing>>
 }
 
 export interface ThriftStoreLocation {
@@ -198,6 +212,7 @@ export interface MarketData {
   competitorCount?: number
   sellThroughRate?: number
   recommendedPrice?: number
+  researchSummary?: string
 }
 
 export interface Session {

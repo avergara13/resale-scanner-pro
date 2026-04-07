@@ -18,7 +18,11 @@ import { CostTrackingScreen } from './components/screens/CostTrackingScreen'
 import { ScanHistoryScreen } from './components/screens/ScanHistoryScreen'
 import { SoldScreen } from './components/screens/SoldScreen'
 import { SessionDetailScreen } from './components/screens/SessionDetailScreen'
+import { ListingDetailScreen } from './components/screens/ListingDetailScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
+import { retryOperation } from './lib/retry-service'
+import { getRetryOptions } from './lib/retry-config'
+import { researchProduct } from './lib/llm-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
@@ -30,7 +34,7 @@ import { useImageOptimization } from './hooks/use-image-optimization'
 import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform } from './types'
 import { cn } from './lib/utils'
 
 function App() {
@@ -44,6 +48,7 @@ function App() {
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
+  const [detailItemId, setDetailItemId] = useState<string | null>(null)
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
@@ -322,59 +327,69 @@ function App() {
       ))
       
       let marketData: typeof newItem.marketData = undefined
-      // Estimate sell price: use 4.5x markup if price entered, otherwise use Gemini confidence as a signal
-      let ebayAvgPrice = price > 0 ? price * 4.5 : 0
-      
+      // Start at 0 — apply ranked fallback after eBay phase: eBay → Lens avg → 4.5x markup
+      let ebayAvgPrice = 0
+
       simulateProgress(2, 3800)
-      
+
       if (ebayService) {
-        try {
-          const searchTerm = visionResult?.searchTerms?.[0] || mockProductName
-          const categoryId = await ebayService.getCategoryId(searchTerm)
-          const searchResults = await ebayService.searchCompletedListings(searchTerm, categoryId)
-          
-          marketData = {
-            ebayAvgSold: searchResults.averageSoldPrice,
-            ebayMedianSold: searchResults.medianSoldPrice,
-            ebayActiveListings: searchResults.activeCount,
-            ebaySoldCount: searchResults.soldCount,
-            ebayPriceRange: searchResults.priceRange,
-            ebaySellThroughRate: searchResults.sellThroughRate,
-            ebayRecentSales: searchResults.soldItems.slice(0, 10),
-            ebayActiveItems: searchResults.activeListings.slice(0, 10),
-            recommendedPrice: searchResults.recommendedPrice,
+        await retryOperation(
+          async () => {
+            const searchTerm = visionResult?.searchTerms?.[0] || mockProductName
+            const categoryId = await ebayService.getCategoryId(searchTerm)
+            const searchResults = await ebayService.searchCompletedListings(searchTerm, categoryId)
+
+            marketData = {
+              ebayAvgSold: searchResults.averageSoldPrice,
+              ebayMedianSold: searchResults.medianSoldPrice,
+              ebayActiveListings: searchResults.activeCount,
+              ebaySoldCount: searchResults.soldCount,
+              ebayPriceRange: searchResults.priceRange,
+              ebaySellThroughRate: searchResults.sellThroughRate,
+              ebayRecentSales: searchResults.soldItems.slice(0, 10),
+              ebayActiveItems: searchResults.activeListings.slice(0, 10),
+              recommendedPrice: searchResults.recommendedPrice,
+            }
+
+            ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : 0
+
+            setPipeline(prev => prev.map((s, i) =>
+              i === 2 ? {
+                ...s,
+                data: `Found ${searchResults.soldCount} sold, ${searchResults.activeCount} active. Avg: $${searchResults.averageSoldPrice.toFixed(2)}`
+              } : s
+            ))
+          },
+          {
+            ...getRetryOptions('ebay-search'),
+            onRetry: (_err, attempt) => {
+              setPipeline(prev => prev.map((s, i) =>
+                i === 2 ? { ...s, data: `Retrying market data (${attempt}/5)...` } : s
+              ))
+            },
           }
-          
-          ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : ebayAvgPrice
-          
-          completeStep(2)
-          await new Promise(resolve => setTimeout(resolve, 100))
-          setPipeline(prev => prev.map((s, i) => 
-            i === 2 ? { 
-              ...s, 
-              data: `Found ${searchResults.soldCount} sold, ${searchResults.activeCount} active. Avg: $${searchResults.averageSoldPrice.toFixed(2)}` 
-            } : s
+        ).catch(() => {
+          setPipeline(prev => prev.map((s, i) =>
+            i === 2 ? { ...s, data: 'Using estimated pricing (eBay API unavailable)' } : s
           ))
-        } catch (error) {
-          console.error('eBay API error:', error)
-          completeStep(2)
-          await new Promise(resolve => setTimeout(resolve, 100))
-          setPipeline(prev => prev.map((s, i) => 
-            i === 2 ? { 
-              ...s, 
-              data: 'Using estimated pricing (eBay API unavailable)' 
-            } : s
-          ))
-        }
+        })
+        completeStep(2)
+        await new Promise(resolve => setTimeout(resolve, 100))
       } else {
         completeStep(2)
         await new Promise(resolve => setTimeout(resolve, 100))
-        setPipeline(prev => prev.map((s, i) => 
-          i === 2 ? { 
-            ...s, 
-            data: 'Configure eBay API in Settings for real market data' 
+        setPipeline(prev => prev.map((s, i) =>
+          i === 2 ? {
+            ...s,
+            data: 'Configure eBay API in Settings for real market data'
           } : s
         ))
+      }
+
+      // 3-tier sell price fallback: eBay recommendedPrice → Google Lens average → 4.5x markup
+      if (ebayAvgPrice <= 0) {
+        const lensAvg = lensAnalysis?.priceRange?.average || 0
+        ebayAvgPrice = lensAvg > 0 ? lensAvg : (price > 0 ? price * 4.5 : 0)
       }
       
       await new Promise(resolve => setTimeout(resolve, 500))
@@ -401,7 +416,9 @@ function App() {
       )
 
       const minMargin = settings?.minProfitMargin || 30
-      const decision = profitMetrics.profitMargin > minMargin ? 'BUY' : 'PASS'
+      const decision = ebayAvgPrice <= 0
+        ? 'PENDING'
+        : profitMetrics.profitMargin > minMargin ? 'BUY' : 'PASS'
 
       if (decision === 'BUY') {
         triggerSuccess()
@@ -426,14 +443,28 @@ function App() {
         productName: visionResult?.productName || mockProductName,
         description: visionResult?.description || 'Product analysis unavailable',
         category: visionResult?.category || 'General',
-        estimatedSellPrice: sellPrice,
-        profitMargin: profitMetrics.profitMargin,
+        estimatedSellPrice: sellPrice > 0 ? sellPrice : undefined,
+        profitMargin: sellPrice > 0 ? profitMetrics.profitMargin : undefined,
         decision,
         lensAnalysis,
         lensResults: lensAnalysis?.results,
         marketData,
       }
-      
+
+      // Non-blocking async research: runs after pipeline completes, enriches marketData
+      if (settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY) {
+        researchProduct(
+          visionResult?.productName || mockProductName,
+          { purchasePrice: price, category: visionResult?.category, brand: visionResult?.brand },
+          settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+        ).then(researchText => {
+          const itemId = newItem.id
+          setQueue(prev => (prev || []).map(i =>
+            i.id === itemId ? { ...i, marketData: { ...i.marketData, researchSummary: researchText } } : i
+          ))
+        }).catch(() => {/* silent — non-blocking enrichment */})
+      }
+
       const tagSuggestions = tagSuggestionService.suggestTags(updatedItem)
       const autoTags = tagSuggestions.slice(0, 5).map(s => s.tag.id)
       updatedItem.tags = autoTags
@@ -861,7 +892,11 @@ function App() {
   }, [setQueue])
 
   const handleBatchAnalyze = useCallback(async () => {
-    const unanalyzedItems = (queue || []).filter(item => !item.productName || item.productName === 'Quick Draft')
+    const unanalyzedItems = (queue || []).filter(item =>
+      !item.productName ||
+      item.productName === 'Quick Draft' ||
+      item.description === 'Product analysis unavailable'
+    )
     
     if (unanalyzedItems.length === 0) {
       toast.info('No quick drafts to analyze')
@@ -921,14 +956,14 @@ function App() {
         }
 
         let marketData: typeof item.marketData = undefined
-        let ebayAvgPrice = item.purchasePrice > 0 ? item.purchasePrice * 4.5 : 0
-        
+        let ebayAvgPrice = 0
+
         if (ebayService && visionResult) {
           try {
             const searchTerm = visionResult.searchTerms?.[0] || mockProductName
             const categoryId = await ebayService.getCategoryId(searchTerm)
             const searchResults = await ebayService.searchCompletedListings(searchTerm, categoryId)
-            
+
             marketData = {
               ebayAvgSold: searchResults.averageSoldPrice,
               ebayMedianSold: searchResults.medianSoldPrice,
@@ -940,11 +975,17 @@ function App() {
               ebayActiveItems: searchResults.activeListings.slice(0, 10),
               recommendedPrice: searchResults.recommendedPrice,
             }
-            
-            ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : ebayAvgPrice
+
+            ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : 0
           } catch (error) {
             console.error('eBay API error for item:', item.id, error)
           }
+        }
+
+        // 3-tier fallback: eBay → Lens avg → 4.5x markup
+        if (ebayAvgPrice <= 0) {
+          const lensAvg = lensAnalysis?.priceRange?.average || 0
+          ebayAvgPrice = lensAvg > 0 ? lensAvg : (item.purchasePrice > 0 ? item.purchasePrice * 4.5 : 0)
         }
 
         const sellPrice = ebayAvgPrice
@@ -960,17 +1001,19 @@ function App() {
           settings?.defaultShippingCost || 5.0,
           settings?.ebayFeePercent || 12.9
         )
-        
+
         const minMargin = settings?.minProfitMargin || 30
-        const decision = profitMetrics.profitMargin > minMargin ? 'BUY' : 'PASS'
+        const decision = sellPrice <= 0
+          ? 'PENDING'
+          : profitMetrics.profitMargin > minMargin ? 'BUY' : 'PASS'
 
         const updatedItem: ScannedItem = {
           ...item,
           productName: visionResult?.productName || mockProductName,
           description: visionResult?.description || 'Product analysis completed',
           category: visionResult?.category || 'General',
-          estimatedSellPrice: sellPrice,
-          profitMargin: profitMetrics.profitMargin,
+          estimatedSellPrice: sellPrice > 0 ? sellPrice : undefined,
+          profitMargin: sellPrice > 0 ? profitMetrics.profitMargin : undefined,
           decision,
           lensAnalysis,
           lensResults: lensAnalysis?.results,
@@ -1024,6 +1067,57 @@ function App() {
     }
     toast.success(`Analyzed ${processedCount} items: ${buyCount} BUY, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
+
+  const handleReanalyzeItem = useCallback(async (itemId: string) => {
+    const item = (queue || []).find(i => i.id === itemId)
+    if (!item) return
+
+    // Reset to re-analyzable state so handleBatchAnalyze picks it up
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId
+        ? { ...i, productName: 'Quick Draft', description: 'Analyzing...', estimatedSellPrice: undefined, profitMargin: undefined }
+        : i
+    ))
+
+    // Trigger batch analyze which now includes 'Quick Draft' items
+    await handleBatchAnalyze()
+  }, [queue, setQueue, handleBatchAnalyze])
+
+  const handleOptimizeForPlatform = useCallback(async (itemId: string, platform: ResalePlatform) => {
+    const item = (queue || []).find(i => i.id === itemId)
+    if (!item) return
+
+    // Ensure eBay listing exists first — generate it if not
+    if (!item.optimizedListing) {
+      await handleOptimizeItem(itemId)
+    }
+
+    const freshItem = (queue || []).find(i => i.id === itemId)
+    if (!freshItem?.optimizedListing || !listingOptimizationService) return
+
+    try {
+      const platformListing = await listingOptimizationService.generatePlatformListing(
+        freshItem,
+        platform,
+        freshItem.optimizedListing
+      )
+      setQueue(prev => (prev || []).map(i =>
+        i.id === itemId
+          ? {
+              ...i,
+              optimizedListing: {
+                ...i.optimizedListing!,
+                platformListings: { ...i.optimizedListing!.platformListings, [platform]: platformListing }
+              }
+            }
+          : i
+      ))
+      toast.success(`${platform.charAt(0).toUpperCase() + platform.slice(1)} listing generated`)
+    } catch (error) {
+      console.error('Platform listing generation failed:', error)
+      toast.error(`Failed to generate ${platform} listing`)
+    }
+  }, [queue, setQueue, listingOptimizationService, handleOptimizeItem])
 
   // Seed 3 test items so the queue cards can be verified (dev/debug only)
   useEffect(() => {
@@ -1307,9 +1401,25 @@ function App() {
                 onMarkAsSold={handleMarkAsSold}
                 onDelist={handleDelist}
                 personalSessionIds={personalSessionIds}
+                onReanalyze={handleReanalyzeItem}
+                onOpenDetail={(item) => setDetailItemId(item.id)}
               />
             </motion.div>
           )}
+          {/* ListingDetailScreen — overlaid on top of queue when a detail item is selected */}
+          {detailItemId && (() => {
+            const detailItem = (queue || []).find(i => i.id === detailItemId)
+            return detailItem ? (
+              <ListingDetailScreen
+                item={detailItem}
+                onClose={() => setDetailItemId(null)}
+                onSave={handleEditQueueItem}
+                onOptimize={handleOptimizeItem}
+                onOptimizeForPlatform={handleOptimizeForPlatform}
+                settings={settings}
+              />
+            ) : null
+          })()}
           {screen === 'sold' && (
             <motion.div
               key="sold"
