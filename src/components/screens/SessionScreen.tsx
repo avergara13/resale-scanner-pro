@@ -160,7 +160,13 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
     })
   }, [queue, scanHistory])
   const [goals, setGoals] = useKV<ProfitGoal[]>('profit-goals', [])
-  
+
+  const personalSessionIds = useMemo(() => {
+    const ids = new Set<string>()
+    ;(allSessions || []).forEach(s => { if (s.sessionType === 'personal') ids.add(s.id) })
+    return ids
+  }, [allSessions])
+
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
     const hours = Math.floor(minutes / 60)
@@ -281,6 +287,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
               <GoalAchievementTracker
                 goals={goals || []}
                 items={queue || []}
+                personalSessionIds={personalSessionIds}
               />
               <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
             </div>

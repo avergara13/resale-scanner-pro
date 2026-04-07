@@ -61,6 +61,7 @@ interface QueueScreenProps {
   onNavigateToTagAnalytics?: () => void
   onNavigateToLocationInsights?: () => void
   onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
+  personalSessionIds?: Set<string>
 }
 
 type FilterOption = 'ALL' | 'BUY' | 'PASS' | 'PENDING'
@@ -70,6 +71,7 @@ interface SortableItemProps {
   item: ScannedItem
   isSelected: boolean
   allTags: ItemTag[]
+  isPersonal?: boolean
   onToggleSelect: (id: string) => void
   onEdit: (item: ScannedItem) => void
   onRemove: (id: string) => void
@@ -82,6 +84,7 @@ function SortableItem({
   item,
   isSelected,
   allTags,
+  isPersonal,
   onToggleSelect,
   onEdit,
   onRemove,
@@ -139,9 +142,14 @@ function SortableItem({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
-            <h3 className="font-semibold text-t1 text-xs sm:text-sm line-clamp-2 leading-tight">
-              {item.productName || 'Unknown Item'}
-            </h3>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h3 className="font-semibold text-t1 text-xs sm:text-sm line-clamp-2 leading-tight">
+                {item.productName || 'Unknown Item'}
+              </h3>
+              {isPersonal && (
+                <span className="text-[7px] font-bold bg-purple-500/15 text-purple-500 px-1 py-0.5 rounded flex-shrink-0 uppercase">Personal</span>
+              )}
+            </div>
             {item.profitMargin !== undefined && (
               <Badge
                 variant="secondary"
@@ -243,7 +251,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, personalSessionIds }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -1287,6 +1295,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       item={item}
                       isSelected={selectedIds.has(item.id)}
                       allTags={allTags || []}
+                      isPersonal={!!item.sessionId && !!personalSessionIds?.has(item.sessionId)}
                       onToggleSelect={handleToggleSelect}
                       onEdit={handleEdit}
                       onRemove={onRemove}
@@ -1427,7 +1436,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
 
           {availableLocations.length > 0 && (() => {
             const totalProfit = queueItems
-              .filter(item => item.location && item.decision === 'BUY')
+              .filter(item => item.location && item.decision === 'BUY' && (!item.sessionId || !personalSessionIds?.has(item.sessionId)))
               .reduce((sum, item) => sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0)
             
             const avgProfitPerStore = availableLocations.length > 0 

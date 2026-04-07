@@ -11,6 +11,7 @@ import type { ProfitGoal, ScannedItem } from '@/types'
 interface GoalAchievementTrackerProps {
   goals: ProfitGoal[]
   items: ScannedItem[]
+  personalSessionIds?: Set<string>
 }
 
 interface GoalPeriodStats {
@@ -28,16 +29,18 @@ interface GoalPeriodStats {
 
 type TimeRange = '7d' | '30d' | '90d' | 'all'
 
-export function GoalAchievementTracker({ goals, items }: GoalAchievementTrackerProps) {
+export function GoalAchievementTracker({ goals, items, personalSessionIds }: GoalAchievementTrackerProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d')
   const [viewMode, setViewMode] = useState<'summary' | 'detailed'>('summary')
 
   const calculateGoalCompletion = (goal: ProfitGoal): number => {
-    const relevantItems = items.filter(item => 
-      item.timestamp >= goal.startDate && 
+    const relevantItems = items.filter(item =>
+      item.timestamp >= goal.startDate &&
       item.timestamp <= goal.endDate &&
       item.decision === 'BUY' &&
-      item.profitMargin !== undefined
+      item.profitMargin !== undefined &&
+      // Exclude personal session items from profit goal tracking
+      (!item.sessionId || !personalSessionIds?.has(item.sessionId))
     )
 
     const actualProfit = relevantItems.reduce((sum, item) => {

@@ -34,6 +34,16 @@ interface TrendMetrics {
 export function TrendVisualization({ items, sessions = [] }: TrendVisualizationProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d')
 
+  // Exclude items from personal sessions in profit calculations
+  const personalSessionIds = useMemo(() => {
+    const ids = new Set<string>()
+    sessions.forEach(s => { if (s.sessionType === 'personal') ids.add(s.id) })
+    return ids
+  }, [sessions])
+
+  const isBusinessItem = (item: ScannedItem) =>
+    !item.sessionId || !personalSessionIds.has(item.sessionId)
+
   const getDaysInRange = (range: TimeRange): number => {
     switch (range) {
       case '7d': return 7
@@ -77,8 +87,9 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
         existing.itemsScanned++
         if (item.decision === 'BUY') existing.buyCount++
         if (item.decision === 'PASS') existing.passCount++
-        
-        if (item.decision === 'BUY' && item.estimatedSellPrice && item.purchasePrice) {
+
+        // Only count profit from business sessions
+        if (item.decision === 'BUY' && item.estimatedSellPrice && item.purchasePrice && isBusinessItem(item)) {
           existing.totalProfit += (item.estimatedSellPrice - item.purchasePrice)
         }
       }

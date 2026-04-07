@@ -904,8 +904,13 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         needsShipping: soldItems.filter(i => i.listingStatus === 'sold').length,
       }
 
+      const sessionTypeLabel = currentSession?.sessionType === 'personal' ? 'PERSONAL' : 'BUSINESS'
       const sessionScope = currentSession?.active
-        ? `You are operating within session "${currentSession.name || 'Active Session'}". All stats, items, and actions below apply ONLY to this session's items.`
+        ? `You are operating within ${sessionTypeLabel} session "${currentSession.name || 'Active Session'}". All stats, items, and actions below apply ONLY to this session's items.${
+            currentSession.sessionType === 'personal'
+              ? '\n\nIMPORTANT: This is a PERSONAL session. Items here are NOT for resale — they are personal purchases. Do NOT include these items in business profit calculations, tax estimates, or resale analytics. You may still help with product identification and price lookups.'
+              : ''
+          }`
         : 'No scanning session is active. You are showing all-time global stats across all sessions.'
 
       const systemPrompt = `You are an expert AI agent for resale business optimization. You have FULL awareness of this app's state — every session, item, goal, and setting. You help users research products, analyze profitability, create optimized eBay listings, manage sessions, track sold items, and make data-driven decisions.

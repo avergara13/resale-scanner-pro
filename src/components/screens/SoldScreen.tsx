@@ -33,9 +33,10 @@ interface SoldScreenProps {
   soldItems: ScannedItem[]
   onMarkShipped: (itemId: string, trackingNumber: string, shippingCarrier: string) => void
   onMarkCompleted: (itemId: string) => void
+  personalSessionIds?: Set<string>
 }
 
-export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted }: SoldScreenProps) {
+export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted, personalSessionIds }: SoldScreenProps) {
   const [fulfillmentFilter, setFulfillmentFilter] = useState<FulfillmentFilter>('all')
   const [marketplaceFilter, setMarketplaceFilter] = useState<MarketplaceFilter>('all')
   const [shippingItemId, setShippingItemId] = useState<string | null>(null)
@@ -58,13 +59,20 @@ export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted }: SoldSc
   }, [soldItems, fulfillmentFilter, marketplaceFilter])
 
   const stats = useMemo(() => {
+    const businessItems = soldItems.filter(i =>
+      !i.sessionId || !personalSessionIds?.has(i.sessionId)
+    )
+    const personalItems = soldItems.filter(i =>
+      i.sessionId != null && personalSessionIds?.has(i.sessionId)
+    )
     const totalSold = soldItems.length
-    const totalRevenue = soldItems.reduce((s, i) => s + (i.soldPrice || 0), 0)
-    const totalCost = soldItems.reduce((s, i) => s + i.purchasePrice, 0)
+    const totalRevenue = businessItems.reduce((s, i) => s + (i.soldPrice || 0), 0)
+    const totalCost = businessItems.reduce((s, i) => s + i.purchasePrice, 0)
     const totalProfit = totalRevenue - totalCost
     const needsShipping = soldItems.filter(i => i.listingStatus === 'sold').length
-    return { totalSold, totalRevenue, totalProfit, needsShipping }
-  }, [soldItems])
+    const personalCount = personalItems.length
+    return { totalSold, totalRevenue, totalProfit, needsShipping, personalCount }
+  }, [soldItems, personalSessionIds])
 
   const handleConfirmShipped = (itemId: string) => {
     if (!trackingNumber.trim() && !shippingCarrier.trim()) {
@@ -120,7 +128,9 @@ export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted }: SoldSc
         </div>
         <div className="stat-card flex-1 p-3 text-center">
           <div className="text-lg font-black text-green">${stats.totalProfit.toFixed(0)}</div>
-          <div className="text-[9px] text-t3 uppercase tracking-wider font-bold mt-0.5">Profit</div>
+          <div className="text-[9px] text-t3 uppercase tracking-wider font-bold mt-0.5">
+            {stats.personalCount > 0 ? 'Biz Profit' : 'Profit'}
+          </div>
         </div>
         <div className="stat-card flex-1 p-3 text-center">
           <div className={cn('text-lg font-black', stats.needsShipping > 0 ? 'text-amber' : 'text-t3')}>
@@ -199,6 +209,9 @@ export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted }: SoldSc
                         </span>
                       )}
                       <span className="text-[9px] text-t3">{formatDate(item.soldDate)}</span>
+                      {item.sessionId && personalSessionIds?.has(item.sessionId) && (
+                        <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase">Personal</span>
+                      )}
                     </div>
                   </div>
 

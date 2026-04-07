@@ -117,6 +117,13 @@ function App() {
     return createNotionService(key, settings?.notionDatabaseId)
   }, [settings?.notionApiKey, settings?.notionDatabaseId])
 
+  // Set of session IDs marked as personal — used to exclude from business profit calculations
+  const personalSessionIds = useMemo(() => {
+    const ids = new Set<string>()
+    ;(allSessions || []).forEach(s => { if (s.sessionType === 'personal') ids.add(s.id) })
+    return ids
+  }, [allSessions])
+
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
     const updateInterval = 80
     const totalUpdates = Math.floor(duration / updateInterval)
@@ -1195,6 +1202,7 @@ function App() {
                 onNavigateToTagAnalytics={() => setScreen('tag-analytics')}
                 onNavigateToLocationInsights={() => setScreen('location-insights')}
                 onMarkAsSold={handleMarkAsSold}
+                personalSessionIds={personalSessionIds}
               />
             </motion.div>
           )}
@@ -1214,6 +1222,7 @@ function App() {
                 )}
                 onMarkShipped={handleMarkShipped}
                 onMarkCompleted={handleMarkCompleted}
+                personalSessionIds={personalSessionIds}
               />
             </motion.div>
           )}
