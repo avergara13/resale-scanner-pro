@@ -1,10 +1,11 @@
-import { Play, Stop, CheckCircle, XCircle, ChartLine, Robot, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, Package } from '@phosphor-icons/react'
+import { Play, Stop, CheckCircle, XCircle, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, Package, ArrowLeft, Robot } from '@phosphor-icons/react'
 import { useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
+import { GoalAchievementTracker } from '../GoalAchievementTracker'
 import { AgentChatWidget } from '../AgentChatWidget'
 import { SharedTodoList } from '../SharedTodoList'
 import { LocationInsights } from '../LocationInsights'
@@ -118,11 +119,12 @@ function PastSessionCard({
   )
 }
 
-type TrendsTab = 'trends' | 'stores' | 'agent'
+type TrendsTab = 'trends' | 'stores' | 'goals'
 
 interface SessionScreenProps {
   session?: Session
   showTrends?: boolean
+  onCloseTrends?: () => void
   onAgentMessage?: (text: string) => void
   isAgentProcessing?: boolean
   onStartSession: () => void
@@ -132,7 +134,7 @@ interface SessionScreenProps {
   onViewSessionDetail?: (sessionId: string) => void
 }
 
-export function SessionScreen({ session, showTrends = false, onAgentMessage, isAgentProcessing = false, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
+export function SessionScreen({ session, showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
@@ -206,11 +208,8 @@ export function SessionScreen({ session, showTrends = false, onAgentMessage, isA
         shouldTrigger={shouldTrigger}
       />
 
-      <div className="px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-black tracking-tight text-t1">
-          {showTrends ? 'PERFORMANCE TRENDS' : 'TODAY\'S SESSION'}
-        </h1>
+      <div className="px-4 pt-4 pb-6">
+      <div className="mb-5">
         <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
         </p>
@@ -218,12 +217,21 @@ export function SessionScreen({ session, showTrends = false, onAgentMessage, isA
 
       {showTrends ? (
         <div className="flex-1 overflow-y-auto pb-24">
+          {/* Back button */}
+          <button
+            onClick={onCloseTrends}
+            className="flex items-center gap-1.5 mb-4 text-b1 active:opacity-60 transition-opacity"
+          >
+            <ArrowLeft size={16} weight="bold" />
+            <span className="text-[11px] font-bold uppercase tracking-wide">Back to Session</span>
+          </button>
+
           {/* Sub-tabs */}
           <div className="flex gap-1.5 mb-4">
             {([
               { id: 'trends' as TrendsTab, label: 'Trends', icon: ChartLine },
               { id: 'stores' as TrendsTab, label: 'Stores', icon: MapPin },
-              { id: 'agent' as TrendsTab, label: 'Agent', icon: Robot },
+              { id: 'goals' as TrendsTab, label: 'Goals', icon: Trophy },
             ]).map(tab => (
               <button
                 key={tab.id}
@@ -247,8 +255,8 @@ export function SessionScreen({ session, showTrends = false, onAgentMessage, isA
                   <div className="text-sm font-bold text-t1">{(allSessions || []).filter(s => s.location?.name).map(s => s.location?.name).filter((v, i, a) => v && a.indexOf(v) === i).length}</div>
                   <div className="text-[9px] text-t3 uppercase tracking-wider font-bold">Stores Visited</div>
                 </button>
-                <button onClick={() => setTrendsTab('agent')} className="stat-card p-3 text-left active:scale-[0.97] transition-transform">
-                  <Robot size={16} className="text-b1 mb-1" />
+                <button onClick={() => setTrendsTab('goals')} className="stat-card p-3 text-left active:scale-[0.97] transition-transform">
+                  <Trophy size={16} className="text-amber mb-1" />
                   <div className="text-sm font-bold text-t1">{(goals || []).filter(g => g.active).length}</div>
                   <div className="text-[9px] text-t3 uppercase tracking-wider font-bold">Active Goals</div>
                 </button>
@@ -264,14 +272,13 @@ export function SessionScreen({ session, showTrends = false, onAgentMessage, isA
             <LocationInsights items={queue || []} />
           )}
 
-          {trendsTab === 'agent' && (
-            <div className="space-y-3">
-              <AgentChatWidget
-                onSendMessage={onAgentMessage}
-                isProcessing={isAgentProcessing}
-                compact
+          {trendsTab === 'goals' && (
+            <div className="space-y-4">
+              <GoalAchievementTracker
+                goals={goals || []}
+                items={queue || []}
               />
-              <SharedTodoList />
+              <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
             </div>
           )}
         </div>
@@ -329,7 +336,12 @@ export function SessionScreen({ session, showTrends = false, onAgentMessage, isA
             </div>
           )}
 
-          <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
+          <AgentChatWidget
+            onSendMessage={onAgentMessage}
+            isProcessing={isAgentProcessing}
+            compact
+          />
+          <SharedTodoList />
         </div>
       ) : (
         <div className="flex-1 space-y-4">
@@ -394,7 +406,12 @@ export function SessionScreen({ session, showTrends = false, onAgentMessage, isA
             </p>
           </Card>
 
-          <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
+          <AgentChatWidget
+            onSendMessage={onAgentMessage}
+            isProcessing={isAgentProcessing}
+            compact
+          />
+          <SharedTodoList />
 
           <Button
             onClick={onEndSession}

@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { ProfitGoalManager } from '../ProfitGoalManager'
+import { SharedTodoList } from '../SharedTodoList'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { Session, ScannedItem, ThriftStoreLocation } from '@/types'
@@ -398,7 +398,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
           )}
 
           {/* Profit Goals */}
-          <ProfitGoalManager sessions={allSessions || []} items={queue || []} />
+          <SharedTodoList />
 
           {/* Delete */}
           <Button

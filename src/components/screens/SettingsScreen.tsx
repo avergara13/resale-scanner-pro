@@ -40,14 +40,16 @@ import { ThemeToggle } from '../ThemeToggle'
 import { TagPresetsManager } from '../TagPresetsManager'
 import { CompressionAnalytics } from '../CompressionAnalytics'
 import { RetryConfigPanel } from '../RetryConfigPanel'
+import { ArrowLeft } from '@phosphor-icons/react'
 import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
   settings: AppSettings
   onUpdate: (settings: Partial<AppSettings>) => void
+  onBack?: () => void
 }
 
-export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
+export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenProps) {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
 
   const toggleKeyVisibility = (key: string) => {
@@ -113,9 +115,16 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
     >
       <div className="px-4 pt-2 pb-4 border-b border-s2 bg-fg">
         <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-t1 mb-2">Settings</h1>
-            <p className="text-sm text-t2">Configure AI models, APIs, and business rules</p>
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <button onClick={onBack} className="p-1.5 -ml-1 rounded-lg hover:bg-s1 transition-colors active:opacity-60">
+                <ArrowLeft size={20} weight="bold" className="text-t1" />
+              </button>
+            )}
+            <div>
+              <h1 className="text-2xl font-semibold text-t1 mb-1">Settings</h1>
+              <p className="text-sm text-t2">Configure AI models, APIs, and business rules</p>
+            </div>
           </div>
           <ThemeToggle />
         </div>

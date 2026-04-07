@@ -1056,6 +1056,7 @@ function App() {
               <SessionScreen
                 session={session}
                 showTrends={showSessionTrends}
+                onCloseTrends={() => setShowSessionTrends(false)}
                 onAgentMessage={(text) => setAgentPendingMessage(text)}
                 isAgentProcessing={agentProcessing}
                 onStartSession={handleStartSession}
@@ -1196,6 +1197,7 @@ function App() {
               <SettingsScreen
                 settings={settings}
                 onUpdate={handleUpdateSettings}
+                onBack={() => setScreen('session')}
               />
             </motion.div>
           )}
