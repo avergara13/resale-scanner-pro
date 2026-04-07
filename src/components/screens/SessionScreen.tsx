@@ -297,47 +297,87 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
             </div>
           </button>
 
-          {/* Past sessions */}
-          {(allSessions || []).length > 0 && (
-            <div>
-              <h3 className="text-xs font-bold text-t3 uppercase tracking-wider mb-3">Past Sessions</h3>
-              <div className="space-y-2">
-                {(allSessions || []).slice().reverse().map(pastSession => {
-                  const sessionItems = allCombinedItems.filter(i => i.sessionId === pastSession.id)
-                  const buyItems = sessionItems.filter(i => i.decision === 'BUY')
-                  const passItems = sessionItems.filter(i => i.decision === 'PASS')
-                  const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
-                  const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
-                  const duration = (pastSession.endTime || Date.now()) - pastSession.startTime
-                  const buyRate = pastSession.itemsScanned > 0 ? Math.round((pastSession.buyCount / pastSession.itemsScanned) * 100) : 0
-
-                  return (
-                    <PastSessionCard
-                      key={pastSession.id}
-                      session={pastSession}
-                      items={sessionItems}
-                      buyCount={buyItems.length}
-                      passCount={passItems.length}
-                      totalProfit={totalProfit}
-                      bestFind={bestFind}
-                      duration={duration}
-                      buyRate={buyRate}
-                      formatDuration={formatDuration}
-                      onDelete={() => {
-                        setAllSessions(prev => (prev || []).filter(s => s.id !== pastSession.id))
-                      }}
-                      onViewDetail={() => onViewSessionDetail?.(pastSession.id)}
-                    />
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
+          {/* Agent panel — collapsed by default */}
           <AgentPanel
             onSendMessage={onAgentMessage}
             isProcessing={isAgentProcessing}
           />
+
+          {/* Open sessions (active but not the current one) */}
+          {(() => {
+            const openSessions = (allSessions || []).filter(s => s.active)
+            if (openSessions.length === 0) return null
+            return (
+              <div>
+                <h3 className="text-xs font-bold text-t3 uppercase tracking-wider mb-3">Open Sessions</h3>
+                <div className="space-y-2">
+                  {openSessions.slice().reverse().map(s => {
+                    const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
+                    const buyItems = sessionItems.filter(i => i.decision === 'BUY')
+                    const passItems = sessionItems.filter(i => i.decision === 'PASS')
+                    const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
+                    const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
+                    const duration = (s.endTime || Date.now()) - s.startTime
+                    const buyRate = s.itemsScanned > 0 ? Math.round((s.buyCount / s.itemsScanned) * 100) : 0
+                    return (
+                      <PastSessionCard
+                        key={s.id}
+                        session={s}
+                        items={sessionItems}
+                        buyCount={buyItems.length}
+                        passCount={passItems.length}
+                        totalProfit={totalProfit}
+                        bestFind={bestFind}
+                        duration={duration}
+                        buyRate={buyRate}
+                        formatDuration={formatDuration}
+                        onDelete={() => setAllSessions(prev => (prev || []).filter(x => x.id !== s.id))}
+                        onViewDetail={() => onViewSessionDetail?.(s.id)}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Past sessions (ended) */}
+          {(() => {
+            const pastSessions = (allSessions || []).filter(s => !s.active)
+            if (pastSessions.length === 0) return null
+            return (
+              <div>
+                <h3 className="text-xs font-bold text-t3 uppercase tracking-wider mb-3">Past Sessions</h3>
+                <div className="space-y-2">
+                  {pastSessions.slice().reverse().map(s => {
+                    const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
+                    const buyItems = sessionItems.filter(i => i.decision === 'BUY')
+                    const passItems = sessionItems.filter(i => i.decision === 'PASS')
+                    const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
+                    const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
+                    const duration = (s.endTime || Date.now()) - s.startTime
+                    const buyRate = s.itemsScanned > 0 ? Math.round((s.buyCount / s.itemsScanned) * 100) : 0
+                    return (
+                      <PastSessionCard
+                        key={s.id}
+                        session={s}
+                        items={sessionItems}
+                        buyCount={buyItems.length}
+                        passCount={passItems.length}
+                        totalProfit={totalProfit}
+                        bestFind={bestFind}
+                        duration={duration}
+                        buyRate={buyRate}
+                        formatDuration={formatDuration}
+                        onDelete={() => setAllSessions(prev => (prev || []).filter(x => x.id !== s.id))}
+                        onViewDetail={() => onViewSessionDetail?.(s.id)}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
         </div>
       ) : (
         <div className="flex-1 space-y-3 pb-24">
