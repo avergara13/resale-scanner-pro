@@ -170,12 +170,12 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
                       {item.estimatedSellPrice !== undefined && item.estimatedSellPrice > 0 && (
                         <span className="text-[10px] text-t2 font-mono">Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
                       )}
-                      {item.profitMargin !== undefined && (
+                      {item.profitMargin != null && isFinite(item.profitMargin) && (
                         <span className={cn(
                           'text-[10px] font-mono font-bold',
-                          (item.profitMargin || 0) > 0 ? 'text-green' : 'text-red'
+                          item.profitMargin > 0 ? 'text-green' : 'text-red'
                         )}>
-                          {item.profitMargin.toFixed(0)}%
+                          {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
                         </span>
                       )}
                     </div>

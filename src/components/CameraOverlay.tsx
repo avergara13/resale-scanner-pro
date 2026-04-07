@@ -20,11 +20,12 @@ const LISTING_PHOTO_TIPS = [
 interface CameraOverlayProps {
   isOpen: boolean
   onClose: () => void
-  onCapture: (imageData: string, price: number, location?: ThriftStoreLocation) => void
-  onQuickDraft?: (imageData: string, price: number, location?: ThriftStoreLocation) => void
+  onCapture: (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => void
+  onQuickDraft?: (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => void
+  geminiApiKey?: string
 }
 
-export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: CameraOverlayProps) {
+export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, geminiApiKey }: CameraOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isMountedRef = useRef(true)
@@ -42,7 +43,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
   const [showLocationDialog, setShowLocationDialog] = useState(false)
   const [barcodeProduct, setBarcodeProduct] = useState<BarcodeProduct | null>(null)
   
-  const barcodeService = useMemo(() => createBarcodeService(), [])
+  const barcodeService = useMemo(() => createBarcodeService(geminiApiKey), [geminiApiKey])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -144,16 +145,18 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
         return
       }
 
+      const capturedBarcodeProduct = barcodeProduct || undefined
       if (quickDraftMode && onQuickDraft) {
-        onQuickDraft(imageData, parseFloat(price) || 0, selectedLocation)
+        onQuickDraft(imageData, parseFloat(price) || 0, selectedLocation, capturedBarcodeProduct)
         setDraftCount(prev => prev + 1)
         setShowCaptureFlash(true)
         setTimeout(() => setShowCaptureFlash(false), 300)
         setPrice('')
       } else {
-        onCapture(imageData, parseFloat(price) || 0, selectedLocation)
+        onCapture(imageData, parseFloat(price) || 0, selectedLocation, capturedBarcodeProduct)
         setPrice('')
       }
+      setBarcodeProduct(null)
     }
   }
 
@@ -468,8 +471,9 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft }: Came
                   {listingPhotos.length > 0 && (
                     <button
                       onClick={() => {
-                        onCapture(listingPhotos[0], 0, selectedLocation)
+                        onCapture(listingPhotos[0], 0, selectedLocation, barcodeProduct || undefined)
                         setListingPhotos([])
+                        setBarcodeProduct(null)
                       }}
                       className="w-full py-3 bg-b1 text-white font-bold rounded-lg text-sm transition-all active:scale-[0.98]"
                     >

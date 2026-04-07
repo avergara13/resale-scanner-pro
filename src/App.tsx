@@ -22,7 +22,7 @@ import { ListingDetailScreen } from './components/screens/ListingDetailScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { retryOperation } from './lib/retry-service'
 import { getRetryOptions } from './lib/retry-config'
-import { researchProduct } from './lib/llm-service'
+import { researchProduct, parseResearchPrice } from './lib/llm-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
@@ -34,6 +34,7 @@ import { useImageOptimization } from './hooks/use-image-optimization'
 import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
+import type { BarcodeProduct } from './lib/barcode-service'
 import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform } from './types'
 import { cn } from './lib/utils'
 
@@ -180,7 +181,7 @@ function App() {
     ))
   }, [])
 
-  const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation) => {
+  const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     triggerCapture()
     setCameraOpen(false)
 
@@ -198,6 +199,8 @@ function App() {
       inQueue: false,
       location,
       sessionId: session?.id,
+      // Pre-seed from barcode lookup; Gemini vision will overwrite with better data if available
+      productName: barcodeProduct?.title || undefined,
     }
     setCurrentItem(newItem)
     setScreen('ai')
@@ -215,7 +218,8 @@ function App() {
     
     try {
       let visionResult: GeminiVisionResponse | undefined
-      let mockProductName = 'Unknown Product'
+      // Fall back to barcode title if Gemini vision is unavailable
+      let mockProductName = barcodeProduct?.title || 'Unknown Product'
       
       simulateProgress(0, 3000)
       
@@ -376,14 +380,44 @@ function App() {
         completeStep(2)
         await new Promise(resolve => setTimeout(resolve, 100))
       } else {
+        // No eBay API — use Gemini Google Search grounding to get real market comps
+        const geminiKey = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+        if (geminiKey) {
+          setPipeline(prev => prev.map((s, i) =>
+            i === 2 ? { ...s, data: 'Searching eBay, Mercari, Poshmark, Whatnot, StockX...' } : s
+          ))
+          try {
+            const researchText = await researchProduct(
+              visionResult?.productName || mockProductName,
+              { purchasePrice: price, category: visionResult?.category, brand: visionResult?.brand },
+              geminiKey
+            )
+            // Store for listing detail agent context
+            marketData = { ...(marketData || {}), researchSummary: researchText }
+            // Parse recommended sell price from research text
+            const researchPrice = parseResearchPrice(researchText)
+            if (researchPrice > 0) {
+              ebayAvgPrice = researchPrice
+              setPipeline(prev => prev.map((s, i) =>
+                i === 2 ? { ...s, data: `Market price ~$${researchPrice.toFixed(2)} (Google Search)` } : s
+              ))
+            } else {
+              setPipeline(prev => prev.map((s, i) =>
+                i === 2 ? { ...s, data: 'Research complete — using estimate' } : s
+              ))
+            }
+          } catch {
+            setPipeline(prev => prev.map((s, i) =>
+              i === 2 ? { ...s, data: 'Search unavailable — using estimate' } : s
+            ))
+          }
+        } else {
+          setPipeline(prev => prev.map((s, i) =>
+            i === 2 ? { ...s, data: 'Add Gemini API key in Settings for live market search' } : s
+          ))
+        }
         completeStep(2)
         await new Promise(resolve => setTimeout(resolve, 100))
-        setPipeline(prev => prev.map((s, i) =>
-          i === 2 ? {
-            ...s,
-            data: 'Configure eBay API in Settings for real market data'
-          } : s
-        ))
       }
 
       // 3-tier sell price fallback: eBay recommendedPrice → Google Lens average → 4.5x markup
@@ -440,23 +474,30 @@ function App() {
       
       const updatedItem: ScannedItem = {
         ...newItem,
-        productName: visionResult?.productName || mockProductName,
-        description: visionResult?.description || 'Product analysis unavailable',
-        category: visionResult?.category || 'General',
+        productName: visionResult?.productName || barcodeProduct?.title || mockProductName,
+        description: visionResult?.description || barcodeProduct?.description || 'Product analysis unavailable',
+        category: visionResult?.category || barcodeProduct?.category || 'General',
         estimatedSellPrice: sellPrice > 0 ? sellPrice : undefined,
         profitMargin: sellPrice > 0 ? profitMetrics.profitMargin : undefined,
         decision,
         lensAnalysis,
         lensResults: lensAnalysis?.results,
-        marketData,
+        marketData: {
+          ...marketData,
+          // Preserve barcode lookup data for listing generation context
+          ...(barcodeProduct ? { barcodeProduct } : {}),
+        },
       }
 
-      // Non-blocking async research: runs after pipeline completes, enriches marketData
-      if (settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY) {
+      // Non-blocking enrichment: runs only when eBay was used (research already ran in pipeline
+      // when eBay was absent — skip to avoid a double call and API cost)
+      const alreadyResearched = !ebayService && !!marketData?.researchSummary
+      const geminiKeyForResearch = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+      if (!alreadyResearched && geminiKeyForResearch) {
         researchProduct(
           visionResult?.productName || mockProductName,
           { purchasePrice: price, category: visionResult?.category, brand: visionResult?.brand },
-          settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+          geminiKeyForResearch
         ).then(researchText => {
           const itemId = newItem.id
           setQueue(prev => (prev || []).map(i =>
@@ -849,9 +890,9 @@ function App() {
     setScreen('queue')
   }, [currentItem, setQueue])
 
-  const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation) => {
+  const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
-    
+
     const draftItem: ScannedItem = {
       id: Date.now().toString(),
       timestamp: Date.now(),
@@ -859,10 +900,12 @@ function App() {
       purchasePrice: price,
       decision: 'PENDING',
       inQueue: true,
-      productName: 'Quick Draft',
-      description: 'Captured in quick draft mode - analyze later',
+      productName: barcodeProduct?.title || 'Quick Draft',
+      description: barcodeProduct?.description || 'Captured in quick draft mode - analyze later',
+      category: barcodeProduct?.category || undefined,
       sessionId: session?.id,
       location,
+      marketData: barcodeProduct ? { barcodeProduct } : undefined,
     }
 
     setQueue((prev) => [...(prev || []), draftItem])
@@ -1218,9 +1261,9 @@ function App() {
   }, []) // intentionally empty deps — runs once on mount
 
   const screenVariants = {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 },
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -8 },
   }
 
   useEffect(() => {
@@ -1288,7 +1331,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <SessionScreen
@@ -1319,7 +1362,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <AgentScreen
@@ -1355,7 +1398,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <AIScreen
@@ -1375,7 +1418,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <QueueScreen
@@ -1427,7 +1470,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <SoldScreen
@@ -1450,7 +1493,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <SettingsScreen
@@ -1467,7 +1510,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <TagAnalyticsScreen
@@ -1484,7 +1527,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <LocationInsightsScreen
@@ -1500,7 +1543,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <CostTrackingScreen
@@ -1515,7 +1558,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <ScanHistoryScreen
@@ -1537,7 +1580,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <SessionDetailScreen
@@ -1569,6 +1612,7 @@ function App() {
         onClose={() => setCameraOpen(false)}
         onCapture={handleCapture}
         onQuickDraft={handleQuickDraft}
+        geminiApiKey={settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY}
       />
 
       {isBatchAnalyzing && (

@@ -213,6 +213,7 @@ export interface MarketData {
   sellThroughRate?: number
   recommendedPrice?: number
   researchSummary?: string
+  barcodeProduct?: import('../lib/barcode-service').BarcodeProduct
 }
 
 export interface Session {

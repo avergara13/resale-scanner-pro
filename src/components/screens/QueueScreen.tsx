@@ -161,7 +161,7 @@ function SortableItem({
                 <span className="text-[7px] font-bold bg-purple-500/15 text-purple-500 px-1 py-0.5 rounded flex-shrink-0 uppercase">Personal</span>
               )}
             </div>
-            {item.profitMargin !== undefined && isFinite(item.profitMargin) && (
+            {item.profitMargin != null && isFinite(item.profitMargin) && (
               <Badge
                 variant="secondary"
                 className={cn(
@@ -1391,7 +1391,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           <h3 className="font-semibold text-t1 text-sm line-clamp-2">
                             {item.productName || 'Unknown Item'}
                           </h3>
-                          {item.profitMargin !== undefined && isFinite(item.profitMargin) && (
+                          {item.profitMargin != null && isFinite(item.profitMargin) && (
                             <Badge
                               variant="secondary"
                               className={`flex-shrink-0 font-mono font-medium ${
