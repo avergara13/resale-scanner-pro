@@ -477,18 +477,45 @@ function App() {
       totalPotentialProfit: 0,
       active: true,
     }
+    // Save to allSessions immediately so it persists
+    setAllSessions((prev) => [...(prev || []), newSession])
     setSession(newSession)
     toast.success('Session started')
+  }, [setSession, setAllSessions])
+
+  // Close the active session view without ending it — go back to session list
+  const handleCloseSessionView = useCallback(() => {
+    setSession(undefined)
   }, [setSession])
+
+  // Resume an existing open session
+  const handleResumeSession = useCallback((sessionId: string) => {
+    const found = (allSessions || []).find(s => s.id === sessionId)
+    if (found && found.active) {
+      setSession(found)
+    }
+  }, [allSessions, setSession])
 
   const handleEndSession = useCallback(() => {
     if (session) {
       const endedSession = { ...session, endTime: Date.now(), active: false }
-      setSession(endedSession)
-      setAllSessions((prev) => [...(prev || []), endedSession])
+      // Update in allSessions
+      setAllSessions((prev) =>
+        (prev || []).map(s => s.id === session.id ? endedSession : s)
+      )
+      setSession(undefined)
       toast.success('Session ended')
     }
   }, [session, setSession, setAllSessions])
+
+  // Keep allSessions in sync with the current active session (scan counts, profit, etc.)
+  useEffect(() => {
+    if (session?.active && session.id) {
+      setAllSessions((prev) =>
+        (prev || []).map(s => s.id === session.id ? session : s)
+      )
+    }
+  }, [session, setAllSessions])
 
   const handleEditSession = useCallback((sessionId: string, updates: Partial<Session>) => {
     // Update active session if it matches
@@ -1050,6 +1077,8 @@ function App() {
                 isAgentProcessing={agentProcessing}
                 onStartSession={handleStartSession}
                 onEndSession={handleEndSession}
+                onCloseSessionView={handleCloseSessionView}
+                onResumeSession={handleResumeSession}
                 onNavigateToQueue={() => setScreen('queue')}
                 onNavigateToHistory={() => setScreen('scan-history')}
                 onViewSessionDetail={(id) => {

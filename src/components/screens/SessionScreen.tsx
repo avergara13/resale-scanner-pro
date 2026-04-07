@@ -129,12 +129,14 @@ interface SessionScreenProps {
   isAgentProcessing?: boolean
   onStartSession: () => void
   onEndSession: () => void
+  onCloseSessionView?: () => void
+  onResumeSession?: (sessionId: string) => void
   onNavigateToQueue?: (filter?: string) => void
   onNavigateToHistory?: () => void
   onViewSessionDetail?: (sessionId: string) => void
 }
 
-export function SessionScreen({ session, showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onEndSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
+export function SessionScreen({ session, showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onEndSession, onCloseSessionView, onResumeSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
@@ -304,7 +306,7 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
             isProcessing={isAgentProcessing}
           />
 
-          {/* Open sessions (active but not the current one) */}
+          {/* Open sessions — tap to resume */}
           {(() => {
             const openSessions = (allSessions || []).filter(s => s.active)
             if (openSessions.length === 0) return null
@@ -333,7 +335,7 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
                         buyRate={buyRate}
                         formatDuration={formatDuration}
                         onDelete={() => setAllSessions(prev => (prev || []).filter(x => x.id !== s.id))}
-                        onViewDetail={() => onViewSessionDetail?.(s.id)}
+                        onViewDetail={() => onResumeSession?.(s.id)}
                       />
                     )
                   })}
@@ -382,6 +384,15 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
         </div>
       ) : (
         <div className="flex-1 space-y-3 pb-24">
+          {/* Back to session list */}
+          <button
+            onClick={onCloseSessionView}
+            className="flex items-center gap-1.5 text-b1 active:opacity-60 transition-opacity"
+          >
+            <ArrowLeft size={14} weight="bold" />
+            <span className="text-[11px] font-bold uppercase tracking-wide">All Sessions</span>
+          </button>
+
           {/* Session name + location/goal buttons */}
           <div className="flex items-center justify-between">
             <div>
