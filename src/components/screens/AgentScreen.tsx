@@ -231,8 +231,13 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
     return { total, buy, pass, pending, totalProfit }
   }, [queueItems])
 
+  const prevMessageCount = useRef(chatMessages.length)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // Only auto-scroll when new messages are added, not on initial mount
+    if (chatMessages.length > prevMessageCount.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    prevMessageCount.current = chatMessages.length
   }, [chatMessages])
 
   useEffect(() => {

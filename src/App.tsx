@@ -1009,9 +1009,13 @@ function App() {
 
   useEffect(() => {
     setPrevScreen(screen)
-    // Scroll to top on every screen change
+    // Scroll all containers to top on every screen change
     window.scrollTo(0, 0)
     document.getElementById('app-container')?.scrollTo(0, 0)
+    // Reset any inner scrollable content areas
+    document.querySelectorAll('.scrollable-content, [class*="overflow-y-auto"]').forEach(el => {
+      el.scrollTop = 0
+    })
   }, [screen])
 
   return (
