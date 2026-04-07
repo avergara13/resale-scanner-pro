@@ -121,22 +121,17 @@ function PastSessionCard({
 type TrendsTab = 'trends' | 'stores' | 'goals'
 
 interface SessionScreenProps {
-  session?: Session
   showTrends?: boolean
   onCloseTrends?: () => void
   onAgentMessage?: (text: string) => void
   isAgentProcessing?: boolean
   onStartSession: () => void
-  onEndSession: () => void
-  onCloseSessionView?: () => void
   onResumeSession?: (sessionId: string) => void
   onDeleteSession?: (sessionId: string) => void
-  onNavigateToQueue?: (filter?: string) => void
-  onNavigateToHistory?: () => void
   onViewSessionDetail?: (sessionId: string) => void
 }
 
-export function SessionScreen({ session, showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onEndSession, onCloseSessionView, onResumeSession, onDeleteSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
+export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])

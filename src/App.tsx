@@ -10,7 +10,6 @@ import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { AIScreen } from './components/screens/AIScreen'
 import { AgentScreen } from './components/screens/AgentScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
-import { IncidentsScreen } from './components/screens/IncidentsScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
 import { TagAnalyticsScreen } from './components/screens/TagAnalyticsScreen'
@@ -485,17 +484,6 @@ function App() {
     setScreen('session-detail')
     toast.success('Session started')
   }, [setSession, setAllSessions, setSelectedSessionId, setScreen])
-
-  // Close the active session view without ending it — go back to session list
-  // Sync current session state to allSessions before clearing the view
-  const handleCloseSessionView = useCallback(() => {
-    if (session?.active && session.id) {
-      setAllSessions((prev) =>
-        (prev || []).map(s => s.id === session.id ? session : s)
-      )
-    }
-    setSession(undefined)
-  }, [session, setSession, setAllSessions])
 
   // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -1077,7 +1065,7 @@ function App() {
             ? () => setScreen('queue')
             : screen === 'cost-tracking'
             ? () => setScreen('settings')
-            : screen === 'ai' || screen === 'incidents'
+            : screen === 'ai'
             ? () => setScreen('session')
             : undefined
         }
@@ -1101,18 +1089,13 @@ function App() {
               className="w-full h-full"
             >
               <SessionScreen
-                session={session}
                 showTrends={showSessionTrends}
                 onCloseTrends={() => setShowSessionTrends(false)}
                 onAgentMessage={(text) => setAgentPendingMessage(text)}
                 isAgentProcessing={agentProcessing}
                 onStartSession={handleStartSession}
-                onEndSession={handleEndSession}
-                onCloseSessionView={handleCloseSessionView}
                 onResumeSession={handleResumeSession}
                 onDeleteSession={handleDeleteSession}
-                onNavigateToQueue={() => setScreen('queue')}
-                onNavigateToHistory={() => setScreen('scan-history')}
                 onViewSessionDetail={(id) => {
                   setSelectedSessionId(id)
                   setScreen('session-detail')
