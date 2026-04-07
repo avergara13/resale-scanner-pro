@@ -76,12 +76,12 @@ Market Data:
 - Sell-through rate: ${marketData.ebaySellThroughRate?.toFixed(1) || 'N/A'}%
 - Active listings: ${marketData.ebayActiveListings || 0}
 - Recent sales: ${marketData.ebaySoldCount || 0}
-${marketData.ebayRecentSales?.slice(0, 8).map(sale => `  - "${sale.title}" sold for $${sale.price}`).join('\n') || ''}
+${marketData.ebayRecentSales?.slice(0, 3).map(sale => `  - "${sale.title}" sold for $${sale.price}`).join('\n') || ''}
 ` : ''
 
     const competitorContext = competitorTitles && competitorTitles.length > 0 ? `
-Competitor Titles (use for SEO inspiration):
-${competitorTitles.slice(0, 5).map((t, i) => `${i + 1}. ${t}`).join('\n')}
+Competitor Titles (SEO inspiration):
+${competitorTitles.slice(0, 3).map((t, i) => `${i + 1}. ${t}`).join('\n')}
 ` : ''
 
     const brandContext = brandInfo ? `
@@ -91,10 +91,9 @@ ${brandInfo.model ? `- Model: ${brandInfo.model}` : ''}
 ${brandInfo.year ? `- Year: ${brandInfo.year}` : ''}
 ` : ''
 
-    // Google Lens results for product identification
     const lensContext = item.lensResults && item.lensResults.length > 0 ? `
-Google Lens Product Matches (top results identifying this item):
-${item.lensResults.slice(0, 5).map((r, i) => `${i + 1}. "${r.title}" — ${r.source}${r.price ? ` (${r.price})` : ''}`).join('\n')}
+Google Lens Matches:
+${item.lensResults.slice(0, 2).map((r, i) => `${i + 1}. "${r.title}" — ${r.source}${r.price ? ` (${r.price})` : ''}`).join('\n')}
 ` : ''
 
     // Existing tags from scan-time tag suggestion

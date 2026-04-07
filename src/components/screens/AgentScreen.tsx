@@ -76,34 +76,24 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
 ]
 
-// Static system instructions — extracted to module level so they're allocated once
-// and can benefit from LLM prompt caching (stable prefix)
-const AGENT_SYSTEM_INSTRUCTIONS = `You are an expert AI agent for resale business optimization. You have FULL awareness of this app's state — every session, item, goal, and setting. You help users research products, analyze profitability, create optimized eBay listings, manage sessions, track sold items, and make data-driven decisions.
+// Static system instructions — module-level constant, allocated once.
+// Gemini API caches identical prefixes across calls, so keeping this
+// stable and at the front of every prompt reduces per-request cost.
+const AGENT_SYSTEM_INSTRUCTIONS = `You are a resale business AI agent with full app state access. You help research products, analyze profit, create eBay listings, manage sessions, and track sold items. All profit figures are NET (after fees + shipping). The user offers 1-day shipping — flag overdue items.
 
-## Available Actions
-You can execute these commands for the user:
-- "Research [product]" — Search real marketplaces for current prices and demand
-- "Change price to $X" / "Update sell price to $X" — Edit item fields
-- "Create listings" — Generate optimized eBay listings for BUY items
-- "Push to Notion" — Publish ready listings
-- "Full pipeline" — End-to-end: analyze → optimize → publish
-- "Camera" / "Scan" — Open the AI Camera
-- "Start session" / "End session" — Manage scanning sessions
-- "Name session [name]" — Rename the active session
-- "Set goal $X" — Set a profit goal for the active session
-- "Set location [name]" — Set the location for the active session
-- "Mark [item] as sold on [marketplace] for $X" — Move a published item to the Sold tab
-- "Add tracking [number] for [item]" / "Mark [item] shipped" — Update shipping status
+## Commands
+- "Research [product]" — live marketplace search
+- "Create listings" / "Full pipeline" — optimize + publish BUY items
+- "Push to Notion" — publish ready listings
+- "Mark [item] sold on [marketplace] for $X" — record a sale
+- "Add tracking [number]" / "Mark shipped" — update shipping
+- "Start/End session" — manage scanning sessions
+- "Set goal $X" / "Set location [name]" — session settings
 
-## Instructions
-- You are fully aware of ALL data in this app. Reference specific items, sessions, goals, and metrics by name and number.
-- When the user asks about sessions, items, goals, or any app data, answer from the state above — don't say you can't access it.
-- When discussing items, reference their specific prices, margins, categories, and brands.
-- If asked about profitability, calculate real numbers using the data. Profit figures are NET (after marketplace fees and shipping).
-- If an item has a negative margin, explain WHY (fees + shipping) and suggest alternatives.
-- When the user asks to edit forms or data, use the available actions to do it immediately.
-- Be proactive: if a session has no goal set, suggest one. If items are unanalyzed, suggest running the pipeline.
-- Items needing shipping are urgent (1-day shipping policy). Flag any items overdue for shipping.` as const
+## Rules
+- Answer from the app state below — never say you can't access it.
+- Reference items by name, price, margin, and category.
+- Be proactive: suggest goals, flag unanalyzed items, warn about overdue shipping.` as const
 
 function formatMessage(text: string): string {
   let formatted = text
@@ -341,74 +331,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
     )
     setActiveSessionId(sessionId)
   }, [setChatSessions, setActiveSessionId])
-
-  const buildContext = useCallback(() => {
-    const queueSummary = sessionItems.slice(0, 10).map(item => ({
-      id: item.id,
-      name: item.productName || 'Unknown',
-      price: item.purchasePrice,
-      estimatedSell: item.estimatedSellPrice,
-      decision: item.decision,
-      profitMargin: item.profitMargin,
-      category: item.category,
-      tags: item.tags,
-      listingStatus: item.listingStatus,
-      inQueue: item.inQueue,
-    }))
-
-    const sessionsSummary = allSessions.slice(-5).map(s => ({
-      id: s.id,
-      name: s.name || new Date(s.startTime).toLocaleDateString(),
-      active: s.active,
-      itemsScanned: s.itemsScanned,
-      buyCount: s.buyCount,
-      passCount: s.passCount,
-      totalProfit: s.totalPotentialProfit,
-      profitGoal: s.profitGoal,
-      location: s.location?.name,
-    }))
-
-    const goalsSummary = profitGoals.filter(g => g.active).map(g => ({
-      id: g.id,
-      type: g.type,
-      target: g.targetAmount,
-      startDate: new Date(g.startDate).toLocaleDateString(),
-      endDate: new Date(g.endDate).toLocaleDateString(),
-    }))
-
-    const recentScans = scanHistory.slice(0, 5).map(i => ({
-      name: i.productName || 'Unknown',
-      decision: i.decision,
-      price: i.purchasePrice,
-      sellPrice: i.estimatedSellPrice,
-      sessionId: i.sessionId,
-    }))
-
-    const soldSummary = soldItems.slice(0, 10).map(item => ({
-      id: item.id,
-      name: item.productName || 'Unknown',
-      soldPrice: item.soldPrice,
-      soldOn: item.soldOn,
-      soldDate: item.soldDate,
-      netProfit: settings ? getNetProfit(item, settings).netProfit : (item.soldPrice || 0) - item.purchasePrice,
-      status: item.listingStatus,
-      trackingNumber: item.trackingNumber,
-    }))
-
-    return {
-      queueStats,
-      recentItems: queueSummary,
-      soldItems: soldSummary,
-      sessions: sessionsSummary,
-      goals: goalsSummary,
-      recentScans,
-      settings: {
-        minProfitMargin: settings?.minProfitMargin,
-        defaultShipping: settings?.defaultShippingCost,
-        ebayFeePercent: settings?.ebayFeePercent
-      }
-    }
-  }, [sessionItems, soldItems, queueStats, settings, allSessions, profitGoals, scanHistory])
 
   const handleSendMessage = useCallback(async (messageText?: string) => {
     const text = messageText || input.trim()
@@ -881,7 +803,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         }
       }
 
-      const context = buildContext()
       const recentItems = sessionItems.slice(-3).map(i =>
         `• ${i.productName || 'Unknown'} — Buy: $${i.purchasePrice.toFixed(2)}, Sell: $${(i.estimatedSellPrice || 0).toFixed(2)}, Margin: ${(i.profitMargin || 0).toFixed(1)}%, Decision: ${i.decision}, Status: ${i.listingStatus || 'not-started'}${i.category ? `, Category: ${i.category}` : ''}`
       ).join('\n')
@@ -919,9 +840,8 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
           }`
         : 'No scanning session is active. You are showing all-time global stats across all sessions.'
 
-      const systemPrompt = `${AGENT_SYSTEM_INSTRUCTIONS}
-
-${sessionScope}
+      // Dynamic context — changes per message, billed per-request
+      const dynamicContext = `${sessionScope}
 
 ## Current App State
 
@@ -935,27 +855,31 @@ ${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
 ${soldSummaryText !== 'No sold items yet' ? `\nRecent Sold:\n${soldSummaryText}` : '\nNo sold items yet'}
 
 ### Active Session
-${currentSession?.active ? `- Name: ${currentSession.name || 'Unnamed'}
-- Started: ${new Date(currentSession.startTime).toLocaleString()}
-- Scans: ${currentSession.itemsScanned} (${currentSession.buyCount} BUY, ${currentSession.passCount} PASS)
-- Profit: $${currentSession.totalPotentialProfit.toFixed(2)}
-- Goal: ${currentSession.profitGoal ? `$${currentSession.profitGoal} (${currentSession.profitGoal > 0 ? Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100) : 0}% achieved)` : 'Not set'}
-- Location: ${currentSession.location?.name || 'Not set'}` : 'No active session'}
+${currentSession?.active ? `- ${currentSession.name || 'Unnamed'}: ${currentSession.itemsScanned} scans (${currentSession.buyCount} BUY, ${currentSession.passCount} PASS), $${currentSession.totalPotentialProfit.toFixed(2)} profit${currentSession.profitGoal ? `, goal: $${currentSession.profitGoal} (${Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100)}%)` : ''}${currentSession.location?.name ? `, at ${currentSession.location.name}` : ''}` : 'No active session'}
 
-### Past Sessions (most recent)
-${pastSessionsSummary || 'No past sessions'}
+### Past Sessions
+${pastSessionsSummary || 'None'}
 
-### Profit Goals
-${activeGoalsSummary || 'No active goals'}
+### Goals
+${activeGoalsSummary || 'None'}
 
 ### Settings
 - Min margin: ${settings?.minProfitMargin}%, Shipping: $${settings?.defaultShippingCost}, eBay fee: ${settings?.ebayFeePercent}%`
 
-      const fullPrompt = `${systemPrompt}\n\nUser: ${text}`
-      const response = await callLLM(fullPrompt, {
+      // Include last 4 messages for conversational continuity
+      const recentHistory = chatMessages.slice(-4).map(m =>
+        `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 300)}`
+      ).join('\n\n')
+      const historyBlock = recentHistory ? `\n\n## Recent Conversation\n${recentHistory}` : ''
+
+      // Static instructions → Gemini systemInstruction (cached across requests)
+      // Dynamic context + history + user message → contents (billed per-request)
+      const userPrompt = `${dynamicContext}${historyBlock}\n\nUser: ${text}`
+      const response = await callLLM(userPrompt, {
         task: 'chat',
         geminiApiKey: settings?.geminiApiKey,
         anthropicApiKey: settings?.anthropicApiKey,
+        systemPrompt: AGENT_SYSTEM_INSTRUCTIONS,
       })
 
       const aiMessage: ChatMessage = {
@@ -979,7 +903,7 @@ ${activeGoalsSummary || 'No active goals'}
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, sessionItems, soldItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {

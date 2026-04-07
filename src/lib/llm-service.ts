@@ -18,24 +18,31 @@ const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages'
 async function callGemini(
   prompt: string,
   apiKey: string,
-  options: { model?: string; jsonMode?: boolean; maxTokens?: number; temperature?: number } = {}
+  options: { model?: string; jsonMode?: boolean; maxTokens?: number; temperature?: number; systemInstruction?: string } = {}
 ): Promise<string> {
-  const { model = 'gemini-2.5-flash', jsonMode = false, maxTokens = 2048, temperature = 0.7 } = options
+  const { model = 'gemini-2.5-flash', jsonMode = false, maxTokens = 2048, temperature = 0.7, systemInstruction } = options
   const url = `${GEMINI_ENDPOINT}/${model}:generateContent?key=${apiKey}`
+
+  const body: Record<string, unknown> = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: maxTokens,
+      ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
+    },
+  }
+  // Gemini caches systemInstruction across requests with identical prefixes,
+  // reducing per-request token billing for the static instruction portion
+  if (systemInstruction) {
+    body.systemInstruction = { parts: [{ text: systemInstruction }] }
+  }
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: maxTokens,
-        ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
-      },
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!response.ok) {
@@ -205,6 +212,7 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
       jsonMode,
       maxTokens: maxTokens || (task === 'listing' ? 2048 : 1024),
       temperature: temperature ?? (task === 'chat' ? 0.7 : 0.4),
+      systemInstruction: systemPrompt,
     })
   }
 
