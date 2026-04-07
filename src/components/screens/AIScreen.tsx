@@ -1,8 +1,9 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image } from '@phosphor-icons/react'
+import { Robot, PencilSimple, Plus, Microphone, Scan, FloppyDisk, Confetti, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
+import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,7 +21,7 @@ import { useCollapsePreference } from '@/hooks/use-collapse-preference'
 import { useTabPreference } from '@/hooks/use-tab-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
-import type { ScannedItem, PipelineStep, AppSettings, ChatMessage } from '@/types'
+import type { ScannedItem, PipelineStep, AppSettings, ChatMessage, SharedTodo } from '@/types'
 
 interface AIScreenProps {
   currentItem?: ScannedItem
@@ -220,8 +221,59 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
   )
 }
 
+function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (item: ScannedItem) => void }) {
+  const statusColor =
+    item.listingStatus === 'ready' ? 'text-green-600 bg-green-50 border-green-200' :
+    item.listingStatus === 'optimizing' ? 'text-amber-600 bg-amber-50 border-amber-200' :
+    item.listingStatus === 'published' ? 'text-blue-600 bg-blue-50 border-blue-200' :
+    'text-t3 bg-s1 border-s2'
+
+  const profit = (item.estimatedSellPrice ?? 0) - item.purchasePrice
+
+  return (
+    <Card className="p-3 bg-fg border-s2 flex gap-3 items-start">
+      {(item.imageThumbnail || item.imageData) && (
+        <img
+          src={item.imageThumbnail || item.imageData}
+          alt={item.productName || 'Item'}
+          className="w-14 h-14 rounded-lg object-cover border border-s2 flex-shrink-0"
+        />
+      )}
+      <div className="flex-1 min-w-0 space-y-1">
+        <p className="text-xs font-bold text-t1 truncate">{item.productName || 'Unnamed Item'}</p>
+        <div className="flex gap-2 text-[10px] font-mono text-t2 flex-wrap">
+          <span>Buy ${item.purchasePrice.toFixed(2)}</span>
+          <span>→</span>
+          <span>Sell ${item.estimatedSellPrice?.toFixed(2) ?? '--'}</span>
+          <span className={profit >= 0 ? 'text-green-600' : 'text-red-500'}>
+            ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
+          </span>
+        </div>
+        {item.profitMargin != null && (
+          <p className={cn(
+            'text-[10px] font-bold',
+            item.profitMargin > 50 ? 'text-green-600' : item.profitMargin > 20 ? 'text-amber-600' : 'text-red-500'
+          )}>
+            {item.profitMargin.toFixed(1)}% margin
+          </p>
+        )}
+        <span className={cn('inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border', statusColor)}>
+          {item.listingStatus?.replace(/-/g, ' ') ?? 'not started'}
+        </span>
+      </div>
+      <button
+        onClick={() => onDiscuss(item)}
+        className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 bg-b1/10 hover:bg-b1/20 text-b1 rounded-lg text-[10px] font-bold transition-colors active:scale-95"
+      >
+        <Sparkle size={12} weight="duotone" />
+        Discuss
+      </button>
+    </Card>
+  )
+}
+
 export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQueue, onDeepSearch, onSaveDraft, onOpenCamera }: AIScreenProps) {
-  const [tab, setTab] = useTabPreference<'analysis' | 'chat'>('ai-screen', 'analysis')
+  const [tab, setTab] = useTabPreference<'chat' | 'scans' | 'tasks'>('ai-screen-v2', 'chat')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [description, setDescription] = useState('')
@@ -232,6 +284,11 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
   const { isListening, startListening, isSupported } = useVoiceInput()
   const chatScrollRef = useRef<HTMLDivElement>(null)
 
+  const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', [])
+  const [taskInput, setTaskInput] = useState('')
+  const pendingTasks = (todos || []).filter(t => !t.completed)
+  const completedTasks = (todos || []).filter(t => t.completed)
+
   const hasDecision = pipeline.some(p => p.id === 'decision' && p.status === 'complete')
   const decision = currentItem?.decision
   const canSaveDraft = currentItem?.imageData || description.trim().length > 0
@@ -239,6 +296,34 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
   const handleRefresh = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, 600))
   }, [])
+
+  const handleAddTask = useCallback(() => {
+    const text = taskInput.trim()
+    if (!text) return
+    setTodos(prev => [...(prev || []), {
+      id: Date.now().toString(),
+      text,
+      completed: false,
+      createdBy: 'user' as const,
+      createdAt: Date.now(),
+    }])
+    setTaskInput('')
+  }, [taskInput, setTodos])
+
+  const handleToggleTask = useCallback((id: string) => {
+    setTodos(prev => (prev || []).map(t => t.id === id ? { ...t, completed: !t.completed } : t))
+  }, [setTodos])
+
+  const handleDeleteTask = useCallback((id: string) => {
+    setTodos(prev => (prev || []).filter(t => t.id !== id))
+  }, [setTodos])
+
+  const handleDiscussItem = useCallback((item: ScannedItem) => {
+    const listingLabel = item.listingStatus?.replace(/-/g, ' ') ?? 'not started'
+    const msg = `Let's work on ${item.productName || 'this item'} — buy price $${item.purchasePrice.toFixed(2)}, estimated sell $${item.estimatedSellPrice?.toFixed(2) ?? 'unknown'}, listing status: ${listingLabel}. Help me finalize the listing details.`
+    setChatInput(msg)
+    setTab('chat')
+  }, [setTab])
 
   const pullToRefresh = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -395,24 +480,28 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
         </div>
         <div className="tab-bar">
           <button
-            onClick={() => setTab('analysis')}
-            className={cn('tab-btn', tab === 'analysis' && 'active')}
-          >
-            <span className="hidden sm:inline">📊 ANALYSIS</span>
-            <span className="sm:hidden">📊 ANALYZE</span>
-          </button>
-          <button
             onClick={() => setTab('chat')}
             className={cn('tab-btn', tab === 'chat' && 'active')}
           >
-            <span className="hidden sm:inline">💬 AI CHAT</span>
-            <span className="sm:hidden">💬 CHAT</span>
+            <span>💬 CHAT</span>
+          </button>
+          <button
+            onClick={() => setTab('scans')}
+            className={cn('tab-btn', tab === 'scans' && 'active')}
+          >
+            <span>📊 SCANS</span>
+          </button>
+          <button
+            onClick={() => setTab('tasks')}
+            className={cn('tab-btn', tab === 'tasks' && 'active')}
+          >
+            <span>✅ TASKS{pendingTasks.length > 0 && ` (${pendingTasks.length})`}</span>
           </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {tab === 'analysis' ? (
+        {tab === 'scans' && (
           <div ref={pullToRefresh.containerRef} className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-52 sm:pb-56">
             {pipeline.length === 0 ? (
               <div className="space-y-4 sm:space-y-6">
@@ -539,8 +628,25 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
                 )}
               </div>
             )}
+            {/* Listing Queue section */}
+            {(() => {
+              const listingItems = (queueItems || []).filter(i => i.decision === 'BUY' && i.inQueue)
+              if (!listingItems.length) return null
+              return (
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center gap-2 py-2 border-t border-s2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-t2">Listing Queue</span>
+                    <span className="text-[10px] text-t3 bg-s1 px-1.5 py-0.5 rounded font-bold">{listingItems.length}</span>
+                  </div>
+                  {listingItems.map(item => (
+                    <QueueListingCard key={item.id} item={item} onDiscuss={handleDiscussItem} />
+                  ))}
+                </div>
+              )
+            })()}
           </div>
-        ) : (
+        )}
+        {tab === 'chat' && (
           <div className="flex flex-col min-h-full pb-32 sm:pb-36">
             <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4" ref={(el) => {
               if (el) {
@@ -608,10 +714,71 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
             </div>
           </div>
         )}
+        {tab === 'tasks' && (
+          <div className="flex flex-col min-h-full pb-32 sm:pb-36">
+            <div className="flex-1 p-3 sm:p-4">
+              {(todos || []).length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-3 sm:mb-4">
+                    <ListChecks size={32} weight="duotone" className="text-b1 sm:w-10 sm:h-10" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-t1 mb-1.5 sm:mb-2">No Tasks Yet</h3>
+                  <p className="text-xs sm:text-sm text-t3 max-w-xs">Add tasks below, or ask the AI to create tasks for you in the Chat tab.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-s1">
+                  {pendingTasks.map(todo => (
+                    <div key={todo.id} className="flex items-center gap-2.5 py-2.5 group">
+                      <button
+                        onClick={() => handleToggleTask(todo.id)}
+                        className="flex-shrink-0 w-5 h-5 rounded-md border border-s2 hover:border-b1 transition-colors"
+                      />
+                      <span className="flex-1 text-xs sm:text-sm text-t1 leading-snug">{todo.text}</span>
+                      <span className={cn(
+                        'text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded',
+                        todo.createdBy === 'agent' ? 'text-b1 bg-b1/10' : 'text-t3 bg-s1'
+                      )}>
+                        {todo.createdBy}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteTask(todo.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red-500 p-1"
+                      >
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {completedTasks.length > 0 && (
+                    <div className="pt-3 pb-1">
+                      <p className="text-[10px] text-t3 font-bold uppercase tracking-wide">Completed ({completedTasks.length})</p>
+                    </div>
+                  )}
+                  {completedTasks.map(todo => (
+                    <div key={todo.id} className="flex items-center gap-2.5 py-2.5 group opacity-50">
+                      <button
+                        onClick={() => handleToggleTask(todo.id)}
+                        className="flex-shrink-0 w-5 h-5 rounded-md bg-green-100 border border-green-300 flex items-center justify-center"
+                      >
+                        <Check size={12} weight="bold" className="text-green-600" />
+                      </button>
+                      <span className="flex-1 text-xs sm:text-sm text-t2 leading-snug line-through">{todo.text}</span>
+                      <button
+                        onClick={() => handleDeleteTask(todo.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red-500 p-1"
+                      >
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="fixed bottom-[80px] left-0 right-0 max-w-[480px] mx-auto border-t border-s2 bg-fg/95 backdrop-blur-md z-20 safe-bottom">
-        {tab === 'analysis' && hasDecision && currentItem?.decision === 'BUY' && (
+        {tab === 'scans' && hasDecision && currentItem?.decision === 'BUY' && (
           <div className="p-2.5 sm:p-3 border-b border-s2">
             <Button
               onClick={onAddToQueue}
@@ -650,7 +817,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
           </div>
         )}
 
-        {tab === 'analysis' && (
+        {tab === 'scans' && (
           <div className="p-2.5 sm:p-3 space-y-2">
             <div className="flex gap-2">
               <Input
@@ -697,6 +864,26 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
               <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
               SAVE DRAFT TO QUEUE
             </Button>
+          </div>
+        )}
+        {tab === 'tasks' && (
+          <div className="p-2.5 sm:p-3">
+            <div className="flex gap-2">
+              <Input
+                value={taskInput}
+                onChange={(e) => setTaskInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAddTask() }}
+                placeholder="Add a task..."
+                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-sm"
+              />
+              <Button
+                onClick={handleAddTask}
+                disabled={!taskInput.trim()}
+                className="bg-b1 hover:bg-b2 text-white h-10 sm:h-11 w-10 sm:w-11 p-0 flex-shrink-0 disabled:opacity-40"
+              >
+                <Plus size={18} weight="bold" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
