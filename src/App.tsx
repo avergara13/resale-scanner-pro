@@ -1009,6 +1009,17 @@ function App() {
         onNavigateToSettings={() => setScreen('settings')}
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
+        onBack={
+          screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
+            ? () => setScreen('session')
+            : screen === 'tag-analytics' || screen === 'location-insights'
+            ? () => setScreen('queue')
+            : screen === 'cost-tracking'
+            ? () => setScreen('settings')
+            : screen === 'ai' || screen === 'incidents'
+            ? () => setScreen('session')
+            : undefined
+        }
       />
 
       <div
