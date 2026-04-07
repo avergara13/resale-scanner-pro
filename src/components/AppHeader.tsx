@@ -21,10 +21,7 @@ export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, sh
   if (!title) return null
 
   return (
-    <header
-      className="flex items-center justify-between px-4 h-12 bg-fg border-b border-s1 flex-shrink-0"
-      style={{ paddingTop: 'env(safe-area-inset-top, 0px)', height: 'calc(48px + env(safe-area-inset-top, 0px))' }}
-    >
+    <header className="flex items-center justify-between px-4 h-12 bg-fg border-b border-s1 flex-shrink-0">
       <span className="text-[11px] font-black tracking-widest text-t3 uppercase">{title}</span>
       <div className="flex items-center gap-1">
         {onNavigateToTrends && (
