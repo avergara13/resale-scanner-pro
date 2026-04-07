@@ -1261,9 +1261,9 @@ function App() {
   }, []) // intentionally empty deps — runs once on mount
 
   const screenVariants = {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 },
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -8 },
   }
 
   useEffect(() => {
@@ -1331,7 +1331,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <SessionScreen
@@ -1362,7 +1362,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <AgentScreen
@@ -1398,7 +1398,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <AIScreen
@@ -1418,7 +1418,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <QueueScreen
@@ -1470,7 +1470,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <SoldScreen
@@ -1493,7 +1493,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <SettingsScreen
@@ -1510,7 +1510,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <TagAnalyticsScreen
@@ -1527,7 +1527,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <LocationInsightsScreen
@@ -1543,7 +1543,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <CostTrackingScreen
@@ -1558,7 +1558,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <ScanHistoryScreen
@@ -1580,7 +1580,7 @@ function App() {
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               className="w-full h-full"
             >
               <SessionDetailScreen

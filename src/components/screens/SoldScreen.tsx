@@ -167,7 +167,7 @@ export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted, onMarkRe
 
   if (soldItems.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center px-8 pb-28 text-center">
+      <div className="h-full flex flex-col items-center justify-center px-8 text-center">
         <Tag size={56} weight="duotone" className="text-t3 mb-4 opacity-40" />
         <h2 className="text-lg font-bold text-t1 mb-2">No Sold Items Yet</h2>
         <p className="text-sm text-t3 max-w-xs">
