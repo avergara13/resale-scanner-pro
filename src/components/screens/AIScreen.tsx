@@ -228,7 +228,8 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
     item.listingStatus === 'published' ? 'text-blue-600 bg-blue-50 border-blue-200' :
     'text-t3 bg-s1 border-s2'
 
-  const profit = (item.estimatedSellPrice ?? 0) - item.purchasePrice
+  const hasSellPrice = item.estimatedSellPrice != null && isFinite(item.estimatedSellPrice)
+  const profit = hasSellPrice ? item.estimatedSellPrice! - item.purchasePrice : null
 
   return (
     <Card className="p-3 bg-fg border-s2 flex gap-3 items-start">
@@ -245,9 +246,11 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
           <span>Buy ${item.purchasePrice.toFixed(2)}</span>
           <span>→</span>
           <span>Sell ${item.estimatedSellPrice?.toFixed(2) ?? '--'}</span>
-          <span className={profit >= 0 ? 'text-green-600' : 'text-red-500'}>
-            ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
-          </span>
+          {profit != null && (
+            <span className={profit >= 0 ? 'text-green-600' : 'text-red-500'}>
+              ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
+            </span>
+          )}
         </div>
         {item.profitMargin != null && (
           <p className={cn(
@@ -731,7 +734,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQ
                     <div key={todo.id} className="flex items-center gap-2.5 py-2.5 group">
                       <button
                         onClick={() => handleToggleTask(todo.id)}
-                        className="flex-shrink-0 w-5 h-5 rounded-md border border-s2 hover:border-b1 transition-colors"
+                        className="flex-shrink-0 w-5 h-5 rounded-md border border-s2 hover:border-b1 hover:bg-b1/10 transition-colors cursor-pointer"
                       />
                       <span className="flex-1 text-xs sm:text-sm text-t1 leading-snug">{todo.text}</span>
                       <span className={cn(

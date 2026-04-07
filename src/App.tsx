@@ -1419,7 +1419,6 @@ function App() {
               <ListingDetailScreen
                 item={detailItem}
                 onClose={() => setDetailItemId(null)}
-                onSave={handleEditQueueItem}
                 onOptimize={handleOptimizeItem}
                 onOptimizeForPlatform={handleOptimizeForPlatform}
                 settings={settings}

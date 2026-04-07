@@ -58,6 +58,7 @@ function isBarcode(text: string): boolean {
 export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupProduct }: BarcodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const lastScannedRef = useRef<string>('')
+  const clearTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const [isScanning, setIsScanning] = useState(false)
   const [isLookingUp, setIsLookingUp] = useState(false)
   const [detectedProduct, setDetectedProduct] = useState<BarcodeProduct | null>(null)
@@ -73,7 +74,11 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
     if (isActive) {
       initScanner()
     }
-    return () => { stopScanner() }
+    return () => {
+      stopScanner()
+      clearTimersRef.current.forEach(clearTimeout)
+      clearTimersRef.current = []
+    }
   }, [isActive, scanMode])
 
   const initScanner = async () => {
@@ -138,12 +143,13 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
 
           // Auto-clear: URLs get 30s (user needs time to tap); everything else 5s
           const clearDelay = !isProductBarcode && parseQRData(decodedText).type === 'url' ? 30000 : 5000
-          setTimeout(() => {
+          const clearTimer = setTimeout(() => {
             setDetectedProduct(null)
             setQrData(null)
             setLookupFailed(false)
             lastScannedRef.current = ''  // allow rescanning the same code
           }, clearDelay)
+          clearTimersRef.current.push(clearTimer)
         },
         () => {}
       )

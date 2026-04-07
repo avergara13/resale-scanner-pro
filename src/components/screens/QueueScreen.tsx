@@ -761,7 +761,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       />
 
       {/* Mark as Sold Dialog */}
-      <Dialog open={soldDialogItemId !== null} onOpenChange={(open) => { if (!open) setSoldDialogItemId(null) }}>
+      <Dialog open={soldDialogItemId !== null} onOpenChange={(open) => { if (!open) { setSoldDialogItemId(null); setSoldPrice(''); setSoldMarketplace('ebay') } }}>
         <DialogContent className="max-w-sm bg-card border-s1 shadow-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-t1">
