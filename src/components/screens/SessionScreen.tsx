@@ -131,12 +131,13 @@ interface SessionScreenProps {
   onEndSession: () => void
   onCloseSessionView?: () => void
   onResumeSession?: (sessionId: string) => void
+  onDeleteSession?: (sessionId: string) => void
   onNavigateToQueue?: (filter?: string) => void
   onNavigateToHistory?: () => void
   onViewSessionDetail?: (sessionId: string) => void
 }
 
-export function SessionScreen({ session, showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onEndSession, onCloseSessionView, onResumeSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
+export function SessionScreen({ session, showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onEndSession, onCloseSessionView, onResumeSession, onDeleteSession, onNavigateToQueue, onNavigateToHistory, onViewSessionDetail }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory] = useKV<ScannedItem[]>('scan-history', [])
@@ -334,7 +335,7 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
                         duration={duration}
                         buyRate={buyRate}
                         formatDuration={formatDuration}
-                        onDelete={() => setAllSessions(prev => (prev || []).filter(x => x.id !== s.id))}
+                        onDelete={() => onDeleteSession?.(s.id)}
                         onViewDetail={() => onResumeSession?.(s.id)}
                       />
                     )
@@ -372,7 +373,7 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
                         duration={duration}
                         buyRate={buyRate}
                         formatDuration={formatDuration}
-                        onDelete={() => setAllSessions(prev => (prev || []).filter(x => x.id !== s.id))}
+                        onDelete={() => onDeleteSession?.(s.id)}
                         onViewDetail={() => onViewSessionDetail?.(s.id)}
                       />
                     )

@@ -484,9 +484,15 @@ function App() {
   }, [setSession, setAllSessions])
 
   // Close the active session view without ending it — go back to session list
+  // Sync current session state to allSessions before clearing the view
   const handleCloseSessionView = useCallback(() => {
+    if (session?.active && session.id) {
+      setAllSessions((prev) =>
+        (prev || []).map(s => s.id === session.id ? session : s)
+      )
+    }
     setSession(undefined)
-  }, [setSession])
+  }, [session, setSession, setAllSessions])
 
   // Resume an existing open session
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -495,6 +501,15 @@ function App() {
       setSession(found)
     }
   }, [allSessions, setSession])
+
+  // Delete a session — remove from allSessions and clear currentSession if it matches
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    setAllSessions((prev) => (prev || []).filter(s => s.id !== sessionId))
+    if (session?.id === sessionId) {
+      setSession(undefined)
+      lastSyncedSession.current = ''
+    }
+  }, [session, setSession, setAllSessions])
 
   const handleEndSession = useCallback(() => {
     if (session) {
@@ -509,16 +524,18 @@ function App() {
   }, [session, setSession, setAllSessions])
 
   // Keep allSessions in sync with the current active session (scan counts, profit, etc.)
+  // Only sync if the session still exists in allSessions (hasn't been deleted)
   const lastSyncedSession = useRef<string>('')
   useEffect(() => {
     if (!session?.active || !session.id) return
-    // Only sync when meaningful data changes (not on every render)
     const fingerprint = `${session.id}:${session.itemsScanned}:${session.buyCount}:${session.passCount}:${session.totalPotentialProfit}:${session.name}:${session.location?.name}:${session.profitGoal}`
     if (fingerprint === lastSyncedSession.current) return
     lastSyncedSession.current = fingerprint
-    setAllSessions((prev) =>
-      (prev || []).map(s => s.id === session.id ? session : s)
-    )
+    setAllSessions((prev) => {
+      const existing = (prev || []).find(s => s.id === session.id)
+      if (!existing) return prev || [] // Session was deleted — don't re-add
+      return (prev || []).map(s => s.id === session.id ? session : s)
+    })
   }, [session, setAllSessions])
 
   const handleEditSession = useCallback((sessionId: string, updates: Partial<Session>) => {
@@ -1083,6 +1100,7 @@ function App() {
                 onEndSession={handleEndSession}
                 onCloseSessionView={handleCloseSessionView}
                 onResumeSession={handleResumeSession}
+                onDeleteSession={handleDeleteSession}
                 onNavigateToQueue={() => setScreen('queue')}
                 onNavigateToHistory={() => setScreen('scan-history')}
                 onViewSessionDetail={(id) => {
