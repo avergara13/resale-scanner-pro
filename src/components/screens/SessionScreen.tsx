@@ -344,7 +344,7 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
           <SharedTodoList />
         </div>
       ) : (
-        <div className="flex-1 space-y-4">
+        <div className="flex-1 space-y-3 pb-24">
           <div className="flex gap-2">
             <button onClick={() => onNavigateToQueue?.()} className="stat-card flex-1 p-3 text-left active:scale-[0.97] transition-transform">
               <div className="text-base font-bold text-green leading-tight">
@@ -364,8 +364,8 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
             </button>
           </div>
 
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
               <Badge variant="secondary" className="bg-green text-white px-3 py-1 uppercase text-xs font-bold">
                 Active
               </Badge>
@@ -373,37 +373,22 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
                 {formatDuration(Date.now() - session.startTime)}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <button onClick={() => onNavigateToQueue?.('BUY')} className="text-left active:opacity-80 transition-opacity">
-                <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY</p>
+                <p className="text-[10px] uppercase tracking-wide text-t3 mb-0.5">BUY</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold mono text-green">{session.buyCount}</p>
-                  <CheckCircle size={20} weight="fill" className="text-green" />
+                  <p className="text-xl font-bold mono text-green">{session.buyCount}</p>
+                  <CheckCircle size={16} weight="fill" className="text-green" />
                 </div>
               </button>
               <button onClick={() => onNavigateToQueue?.('PASS')} className="text-left active:opacity-80 transition-opacity">
-                <p className="text-xs uppercase tracking-wide text-t3 mb-1">PASS</p>
+                <p className="text-[10px] uppercase tracking-wide text-t3 mb-0.5">PASS</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold mono text-red">{session.passCount}</p>
-                  <XCircle size={20} weight="fill" className="text-red" />
+                  <p className="text-xl font-bold mono text-red">{session.passCount}</p>
+                  <XCircle size={16} weight="fill" className="text-red" />
                 </div>
               </button>
             </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-sm font-semibold text-t3 uppercase tracking-wide mb-3">Potential Profit</h3>
-            <p className="text-4xl font-bold mono text-t1">
-              ${session.totalPotentialProfit.toFixed(2)}
-            </p>
-            <p className="text-sm text-t3 mt-2">
-              From {session.buyCount} items{' '}
-              {session.buyCount > 0 && (
-                <span className="mono">
-                  (${(session.totalPotentialProfit / session.buyCount).toFixed(2)} avg)
-                </span>
-              )}
-            </p>
           </Card>
 
           <AgentChatWidget
@@ -416,9 +401,9 @@ export function SessionScreen({ session, showTrends = false, onCloseTrends, onAg
           <Button
             onClick={onEndSession}
             variant="outline"
-            className="w-full h-12 border-red text-red hover:bg-red/10 font-medium"
+            className="w-full h-10 border-red text-red hover:bg-red/10 font-medium text-sm"
           >
-            <Stop size={20} weight="bold" className="mr-2" />
+            <Stop size={18} weight="bold" className="mr-2" />
             End Session
           </Button>
         </div>
