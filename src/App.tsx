@@ -1003,10 +1003,30 @@ function App() {
     })
     setDetailItemId(listingItem.id)
     setScreen('queue')
-    toast.loading('Creating listing...')
-    // Optimize after navigating so the detail screen opens immediately
-    setTimeout(() => handleOptimizeItem(listingItem.id), 50)
-  }, [currentItem, setQueue, handleOptimizeItem])
+    const toastId = toast.loading('Creating listing...')
+    // Optimize directly with listingItem — avoids stale queue closure read
+    // (handleOptimizeItem looks up the item from queue, which hasn't committed yet)
+    try {
+      const optimized = await listingOptimizationService.generateOptimizedListing({
+        item: listingItem,
+        marketData: listingItem.marketData,
+      })
+      const mergedTags = Array.from(new Set([
+        ...(listingItem.tags || []),
+        ...(optimized.suggestedTags || []),
+      ]))
+      setQueue(prev => (prev || []).map(i =>
+        i.id === listingItem.id
+          ? { ...i, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
+          : i
+      ))
+      toast.dismiss(toastId)
+      toast.success('Listing created')
+    } catch {
+      toast.dismiss(toastId)
+      toast.error('Listing optimization failed — you can edit it manually')
+    }
+  }, [currentItem, setQueue, listingOptimizationService])
 
   const handlePassFromScan = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
