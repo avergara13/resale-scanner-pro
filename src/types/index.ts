@@ -281,6 +281,14 @@ export interface AppSettings {
   lensSkipConfidence?: number
 }
 
+export interface SharedTodo {
+  id: string
+  text: string
+  completed: boolean
+  createdBy: 'user' | 'agent'
+  createdAt: number
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'

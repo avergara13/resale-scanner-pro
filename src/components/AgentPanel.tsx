@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { PaperPlaneRight, Robot, User, CircleNotch, ListChecks, ChatCircle, Plus, Check, Trash, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
-import type { ChatSession, ChatMessage } from '@/types'
+import type { ChatSession, ChatMessage, SharedTodo } from '@/types'
 
 function formatMsg(text: string): string {
   let f = text
@@ -14,14 +14,6 @@ function formatMsg(text: string): string {
   f = f.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-t1">$1</strong>')
   f = f.replace(/\$(\d+(?:\.\d{2})?)/g, '<span class="font-bold text-green">$$$1</span>')
   return f
-}
-
-export interface SharedTodo {
-  id: string
-  text: string
-  completed: boolean
-  createdBy: 'user' | 'agent'
-  createdAt: number
 }
 
 type PanelTab = 'chat' | 'tasks'

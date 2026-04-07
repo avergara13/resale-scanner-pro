@@ -1,15 +1,17 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { 
-  Robot, 
-  Sparkle, 
+import {
+  Robot,
+  Sparkle,
   Plus,
   Trash,
   DotsThreeVertical,
   PencilSimple,
   PaperPlaneRight,
+  ArrowLeft,
   CaretDown,
   CaretUp,
+  Check,
   Package,
   TrendUp,
   ChartLine,
@@ -18,7 +20,9 @@ import {
   Globe,
   Stack,
   CheckCircle,
-  Warning
+  Warning,
+  ListChecks,
+  ChatCircle,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -35,7 +39,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -45,7 +48,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal } from '@/types'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo } from '@/types'
 
 interface QuickAction {
   emoji: string
@@ -75,6 +78,27 @@ const QUICK_ACTIONS: QuickAction[] = [
     prompt: 'What\'s my current session status? Show me all stats, goals, and recent items.'
   },
 ]
+
+const EMPTY_TODOS: SharedTodo[] = []
+
+function lastMessagePreview(session: ChatSession): string {
+  const last = session.messages[session.messages.length - 1]
+  if (!last) return 'No messages yet'
+  const text = last.content.replace(/[#*_`]/g, '').trim()
+  return text.length > 60 ? text.slice(0, 60) + '…' : text
+}
+
+function relativeTime(ts: number): string {
+  const mins = Math.floor((Date.now() - ts) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days}d ago`
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 // Static system instructions — module-level constant, allocated once.
 // Gemini API caches identical prefixes across calls, so keeping this
@@ -193,15 +217,19 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   const activeKey = useMemo(() => sessionId ? `active-chat-session-${sessionId}` : 'active-chat-session-global', [sessionId])
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>(chatKey, EMPTY_CHAT_SESSIONS)
   const [activeSessionId, setActiveSessionId] = useKV<string | null>(activeKey, null)
+  const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', EMPTY_TODOS)
+  const [viewMode, setViewMode] = useState<'list' | 'chat'>('list')
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [showNewSessionDialog, setShowNewSessionDialog] = useState(false)
-  const [newSessionName, setNewSessionName] = useState('')
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [taskInput, setTaskInput] = useState('')
+  const [showTaskInput, setShowTaskInput] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const pendingTodos = useMemo(() => (todos || []).filter(t => !t.completed), [todos])
+  const completedTodos = useMemo(() => (todos || []).filter(t => t.completed), [todos])
 
   const activeSession = chatSessions?.find(s => s.id === activeSessionId)
   const chatMessages = activeSession?.messages || []
@@ -251,15 +279,8 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
     prevMessageCount.current = chatMessages.length
   }, [chatMessages])
 
-  useEffect(() => {
-    if (!activeSessionId && chatSessions && chatSessions.length > 0) {
-      setActiveSessionId(chatSessions[0].id)
-    }
-  }, [activeSessionId, chatSessions, setActiveSessionId])
-
   const handleCreateSession = useCallback(() => {
-    const name = newSessionName.trim() || `Session ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-    
+    const name = `Session ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
     const newSession: ChatSession = {
       id: Date.now().toString(),
       name,
@@ -268,35 +289,21 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       messages: [],
       isActive: true,
     }
-
     setChatSessions((prev) => {
       const updated = (prev || []).map(s => ({ ...s, isActive: false }))
       return [newSession, ...updated]
     })
-    
     setActiveSessionId(newSession.id)
-    setNewSessionName('')
-    setShowNewSessionDialog(false)
-    // silent
-  }, [newSessionName, setChatSessions, setActiveSessionId])
+    setViewMode('chat')
+  }, [setChatSessions, setActiveSessionId])
 
   const handleDeleteSession = useCallback((sessionId: string) => {
-    setChatSessions((prev) => {
-      const filtered = (prev || []).filter(s => s.id !== sessionId)
-      return filtered
-    })
-    
+    setChatSessions((prev) => (prev || []).filter(s => s.id !== sessionId))
     if (activeSessionId === sessionId) {
-      const remaining = (chatSessions || []).filter(s => s.id !== sessionId)
-      if (remaining.length > 0) {
-        setActiveSessionId(remaining[0].id)
-      } else {
-        setActiveSessionId(null)
-      }
+      setActiveSessionId(null)
+      setViewMode('list')
     }
-    
-    // silent
-  }, [chatSessions, activeSessionId, setChatSessions, setActiveSessionId])
+  }, [activeSessionId, setChatSessions, setActiveSessionId])
 
   const handleRenameSession = useCallback(() => {
     if (!renameSessionId || !renameValue.trim()) {
@@ -326,10 +333,11 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   }, [chatSessions])
 
   const handleSwitchSession = useCallback((sessionId: string) => {
-    setChatSessions((prev) => 
+    setChatSessions((prev) =>
       (prev || []).map(s => ({ ...s, isActive: s.id === sessionId }))
     )
     setActiveSessionId(sessionId)
+    setViewMode('chat')
   }, [setChatSessions, setActiveSessionId])
 
   const handleSendMessage = useCallback(async (messageText?: string) => {
@@ -354,6 +362,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       })
       setActiveSessionId(newSession.id)
       sessionId = newSession.id
+      setViewMode('chat')
     }
 
     const lowerText = text.toLowerCase()
@@ -380,6 +389,36 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       
       setInput('')
       return
+    }
+
+    // Add task command: "add task X", "remind me to X", "todo X"
+    if (/\b(add task|remind me to|todo)\b/i.test(text)) {
+      const taskText = text.replace(/^.*?\b(add task|remind me to|todo)\s*/i, '').trim()
+      if (taskText) {
+        setTodos(prev => [...(prev || []), {
+          id: Date.now().toString(),
+          text: taskText,
+          completed: false,
+          createdBy: 'agent' as const,
+          createdAt: Date.now(),
+        }])
+        const addMsg: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `✅ Added task: "${taskText}"`,
+          timestamp: Date.now(),
+        }
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === sessionId
+              ? { ...s, messages: [...s.messages, { id: (Date.now() - 1).toString(), role: 'user' as const, content: text, timestamp: Date.now() }, addMsg], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+        setInput('')
+        setIsProcessing(false)
+        return
+      }
     }
 
     const userMessage: ChatMessage = {
@@ -863,6 +902,9 @@ ${pastSessionsSummary || 'None'}
 ### Goals
 ${activeGoalsSummary || 'None'}
 
+### Tasks
+${pendingTodos.length > 0 ? pendingTodos.map(t => `- [ ] ${t.text} (${t.createdBy})`).join('\n') : 'No pending tasks'}
+
 ### Settings
 - Min margin: ${settings?.minProfitMargin}%, Shipping: $${settings?.defaultShippingCost}, eBay fee: ${settings?.ebayFeePercent}%`
 
@@ -903,7 +945,7 @@ ${activeGoalsSummary || 'None'}
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, setTodos, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {
@@ -913,6 +955,7 @@ ${activeGoalsSummary || 'None'}
   // Handle messages injected from external widgets (e.g. AgentChatWidget)
   useEffect(() => {
     if (pendingMessage && !isProcessing) {
+      setViewMode('chat')
       handleSendMessage(pendingMessage)
       onPendingMessageHandled?.()
     }
@@ -923,7 +966,71 @@ ${activeGoalsSummary || 'None'}
     inputRef.current?.focus()
   }, [])
 
-  const hasMessages = chatMessages.length > 0
+  // Shared stats bar used in both views
+  const statsBar = (
+    <div className="px-4 py-2 bg-s1/30 border-b border-s1">
+      {currentSession?.active && (
+        <div className="text-[9px] font-bold text-b1 mb-1.5 uppercase tracking-wide">
+          {currentSession.name || 'Active Session'}
+        </div>
+      )}
+      <div className="grid grid-cols-4 gap-1.5">
+        <Card className="p-2 flex flex-col items-center justify-center">
+          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>
+          <div className="text-base font-black text-t1">{queueStats.total}</div>
+        </Card>
+        <Card className="p-2 flex flex-col items-center justify-center">
+          <div className="text-[9px] text-green font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
+            <CheckCircle size={10} weight="fill" /> BUY
+          </div>
+          <div className="text-base font-black text-green">{queueStats.buy}</div>
+        </Card>
+        <Card className="p-2 flex flex-col items-center justify-center">
+          <div className="text-[9px] text-red font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
+            <Warning size={10} weight="fill" /> PASS
+          </div>
+          <div className="text-base font-black text-red">{queueStats.pass}</div>
+        </Card>
+        <Card className="p-2 flex flex-col items-center justify-center">
+          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Profit</div>
+          <div className="text-xs font-black text-green">${queueStats.totalProfit.toFixed(0)}</div>
+        </Card>
+      </div>
+    </div>
+  )
+
+  // Shared input bar used in both views
+  const inputBar = (
+    <div className="p-4 bg-fg border-t border-s1 safe-bottom">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          handleSendMessage()
+        }}
+        className="flex gap-2"
+      >
+        <Input
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask me anything about your resale business..."
+          disabled={isProcessing}
+          className="flex-1"
+        />
+        <Button
+          type="submit"
+          disabled={!input.trim() || isProcessing}
+          className="w-10 h-10 flex items-center justify-center p-0"
+        >
+          <PaperPlaneRight size={18} weight="bold" />
+        </Button>
+      </form>
+    </div>
+  )
+
+  const sortedSessions = useMemo(() =>
+    [...(chatSessions || [])].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
+  [chatSessions])
 
   return (
     <div className="flex flex-col h-full bg-bg">
@@ -934,262 +1041,247 @@ ${activeGoalsSummary || 'None'}
         progress={pullToRefresh.progress}
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
-      <div className="flex items-center justify-between px-4 py-4 bg-fg border-b border-s1">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-b1 to-b2 rounded-xl">
-            <Robot size={24} weight="bold" className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-t1">Agent</h1>
-            <p className="text-xs text-t3">AI Research & Automation</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowNewSessionDialog(true)}
-            className="h-9 px-3"
-          >
-            <Plus size={18} weight="bold" />
-          </Button>
-        </div>
-      </div>
 
-      {chatSessions && chatSessions.length > 0 && (
-        <div className="px-4 py-3 bg-fg border-b border-s1">
-          <ScrollArea className="w-full">
-            <div className="flex gap-2 pb-2">
-              {chatSessions.map((session) => (
-                <div key={session.id} className="relative group">
-                  <button
-                    onClick={() => handleSwitchSession(session.id)}
+      <AnimatePresence mode="wait">
+        {viewMode === 'list' ? (
+          <motion.div
+            key="agent-list"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.15 }}
+            className="flex flex-col flex-1 min-h-0"
+          >
+            {/* List header */}
+            <div className="flex items-center justify-between px-4 py-4 bg-fg border-b border-s1">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-b1 to-b2 rounded-xl">
+                  <Robot size={24} weight="bold" className="text-white" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold text-t1">Agent</h1>
+                  <p className="text-xs text-t3">AI Research & Automation</p>
+                </div>
+              </div>
+              <Button size="sm" onClick={handleCreateSession} className="h-8 px-3 text-xs">
+                <Plus size={14} weight="bold" className="mr-1" /> New Chat
+              </Button>
+            </div>
+
+            {statsBar}
+
+            <ScrollArea className="flex-1">
+              <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5">
+                {/* Quick Actions — always visible */}
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">Quick Actions</div>
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                    {QUICK_ACTIONS.map(action => (
+                      <button
+                        key={action.label}
+                        onClick={() => handleQuickAction(action.prompt)}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-fg border border-s1 rounded-xl text-xs font-bold text-t1 active:scale-95 transition-all"
+                      >
+                        <span>{action.emoji}</span>
+                        <span>{action.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tasks */}
+                {(pendingTodos.length > 0 || showTaskInput) && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <ListChecks size={14} className="text-t3" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-t3">Tasks</span>
+                        {pendingTodos.length > 0 && (
+                          <span className="text-[8px] bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md font-bold">{pendingTodos.length}</span>
+                        )}
+                      </div>
+                      <button onClick={() => setShowTaskInput(!showTaskInput)} className="text-[10px] text-b1 font-bold">
+                        {showTaskInput ? 'Done' : '+ Add'}
+                      </button>
+                    </div>
+                    {showTaskInput && (
+                      <form onSubmit={(e) => { e.preventDefault(); if (taskInput.trim()) { setTodos(prev => [...(prev || []), { id: Date.now().toString(), text: taskInput.trim(), completed: false, createdBy: 'user' as const, createdAt: Date.now() }]); setTaskInput('') } }} className="flex gap-2 mb-2">
+                        <Input value={taskInput} onChange={e => setTaskInput(e.target.value)} placeholder="Add a task..." className="flex-1 h-8 text-xs" autoFocus />
+                        <Button type="submit" size="sm" disabled={!taskInput.trim()} className="h-8 px-3 text-xs">Add</Button>
+                      </form>
+                    )}
+                    <div className="space-y-1">
+                      {pendingTodos.map(t => (
+                        <div key={t.id} className="flex items-center gap-2 py-1.5 px-2 bg-fg rounded-lg border border-s1 group">
+                          <button onClick={() => setTodos(prev => (prev || []).map(x => x.id === t.id ? { ...x, completed: true } : x))} className="w-4 h-4 rounded border border-s2 flex items-center justify-center flex-shrink-0 hover:border-b1">
+                          </button>
+                          <span className="text-xs text-t1 flex-1 truncate">{t.text}</span>
+                          <span className="text-[8px] text-t3 uppercase">{t.createdBy}</span>
+                          <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      {completedTodos.length > 0 && (
+                        <div className="text-[10px] text-t3 px-2 pt-1">{completedTodos.length} completed</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {pendingTodos.length === 0 && !showTaskInput && (
+                  <button onClick={() => setShowTaskInput(true)} className="flex items-center gap-1.5 text-[10px] text-t3 font-bold">
+                    <ListChecks size={12} /> Add a task
+                  </button>
+                )}
+
+                {/* Conversation List */}
+                {sortedSessions.length === 0 ? (
+                  <div className="text-center py-10">
+                    <button
+                      onClick={() => inputRef.current?.focus()}
+                      className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
+                    >
+                      <Sparkle size={32} weight="fill" className="text-white" />
+                    </button>
+                    <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
+                    <p className="text-sm text-t3 max-w-xs mx-auto">Start a conversation below</p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">
+                      <ChatCircle size={12} className="inline mr-1" />
+                      Conversations
+                    </div>
+                    <div className="space-y-2">
+                      {sortedSessions.map(session => (
+                        <button
+                          key={session.id}
+                          onClick={() => handleSwitchSession(session.id)}
+                          className="w-full p-3 bg-fg border border-s1 rounded-xl text-left active:scale-[0.98] transition-all group"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <span className="text-sm font-bold text-t1 truncate">{session.name}</span>
+                            <span className="text-[9px] text-t3 flex-shrink-0">{relativeTime(session.lastMessageAt)}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] text-t3 truncate flex-1">{lastMessagePreview(session)}</p>
+                            <span className="text-[9px] text-t3 flex-shrink-0">{session.messages.length} msg{session.messages.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {inputBar}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="agent-chat"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.15 }}
+            className="flex flex-col flex-1 min-h-0"
+          >
+            {/* Chat header with back button */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-fg border-b border-s1">
+              <button onClick={() => setViewMode('list')} className="p-1.5 -ml-1 rounded-lg active:bg-s1 transition-colors">
+                <ArrowLeft size={20} weight="bold" className="text-t1" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-t1 truncate">{activeSession?.name || 'Chat'}</div>
+                <div className="text-[10px] text-t3">{chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''}</div>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-1.5 rounded-lg hover:bg-s1 transition-colors">
+                    <DotsThreeVertical size={20} weight="bold" className="text-t3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => activeSessionId && handleOpenRenameDialog(activeSessionId)}>
+                    <PencilSimple size={16} className="mr-2" /> Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => activeSessionId && handleDeleteSession(activeSessionId)}
+                    className="text-red"
+                  >
+                    <Trash size={16} className="mr-2" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {statsBar}
+
+            {/* Messages */}
+            <ScrollArea className="flex-1 px-4">
+              <div ref={pullToRefresh.containerRef} className="py-4 space-y-4">
+                {chatMessages.map((msg, index) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.02 }}
                     className={cn(
-                      "px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-2",
-                      session.id === activeSessionId
-                        ? "bg-b1 text-white"
-                        : "bg-s1 text-t2 hover:bg-s2 hover:text-t1"
+                      "flex gap-3",
+                      msg.role === 'user' ? "justify-end" : "justify-start"
                     )}
                   >
-                    {session.name}
-                  </button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        className={cn(
-                          "absolute -top-1 -right-1 p-1 bg-s2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity",
-                          session.id === activeSessionId && "bg-b2"
-                        )}
-                      >
-                        <DotsThreeVertical size={12} weight="bold" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleOpenRenameDialog(session.id)}>
-                        <PencilSimple size={16} className="mr-2" />
-                        Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => handleDeleteSession(session.id)}
-                        className="text-red"
-                      >
-                        <Trash size={16} className="mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-      )}
-
-      <div className="px-4 py-2 bg-s1/30 border-b border-s1">
-        {currentSession?.active && (
-          <div className="text-[9px] font-bold text-b1 mb-1.5 uppercase tracking-wide">
-            {currentSession.name || 'Active Session'}
-          </div>
-        )}
-        <div className="grid grid-cols-4 gap-1.5">
-          <Card className="p-2 flex flex-col items-center justify-center">
-            <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>
-            <div className="text-base font-black text-t1">{queueStats.total}</div>
-          </Card>
-          <Card className="p-2 flex flex-col items-center justify-center">
-            <div className="text-[9px] text-green font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-              <CheckCircle size={10} weight="fill" />
-              BUY
-            </div>
-            <div className="text-base font-black text-green">{queueStats.buy}</div>
-          </Card>
-          <Card className="p-2 flex flex-col items-center justify-center">
-            <div className="text-[9px] text-red font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-              <Warning size={10} weight="fill" />
-              PASS
-            </div>
-            <div className="text-base font-black text-red">{queueStats.pass}</div>
-          </Card>
-          <Card className="p-2 flex flex-col items-center justify-center">
-            <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Profit</div>
-            <div className="text-xs font-black text-green">${queueStats.totalProfit.toFixed(0)}</div>
-          </Card>
-        </div>
-      </div>
-
-      <ScrollArea className="flex-1 px-4">
-        <div ref={pullToRefresh.containerRef} className="py-4 space-y-4">
-          {!hasMessages && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
-              <div className="text-center py-8">
-                <button
-                  onClick={() => inputRef.current?.focus()}
-                  className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
-                >
-                  <Sparkle size={32} weight="fill" className="text-white" />
-                </button>
-                <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
-                <p className="text-sm text-t3 max-w-xs mx-auto">
-                  Tap the icon or type below to start a chat
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="text-xs font-bold uppercase tracking-wider text-t2 px-1">
-                  Quick Actions
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {QUICK_ACTIONS.map((action, index) => (
-                    <motion.button
-                      key={action.label}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => handleQuickAction(action.prompt)}
-                      className="p-3 bg-fg border border-s1 rounded-xl hover:border-b1 hover:bg-blue-bg transition-all text-left group"
-                    >
-                      <div className="text-2xl mb-2">{action.emoji}</div>
-                      <div className="text-xs font-bold text-t1 group-hover:text-b1 transition-colors">
-                        {action.label}
+                    {msg.role === 'assistant' && (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
+                        <Robot size={18} weight="bold" className="text-white" />
                       </div>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
+                    )}
+                    <div
+                      className={cn(
+                        "max-w-[80%] rounded-2xl px-4 py-3",
+                        msg.role === 'user'
+                          ? "bg-gradient-to-br from-b1 to-b2 text-white"
+                          : "bg-s1 border border-s2 text-t1"
+                      )}
+                    >
+                      {msg.role === 'user' ? (
+                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                      ) : (
+                        <CollapsibleMessage message={msg.content} />
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
 
-          {hasMessages && (
-            <>
-              {chatMessages.map((msg, index) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.02 }}
-                  className={cn(
-                    "flex gap-3",
-                    msg.role === 'user' ? "justify-end" : "justify-start"
-                  )}
-                >
-                  {msg.role === 'assistant' && (
+                {isProcessing && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-3 justify-start"
+                  >
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
                       <Robot size={18} weight="bold" className="text-white" />
                     </div>
-                  )}
-                  <div
-                    className={cn(
-                      "max-w-[80%] rounded-2xl px-4 py-3",
-                      msg.role === 'user'
-                        ? "bg-gradient-to-br from-b1 to-b2 text-white"
-                        : "bg-s1 border border-s2 text-t1"
-                    )}
-                  >
-                    {msg.role === 'user' ? (
-                      <p className="text-sm leading-relaxed">{msg.content}</p>
-                    ) : (
-                      <CollapsibleMessage message={msg.content} />
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </>
-          )}
+                    <div className="bg-s1 border border-s2 rounded-2xl px-4 py-3">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
-          {isProcessing && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex gap-3 justify-start"
-            >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
-                <Robot size={18} weight="bold" className="text-white" />
+                <div ref={messagesEndRef} />
               </div>
-              <div className="bg-s1 border border-s2 rounded-2xl px-4 py-3">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            </motion.div>
-          )}
+            </ScrollArea>
 
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+            {inputBar}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="p-4 bg-fg border-t border-s1 safe-bottom">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            handleSendMessage()
-          }}
-          className="flex gap-2"
-        >
-          <Input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask me anything about your resale business..."
-            disabled={isProcessing}
-            className="flex-1"
-          />
-          <Button
-            type="submit"
-            disabled={!input.trim() || isProcessing}
-            className="w-10 h-10 flex items-center justify-center p-0"
-          >
-            <PaperPlaneRight size={18} weight="bold" />
-          </Button>
-        </form>
-      </div>
-
-      <Dialog open={showNewSessionDialog} onOpenChange={setShowNewSessionDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New Chat Session</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={newSessionName}
-            onChange={(e) => setNewSessionName(e.target.value)}
-            placeholder="Session name (optional)"
-            onKeyDown={(e) => e.key === 'Enter' && handleCreateSession()}
-          />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowNewSessionDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateSession}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      {/* Rename dialog */}
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
         <DialogContent>
           <DialogHeader>
@@ -1202,9 +1294,7 @@ ${activeGoalsSummary || 'None'}
             onKeyDown={(e) => e.key === 'Enter' && handleRenameSession()}
           />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowRenameDialog(false)}>
-              Cancel
-            </Button>
+            <Button variant="ghost" onClick={() => setShowRenameDialog(false)}>Cancel</Button>
             <Button onClick={handleRenameSession}>Rename</Button>
           </DialogFooter>
         </DialogContent>
