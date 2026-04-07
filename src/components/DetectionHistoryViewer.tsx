@@ -93,7 +93,7 @@ export function DetectionHistoryViewer() {
   return (
     <div className="flex flex-col h-full bg-bg">
       <div className="px-4 py-3 border-b border-s2">
-        <h1 className="text-lg font-semibold text-fg">Detection History</h1>
+        <h1 className="text-lg font-semibold text-t1">Detection History</h1>
         <p className="text-sm text-s4 mt-0.5">Multi-object scan accuracy tracking</p>
       </div>
 
@@ -108,7 +108,7 @@ export function DetectionHistoryViewer() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3 pb-3">
-                <div className="text-2xl font-bold text-fg">{stats.totalScans}</div>
+                <div className="text-2xl font-bold text-t1">{stats.totalScans}</div>
                 <div className="text-xs text-s3 mt-0.5">
                   {stats.totalDetections} products detected
                 </div>
@@ -123,7 +123,7 @@ export function DetectionHistoryViewer() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3 pb-3">
-                <div className="text-2xl font-bold text-fg">
+                <div className="text-2xl font-bold text-t1">
                   {stats.averageAccuracy > 0 ? `${stats.averageAccuracy.toFixed(0)}%` : 'N/A'}
                 </div>
                 <div className="text-xs text-s3 mt-0.5">
@@ -140,7 +140,7 @@ export function DetectionHistoryViewer() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3 pb-3">
-                <div className="text-2xl font-bold text-fg">
+                <div className="text-2xl font-bold text-t1">
                   {formatDuration(stats.averageProcessingTime)}
                 </div>
                 <div className="text-xs text-s3 mt-0.5">
@@ -157,7 +157,7 @@ export function DetectionHistoryViewer() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3 pb-3">
-                <div className="text-2xl font-bold text-fg">
+                <div className="text-2xl font-bold text-t1">
                   {stats.averageDetectionsPerScan.toFixed(1)}
                 </div>
                 <div className="text-xs text-s3 mt-0.5">
@@ -263,7 +263,7 @@ export function DetectionHistoryViewer() {
                         </div>
 
                         <div className="space-y-2">
-                          <div className="text-xs font-medium text-fg">
+                          <div className="text-xs font-medium text-t1">
                             Detected Products ({entry.detectedProducts.length})
                           </div>
                           {entry.detectedProducts.map((product, idx) => {
@@ -277,7 +277,7 @@ export function DetectionHistoryViewer() {
                               >
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-medium text-fg">
+                                    <span className="text-xs font-medium text-t1">
                                       {product.name}
                                     </span>
                                     <Badge

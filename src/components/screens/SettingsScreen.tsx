@@ -166,7 +166,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
               <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-4 bg-gradient-to-br from-green-bg to-transparent border border-green/20 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green text-fg flex-shrink-0">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green text-t1 flex-shrink-0">
                       <Info size={16} weight="fill" />
                     </div>
                     <div>
@@ -207,7 +207,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
               <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-4 bg-gradient-to-br from-b1/10 to-b1/5 border-2 border-b1/40 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-b1 text-fg flex-shrink-0">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-b1 text-t1 flex-shrink-0">
                       <ClockCounterClockwise size={20} weight="duotone" />
                     </div>
                     <div className="flex-1 space-y-2">
@@ -393,7 +393,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
               <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-4 bg-gradient-to-br from-b1/10 to-b1/5 border-2 border-b1/40 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-b1 text-fg flex-shrink-0">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-b1 text-t1 flex-shrink-0">
                       <Info size={20} weight="fill" />
                     </div>
                     <div className="flex-1 space-y-2">
@@ -464,7 +464,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="google-api-key" className="text-xs uppercase tracking-wide text-t2">
                       <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-fg text-[10px] font-bold">1</span>
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">1</span>
                         Google Cloud API Key
                       </span>
                     </Label>
@@ -506,7 +506,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="google-search-engine-id" className="text-xs uppercase tracking-wide text-t2">
                       <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-s3 text-fg text-[10px] font-bold">2</span>
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-s3 text-t1 text-[10px] font-bold">2</span>
                         Custom Search Engine ID (Optional)
                       </span>
                     </Label>
@@ -607,7 +607,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
               <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
                 <div className="p-4 bg-gradient-to-br from-green-bg to-transparent border-2 border-green/30 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green text-fg flex-shrink-0">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green text-t1 flex-shrink-0">
                       <Info size={20} weight="fill" />
                     </div>
                     <div className="flex-1 space-y-2">
@@ -674,7 +674,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="ebay-app-id" className="text-xs uppercase tracking-wide text-t2">
                       <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-fg text-[10px] font-bold">1</span>
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">1</span>
                         eBay App ID (Client ID)
                       </span>
                     </Label>
@@ -704,7 +704,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="ebay-dev-id" className="text-xs uppercase tracking-wide text-t2">
                       <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-fg text-[10px] font-bold">2</span>
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">2</span>
                         eBay Dev ID
                       </span>
                     </Label>
@@ -734,7 +734,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="ebay-cert-id" className="text-xs uppercase tracking-wide text-t2">
                       <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-fg text-[10px] font-bold">3</span>
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">3</span>
                         eBay Cert ID (Client Secret)
                       </span>
                     </Label>
@@ -764,7 +764,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                   <div className="flex items-center justify-between mb-1.5">
                     <Label htmlFor="ebay-api-key" className="text-xs uppercase tracking-wide text-t2">
                       <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-fg text-[10px] font-bold">4</span>
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">4</span>
                         eBay OAuth User Token
                       </span>
                     </Label>
@@ -1352,7 +1352,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction 
                     onClick={handleResetSettings}
-                    className="bg-b1 hover:bg-b2 text-fg"
+                    className="bg-b1 hover:bg-b2 text-t1"
                   >
                     Reset Settings
                   </AlertDialogAction>
@@ -1368,7 +1368,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
 
             <Button 
               variant="outline" 
-              className="w-full text-red hover:bg-red hover:text-fg border-s2 hover:border-red"
+              className="w-full text-red hover:bg-red hover:text-t1 border-s2 hover:border-red"
             >
               Clear All App Data
             </Button>

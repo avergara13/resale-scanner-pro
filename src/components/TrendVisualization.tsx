@@ -268,7 +268,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
                   style={{ height: `${Math.max(heightPercent, 2)}%` }}
                 />
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                  <div className="bg-t1 text-fg px-2 py-1.5 rounded-lg shadow-lg text-xs whitespace-nowrap">
+                  <div className="bg-fg text-t1 px-2 py-1.5 rounded-lg shadow-lg text-xs whitespace-nowrap">
                     <p className="font-bold mb-0.5">{day.date}</p>
                     <p className="text-green font-mono">${day.totalProfit.toFixed(2)}</p>
                     <p className="text-t4">{day.itemsScanned} scans</p>
@@ -307,7 +307,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
                   style={{ height: `${Math.max(heightPercent, 2)}%` }}
                 />
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                  <div className="bg-t1 text-fg px-2 py-1.5 rounded-lg shadow-lg text-xs whitespace-nowrap">
+                  <div className="bg-fg text-t1 px-2 py-1.5 rounded-lg shadow-lg text-xs whitespace-nowrap">
                     <p className="font-bold mb-0.5">{day.date}</p>
                     <p className="text-b1 font-mono">{day.itemsScanned} scans</p>
                     <p className="text-green">{day.buyCount} BUY</p>

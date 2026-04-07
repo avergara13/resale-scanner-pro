@@ -125,7 +125,7 @@ export function FalsePositiveAnalyzerPanel() {
     <div className="flex flex-col h-full bg-bg">
       <div className="px-4 py-3 border-b border-s2 bg-gradient-to-br from-s1 to-bg">
         <div className="flex items-center justify-between mb-1">
-          <h1 className="text-lg font-semibold text-fg">Detection Analysis</h1>
+          <h1 className="text-lg font-semibold text-t1">Detection Analysis</h1>
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -167,7 +167,7 @@ export function FalsePositiveAnalyzerPanel() {
               </div>
               <div className="flex-1">
                 <div className="text-xs text-s4 uppercase tracking-wide mb-1">Patterns Found</div>
-                <div className="text-2xl font-bold text-fg">
+                <div className="text-2xl font-bold text-t1">
                   {patternsByFrequency.length}
                 </div>
               </div>
@@ -212,7 +212,7 @@ export function FalsePositiveAnalyzerPanel() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-3 pb-3">
-                    <div className="text-2xl font-bold text-fg">
+                    <div className="text-2xl font-bold text-t1">
                       {corrections?.length || 0}
                     </div>
                     <div className="text-xs text-s3 mt-0.5">All time</div>
@@ -239,7 +239,7 @@ export function FalsePositiveAnalyzerPanel() {
 
               <Card className="border-s2">
                 <CardHeader className="pb-2 pt-3 px-3">
-                  <CardTitle className="text-sm text-fg font-semibold">
+                  <CardTitle className="text-sm text-t1 font-semibold">
                     Confidence Distribution
                   </CardTitle>
                 </CardHeader>
@@ -292,13 +292,13 @@ export function FalsePositiveAnalyzerPanel() {
 
               <Card className="border-s2">
                 <CardHeader className="pb-2 pt-3 px-3">
-                  <CardTitle className="text-sm text-fg font-semibold">
+                  <CardTitle className="text-sm text-t1 font-semibold">
                     Optimal Thresholds
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="px-3 pb-3 space-y-2">
                   <div className="flex items-center justify-between p-2 bg-t4 rounded">
-                    <span className="text-xs text-fg font-medium">Global Confidence</span>
+                    <span className="text-xs text-t1 font-medium">Global Confidence</span>
                     <Badge className="bg-b1 text-white font-mono">
                       {(report.optimalThresholds.globalConfidence * 100).toFixed(0)}%
                     </Badge>
@@ -319,7 +319,7 @@ export function FalsePositiveAnalyzerPanel() {
               {report.commonMisidentifications.length > 0 && (
                 <Card className="border-s2">
                   <CardHeader className="pb-2 pt-3 px-3">
-                    <CardTitle className="text-sm text-fg font-semibold">
+                    <CardTitle className="text-sm text-t1 font-semibold">
                       Common Misidentifications
                     </CardTitle>
                   </CardHeader>
@@ -334,7 +334,7 @@ export function FalsePositiveAnalyzerPanel() {
                             <div className="flex items-center gap-2">
                               <span className="line-through text-s4">{item.wrong}</span>
                               <span className="text-s3">→</span>
-                              <span className="text-fg font-medium">{item.correct}</span>
+                              <span className="text-t1 font-medium">{item.correct}</span>
                             </div>
                           </div>
                         </div>
@@ -374,7 +374,7 @@ export function FalsePositiveAnalyzerPanel() {
                               <Icon size={20} className={colorClass} weight="duotone" />
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <p className="text-sm font-semibold text-fg">
+                                  <p className="text-sm font-semibold text-t1">
                                     {pattern.patternType
                                       .split('_')
                                       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -414,7 +414,7 @@ export function FalsePositiveAnalyzerPanel() {
                             <div className="text-xs text-t1 font-medium mb-1">
                               Suggested Fix
                             </div>
-                            <div className="text-xs text-fg">
+                            <div className="text-xs text-t1">
                               Set minimum confidence threshold to{' '}
                               <span className="font-mono font-bold">
                                 {(pattern.suggestedThreshold * 100).toFixed(0)}%
@@ -423,13 +423,13 @@ export function FalsePositiveAnalyzerPanel() {
                           </div>
 
                           <div>
-                            <div className="text-xs font-medium text-fg mb-2">
+                            <div className="text-xs font-medium text-t1 mb-2">
                               Example Products ({pattern.exampleProductNames.length})
                             </div>
                             <div className="space-y-1">
                               {pattern.exampleProductNames.slice(0, 5).map((name, idx) => (
                                 <div key={idx} className="p-2 bg-s1 rounded border border-s2">
-                                  <p className="text-xs text-fg">{name}</p>
+                                  <p className="text-xs text-t1">{name}</p>
                                 </div>
                               ))}
                             </div>
@@ -437,7 +437,7 @@ export function FalsePositiveAnalyzerPanel() {
 
                           {pattern.exampleImages.length > 0 && (
                             <div>
-                              <div className="text-xs font-medium text-fg mb-2">
+                              <div className="text-xs font-medium text-t1 mb-2">
                                 Example Images ({pattern.exampleImages.length})
                               </div>
                               <div className="grid grid-cols-3 gap-2">
@@ -471,7 +471,7 @@ export function FalsePositiveAnalyzerPanel() {
             <div className="p-4 space-y-3">
               <Card className="border-s2 bg-gradient-to-br from-t4 to-bg">
                 <CardHeader className="pb-3 pt-3 px-3">
-                  <CardTitle className="text-sm text-fg font-semibold flex items-center gap-2">
+                  <CardTitle className="text-sm text-t1 font-semibold flex items-center gap-2">
                     <Lightbulb size={18} weight="duotone" className="text-amber" />
                     Improvement Recommendations
                   </CardTitle>
@@ -482,7 +482,7 @@ export function FalsePositiveAnalyzerPanel() {
                       <div className="flex items-center justify-center w-6 h-6 rounded-full bg-b1 text-white text-xs font-bold flex-shrink-0">
                         {idx + 1}
                       </div>
-                      <p className="text-xs text-fg flex-1">{recommendation}</p>
+                      <p className="text-xs text-t1 flex-1">{recommendation}</p>
                     </div>
                   ))}
                 </CardContent>
@@ -490,7 +490,7 @@ export function FalsePositiveAnalyzerPanel() {
 
               <Card className="border-s2">
                 <CardHeader className="pb-3 pt-3 px-3">
-                  <CardTitle className="text-sm text-fg font-semibold flex items-center gap-2">
+                  <CardTitle className="text-sm text-t1 font-semibold flex items-center gap-2">
                     <TrendUp size={18} weight="duotone" className="text-green" />
                     Quick Actions
                   </CardTitle>
@@ -504,7 +504,7 @@ export function FalsePositiveAnalyzerPanel() {
                     }}
                   >
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-fg">
+                      <div className="text-sm font-medium text-t1">
                         Apply Optimal Threshold
                       </div>
                       <div className="text-xs text-s4 mt-0.5">
@@ -521,7 +521,7 @@ export function FalsePositiveAnalyzerPanel() {
                     }}
                   >
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-fg">
+                      <div className="text-sm font-medium text-t1">
                         Filter Low Confidence
                       </div>
                       <div className="text-xs text-s4 mt-0.5">
@@ -538,7 +538,7 @@ export function FalsePositiveAnalyzerPanel() {
                     }}
                   >
                     <div className="flex-1">
-                      <div className="text-sm font-medium text-fg">
+                      <div className="text-sm font-medium text-t1">
                         Apply Category Thresholds
                       </div>
                       <div className="text-xs text-s4 mt-0.5">
@@ -582,7 +582,7 @@ export function FalsePositiveAnalyzerPanel() {
                               {(correction.confidence * 100).toFixed(0)}%
                             </Badge>
                           </div>
-                          <p className="text-sm font-medium text-fg line-through">
+                          <p className="text-sm font-medium text-t1 line-through">
                             {correction.originalProductName}
                           </p>
                           {correction.correctedProductName && (

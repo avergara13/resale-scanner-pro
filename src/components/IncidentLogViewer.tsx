@@ -259,7 +259,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
               <div className="text-xs text-s4 uppercase tracking-wide">
                 {getServiceDisplayName(service)}
               </div>
-              <div className="text-lg font-bold text-fg">{total}</div>
+              <div className="text-lg font-bold text-t1">{total}</div>
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-red">{active} active</span>
                 <span className="text-s3">•</span>
@@ -275,7 +275,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
       {viewMode === 'incidents' ? (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-fg uppercase tracking-wide">
+            <h3 className="text-xs font-semibold text-t1 uppercase tracking-wide">
               Incident Log ({filteredIncidents.length})
             </h3>
           </div>
@@ -303,7 +303,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
                         ) : (
                           <XCircle size={16} weight="fill" className="text-red animate-pulse" />
                         )}
-                        <span className="text-sm font-semibold text-fg">
+                        <span className="text-sm font-semibold text-t1">
                           {getServiceDisplayName(incident.service)}
                         </span>
                       </div>
@@ -315,7 +315,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
                     <div className="space-y-1.5 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="text-s4">Started</span>
-                        <span className="text-fg font-mono">
+                        <span className="text-t1 font-mono">
                           {format(incident.startTime, 'MMM d, yyyy HH:mm:ss')}
                         </span>
                       </div>
@@ -323,7 +323,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
                       {incident.endTime && (
                         <div className="flex items-center justify-between">
                           <span className="text-s4">Resolved</span>
-                          <span className="text-fg font-mono">
+                          <span className="text-t1 font-mono">
                             {format(incident.endTime, 'MMM d, yyyy HH:mm:ss')}
                           </span>
                         </div>
@@ -334,7 +334,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
                         <span className={`font-mono font-semibold ${
                           severity === 'critical' ? 'text-red' : 
                           severity === 'high' ? 'text-amber' : 
-                          'text-fg'
+                          'text-t1'
                         }`}>
                           {formatDuration(duration)}
                         </span>
@@ -343,7 +343,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
                       {incident.error && (
                         <div className="mt-2 p-2 bg-red/10 border border-red/30 rounded">
                           <div className="text-xs text-s4 uppercase tracking-wide mb-0.5">Error</div>
-                          <div className="text-xs font-mono text-fg">{incident.error}</div>
+                          <div className="text-xs font-mono text-t1">{incident.error}</div>
                         </div>
                       )}
 
@@ -365,7 +365,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-fg uppercase tracking-wide">
+            <h3 className="text-xs font-semibold text-t1 uppercase tracking-wide">
               Event Log ({filteredEvents.length})
             </h3>
           </div>
@@ -387,7 +387,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       {getStatusIcon(event.newStatus, 12)}
-                      <span className="font-medium text-fg">
+                      <span className="font-medium text-t1">
                         {getServiceDisplayName(event.service)}
                       </span>
                       <span className="text-s4">→</span>

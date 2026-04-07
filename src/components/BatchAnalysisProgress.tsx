@@ -19,7 +19,7 @@ export function BatchAnalysisProgress({ current, total, currentItemName }: Batch
           </div>
         </div>
         
-        <h3 className="text-lg font-semibold text-fg text-center mb-2">
+        <h3 className="text-lg font-semibold text-t1 text-center mb-2">
           Batch Analysis
         </h3>
         

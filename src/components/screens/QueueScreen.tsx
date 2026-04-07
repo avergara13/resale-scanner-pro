@@ -1356,7 +1356,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <h3 className="font-semibold text-fg text-sm line-clamp-2">
+                          <h3 className="font-semibold text-t1 text-sm line-clamp-2">
                             {item.productName || 'Unknown Item'}
                           </h3>
                           {item.profitMargin !== undefined && (

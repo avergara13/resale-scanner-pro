@@ -152,7 +152,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-md bg-bg border-s2">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-fg">Edit Item Details</DialogTitle>
+            <DialogTitle className="text-lg font-semibold text-t1">Edit Item Details</DialogTitle>
             <DialogDescription className="text-sm text-s4">
               Update product information before creating a listing
             </DialogDescription>
@@ -184,7 +184,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
               )}
 
             <div className="space-y-2">
-              <Label htmlFor="edit-product-name" className="text-sm font-medium text-fg">
+              <Label htmlFor="edit-product-name" className="text-sm font-medium text-t1">
                 Product Name
               </Label>
               <Input
@@ -192,12 +192,12 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
                 value={formData.productName}
                 onChange={(e) => handleInputChange('productName', e.target.value)}
                 placeholder="e.g., Vintage Nike Air Jordan Sneakers"
-                className="bg-bg border-s2 text-fg placeholder:text-s3"
+                className="bg-bg border-s2 text-t1 placeholder:text-s3"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-category" className="text-sm font-medium text-fg">
+              <Label htmlFor="edit-category" className="text-sm font-medium text-t1">
                 Category
               </Label>
               <Input
@@ -205,13 +205,13 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
                 value={formData.category}
                 onChange={(e) => handleInputChange('category', e.target.value)}
                 placeholder="e.g., Footwear, Electronics, Clothing"
-                className="bg-bg border-s2 text-fg placeholder:text-s3"
+                className="bg-bg border-s2 text-t1 placeholder:text-s3"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="edit-purchase-price" className="text-sm font-medium text-fg">
+                <Label htmlFor="edit-purchase-price" className="text-sm font-medium text-t1">
                   Purchase Price
                 </Label>
                 <div className="relative">
@@ -223,13 +223,13 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
                     min="0"
                     value={formData.purchasePrice}
                     onChange={(e) => handleInputChange('purchasePrice', e.target.value)}
-                    className="bg-bg border-s2 text-fg pl-7 font-mono"
+                    className="bg-bg border-s2 text-t1 pl-7 font-mono"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-sell-price" className="text-sm font-medium text-fg">
+                <Label htmlFor="edit-sell-price" className="text-sm font-medium text-t1">
                   Estimated Sell Price
                 </Label>
                 <div className="relative">
@@ -241,7 +241,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
                     min="0"
                     value={formData.estimatedSellPrice}
                     onChange={(e) => handleInputChange('estimatedSellPrice', e.target.value)}
-                    className="bg-bg border-s2 text-fg pl-7 font-mono"
+                    className="bg-bg border-s2 text-t1 pl-7 font-mono"
                   />
                 </div>
               </div>
@@ -269,7 +269,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="edit-description" className="text-sm font-medium text-fg">
+              <Label htmlFor="edit-description" className="text-sm font-medium text-t1">
                 Description
               </Label>
               <Textarea
@@ -278,12 +278,12 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Add detailed product description, condition, features..."
                 rows={4}
-                className="bg-bg border-s2 text-fg placeholder:text-s3 resize-none"
+                className="bg-bg border-s2 text-t1 placeholder:text-s3 resize-none"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-notes" className="text-sm font-medium text-fg">
+              <Label htmlFor="edit-notes" className="text-sm font-medium text-t1">
                 Notes (Internal)
               </Label>
               <Textarea
@@ -292,7 +292,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
                 onChange={(e) => handleInputChange('notes', e.target.value)}
                 placeholder="Private notes, storage location, sourcing details..."
                 rows={3}
-                className="bg-bg border-s2 text-fg placeholder:text-s3 resize-none"
+                className="bg-bg border-s2 text-t1 placeholder:text-s3 resize-none"
               />
             </div>
 
@@ -319,7 +319,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
           <Button
             onClick={onClose}
             variant="outline"
-            className="flex-1 border-s2 text-s4 hover:bg-s1 hover:text-fg"
+            className="flex-1 border-s2 text-s4 hover:bg-s1 hover:text-t1"
           >
             <X size={16} weight="bold" className="mr-2" />
             Cancel

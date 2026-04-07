@@ -93,7 +93,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
           <div className="text-xs font-medium text-s4 uppercase tracking-wide mb-1">
             Avg Uptime (24h)
           </div>
-          <div className="text-2xl font-semibold text-fg mb-2">
+          <div className="text-2xl font-semibold text-t1 mb-2">
             {stats.averageUptime.toFixed(1)}%
           </div>
           <Progress value={stats.averageUptime} className="h-1.5" />
@@ -103,7 +103,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
           <div className="text-xs font-medium text-s4 uppercase tracking-wide mb-1">
             Incidents (24h)
           </div>
-          <div className="text-2xl font-semibold text-fg flex items-center gap-2">
+          <div className="text-2xl font-semibold text-t1 flex items-center gap-2">
             {stats.incidentCount}
             {stats.incidentCount > 0 && (
               <TrendUp size={20} className="text-red" weight="bold" />
@@ -121,7 +121,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
             <div className="text-xs text-s4 mb-1">
               {getServiceDisplayName(service)}
             </div>
-            <div className="text-lg font-semibold text-fg">
+            <div className="text-lg font-semibold text-t1">
               {(stats.uptimePercentage[service] || 0).toFixed(1)}%
             </div>
             <div className="mt-1.5">
@@ -134,7 +134,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
       {activeIncidents.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-fg uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-t1 uppercase tracking-wide">
               Active Incidents
             </h3>
             <Badge variant="destructive" className="text-xs">
@@ -151,7 +151,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
                 <div className="flex items-start justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <XCircle size={16} weight="fill" className="text-red" />
-                    <span className="text-sm font-medium text-fg">
+                    <span className="text-sm font-medium text-t1">
                       {getServiceDisplayName(incident.service)}
                     </span>
                   </div>
@@ -172,7 +172,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
 
       {resolvedIncidents.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-fg uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-t1 uppercase tracking-wide">
             Recent Incidents
           </h3>
 
@@ -186,7 +186,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
                   <div className="flex items-start justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <CheckCircle size={14} weight="fill" className="text-green" />
-                      <span className="text-xs font-medium text-fg">
+                      <span className="text-xs font-medium text-t1">
                         {getServiceDisplayName(incident.service)}
                       </span>
                     </div>
@@ -208,7 +208,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-fg uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-t1 uppercase tracking-wide">
             Event Log
           </h3>
           <Button
@@ -238,7 +238,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     {getStatusIcon(event.newStatus, 12)}
-                    <span className="font-medium text-fg">
+                    <span className="font-medium text-t1">
                       {getServiceDisplayName(event.service)}
                     </span>
                     <span className="text-s4">→</span>
