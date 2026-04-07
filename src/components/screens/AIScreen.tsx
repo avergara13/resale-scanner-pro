@@ -14,7 +14,6 @@ import { DecisionSignal } from './DecisionSignal'
 import { MarketDataPanel } from '../MarketDataPanel'
 import { GoogleLensResults } from '../GoogleLensResults'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
-import { ThemeToggle } from '../ThemeToggle'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useCollapsePreference } from '@/hooks/use-collapse-preference'
@@ -27,9 +26,11 @@ interface AIScreenProps {
   currentItem?: ScannedItem
   pipeline: PipelineStep[]
   settings?: AppSettings
+  queueItems?: ScannedItem[]
   onAddToQueue: () => void
   onDeepSearch: () => void
   onSaveDraft: (price: number, notes: string) => void
+  onOpenCamera?: () => void
 }
 
 function CelebrationParticle({ delay, index }: { delay: number; index: number }) {
@@ -219,7 +220,7 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
   )
 }
 
-export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeepSearch, onSaveDraft }: AIScreenProps) {
+export function AIScreen({ currentItem, pipeline, settings, queueItems, onAddToQueue, onDeepSearch, onSaveDraft, onOpenCamera }: AIScreenProps) {
   const [tab, setTab] = useTabPreference<'analysis' | 'chat'>('ai-screen', 'analysis')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -260,6 +261,14 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
   }, [chatMessages])
 
   const buildAIContext = useCallback(() => {
+    const buyItems = queueItems?.filter(i => i.decision === 'BUY' && i.inQueue) ?? []
+    const passItems = queueItems?.filter(i => i.decision === 'PASS') ?? []
+    const totalProfit = buyItems.reduce((sum, i) => {
+      if (i.estimatedSellPrice && i.purchasePrice) {
+        return sum + (i.estimatedSellPrice - i.purchasePrice)
+      }
+      return sum
+    }, 0)
     const context = {
       currentAnalysis: currentItem ? {
         productName: currentItem.productName,
@@ -271,6 +280,18 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
         decision: currentItem.decision,
         marketData: currentItem.marketData,
       } : null,
+      queue: {
+        totalItems: queueItems?.length ?? 0,
+        buyCount: buyItems.length,
+        passCount: passItems.length,
+        estimatedProfit: totalProfit.toFixed(2),
+        recentItems: buyItems.slice(0, 5).map(i => ({
+          name: i.productName,
+          buyPrice: i.purchasePrice,
+          sellPrice: i.estimatedSellPrice,
+          margin: i.profitMargin,
+        }))
+      },
       pipelineStatus: pipeline.map(p => ({
         step: p.label,
         status: p.status,
@@ -284,7 +305,7 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
       }
     }
     return JSON.stringify(context, null, 2)
-  }, [currentItem, pipeline, settings])
+  }, [currentItem, pipeline, settings, queueItems])
 
   const handleSendMessage = useCallback(async () => {
     if (!chatInput.trim() || isSendingMessage) return
@@ -369,7 +390,6 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
             </div>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <ThemeToggle />
             <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
           </div>
         </div>
@@ -401,7 +421,16 @@ export function AIScreen({ currentItem, pipeline, settings, onAddToQueue, onDeep
                     <Scan size={32} strokeWidth={1.5} className="text-b1 sm:w-10 sm:h-10" />
                   </div>
                   <h3 className="text-base sm:text-lg font-bold text-t1 mb-1.5 sm:mb-2">Ready to Analyze</h3>
-                  <p className="text-xs sm:text-sm text-t3 max-w-xs">Tap the camera button below to scan an item and start AI analysis</p>
+                  <p className="text-xs sm:text-sm text-t3 max-w-xs mb-4">Tap the camera button to scan an item and start AI analysis</p>
+                  {onOpenCamera && (
+                    <button
+                      onClick={onOpenCamera}
+                      className="flex items-center gap-2 px-4 py-2 bg-b1 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform"
+                    >
+                      <Scan size={16} weight="bold" />
+                      Scan an Item
+                    </button>
+                  )}
                 </div>
                 <div className="px-2 sm:px-4">
                   <ApiStatusIndicator settings={settings} />

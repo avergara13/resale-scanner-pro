@@ -1,4 +1,4 @@
-export type Screen = 'session' | 'session-detail' | 'agent' | 'ai' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
+export type Screen = 'session' | 'session-detail' | 'agent' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
 
 export type ResalePlatform = 'ebay' | 'mercari' | 'poshmark' | 'whatnot' | 'facebook'
 
