@@ -21,7 +21,7 @@ import { ListingDetailScreen } from './components/screens/ListingDetailScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { retryOperation } from './lib/retry-service'
 import { getRetryOptions } from './lib/retry-config'
-import { researchProduct, parseResearchPrice } from './lib/llm-service'
+import { callLLM, researchProduct, parseResearchPrice } from './lib/llm-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
@@ -401,9 +401,30 @@ function App() {
                 i === 2 ? { ...s, data: `Market price ~$${researchPrice.toFixed(2)} (Google Search)` } : s
               ))
             } else {
-              setPipeline(prev => prev.map((s, i) =>
-                i === 2 ? { ...s, data: 'Research complete — using estimate' } : s
-              ))
+              // Price extraction failed on the full report — ask Gemini directly for a number
+              try {
+                const productLabel = visionResult?.productName || mockProductName
+                const directPriceText = await callLLM(
+                  `What is the current average resale price for "${productLabel}" on eBay or Mercari? Reply with ONLY a single dollar amount, e.g. "$24.99". No other text.`,
+                  geminiKey,
+                  undefined
+                )
+                const directPrice = parseResearchPrice(directPriceText)
+                if (directPrice > 0) {
+                  ebayAvgPrice = directPrice
+                  setPipeline(prev => prev.map((s, i) =>
+                    i === 2 ? { ...s, data: `Est. market value ~$${directPrice.toFixed(2)}` } : s
+                  ))
+                } else {
+                  setPipeline(prev => prev.map((s, i) =>
+                    i === 2 ? { ...s, data: 'Market data unavailable — enter price manually' } : s
+                  ))
+                }
+              } catch {
+                setPipeline(prev => prev.map((s, i) =>
+                  i === 2 ? { ...s, data: 'Market data unavailable — enter price manually' } : s
+                ))
+              }
             }
           } catch {
             setPipeline(prev => prev.map((s, i) =>
@@ -419,10 +440,16 @@ function App() {
         await new Promise(resolve => setTimeout(resolve, 100))
       }
 
-      // 3-tier sell price fallback: eBay recommendedPrice → Google Lens average → 4.5x markup
+      // Sell price fallback chain: eBay/Gemini research → Google Lens average → 4.5× markup (only if price > 0)
       if (ebayAvgPrice <= 0) {
         const lensAvg = lensAnalysis?.priceRange?.average || 0
-        ebayAvgPrice = lensAvg > 0 ? lensAvg : (price > 0 ? price * 4.5 : 0)
+        if (lensAvg > 0) {
+          ebayAvgPrice = lensAvg
+        } else if (price > 0) {
+          // Last resort: use purchase-price multiplier only when user actually entered a price
+          ebayAvgPrice = price * 4.5
+        }
+        // If price=0 and no market data: ebayAvgPrice stays 0 → decision stays PENDING
       }
       
       await new Promise(resolve => setTimeout(resolve, 500))
