@@ -63,6 +63,8 @@ interface QueueScreenProps {
   onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
   onDelist?: (itemId: string) => void
   personalSessionIds?: Set<string>
+  onReanalyze?: (itemId: string) => void
+  onOpenDetail?: (item: ScannedItem) => void
 }
 
 type FilterOption = 'ALL' | 'BUY' | 'PASS' | 'PENDING'
@@ -80,6 +82,8 @@ interface SortableItemProps {
   onEditTags: (itemId: string, tags: string[]) => void
   onOpenSoldDialog?: (item: ScannedItem) => void
   onDelist?: (itemId: string) => void
+  onReanalyze?: (itemId: string) => void
+  onOpenDetail?: (item: ScannedItem) => void
 }
 
 function SortableItem({
@@ -94,6 +98,8 @@ function SortableItem({
   onEditTags,
   onOpenSoldDialog,
   onDelist,
+  onReanalyze,
+  onOpenDetail,
 }: SortableItemProps) {
   const {
     attributes,
@@ -111,38 +117,40 @@ function SortableItem({
   }
 
   return (
-    <Card 
+    <Card
       ref={setNodeRef}
       style={style}
       className={cn(
         "p-2 sm:p-3 border transition-colors",
-        isSelected ? 'border-b1 bg-t4' : 'border-s2'
+        isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
       )}
     >
       <div className="flex gap-2 sm:gap-2.5">
-        <div className="flex flex-col gap-1 sm:gap-1.5 items-center justify-start pt-0.5">
-          <div 
-            {...attributes} 
+        {/* Narrow control column: drag handle + checkbox */}
+        <div className="flex flex-col gap-1 items-center justify-start pt-0.5 flex-shrink-0">
+          <div
+            {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing touch-none p-0.5 sm:p-1 hover:bg-s1 rounded transition-colors"
+            className="cursor-grab active:cursor-grabbing touch-none p-0.5 hover:bg-s1 rounded transition-colors"
             aria-label="Drag to reorder"
           >
-            <DotsSixVertical size={16} weight="bold" className="text-s3 sm:w-[18px] sm:h-[18px]" />
+            <DotsSixVertical size={14} weight="bold" className="text-s3" />
           </div>
           <Checkbox
             id={`select-${item.id}`}
             checked={isSelected}
             onCheckedChange={() => onToggleSelect(item.id)}
-            className="w-4 h-4 sm:w-5 sm:h-5 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+            className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
           />
-          {(item.imageThumbnail || item.imageData) && (
-            <img
-              src={item.imageThumbnail || item.imageData}
-              alt={item.productName || 'Item'}
-              className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-md border border-s2 flex-shrink-0"
-            />
-          )}
         </div>
+        {/* Thumbnail column */}
+        {(item.imageThumbnail || item.imageData) && (
+          <img
+            src={item.imageThumbnail || item.imageData}
+            alt={item.productName || 'Item'}
+            className="w-14 h-14 sm:w-[68px] sm:h-[68px] object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+          />
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
             <div className="flex items-center gap-1.5 min-w-0">
@@ -153,7 +161,7 @@ function SortableItem({
                 <span className="text-[7px] font-bold bg-purple-500/15 text-purple-500 px-1 py-0.5 rounded flex-shrink-0 uppercase">Personal</span>
               )}
             </div>
-            {item.profitMargin !== undefined && (
+            {item.profitMargin !== undefined && isFinite(item.profitMargin) && (
               <Badge
                 variant="secondary"
                 className={cn(
@@ -165,15 +173,16 @@ function SortableItem({
                     : 'bg-red/20 text-red'
                 )}
               >
-                +{item.profitMargin.toFixed(0)}%
+                {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
               </Badge>
             )}
           </div>
           <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-mono text-t3 mb-1.5 sm:mb-2">
             <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
-            {item.estimatedSellPrice && (
-              <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
-            )}
+            {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
+              ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
+              : <span className="text-s3">Sell: —</span>
+            }
           </div>
           {item.tags && item.tags.length > 0 && (
             <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 mb-2 sm:mb-2.5">
@@ -210,7 +219,7 @@ function SortableItem({
               })}
             </div>
           )}
-          <div className="flex gap-1 sm:gap-1.5">
+          <div className="flex gap-1 sm:gap-1.5 flex-wrap">
             <Button
               size="sm"
               onClick={() => onEdit(item)}
@@ -220,6 +229,27 @@ function SortableItem({
               <PencilSimple size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
               Edit
             </Button>
+            {onOpenDetail && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onOpenDetail(item)}
+                className="h-6 sm:h-7 px-2 text-[10px] sm:text-[11px] text-b1 hover:bg-b1/10"
+              >
+                Detail
+              </Button>
+            )}
+            {(item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onReanalyze(item.id)}
+                className="h-6 sm:h-7 px-2 text-[10px] sm:text-[11px] border-amber/40 text-amber hover:bg-amber/10"
+              >
+                <ArrowCounterClockwise size={11} weight="bold" className="mr-0.5 sm:w-[13px] sm:h-[13px]" />
+                Re-analyze
+              </Button>
+            )}
             {item.listingStatus === 'published' && onOpenSoldDialog ? (
               <>
                 <Button
@@ -266,7 +296,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -1322,6 +1352,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                         setSoldMarketplace('ebay')
                       } : undefined}
                       onDelist={onDelist}
+                      onReanalyze={onReanalyze}
+                      onOpenDetail={onOpenDetail}
                     />
                   ))}
                 </div>
@@ -1332,34 +1364,34 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               {sortedItems.map((item) => {
                 const isSelected = selectedIds.has(item.id)
                 return (
-                  <Card 
-                    key={item.id} 
+                  <Card
+                    key={item.id}
                     className={`p-4 border transition-colors ${
-                      isSelected ? 'border-b1 bg-t4' : 'border-s2'
+                      isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
                     }`}
                   >
                     <div className="flex gap-3">
-                      <div className="flex flex-col gap-2 items-center justify-start pt-1">
+                      <div className="flex flex-col gap-2 items-center justify-start pt-1 flex-shrink-0">
                         <Checkbox
                           id={`select-${item.id}`}
                           checked={isSelected}
                           onCheckedChange={() => handleToggleSelect(item.id)}
-                          className="w-5 h-5 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+                          className="w-4 h-4 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
                         />
-                        {(item.imageThumbnail || item.imageData) && (
-                          <img
-                            src={item.imageThumbnail || item.imageData}
-                            alt={item.productName || 'Item'}
-                            className="w-20 h-20 object-cover rounded-md border border-s2 flex-shrink-0"
-                          />
-                        )}
                       </div>
+                      {(item.imageThumbnail || item.imageData) && (
+                        <img
+                          src={item.imageThumbnail || item.imageData}
+                          alt={item.productName || 'Item'}
+                          className="w-16 h-16 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+                        />
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <h3 className="font-semibold text-t1 text-sm line-clamp-2">
                             {item.productName || 'Unknown Item'}
                           </h3>
-                          {item.profitMargin !== undefined && (
+                          {item.profitMargin !== undefined && isFinite(item.profitMargin) && (
                             <Badge
                               variant="secondary"
                               className={`flex-shrink-0 font-mono font-medium ${
@@ -1370,15 +1402,16 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                                   : 'bg-red/20 text-red'
                               }`}
                             >
-                              +{item.profitMargin.toFixed(0)}%
+                              {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
                             </Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-2">
                           <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
-                          {item.estimatedSellPrice && (
-                            <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
-                          )}
+                          {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
+                            ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
+                            : <span className="text-s3">Sell: —</span>
+                          }
                         </div>
                         {item.tags && item.tags.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1 mb-3">

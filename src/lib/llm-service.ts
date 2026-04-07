@@ -67,6 +67,45 @@ async function callGemini(
   return text
 }
 
+// ------- Category-aware store list for market research -------
+
+function getCategorySpecificStores(category: string, brand?: string): string[] {
+  const cat = (category || '').toLowerCase()
+  const stores: string[] = []
+
+  if (cat.includes('shoe') || cat.includes('sneaker') || cat.includes('boot') || cat.includes('footwear')) {
+    stores.push('footlocker.com', 'nike.com', 'adidas.com', 'stockx.com', 'goat.com', 'flightclub.com', 'zappos.com')
+  }
+  if (cat.includes('electronic') || cat.includes('tech') || cat.includes('computer') || cat.includes('phone') || cat.includes('console') || cat.includes('gaming')) {
+    stores.push('newegg.com', 'bhphotovideo.com', 'adorama.com', 'gamestop.com', 'backmarket.com', 'swappa.com')
+  }
+  if (cat.includes('cloth') || cat.includes('apparel') || cat.includes('fashion') || cat.includes('shirt') || cat.includes('pants') || cat.includes('jacket') || cat.includes('dress')) {
+    stores.push('depop.com', 'grailed.com', 'thredup.com', 'tradesy.com')
+  }
+  if (cat.includes('toy') || cat.includes('collectible') || cat.includes('lego') || cat.includes('figure') || cat.includes('card') || cat.includes('game')) {
+    stores.push('toysrus.com', 'comc.com', 'pricecharting.com', 'funko.com', 'tcgplayer.com')
+  }
+  if (cat.includes('sport') || cat.includes('outdoor') || cat.includes('fitness') || cat.includes('golf')) {
+    stores.push('dickssportinggoods.com', 'rei.com', 'academy.com')
+  }
+  if (cat.includes('furniture') || cat.includes('home') || cat.includes('decor') || cat.includes('kitchen')) {
+    stores.push('wayfair.com', 'ikea.com', 'homedepot.com', 'craigslist.org')
+  }
+
+  if (brand) {
+    const b = brand.toLowerCase()
+    if (b.includes('nike')) stores.push('nike.com')
+    if (b.includes('adidas')) stores.push('adidas.com')
+    if (b.includes('apple')) stores.push('apple.com', 'swappa.com')
+    if (b.includes('lego')) stores.push('lego.com')
+    if (b.includes('sony')) stores.push('sony.com')
+    if (b.includes('samsung')) stores.push('samsung.com')
+    if (b.includes('jordan') || b.includes('air jordan')) stores.push('stockx.com', 'goat.com')
+  }
+
+  return [...new Set(stores)]
+}
+
 // ------- Gemini with Google Search grounding (for product research) -------
 
 async function callGeminiGrounded(
@@ -103,29 +142,49 @@ async function callGeminiGrounded(
 
 /**
  * Research a product using Gemini with Google Search grounding.
- * Returns real-time market data from the web.
+ * Queries all 5 resale platforms + core retail stores + category-specific specialty stores.
+ * Returns structured real-time market intelligence.
  */
 export async function researchProduct(
   productName: string,
-  context: { purchasePrice?: number; category?: string },
+  context: { purchasePrice?: number; category?: string; brand?: string },
   geminiApiKey: string
 ): Promise<string> {
-  const prompt = `Research the current resale market value for: "${productName}"
+  const resalePlatforms = ['ebay.com', 'mercari.com', 'poshmark.com', 'whatnot.com', 'facebook.com/marketplace']
+  const retailStores = ['amazon.com', 'walmart.com', 'bestbuy.com', 'target.com']
+  const specialtyStores = getCategorySpecificStores(context.category || '', context.brand)
+
+  const prompt = `You are a professional resale market analyst for a resale business. Research current pricing for: "${productName}"
 ${context.category ? `Category: ${context.category}` : ''}
-${context.purchasePrice ? `Purchase price: $${context.purchasePrice.toFixed(2)}` : ''}
+${context.brand ? `Brand: ${context.brand}` : ''}
+${context.purchasePrice ? `Purchase price paid: $${context.purchasePrice.toFixed(2)}` : ''}
 
-Search eBay sold listings, Amazon, Mercari, Poshmark, and other resale marketplaces.
+Search ALL of the following sources:
 
-Provide:
-1. **Estimated resale value range** (low / average / high) based on actual sold listings
-2. **Best marketplace** to sell this item (eBay, Mercari, Poshmark, etc.)
-3. **Demand level** (high/medium/low) based on how many are selling
-4. **Profit assessment** — is this a good buy at the purchase price?
-5. **Recommended listing price** for fastest sale with good margin
+RESALE PLATFORMS — check SOLD/COMPLETED listings (most important):
+${resalePlatforms.join(' | ')}
 
-Be specific with dollar amounts. Reference actual marketplace data.`
+RETAIL STORES — check new/MSRP pricing (for resale discount context):
+${retailStores.join(' | ')}
+${specialtyStores.length > 0 ? `\nSPECIALTY STORES for this category:\n${specialtyStores.join(' | ')}` : ''}
 
-  return callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 1024 })
+Provide a concise analysis with:
+1. **Resale value range**: low / average / high from actual sold listings
+2. **Retail price** (new): what stores charge for it new (establishes discount %)
+3. **Best resale platform** with reasoning (volume + price)
+4. **Platform pricing guide**:
+   - eBay: $X (12.9% fee)
+   - Mercari: $X (10% fee)
+   - Poshmark: $X (20% fee >$15)
+   - Whatnot: $X (auction — starting bid)
+   - Facebook Marketplace: $X (local, no fees)
+5. **Demand**: high / medium / low — sell-through velocity
+6. **Recommended list price** for best margin + speed
+${context.purchasePrice ? `7. **Verdict**: BUY or PASS at $${context.purchasePrice.toFixed(2)} — with margin estimate` : ''}
+
+Be specific with dollar amounts. Cite actual marketplace data found.`
+
+  return callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 1500 })
 }
 
 // ------- Anthropic Claude (secondary — complex tasks only) -------

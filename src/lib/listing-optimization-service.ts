@@ -1,4 +1,4 @@
-import type { ScannedItem, MarketData } from '@/types'
+import type { ScannedItem, MarketData, ResalePlatform, PlatformListing, OptimizedListing as AppOptimizedListing } from '@/types'
 import { callLLM } from './llm-service'
 
 export interface OptimizedListing {
@@ -300,6 +300,138 @@ Return a JSON object with this exact structure:
     score += Math.min(keywordsInDesc * 3, 20)
 
     return Math.min(score, 100)
+  }
+
+  async generatePlatformListing(
+    item: ScannedItem,
+    platform: ResalePlatform,
+    ebayListing: AppOptimizedListing
+  ): Promise<PlatformListing> {
+    const platformRules: Record<ResalePlatform, { name: string; titleMax: number; feePercent: number; rules: string }> = {
+      ebay: {
+        name: 'eBay',
+        titleMax: 80,
+        feePercent: 12.9,
+        rules: 'Professional tone. Use | separators. Front-load brand and model. Include condition keywords (NWT, NWOT, NIB, etc). Add item specifics in title when space allows.',
+      },
+      mercari: {
+        name: 'Mercari',
+        titleMax: 80,
+        feePercent: 10,
+        rules: 'Casual, friendly tone. No HTML in description — plain text only. Concise bullet-point description. Emphasize condition clearly. Include brand and model upfront. Mercari buyers are value-hunters so highlight the deal.',
+      },
+      poshmark: {
+        name: 'Poshmark',
+        titleMax: 60,
+        feePercent: 20,
+        rules: 'Fashion-forward, aspirational tone. Title ≤60 chars. Add 3-5 relevant #hashtags at the END of the description (e.g. #nike #running #sneakers). Poshmark charges 20% on items over $15, so price accordingly. Emphasize style, brand prestige, and occasion.',
+      },
+      whatnot: {
+        name: 'Whatnot',
+        titleMax: 80,
+        feePercent: 8,
+        rules: 'Auction-format listing. Title should be snappy and exciting for live streaming. Description MUST include: condition grade (1-10), any flaws, what is included in the lot, authenticity notes. Include a suggested starting bid price as well as buy-now price. Whatnot buyers are collectors — mention rarity, edition, and lot contents.',
+      },
+      facebook: {
+        name: 'Facebook Marketplace',
+        titleMax: 100,
+        feePercent: 0,
+        rules: 'Local buyer tone — conversational and direct. No shipping required (local pickup). No strict brand restrictions. Mention city/area availability. Price should be negotiable-friendly (slightly above target). Description should be brief (3-5 sentences max). No formal return policy needed.',
+      },
+    }
+
+    const p = platformRules[platform]
+    if (!this.geminiApiKey) {
+      return this.generateFallbackPlatformListing(item, platform, ebayListing, p)
+    }
+
+    const feeMultiplier = 1 + p.feePercent / 100
+    const suggestedPrice = ebayListing.price * feeMultiplier / (1 + 0.129) // re-normalize from eBay fee base
+
+    const systemPrompt = `You are a professional resale listing copywriter specializing in ${p.name}. You adapt eBay listings to each platform's unique audience, rules, and fee structure to maximize conversions and profit.
+
+Platform: ${p.name}
+Fee: ${p.feePercent}% (price your listing so the SELLER nets the same margin after fees)
+Title limit: ${p.titleMax} characters
+Platform rules: ${p.rules}`
+
+    const prompt = `Adapt the following eBay listing for ${p.name}.
+
+SOURCE eBay LISTING:
+Title: ${ebayListing.title}
+Description: ${ebayListing.description}
+Price: $${ebayListing.price.toFixed(2)}
+Condition: ${ebayListing.condition}
+Category: ${ebayListing.category}
+Item Specifics: ${JSON.stringify(ebayListing.itemSpecifics)}
+Shipping: $${ebayListing.shippingCost.toFixed(2)}
+
+ITEM CONTEXT:
+- Product: ${item.productName || 'Unknown'}
+- Purchase price: $${item.purchasePrice.toFixed(2)}
+- Target net: $${suggestedPrice.toFixed(2)} after ${p.feePercent}% ${p.name} fee
+
+REQUIREMENTS:
+1. Title: max ${p.titleMax} chars, optimized for ${p.name} search
+2. Description: adapted tone and format for ${p.name} — follow platform rules above
+3. Price: set so seller nets the same profit after ${p.feePercent}% fee
+4. Shipping: $0 if Facebook Marketplace (local only), otherwise suggest appropriate flat rate
+5. platformNotes: one line of actionable advice specific to selling THIS item on ${p.name}
+
+Return ONLY valid JSON:
+{
+  "title": "...",
+  "description": "...",
+  "price": 0.00,
+  "category": "...",
+  "condition": "...",
+  "shippingCost": 0.00,
+  "platformNotes": "..."
+}`
+
+    try {
+      const response = await callLLM(prompt, {
+        task: 'listing',
+        geminiApiKey: this.geminiApiKey,
+        jsonMode: true,
+        maxTokens: 1200,
+        systemPrompt,
+      })
+      const parsed = JSON.parse(response)
+      return {
+        title: (parsed.title || ebayListing.title).slice(0, p.titleMax),
+        description: parsed.description || ebayListing.description,
+        price: parsed.price > 0 ? parsed.price : suggestedPrice,
+        category: parsed.category || ebayListing.category,
+        condition: parsed.condition || ebayListing.condition,
+        shippingCost: platform === 'facebook' ? 0 : (parsed.shippingCost ?? ebayListing.shippingCost),
+        platformNotes: parsed.platformNotes,
+        generatedAt: Date.now(),
+      }
+    } catch {
+      return this.generateFallbackPlatformListing(item, platform, ebayListing, p)
+    }
+  }
+
+  private generateFallbackPlatformListing(
+    _item: ScannedItem,
+    platform: ResalePlatform,
+    ebayListing: AppOptimizedListing,
+    p: { name: string; titleMax: number; feePercent: number }
+  ): PlatformListing {
+    const adjustedPrice = platform === 'facebook'
+      ? ebayListing.price * 0.85
+      : ebayListing.price * (1 + p.feePercent / 100) / 1.129
+    return {
+      title: ebayListing.title.slice(0, p.titleMax),
+      description: ebayListing.description,
+      price: Math.round(adjustedPrice * 100) / 100,
+      category: ebayListing.category,
+      condition: ebayListing.condition,
+      shippingCost: platform === 'facebook' ? 0 : ebayListing.shippingCost,
+      platformNotes: `Configure AI in Settings for optimized ${p.name} listings`,
+      generatedAt: Date.now(),
+    }
   }
 
   async batchOptimizeListings(

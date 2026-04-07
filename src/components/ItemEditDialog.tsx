@@ -120,18 +120,21 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
       updates.imageData = editedImage
     }
 
-    if (updates.purchasePrice !== undefined && updates.estimatedSellPrice !== undefined) {
-      const profit = updates.estimatedSellPrice - updates.purchasePrice
-      const margin = (profit / updates.estimatedSellPrice) * 100
-      updates.profitMargin = margin
+    if (updates.estimatedSellPrice !== undefined && updates.estimatedSellPrice > 0) {
+      const profit = updates.estimatedSellPrice - (updates.purchasePrice ?? 0)
+      updates.profitMargin = (profit / updates.estimatedSellPrice) * 100
+    } else {
+      updates.profitMargin = undefined
     }
 
     onSave(item.id, updates)
     onClose()
   }
 
-  const profitMargin = formData.estimatedSellPrice && formData.purchasePrice
-    ? (((parseFloat(formData.estimatedSellPrice) - parseFloat(formData.purchasePrice)) / parseFloat(formData.estimatedSellPrice)) * 100)
+  const sellPrice = parseFloat(formData.estimatedSellPrice)
+  const buyPrice = parseFloat(formData.purchasePrice)
+  const profitMargin = (sellPrice > 0 && buyPrice >= 0 && !isNaN(sellPrice) && !isNaN(buyPrice))
+    ? ((sellPrice - buyPrice) / sellPrice) * 100
     : null
 
   if (!item) return null
@@ -247,7 +250,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
               </div>
             </div>
 
-            {profitMargin !== null && !isNaN(profitMargin) && (
+            {profitMargin !== null && !isNaN(profitMargin) && isFinite(profitMargin) && (
               <div className="flex items-center gap-2 p-3 bg-t4 border border-t3 rounded-md">
                 <span className="text-xs font-medium text-t1">Profit Margin:</span>
                 <Badge
@@ -274,9 +277,11 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
               </Label>
               <Textarea
                 id="edit-description"
-                value={formData.description}
+                value={formData.description === 'Product analysis unavailable' ? '' : formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
-                placeholder="Add detailed product description, condition, features..."
+                placeholder={formData.description === 'Product analysis unavailable'
+                  ? 'Product analysis unavailable — add manually or tap Re-analyze'
+                  : 'Add detailed product description, condition, features...'}
                 rows={4}
                 className="bg-bg border-s2 text-t1 placeholder:text-s3 resize-none"
               />
