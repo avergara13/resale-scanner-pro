@@ -167,7 +167,7 @@ export class NotionService {
   }
 
   async updateListingStatus(pageId: string, update: {
-    status: 'sold' | 'shipped' | 'completed' | 'returned' | 'delisted' | 'ready'
+    status: 'published' | 'sold' | 'shipped' | 'completed' | 'returned' | 'delisted' | 'ready'
     soldPrice?: number
     soldOn?: string
     trackingNumber?: string
@@ -200,6 +200,9 @@ export class NotionService {
       }
       if (update.soldDate) {
         properties['Sold Date'] = { date: { start: new Date(update.soldDate).toISOString() } }
+      }
+      if (update.shippedDate) {
+        properties['Shipped Date'] = { date: { start: new Date(update.shippedDate).toISOString() } }
       }
       if (update.returnedDate) {
         properties['Returned Date'] = { date: { start: new Date(update.returnedDate).toISOString() } }

@@ -696,6 +696,10 @@ function App() {
           ? { ...i, notionPageId: result.pageId, notionUrl: result.url, listingStatus: 'published', publishedDate: Date.now() }
           : i
       ))
+      // Update Notion status from 'ready' → 'published'
+      if (result.pageId && notionService) {
+        notionService.updateListingStatus(result.pageId, { status: 'published' }).catch(e => console.warn('Notion status update failed:', e))
+      }
       toast.success('Pushed to Notion ✓')
     } else {
       toast.error(`Notion error: ${result.error}`)
@@ -708,77 +712,69 @@ function App() {
     soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
   ) => {
     const soldDate = Date.now()
-    setQueue(prev => (prev || []).map(item =>
-      item.id === itemId
-        ? { ...item, listingStatus: 'sold', soldPrice, soldDate, soldOn }
-        : item
-    ))
-    // Sync to Notion if item was published there
     const item = (queue || []).find(i => i.id === itemId)
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId ? { ...i, listingStatus: 'sold', soldPrice, soldDate, soldOn } : i
+    ))
     if (item?.notionPageId && notionService) {
-      notionService.updateListingStatus(item.notionPageId, { status: 'sold', soldPrice, soldOn, soldDate }).catch(() => {})
+      notionService.updateListingStatus(item.notionPageId, { status: 'sold', soldPrice, soldOn, soldDate }).catch(e => console.warn('Notion sync failed:', e))
     }
     toast.success('Item marked as sold')
   }, [setQueue, queue, notionService])
 
   const handleMarkShipped = useCallback((itemId: string, trackingNumber: string, shippingCarrier: string) => {
     const shippedDate = Date.now()
-    setQueue(prev => (prev || []).map(item =>
-      item.id === itemId
-        ? { ...item, listingStatus: 'shipped', trackingNumber, shippingCarrier, shippedDate }
-        : item
-    ))
     const item = (queue || []).find(i => i.id === itemId)
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId ? { ...i, listingStatus: 'shipped', trackingNumber, shippingCarrier, shippedDate } : i
+    ))
     if (item?.notionPageId && notionService) {
-      notionService.updateListingStatus(item.notionPageId, { status: 'shipped', trackingNumber, shippingCarrier, shippedDate }).catch(() => {})
+      notionService.updateListingStatus(item.notionPageId, { status: 'shipped', trackingNumber, shippingCarrier, shippedDate }).catch(e => console.warn('Notion sync failed:', e))
     }
     toast.success('Item marked as shipped')
   }, [setQueue, queue, notionService])
 
   const handleMarkCompleted = useCallback((itemId: string) => {
-    setQueue(prev => (prev || []).map(item =>
-      item.id === itemId ? { ...item, listingStatus: 'completed' } : item
-    ))
     const item = (queue || []).find(i => i.id === itemId)
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId ? { ...i, listingStatus: 'completed' } : i
+    ))
     if (item?.notionPageId && notionService) {
-      notionService.updateListingStatus(item.notionPageId, { status: 'completed' }).catch(() => {})
+      notionService.updateListingStatus(item.notionPageId, { status: 'completed' }).catch(e => console.warn('Notion sync failed:', e))
     }
     toast.success('Transaction completed')
   }, [setQueue, queue, notionService])
 
   const handleMarkReturned = useCallback((itemId: string, reason?: string) => {
     const returnedDate = Date.now()
-    setQueue(prev => (prev || []).map(item =>
-      item.id === itemId
-        ? { ...item, listingStatus: 'returned' as const, returnedDate, returnReason: reason }
-        : item
-    ))
     const item = (queue || []).find(i => i.id === itemId)
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId ? { ...i, listingStatus: 'returned' as const, returnedDate, returnReason: reason } : i
+    ))
     if (item?.notionPageId && notionService) {
-      notionService.updateListingStatus(item.notionPageId, { status: 'returned', returnedDate, returnReason: reason }).catch(() => {})
+      notionService.updateListingStatus(item.notionPageId, { status: 'returned', returnedDate, returnReason: reason }).catch(e => console.warn('Notion sync failed:', e))
     }
     toast.success('Item marked as returned')
   }, [setQueue, queue, notionService])
 
   const handleDelist = useCallback((itemId: string) => {
     const delistedDate = Date.now()
-    setQueue(prev => (prev || []).map(item =>
-      item.id === itemId
-        ? { ...item, listingStatus: 'delisted' as const, delistedDate }
-        : item
-    ))
     const item = (queue || []).find(i => i.id === itemId)
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId ? { ...i, listingStatus: 'delisted' as const, delistedDate } : i
+    ))
     if (item?.notionPageId && notionService) {
-      notionService.updateListingStatus(item.notionPageId, { status: 'delisted', delistedDate }).catch(() => {})
+      notionService.updateListingStatus(item.notionPageId, { status: 'delisted', delistedDate }).catch(e => console.warn('Notion sync failed:', e))
     }
     toast.success('Item delisted')
   }, [setQueue, queue, notionService])
 
   const handleRelistItem = useCallback((itemId: string) => {
-    setQueue(prev => (prev || []).map(item =>
-      item.id === itemId
+    const item = (queue || []).find(i => i.id === itemId)
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId
         ? {
-            ...item,
+            ...i,
             listingStatus: 'ready' as const,
             soldPrice: undefined,
             soldDate: undefined,
@@ -791,11 +787,10 @@ function App() {
             returnReason: undefined,
             delistedDate: undefined,
           }
-        : item
+        : i
     ))
-    const item = (queue || []).find(i => i.id === itemId)
     if (item?.notionPageId && notionService) {
-      notionService.updateListingStatus(item.notionPageId, { status: 'ready' }).catch(() => {})
+      notionService.updateListingStatus(item.notionPageId, { status: 'ready' }).catch(e => console.warn('Notion sync failed:', e))
     }
     toast.success('Item re-listed')
   }, [setQueue, queue, notionService])
