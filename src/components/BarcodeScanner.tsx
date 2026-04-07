@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
-import { Barcode, X, Sparkle, QrCode, Clock, ArrowRight, LinkSimple, Copy, Check } from '@phosphor-icons/react'
+import { Barcode, X, Sparkle, QrCode, Clock, ArrowRight, LinkSimple, Copy, Check, MagnifyingGlass } from '@phosphor-icons/react'
 import { Button } from './ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -57,10 +57,12 @@ function isBarcode(text: string): boolean {
 
 export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupProduct }: BarcodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const lastScannedRef = useRef<string>('')
   const [isScanning, setIsScanning] = useState(false)
-  const [lastScanned, setLastScanned] = useState<string>('')
   const [isLookingUp, setIsLookingUp] = useState(false)
   const [detectedProduct, setDetectedProduct] = useState<BarcodeProduct | null>(null)
+  const [lookupFailed, setLookupFailed] = useState(false)
+  const [lastBarcode, setLastBarcode] = useState<string>('')
   const [scanMode, setScanMode] = useState<'barcode' | 'qr'>('barcode')
   const [scanHistory, setScanHistory] = useState<ScanHistoryEntry[]>([])
   const [showHistory, setShowHistory] = useState(false)
@@ -89,48 +91,59 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
         { facingMode: 'environment' },
         { fps: 10, qrbox: qrboxSize, aspectRatio: 16 / 9 },
         async (decodedText) => {
-          if (decodedText !== lastScanned) {
-            setLastScanned(decodedText)
-            navigator.vibrate?.(200)
+          if (decodedText === lastScannedRef.current) return
+          lastScannedRef.current = decodedText
+          navigator.vibrate?.(200)
 
-            const isProductBarcode = isBarcode(decodedText)
+          const isProductBarcode = isBarcode(decodedText)
 
-            if (isProductBarcode) {
-              // Barcode → product lookup
-              setIsLookingUp(true)
-              setQrData(null)
-              const product = await onLookupProduct(decodedText)
-              setDetectedProduct(product)
+          if (isProductBarcode) {
+            setLastBarcode(decodedText)
+            setIsLookingUp(true)
+            setQrData(null)
+            setLookupFailed(false)
+
+            let product: BarcodeProduct | null = null
+            try {
+              product = await onLookupProduct(decodedText)
+            } finally {
               setIsLookingUp(false)
-
-              setScanHistory(prev => [{
-                code: decodedText,
-                type: 'barcode' as const,
-                product: product || undefined,
-                timestamp: Date.now(),
-              }, ...prev].slice(0, 20))
-
-              onBarcodeDetected(decodedText, product || undefined)
-            } else {
-              // QR code → parse data
-              const parsed = parseQRData(decodedText)
-              setQrData(parsed)
-              setDetectedProduct(null)
-
-              setScanHistory(prev => [{
-                code: decodedText,
-                type: 'qr' as const,
-                data: parsed,
-                timestamp: Date.now(),
-              }, ...prev].slice(0, 20))
             }
 
-            // Auto-clear after 5 seconds
-            setTimeout(() => {
-              setDetectedProduct(null)
-              setQrData(null)
-            }, 5000)
+            setDetectedProduct(product)
+            setLookupFailed(product === null)
+
+            setScanHistory(prev => [{
+              code: decodedText,
+              type: 'barcode' as const,
+              product: product || undefined,
+              timestamp: Date.now(),
+            }, ...prev].slice(0, 20))
+
+            onBarcodeDetected(decodedText, product || undefined)
+          } else {
+            // QR code → parse data
+            const parsed = parseQRData(decodedText)
+            setQrData(parsed)
+            setDetectedProduct(null)
+            setLookupFailed(false)
+
+            setScanHistory(prev => [{
+              code: decodedText,
+              type: 'qr' as const,
+              data: parsed,
+              timestamp: Date.now(),
+            }, ...prev].slice(0, 20))
           }
+
+          // Auto-clear: URLs get 30s (user needs time to tap); everything else 5s
+          const clearDelay = !isProductBarcode && parseQRData(decodedText).type === 'url' ? 30000 : 5000
+          setTimeout(() => {
+            setDetectedProduct(null)
+            setQrData(null)
+            setLookupFailed(false)
+            lastScannedRef.current = ''  // allow rescanning the same code
+          }, clearDelay)
         },
         () => {}
       )
@@ -158,6 +171,12 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
     }
   }
 
+  // "Use Barcode" when no product found — passes barcode code alone so App can search by it
+  const handleUseBarcodeOnly = () => {
+    onBarcodeDetected(lastBarcode)
+    onClose()
+  }
+
   const handleCopyQR = useCallback(() => {
     if (qrData) {
       navigator.clipboard.writeText(qrData.raw).then(() => {
@@ -168,16 +187,23 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
     }
   }, [qrData])
 
+  // Use a programmatic anchor click instead of window.open — required for iOS Safari PWA mode
   const handleOpenURL = useCallback(() => {
-    if (qrData?.url) {
-      window.open(qrData.url, '_blank', 'noopener,noreferrer')
-    }
+    if (!qrData?.url) return
+    const a = document.createElement('a')
+    a.href = qrData.url
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
   }, [qrData])
 
   const handleToggleMode = useCallback(() => {
-    setLastScanned('')
+    lastScannedRef.current = ''
     setDetectedProduct(null)
     setQrData(null)
+    setLookupFailed(false)
     setScanMode(prev => prev === 'barcode' ? 'qr' : 'barcode')
   }, [])
 
@@ -285,6 +311,7 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
         <AnimatePresence>
           {isLookingUp && (
             <motion.div
+              key="looking-up"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -297,9 +324,10 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
             </motion.div>
           )}
 
-          {/* Barcode product result */}
+          {/* Barcode product found */}
           {detectedProduct && !isLookingUp && (
             <motion.div
+              key="product-found"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -333,9 +361,41 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
             </motion.div>
           )}
 
+          {/* Barcode detected but not found in any database */}
+          {lookupFailed && !isLookingUp && !detectedProduct && (
+            <motion.div
+              key="not-found"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute bottom-20 left-4 right-4 bg-black/90 backdrop-blur-md border border-white/20 rounded-2xl p-4"
+            >
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-white/10 rounded-lg flex-shrink-0">
+                    <MagnifyingGlass size={20} className="text-white/60" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm">No product data found</p>
+                    <p className="text-white/50 text-[10px] font-mono mt-0.5">{lastBarcode}</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleUseBarcodeOnly}
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-white/20 text-white hover:bg-white/10 font-bold"
+                >
+                  Use Barcode — Fill Details Manually
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
           {/* QR code data result */}
           {qrData && !isLookingUp && (
             <motion.div
+              key="qr-result"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -375,12 +435,19 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
                   {qrData.type === 'product' && (
                     <Button
                       onClick={async () => {
+                        const code = qrData.raw
                         setIsLookingUp(true)
                         setQrData(null)
-                        const product = await onLookupProduct(qrData.raw)
+                        setLookupFailed(false)
+                        let product: BarcodeProduct | null = null
+                        try {
+                          product = await onLookupProduct(code)
+                        } finally {
+                          setIsLookingUp(false)
+                        }
                         setDetectedProduct(product)
-                        setIsLookingUp(false)
-                        if (product) onBarcodeDetected(qrData.raw, product)
+                        setLookupFailed(product === null)
+                        if (product) onBarcodeDetected(code, product)
                       }}
                       size="sm"
                       className="flex-1 bg-white text-violet-700 hover:bg-white/90 font-bold"
