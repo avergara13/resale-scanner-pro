@@ -1434,6 +1434,7 @@ function App() {
                 sessionId={selectedSessionId}
                 onBack={() => setScreen('session')}
                 onDeleteSession={handleDeleteSession}
+                onEndSession={handleEndSession}
                 allSessions={visibleSessions}
                 onUpdateSessions={setAllSessions}
                 queueItems={queue || []}

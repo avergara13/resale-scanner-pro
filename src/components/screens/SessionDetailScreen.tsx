@@ -16,13 +16,14 @@ interface SessionDetailScreenProps {
   sessionId: string
   onBack: () => void
   onDeleteSession?: (sessionId: string) => void
+  onEndSession?: () => void
   allSessions?: Session[]
   onUpdateSessions?: (updater: (prev: Session[]) => Session[]) => void
   queueItems?: ScannedItem[]
   scanHistory?: ScannedItem[]
 }
 
-export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp }: SessionDetailScreenProps) {
+export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp }: SessionDetailScreenProps) {
   const [allSessionsFallback, setAllSessionsFallback] = useKV<Session[]>('all-sessions', [])
   const allSessions = allSessionsProp ?? allSessionsFallback
   const setAllSessions = onUpdateSessions ?? setAllSessionsFallback
@@ -441,14 +442,16 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, allSes
           {/* Profit Goals */}
           <AgentPanel sessionId={sessionId} />
 
-          {/* Delete */}
-          <Button
-            onClick={handleDelete}
-            variant="outline"
-            className="w-full h-12 border-red text-red hover:bg-red/10 font-medium mt-4"
-          >
-            Delete Session
-          </Button>
+          {/* End Session — only when active */}
+          {session.active && onEndSession && (
+            <Button
+              onClick={() => { onEndSession(); onBack() }}
+              variant="outline"
+              className="w-full h-12 border-amber text-amber hover:bg-amber/10 font-medium mt-4"
+            >
+              End Session
+            </Button>
+          )}
         </div>
       </div>
     </div>
