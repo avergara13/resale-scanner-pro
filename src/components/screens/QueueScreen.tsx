@@ -644,14 +644,18 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
 
   const handleRefresh = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, 800))
-    
-    const currentQueue = await window.spark.kv.get<ScannedItem[]>('queue')
-    const currentTags = await window.spark.kv.get<ItemTag[]>('all-tags')
-    
-    if (currentQueue && queueItems !== currentQueue) {
-      // silent refresh
-    } else {
-      // silent — already up to date
+
+    try {
+      const currentQueue = await window.spark?.kv?.get<ScannedItem[]>('queue')
+      const currentTags = await window.spark?.kv?.get<ItemTag[]>('all-tags')
+
+      if (currentQueue && queueItems !== currentQueue) {
+        // silent refresh
+      } else {
+        // silent — already up to date
+      }
+    } catch {
+      // Spark runtime not available
     }
   }, [queueItems])
 

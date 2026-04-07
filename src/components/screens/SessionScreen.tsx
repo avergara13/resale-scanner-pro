@@ -158,14 +158,18 @@ export function SessionScreen({ session, showTrends = false, onAgentMessage, isA
 
   const handleRefresh = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, 800))
-    
-    const currentQueue = await window.spark.kv.get<ScannedItem[]>('queue')
-    const currentSessions = await window.spark.kv.get<Session[]>('all-sessions')
-    const currentGoals = await window.spark.kv.get<ProfitGoal[]>('profit-goals')
-    
-    if (currentQueue) setQueue(currentQueue)
-    if (currentSessions) setAllSessions(currentSessions)
-    if (currentGoals) setGoals(currentGoals)
+
+    try {
+      const currentQueue = await window.spark?.kv?.get<ScannedItem[]>('queue')
+      const currentSessions = await window.spark?.kv?.get<Session[]>('all-sessions')
+      const currentGoals = await window.spark?.kv?.get<ProfitGoal[]>('profit-goals')
+
+      if (currentQueue) setQueue(currentQueue)
+      if (currentSessions) setAllSessions(currentSessions)
+      if (currentGoals) setGoals(currentGoals)
+    } catch {
+      // Spark runtime not available — silently ignore
+    }
     
     // silent refresh
   }, [setQueue, setAllSessions, setGoals])
@@ -240,7 +244,7 @@ export function SessionScreen({ session, showTrends = false, onAgentMessage, isA
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => setTrendsTab('stores')} className="stat-card p-3 text-left active:scale-[0.97] transition-transform">
                   <MapPin size={16} className="text-green mb-1" />
-                  <div className="text-sm font-bold text-t1">{(allSessions || []).filter(s => s.location?.name).map(s => s.location!.name).filter((v, i, a) => a.indexOf(v) === i).length}</div>
+                  <div className="text-sm font-bold text-t1">{(allSessions || []).filter(s => s.location?.name).map(s => s.location?.name).filter((v, i, a) => v && a.indexOf(v) === i).length}</div>
                   <div className="text-[9px] text-t3 uppercase tracking-wider font-bold">Stores Visited</div>
                 </button>
                 <button onClick={() => setTrendsTab('agent')} className="stat-card p-3 text-left active:scale-[0.97] transition-transform">
