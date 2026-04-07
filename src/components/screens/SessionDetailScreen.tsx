@@ -429,7 +429,7 @@ export function SessionDetailScreen({ sessionId, onBack }: SessionDetailScreenPr
           )}
 
           {/* Profit Goals */}
-          <AgentPanel />
+          <AgentPanel sessionId={sessionId} />
 
           {/* Delete */}
           <Button

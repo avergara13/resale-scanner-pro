@@ -190,9 +190,11 @@ interface AgentScreenProps {
 }
 
 export function AgentScreen({ queueItems = [], soldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
-  const [chatSessions, setChatSessions] = useKV<ChatSession[]>('chat-sessions', [])
-  const [activeSessionId, setActiveSessionId] = useKV<string | null>('active-chat-session', null)
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
+  const chatKey = currentSession?.id ? `chat-sessions-${currentSession.id}` : 'chat-sessions-global'
+  const activeKey = currentSession?.id ? `active-chat-session-${currentSession.id}` : 'active-chat-session-global'
+  const [chatSessions, setChatSessions] = useKV<ChatSession[]>(chatKey, [])
+  const [activeSessionId, setActiveSessionId] = useKV<string | null>(activeKey, null)
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [showNewSessionDialog, setShowNewSessionDialog] = useState(false)
@@ -216,20 +218,26 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
     enabled: true,
   })
 
+  // Session-scoped items: filter by current session when active, else show all
+  const sessionItems = useMemo(() => {
+    if (!currentSession?.id) return queueItems
+    return queueItems.filter(item => item.sessionId === currentSession.id)
+  }, [queueItems, currentSession?.id])
+
   const queueStats = useMemo(() => {
-    const total = queueItems.length
-    const buy = queueItems.filter(item => item.decision === 'BUY').length
-    const pass = queueItems.filter(item => item.decision === 'PASS').length
-    const pending = queueItems.filter(item => item.decision === 'PENDING').length
-    const totalProfit = queueItems
+    const total = sessionItems.length
+    const buy = sessionItems.filter(item => item.decision === 'BUY').length
+    const pass = sessionItems.filter(item => item.decision === 'PASS').length
+    const pending = sessionItems.filter(item => item.decision === 'PENDING').length
+    const totalProfit = sessionItems
       .filter(item => item.decision === 'BUY' && item.profitMargin)
       .reduce((sum, item) => {
         const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
         return sum + profit
       }, 0)
-    
+
     return { total, buy, pass, pending, totalProfit }
-  }, [queueItems])
+  }, [sessionItems])
 
   const prevMessageCount = useRef(chatMessages.length)
   const agentHasMounted = useRef(false)
@@ -327,7 +335,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   }, [setChatSessions, setActiveSessionId])
 
   const buildContext = useCallback(() => {
-    const queueSummary = queueItems.slice(0, 10).map(item => ({
+    const queueSummary = sessionItems.slice(0, 10).map(item => ({
       id: item.id,
       name: item.productName || 'Unknown',
       price: item.purchasePrice,
@@ -392,7 +400,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         ebayFeePercent: settings?.ebayFeePercent
       }
     }
-  }, [queueItems, soldItems, queueStats, settings, allSessions, profitGoals, scanHistory])
+  }, [sessionItems, soldItems, queueStats, settings, allSessions, profitGoals, scanHistory])
 
   const handleSendMessage = useCallback(async (messageText?: string) => {
     const text = messageText || input.trim()
@@ -485,7 +493,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       // Full agentic pipeline: analyze → optimize → push
       if (lowerText.includes('full pipeline') || lowerText.includes('auto-list') || lowerText.includes('process queue') || lowerText.includes('run pipeline')) {
         // Step 1: Batch analyze unanalyzed items
-        const drafts = queueItems.filter(i => !i.productName || i.productName === 'Quick Draft')
+        const drafts = sessionItems.filter(i => !i.productName || i.productName === 'Quick Draft')
         if (drafts.length > 0 && onBatchAnalyze) {
           addMsg(`**Step 1/3 — Analyzing ${drafts.length} draft(s)**\nRunning AI vision, market research, and profit analysis...`)
           try {
@@ -503,7 +511,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         // onOptimizeItem reads fresh queue state from App.tsx internally,
         // so we collect candidate IDs from current props but the actual
         // optimization operates on up-to-date data in the parent.
-        const goItemIds = queueItems
+        const goItemIds = sessionItems
           .filter(i => i.decision === 'BUY' && !i.optimizedListing)
           .map(i => i.id)
         // Also include items that were drafts (just analyzed in step 1) —
@@ -532,7 +540,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         // AND any pre-existing optimized-but-unpushed items.
         // onPushToNotion guards: skips items without optimizedListing or
         // already-pushed (notionPageId). Safe to over-include IDs.
-        const preExistingReadyIds = queueItems
+        const preExistingReadyIds = sessionItems
           .filter(i => i.optimizedListing && !i.notionPageId)
           .map(i => i.id)
         const pushCandidateIds = [...new Set([...allCandidateIds, ...preExistingReadyIds])]
@@ -561,7 +569,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       }
 
       if (lowerText.includes('create listing') || lowerText.includes('optimize listing')) {
-        const buyItems = queueItems.filter(item => item.decision === 'BUY' && !item.optimizedListing)
+        const buyItems = sessionItems.filter(item => item.decision === 'BUY' && !item.optimizedListing)
         
         if (buyItems.length === 0) {
           const aiMessage: ChatMessage = {
@@ -625,7 +633,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       }
 
       if (lowerText.includes('push to notion') || lowerText.includes('send to notion')) {
-        const readyItems = queueItems.filter(item => item.optimizedListing && !item.notionPageId)
+        const readyItems = sessionItems.filter(item => item.optimizedListing && !item.notionPageId)
         
         if (readyItems.length === 0) {
           const aiMessage: ChatMessage = {
@@ -697,9 +705,9 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       // Research command — uses Gemini with Google Search grounding for real market data
       if ((lowerText.includes('research') || lowerText.includes('look up') || lowerText.includes('double check') || lowerText.includes('price check') || lowerText.includes('market value')) && settings?.geminiApiKey) {
         // Find the most recently discussed item or the most recent queue item
-        const recentItem = queueItems.find(i =>
+        const recentItem = sessionItems.find(i =>
           lowerText.includes(i.productName?.toLowerCase() || '')
-        ) || queueItems[queueItems.length - 1]
+        ) || sessionItems[sessionItems.length - 1]
 
         if (recentItem?.productName) {
           addMsg(`Researching **${recentItem.productName}** across marketplaces...`)
@@ -725,7 +733,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       if ((lowerText.includes('change') || lowerText.includes('update') || lowerText.includes('set')) &&
           (lowerText.includes('price') || lowerText.includes('description') || lowerText.includes('title') || lowerText.includes('category')) &&
           onEditItem) {
-        const recentItem = queueItems[queueItems.length - 1]
+        const recentItem = sessionItems[sessionItems.length - 1]
         if (recentItem) {
           const updates: Partial<ScannedItem> = {}
 
@@ -836,9 +844,9 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         const foundMarketplace = marketplaces.find(m => lowerText.includes(m)) || 'other'
         const soldPrice = priceMatch ? parseFloat(priceMatch) : 0
 
-        const matchedItem = queueItems.find(i =>
+        const matchedItem = sessionItems.find(i =>
           i.listingStatus === 'published' && i.productName && lowerText.includes(i.productName.toLowerCase())
-        ) || queueItems.filter(i => i.listingStatus === 'published').slice(-1)[0]
+        ) || sessionItems.filter(i => i.listingStatus === 'published').slice(-1)[0]
 
         if (matchedItem) {
           onMarkAsSold(matchedItem.id, soldPrice, foundMarketplace)
@@ -866,7 +874,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
       }
 
       const context = buildContext()
-      const recentItems = queueItems.slice(-3).map(i =>
+      const recentItems = sessionItems.slice(-3).map(i =>
         `• ${i.productName || 'Unknown'} — Buy: $${i.purchasePrice.toFixed(2)}, Sell: $${(i.estimatedSellPrice || 0).toFixed(2)}, Margin: ${(i.profitMargin || 0).toFixed(1)}%, Decision: ${i.decision}, Status: ${i.listingStatus || 'not-started'}${i.category ? `, Category: ${i.category}` : ''}`
       ).join('\n')
 
@@ -893,11 +901,17 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         needsShipping: soldItems.filter(i => i.listingStatus === 'sold').length,
       }
 
+      const sessionScope = currentSession?.active
+        ? `You are operating within session "${currentSession.name || 'Active Session'}". All stats, items, and actions below apply ONLY to this session's items.`
+        : 'No scanning session is active. You are showing all-time global stats across all sessions.'
+
       const systemPrompt = `You are an expert AI agent for resale business optimization. You have FULL awareness of this app's state — every session, item, goal, and setting. You help users research products, analyze profitability, create optimized eBay listings, manage sessions, track sold items, and make data-driven decisions.
+
+${sessionScope}
 
 ## Current App State
 
-### Listings Queue
+### ${currentSession?.active ? `Session: ${currentSession.name || 'Active'} — Listings` : 'All Listings (Global)'}
 - ${queueStats.total} items (${queueStats.buy} BUY, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
 - Potential profit: $${queueStats.totalProfit.toFixed(2)}
 ${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
@@ -975,7 +989,7 @@ You can execute these commands for the user:
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, queueItems, soldItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, buildContext, queueStats, settings, sessionItems, soldItems, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {
@@ -1079,6 +1093,11 @@ You can execute these commands for the user:
       )}
 
       <div className="px-4 py-2 bg-s1/30 border-b border-s1">
+        {currentSession?.active && (
+          <div className="text-[9px] font-bold text-b1 mb-1.5 uppercase tracking-wide">
+            {currentSession.name || 'Active Session'}
+          </div>
+        )}
         <div className="grid grid-cols-4 gap-1.5">
           <Card className="p-2 flex flex-col items-center justify-center">
             <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>

@@ -29,11 +29,14 @@ type PanelTab = 'chat' | 'tasks'
 interface AgentPanelProps {
   onSendMessage?: (text: string) => void
   isProcessing?: boolean
+  sessionId?: string
 }
 
-export function AgentPanel({ onSendMessage, isProcessing = false }: AgentPanelProps) {
-  const [chatSessions] = useKV<ChatSession[]>('chat-sessions', [])
-  const [activeSessionId] = useKV<string | null>('active-chat-session', null)
+export function AgentPanel({ onSendMessage, isProcessing = false, sessionId }: AgentPanelProps) {
+  const chatKey = sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global'
+  const activeKey = sessionId ? `active-chat-session-${sessionId}` : 'active-chat-session-global'
+  const [chatSessions] = useKV<ChatSession[]>(chatKey, [])
+  const [activeSessionId] = useKV<string | null>(activeKey, null)
   const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', [])
   const [collapsed, setCollapsed] = useState(true)
   const [tab, setTab] = useState<PanelTab>('chat')
