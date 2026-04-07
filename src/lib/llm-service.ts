@@ -10,6 +10,8 @@
  *   - Never use Claude for simple chat or listing text generation
  */
 
+import { retryFetch } from './retry-service'
+
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages'
 
@@ -116,28 +118,58 @@ async function callGeminiGrounded(
   const { model = 'gemini-2.5-flash', maxTokens = 2048 } = options
   const url = `${GEMINI_ENDPOINT}/${model}:generateContent?key=${apiKey}`
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      tools: [{ googleSearch: {} }],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: maxTokens,
-      },
-    }),
-  })
+  type GeminiResponse = { candidates?: Array<{ content: { parts: Array<{ text?: string }> } }> }
+  const data = await retryFetch<GeminiResponse>(
+    url,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ googleSearch: {} }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: maxTokens,
+        },
+      }),
+    },
+    { maxRetries: 3, initialDelay: 1500, maxDelay: 10000, timeout: 45000 }
+  )
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '')
-    throw new Error(`Gemini Search ${response.status}: ${errorText.slice(0, 200)}`)
-  }
-
-  const data = await response.json()
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) throw new Error('Gemini search returned empty response')
   return text
+}
+
+/**
+ * Extract the recommended sell price from researchProduct() text output.
+ * Tries explicit "recommended price" patterns first, then eBay-specific,
+ * then averages, then price ranges (takes midpoint).
+ * Returns 0 if no price can be parsed.
+ */
+export function parseResearchPrice(text: string): number {
+  const patterns: Array<[RegExp, 'single' | 'range']> = [
+    [/recommended\s+(?:list\s+)?price[:\s]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
+    [/(?:list|sell)\s+(?:at|for)[:\s]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
+    [/ebay[:\s*]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
+    [/resale\s+value[:\s]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
+    [/average\s+(?:sold\s+)?(?:price\s*)?[:\s]+\$?([\d,]+(?:\.\d{2})?)/i, 'single'],
+    [/\$(\d[\d,]*(?:\.\d{2})?)\s*[-–—to]+\s*\$(\d[\d,]*(?:\.\d{2})?)/i, 'range'],
+  ]
+  for (const [pattern, type] of patterns) {
+    const m = text.match(pattern)
+    if (!m) continue
+    if (type === 'range' && m[2]) {
+      const lo = parseFloat(m[1].replace(/,/g, ''))
+      const hi = parseFloat(m[2].replace(/,/g, ''))
+      const mid = (lo + hi) / 2
+      if (mid > 0 && mid < 50000) return Math.round(mid * 100) / 100
+    } else {
+      const price = parseFloat(m[1].replace(/,/g, ''))
+      if (price > 0 && price < 50000) return price
+    }
+  }
+  return 0
 }
 
 /**

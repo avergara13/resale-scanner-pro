@@ -22,7 +22,7 @@ import { ListingDetailScreen } from './components/screens/ListingDetailScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { retryOperation } from './lib/retry-service'
 import { getRetryOptions } from './lib/retry-config'
-import { researchProduct } from './lib/llm-service'
+import { researchProduct, parseResearchPrice } from './lib/llm-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
@@ -376,14 +376,44 @@ function App() {
         completeStep(2)
         await new Promise(resolve => setTimeout(resolve, 100))
       } else {
+        // No eBay API — use Gemini Google Search grounding to get real market comps
+        const geminiKey = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+        if (geminiKey) {
+          setPipeline(prev => prev.map((s, i) =>
+            i === 2 ? { ...s, data: 'Searching eBay, Mercari, Poshmark, Whatnot, StockX...' } : s
+          ))
+          try {
+            const researchText = await researchProduct(
+              visionResult?.productName || mockProductName,
+              { purchasePrice: price, category: visionResult?.category, brand: visionResult?.brand },
+              geminiKey
+            )
+            // Store for listing detail agent context
+            marketData = { ...(marketData || {}), researchSummary: researchText }
+            // Parse recommended sell price from research text
+            const researchPrice = parseResearchPrice(researchText)
+            if (researchPrice > 0) {
+              ebayAvgPrice = researchPrice
+              setPipeline(prev => prev.map((s, i) =>
+                i === 2 ? { ...s, data: `Market price ~$${researchPrice.toFixed(2)} (Google Search)` } : s
+              ))
+            } else {
+              setPipeline(prev => prev.map((s, i) =>
+                i === 2 ? { ...s, data: 'Research complete — using estimate' } : s
+              ))
+            }
+          } catch {
+            setPipeline(prev => prev.map((s, i) =>
+              i === 2 ? { ...s, data: 'Search unavailable — using estimate' } : s
+            ))
+          }
+        } else {
+          setPipeline(prev => prev.map((s, i) =>
+            i === 2 ? { ...s, data: 'Add Gemini API key in Settings for live market search' } : s
+          ))
+        }
         completeStep(2)
         await new Promise(resolve => setTimeout(resolve, 100))
-        setPipeline(prev => prev.map((s, i) =>
-          i === 2 ? {
-            ...s,
-            data: 'Configure eBay API in Settings for real market data'
-          } : s
-        ))
       }
 
       // 3-tier sell price fallback: eBay recommendedPrice → Google Lens average → 4.5x markup
@@ -451,12 +481,15 @@ function App() {
         marketData,
       }
 
-      // Non-blocking async research: runs after pipeline completes, enriches marketData
-      if (settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY) {
+      // Non-blocking enrichment: runs only when eBay was used (research already ran in pipeline
+      // when eBay was absent — skip to avoid a double call and API cost)
+      const alreadyResearched = !ebayService && !!marketData?.researchSummary
+      const geminiKeyForResearch = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+      if (!alreadyResearched && geminiKeyForResearch) {
         researchProduct(
           visionResult?.productName || mockProductName,
           { purchasePrice: price, category: visionResult?.category, brand: visionResult?.brand },
-          settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
+          geminiKeyForResearch
         ).then(researchText => {
           const itemId = newItem.id
           setQueue(prev => (prev || []).map(i =>

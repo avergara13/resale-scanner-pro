@@ -26,7 +26,7 @@ export function DecisionSignal({ decision, item }: DecisionSignalProps) {
       )}
     >
       <div className="text-5xl tracking-tight mb-2">{decision}</div>
-      {item?.profitMargin !== undefined && (
+      {item?.profitMargin != null && isFinite(item.profitMargin) && (
         <div className="text-base font-bold opacity-80">
           Margin: {item.profitMargin.toFixed(1)}%
         </div>
