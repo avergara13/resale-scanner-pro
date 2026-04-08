@@ -45,11 +45,7 @@ function makeDecision(
   netProfit: number,
   minMargin: number
 ): 'BUY' | 'PASS' | 'PENDING' {
-  if (sellPrice <= 0) {
-    // No market price found: free items default to BUY (any sell price = pure profit)
-    // Items that cost something stay PENDING — can't assess profitability without a sell price
-    return buyPrice === 0 ? 'BUY' : 'PENDING'
-  }
+  if (sellPrice <= 0) return 'PENDING'
   if (buyPrice === 0) return netProfit > 0 ? 'BUY' : 'PASS'
   return profitMargin > minMargin ? 'BUY' : 'PASS'
 }
@@ -417,7 +413,7 @@ function App() {
                 i === 2 ? { ...s, data: `Market price ~$${researchPrice.toFixed(2)} (Google Search)` } : s
               ))
             } else {
-              // Tier 2: direct price ask — fixed options object so Anthropic can fill in
+              // Tier 2: direct Gemini ask — fixed options object (Anthropic tried at Tier 3 via task:'complex')
               const productLabel = visionResult?.productName || mockProductName
               const anthropicKey = settings?.anthropicApiKey || import.meta.env.VITE_ANTHROPIC_API_KEY
               let gotPrice = false
@@ -484,7 +480,7 @@ function App() {
             } catch { /* both failed */ }
             if (!recovered) {
               setPipeline(prev => prev.map((s, i) =>
-                i === 2 ? { ...s, data: 'Search unavailable — using estimate' } : s
+                i === 2 ? { ...s, data: 'Search unavailable' } : s
               ))
             }
           }
