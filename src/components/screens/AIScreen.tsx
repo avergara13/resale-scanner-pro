@@ -225,9 +225,9 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
 
 function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (item: ScannedItem) => void }) {
   const statusColor =
-    item.listingStatus === 'ready' ? 'text-green-600 bg-green-50 border-green-200' :
-    item.listingStatus === 'optimizing' ? 'text-amber-600 bg-amber-50 border-amber-200' :
-    item.listingStatus === 'published' ? 'text-blue-600 bg-blue-50 border-blue-200' :
+    item.listingStatus === 'ready' ? 'text-green bg-green/10 border-green/30' :
+    item.listingStatus === 'optimizing' ? 'text-amber bg-amber/10 border-amber/30' :
+    item.listingStatus === 'published' ? 'text-b1 bg-b1/10 border-b1/30' :
     'text-t3 bg-s1 border-s2'
 
   const hasSellPrice = item.estimatedSellPrice != null && isFinite(item.estimatedSellPrice)
@@ -249,7 +249,7 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
           <span>→</span>
           <span>Sell ${item.estimatedSellPrice?.toFixed(2) ?? '--'}</span>
           {profit != null && (
-            <span className={profit >= 0 ? 'text-green-600' : 'text-red-500'}>
+            <span className={profit >= 0 ? 'text-green' : 'text-red'}>
               ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
             </span>
           )}
@@ -257,7 +257,7 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
         {item.profitMargin != null && (
           <p className={cn(
             'text-[10px] font-bold',
-            item.profitMargin > 50 ? 'text-green-600' : item.profitMargin > 20 ? 'text-amber-600' : 'text-red-500'
+            item.profitMargin > 50 ? 'text-green' : item.profitMargin > 20 ? 'text-amber' : 'text-red'
           )}>
             {item.profitMargin.toFixed(1)}% margin
           </p>
@@ -762,7 +762,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                       </span>
                       <button
                         onClick={() => handleDeleteTask(todo.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red-500 p-1"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red p-1"
                       >
                         <Trash size={14} />
                       </button>
@@ -777,14 +777,14 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                     <div key={todo.id} className="flex items-center gap-2.5 py-2.5 group opacity-50">
                       <button
                         onClick={() => handleToggleTask(todo.id)}
-                        className="flex-shrink-0 w-5 h-5 rounded-md bg-green-100 border border-green-300 flex items-center justify-center"
+                        className="flex-shrink-0 w-5 h-5 rounded-md bg-green/15 border border-green/40 flex items-center justify-center"
                       >
-                        <Check size={12} weight="bold" className="text-green-600" />
+                        <Check size={12} weight="bold" className="text-green" />
                       </button>
                       <span className="flex-1 text-xs sm:text-sm text-t2 leading-snug line-through">{todo.text}</span>
                       <button
                         onClick={() => handleDeleteTask(todo.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red-500 p-1"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red p-1"
                       >
                         <Trash size={14} />
                       </button>

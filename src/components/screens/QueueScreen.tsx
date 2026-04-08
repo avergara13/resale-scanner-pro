@@ -121,11 +121,11 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-2 sm:p-3 border transition-colors",
+        "p-2 sm:p-3 md:p-3.5 border transition-colors",
         isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
       )}
     >
-      <div className="flex gap-2 sm:gap-2.5">
+      <div className="flex gap-2 sm:gap-2.5 md:gap-3">
         {/* Narrow control column: drag handle + checkbox */}
         <div className="flex flex-col gap-1 items-center justify-start pt-0.5 flex-shrink-0">
           <div
@@ -148,13 +148,13 @@ function SortableItem({
           <img
             src={item.imageThumbnail || item.imageData}
             alt={item.productName || 'Item'}
-            className="w-14 h-14 sm:w-[68px] sm:h-[68px] object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+            className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
           />
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
+          <div className="flex items-start justify-between gap-1 sm:gap-1.5 md:gap-2 mb-1 sm:mb-1.5 md:mb-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              <h3 className="font-semibold text-t1 text-xs sm:text-sm line-clamp-2 leading-tight">
+              <h3 className="font-semibold text-t1 text-xs sm:text-sm md:text-base line-clamp-2 leading-tight">
                 {item.productName || 'Unknown Item'}
               </h3>
               {isPersonal && (
@@ -177,7 +177,7 @@ function SortableItem({
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-mono text-t3 mb-1.5 sm:mb-2">
+          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 text-[10px] sm:text-[11px] md:text-xs font-mono text-t3 mb-1.5 sm:mb-2 md:mb-2.5">
             <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
             {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
               ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
@@ -219,14 +219,14 @@ function SortableItem({
               })}
             </div>
           )}
-          <div className="flex gap-1 flex-wrap items-center">
+          <div className="flex gap-1 flex-wrap items-center mt-1 md:mt-1.5">
             {/* Edit — icon only */}
             <Button
               size="sm"
               onClick={() => onEdit(item)}
               variant="outline"
               title="Edit"
-              className="h-6 w-6 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+              className="h-6 w-6 md:h-7 md:w-7 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
             >
               <PencilSimple size={11} weight="bold" />
             </Button>
@@ -237,30 +237,30 @@ function SortableItem({
                 variant="ghost"
                 onClick={() => onOpenDetail(item)}
                 title="View detail"
-                className="h-6 w-6 p-0 text-b1 hover:bg-b1/10"
+                className="h-6 w-6 md:h-7 md:w-7 p-0 text-b1 hover:bg-b1/10"
               >
                 <Eye size={11} weight="bold" />
               </Button>
             )}
-            {/* Re-analyze — icon only */}
+            {/* Re-analyze — icon only (PENDING, failed analysis, or missing sell price) */}
             {(item.decision === 'PENDING' || item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => onReanalyze(item.id)}
                 title="Re-analyze"
-                className="h-6 w-6 p-0 border-amber/40 text-amber hover:bg-amber/10"
+                className="h-6 w-6 md:h-7 md:w-7 p-0 border-amber/40 text-amber hover:bg-amber/10"
               >
                 <ArrowCounterClockwise size={11} weight="bold" />
               </Button>
             )}
             {item.listingStatus === 'published' && onOpenSoldDialog ? (
               <>
-                {/* Mark Sold — keep text, important action */}
+                {/* Mark Sold — text, important action */}
                 <Button
                   size="sm"
                   onClick={() => onOpenSoldDialog(item)}
-                  className="flex-1 bg-green hover:bg-green/90 text-white h-6 text-[10px] font-medium px-2"
+                  className="flex-1 bg-green hover:bg-green/90 text-white h-6 md:h-7 text-[10px] md:text-xs font-medium px-2"
                 >
                   Sold
                 </Button>
@@ -271,18 +271,18 @@ function SortableItem({
                     variant="ghost"
                     onClick={() => onDelist(item.id)}
                     title="Delist"
-                    className="h-6 w-6 p-0 text-t3 hover:text-red hover:bg-red/10"
+                    className="h-6 w-6 md:h-7 md:w-7 p-0 text-t3 hover:text-red hover:bg-red/10"
                   >
                     <X size={11} weight="bold" />
                   </Button>
                 )}
               </>
             ) : (
-              /* List — text only, no icon, important action */
+              /* List — text only, important action */
               <Button
                 size="sm"
                 onClick={() => onCreateListing(item.id)}
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 text-[10px] font-semibold px-2"
+                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
               >
                 List
               </Button>
@@ -293,7 +293,7 @@ function SortableItem({
               variant="ghost"
               onClick={() => onRemove(item.id)}
               title="Remove"
-              className="h-6 w-6 p-0 text-t2 hover:text-red hover:bg-red/10"
+              className="h-6 w-6 md:h-7 md:w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
             >
               <Trash size={11} weight="bold" />
             </Button>
@@ -380,13 +380,17 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     }
     
     if (preset.filters?.decision && preset.filters.decision.length === 1) {
-      setFilter(preset.filters.decision[0] as FilterOption)
+      const validFilters: FilterOption[] = ['ALL', 'BUY', 'PASS', 'PENDING']
+      const val = preset.filters.decision[0]
+      setFilter(validFilters.includes(val as FilterOption) ? (val as FilterOption) : 'ALL')
     } else {
       setFilter('ALL')
     }
-    
+
     if (preset.sortBy && preset.sortOrder) {
-      setSortBy(`${preset.sortBy}-${preset.sortOrder}` as SortOption)
+      const candidate = `${preset.sortBy}-${preset.sortOrder}`
+      const validSorts: SortOption[] = ['profit-desc','profit-asc','date-desc','date-asc','category-asc','category-desc','tag-count-desc','tag-count-asc','tag-name-asc','tag-name-desc','manual']
+      setSortBy(validSorts.includes(candidate as SortOption) ? (candidate as SortOption) : 'manual')
     }
     
     setPresetsOpen(false)
@@ -511,22 +515,18 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         return (b.tags?.length || 0) - (a.tags?.length || 0)
       case 'tag-count-asc':
         return (a.tags?.length || 0) - (b.tags?.length || 0)
-      case 'tag-name-asc': {
-        const aFirstTag = a.tags?.[0] ? (allTags || []).find(t => t.id === a.tags![0])?.name || '' : ''
-        const bFirstTag = b.tags?.[0] ? (allTags || []).find(t => t.id === b.tags![0])?.name || '' : ''
-        return aFirstTag.localeCompare(bFirstTag)
-      }
+      case 'tag-name-asc':
       case 'tag-name-desc': {
-        const aFirstTag = a.tags?.[0] ? (allTags || []).find(t => t.id === a.tags![0])?.name || '' : ''
-        const bFirstTag = b.tags?.[0] ? (allTags || []).find(t => t.id === b.tags![0])?.name || '' : ''
-        return bFirstTag.localeCompare(aFirstTag)
+        const getName = (tags?: string[]) =>
+          (allTags || []).find(t => t.id === tags?.[0])?.name || ''
+        const cmp = getName(a.tags).localeCompare(getName(b.tags))
+        return sortBy === 'tag-name-asc' ? cmp : -cmp
       }
       default:
         return 0
     }
   })
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
-  const analyzedItems = queueItems.filter(item => item.productName && item.productName !== 'Quick Draft')
   
   const buyCount = queueItems.filter(item => item.decision === 'BUY').length
   const passCount = queueItems.filter(item => item.decision === 'PASS').length
@@ -1358,12 +1358,13 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 return (
                   <Card
                     key={item.id}
-                    className={`p-4 border transition-colors ${
+                    className={cn(
+                      "p-3 sm:p-3.5 md:p-4 border transition-colors",
                       isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
-                    }`}
+                    )}
                   >
-                    <div className="flex gap-3">
-                      <div className="flex flex-col gap-2 items-center justify-start pt-1 flex-shrink-0">
+                    <div className="flex gap-2.5 sm:gap-3 md:gap-3.5">
+                      <div className="flex flex-col gap-2 items-center justify-start pt-0.5 flex-shrink-0">
                         <Checkbox
                           id={`select-${item.id}`}
                           checked={isSelected}
@@ -1375,12 +1376,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                         <img
                           src={item.imageThumbnail || item.imageData}
                           alt={item.productName || 'Item'}
-                          className="w-16 h-16 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+                          className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <h3 className="font-semibold text-t1 text-sm line-clamp-2">
+                        <div className="flex items-start justify-between gap-2 mb-2 md:mb-2.5">
+                          <h3 className="font-semibold text-t1 text-sm md:text-base line-clamp-2">
                             {item.productName || 'Unknown Item'}
                           </h3>
                           {item.profitMargin != null && isFinite(item.profitMargin) && (
@@ -1440,20 +1441,20 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             })}
                           </div>
                         )}
-                        <div className="flex gap-1 items-center">
+                        <div className="flex gap-1 items-center mt-1 md:mt-1.5">
                           <Button
                             size="sm"
                             onClick={() => handleEdit(item)}
                             variant="outline"
                             title="Edit"
-                            className="h-7 w-7 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+                            className="h-7 w-7 md:h-8 md:w-8 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
                           >
                             <PencilSimple size={13} weight="bold" />
                           </Button>
                           <Button
                             size="sm"
                             onClick={() => onCreateListing(item.id)}
-                            className="flex-1 bg-b1 hover:bg-b2 text-white h-7 text-[11px] font-semibold"
+                            className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
                           >
                             List
                           </Button>
@@ -1462,7 +1463,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             variant="ghost"
                             onClick={() => onRemove(item.id)}
                             title="Remove"
-                            className="h-7 w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
+                            className="h-7 w-7 md:h-8 md:w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
                           >
                             <Trash size={13} weight="bold" />
                           </Button>
