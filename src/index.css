@@ -496,6 +496,11 @@ input, textarea, select {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Scope higher contrast to Listing Queue only — AIScreen keeps default t3 */
+.queue-tab-bar .tab-btn:not(.active) {
+  color: var(--t2);
+}
+
 .tab-btn:hover:not(.active) {
   color: var(--b1);
 }

@@ -925,7 +925,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           </div>
         </DialogContent>
       </Dialog>
-      <div className="px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 pb-3 sm:pb-4 border-b border-s1">
+      <div className="px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 pb-3 sm:pb-4 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
         <div className="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-4">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
             <div className="flex-1 min-w-0">
@@ -1042,7 +1042,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         </div>
         
         <div className="px-0 mb-4">
-          <div className="tab-bar">
+          <div className="tab-bar queue-tab-bar">
             <button 
               onClick={() => setFilter('ALL')}
               className={cn('tab-btn', filter === 'ALL' && 'active')}
