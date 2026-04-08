@@ -1303,15 +1303,14 @@ function App() {
     toast.success(`Analyzed ${processedCount} items: ${buyCount} BUY, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
-  const handleUpdateCurrentItem = useCallback((updates: Partial<ScannedItem>) => {
-    const targetId = currentItem?.id
-    if (!targetId) return
-    // Guard by id so a stale in-flight result never overwrites a different item
-    setCurrentItem(prev => prev?.id === targetId ? { ...prev, ...updates } : prev)
+  const handleUpdateCurrentItem = useCallback((itemId: string, updates: Partial<ScannedItem>) => {
+    if (!itemId) return
+    // Guard by explicit item id so a stale in-flight result never overwrites a different item
+    setCurrentItem(prev => prev?.id === itemId ? { ...prev, ...updates } : prev)
     setQueue(prev => (prev || []).map(i =>
-      i.id === targetId ? { ...i, ...updates } : i
+      i.id === itemId ? { ...i, ...updates } : i
     ))
-  }, [currentItem?.id, setQueue])
+  }, [setQueue])
 
   const handleReanalyzeItem = useCallback(async (itemId: string) => {
     const item = (queue || []).find(i => i.id === itemId)

@@ -36,7 +36,7 @@ interface AIScreenProps {
   pendingMessage?: string | null
   onPendingMessageHandled?: () => void
   geminiService?: GeminiService | null
-  onUpdateItem?: (updates: Partial<ScannedItem>) => void
+  onUpdateItem?: (itemId: string, updates: Partial<ScannedItem>) => void
 }
 
 function buildUpdateSummary(updates: Partial<ScannedItem>, prev: ScannedItem): string {
@@ -479,7 +479,12 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
               updates.productName = visionResult.productName
             }
             if (visionResult.description) updates.description = visionResult.description
-            if (visionResult.category)    updates.category = visionResult.category
+            // Skip generic "General" fallback when the item already has a specific category
+            const nextCategory = visionResult.category
+            const hasExistingCategory = !!currentItem.category
+            if (nextCategory && (nextCategory !== 'General' || !hasExistingCategory)) {
+              updates.category = nextCategory
+            }
 
             // Best-effort market research for price
             if (updates.productName && settings.geminiApiKey) {
@@ -493,7 +498,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 if (price > 0) updates.estimatedSellPrice = price
               } catch { /* price is best-effort */ }
             }
-            onUpdateItem?.(updates)
+            onUpdateItem?.(currentItem.id, updates)
             response = buildUpdateSummary(updates, currentItem)
           } catch {
             response = "I wasn't able to identify the product from the image. Try a clearer photo (tap Rescan), or type the product name and ask me to research its value."
@@ -542,7 +547,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
     } finally {
       setIsSendingMessage(false)
     }
-  }, [chatInput, isSendingMessage, buildAIContext, settings?.geminiApiKey, currentItem])
+  }, [chatInput, isSendingMessage, buildAIContext, settings?.geminiApiKey, currentItem, geminiService, onUpdateItem])
 
   return (
     <div className="flex flex-col w-full h-full bg-bg">

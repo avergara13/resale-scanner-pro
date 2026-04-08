@@ -305,10 +305,11 @@ export function ListingDetailScreen({
     const apiKey = settings?.geminiApiKey || settings?.anthropicApiKey
     if (!apiKey || isChatProcessing) return
     setIsChatProcessing(true)
+    const productName = item.productName || 'Unknown product'
     const prompts = {
-      title: `Write an optimized eBay title for: ${item.productName}. Max 80 chars, include brand, model, key specs. Return ONLY the title text.`,
-      description: `Write a complete eBay description for: ${item.productName}, ${item.category || 'general'}. Include condition notes, key features, measurements if known.`,
-      specifics: `List the key item specifics for eBay for: ${item.productName}. Format as "Label: Value" on separate lines.`,
+      title: `Write an optimized eBay title for: ${productName}. Max 80 chars, include brand, model, key specs. Return ONLY the title text.`,
+      description: `Write a complete eBay description for: ${productName}, ${item.category || 'general'}. Include condition notes, key features, measurements if known.`,
+      specifics: `List the key item specifics for eBay for: ${productName}. Format as "Label: Value" on separate lines.`,
     }
     try {
       const result = await callLLM(prompts[actionType], {
