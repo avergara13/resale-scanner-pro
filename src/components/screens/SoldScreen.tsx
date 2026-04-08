@@ -184,7 +184,7 @@ export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted, onMarkRe
         <div>
           <h1 className="text-xl font-black text-t1 tracking-tight">Shipping Center</h1>
           <p className="text-[10px] text-t3 font-medium uppercase tracking-wider mt-0.5">
-            {stats.totalSold} sold · {stats.needsShipping} need shipping
+            {stats.totalSold} sold · {stats.needsShipping} to ship
           </p>
         </div>
       </div>
