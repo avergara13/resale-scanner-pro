@@ -179,8 +179,17 @@ export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted, onMarkRe
 
   return (
     <div className="h-full flex flex-col bg-bg">
+      {/* Page title */}
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-black text-t1 tracking-tight">Shipping Center</h1>
+          <p className="text-[10px] text-t3 font-medium uppercase tracking-wider mt-0.5">
+            {stats.totalSold} sold · {stats.needsShipping} need shipping
+          </p>
+        </div>
+      </div>
       {/* Stats row — 4 cards */}
-      <div className="px-4 pt-4 pb-3 grid grid-cols-4 gap-1.5">
+      <div className="px-4 pt-2 pb-3 grid grid-cols-4 gap-1.5">
         <div className="stat-card p-2.5 text-center">
           <div className="text-base font-black text-t1">{stats.totalSold}</div>
           <div className="text-[8px] text-t3 uppercase tracking-wider font-bold mt-0.5">Sold</div>
