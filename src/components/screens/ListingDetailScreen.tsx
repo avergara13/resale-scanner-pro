@@ -282,6 +282,7 @@ interface ListingDetailScreenProps {
   onOptimize: (itemId: string) => Promise<void>
   onOptimizeForPlatform: (itemId: string, platform: ResalePlatform) => Promise<void>
   settings?: AppSettings
+  onEdit?: (itemId: string, updates: Partial<ScannedItem>) => void
 }
 
 export function ListingDetailScreen({
@@ -290,6 +291,7 @@ export function ListingDetailScreen({
   onOptimize,
   onOptimizeForPlatform,
   settings,
+  onEdit,
 }: ListingDetailScreenProps) {
   const [activeTab, setActiveTab] = useState<ResalePlatform>('ebay')
   const [generatingPlatform, setGeneratingPlatform] = useState<ResalePlatform | null>(null)
@@ -298,6 +300,46 @@ export function ListingDetailScreen({
   const [isChatProcessing, setIsChatProcessing] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const handleQuickAction = useCallback(async (actionType: 'title' | 'description' | 'specifics') => {
+    const apiKey = settings?.geminiApiKey || settings?.anthropicApiKey
+    if (!apiKey || isChatProcessing) return
+    setIsChatProcessing(true)
+    const productName = item.productName || 'Unknown product'
+    const prompts = {
+      title: `Write an optimized eBay title for: ${productName}. Max 80 chars, include brand, model, key specs. Return ONLY the title text.`,
+      description: `Write a complete eBay description for: ${productName}, ${item.category || 'general'}. Include condition notes, key features, measurements if known.`,
+      specifics: `List the key item specifics for eBay for: ${productName}. Format as "Label: Value" on separate lines.`,
+    }
+    try {
+      const result = await callLLM(prompts[actionType], {
+        task: 'chat',
+        geminiApiKey: settings?.geminiApiKey,
+        anthropicApiKey: settings?.anthropicApiKey,
+        maxTokens: 600,
+        temperature: 0.6,
+      })
+      if (actionType === 'title') {
+        onEdit?.(item.id, { productName: result.trim().slice(0, 80) })
+      } else if (actionType === 'description') {
+        onEdit?.(item.id, { description: result.trim() })
+      }
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: result,
+      }])
+      setChatCollapsed(false)
+    } catch {
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'AI action failed — check your API key in Settings.',
+      }])
+    } finally {
+      setIsChatProcessing(false)
+    }
+  }, [item.id, item.productName, item.category, settings?.geminiApiKey, isChatProcessing, onEdit])
 
   // Auto-scroll chat
   useEffect(() => {
@@ -513,19 +555,28 @@ export function ListingDetailScreen({
                 {/* Quick prompts */}
                 {messages.length === 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {[
-                      'What\'s the resale value range?',
-                      'Which platform should I list on?',
-                      'Write a better title',
-                      'Fill in item specifics',
-                      'Is this a good buy?',
-                    ].map(prompt => (
+                    {([
+                      { label: "What's the resale value range?", action: 'chat' as const },
+                      { label: 'Which platform should I list on?', action: 'chat' as const },
+                      { label: 'Write a better title', action: 'title' as const },
+                      { label: 'Fill in item specifics', action: 'specifics' as const },
+                      { label: 'Is this a good buy?', action: 'chat' as const },
+                    ]).map(({ label, action }) => (
                       <button
-                        key={prompt}
-                        onClick={() => { setChatInput(prompt); }}
-                        className="text-[10px] px-2 py-1 rounded-full border border-s2 text-t3 hover:border-b1 hover:text-b1 transition-colors"
+                        key={label}
+                        disabled={isChatProcessing}
+                        onClick={() => {
+                          if (action === 'title') {
+                            handleQuickAction('title')
+                          } else if (action === 'specifics') {
+                            handleQuickAction('specifics')
+                          } else {
+                            setChatInput(label)
+                          }
+                        }}
+                        className="text-[10px] px-2 py-1 rounded-full border border-s2 text-t3 hover:border-b1 hover:text-b1 transition-colors disabled:opacity-40"
                       >
-                        {prompt}
+                        {label}
                       </button>
                     ))}
                   </div>
