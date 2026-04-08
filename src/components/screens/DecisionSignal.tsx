@@ -25,12 +25,20 @@ export function DecisionSignal({ decision, item }: DecisionSignalProps) {
         isPending && 'bg-gradient-to-br from-amber/10 to-amber/5 text-amber border-amber/60'
       )}
     >
-      <div className="text-4xl tracking-tight mb-1">{isPending ? '⏳ NEEDS PRICE' : decision}</div>
       {isPending ? (
-        <div className="text-xs font-semibold opacity-70 text-center px-4">
-          Enter buy price + tap Re-analyze, or use Chat to get a market estimate
+        <div className="flex items-center gap-3 py-1 px-2">
+          <span className="text-2xl">📊</span>
+          <div className="text-left">
+            <p className="text-base font-black tracking-wide leading-tight">NEEDS PRICE</p>
+            <p className="text-[11px] font-medium opacity-70 leading-tight">
+              Enter buy price → Recalculate, or ask AI in Chat
+            </p>
+          </div>
         </div>
       ) : (
+        <div className="text-4xl tracking-tight mb-1">{decision}</div>
+      )}
+      {!isPending && (
         <>
           {item?.profitMargin != null && isFinite(item.profitMargin) && (
             <div className="text-base font-bold opacity-80">

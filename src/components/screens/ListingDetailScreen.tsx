@@ -446,7 +446,7 @@ export function ListingDetailScreen({
           </div>
           {item.decision && (
             <Badge
-              className={cn('text-[10px] font-bold shrink-0',
+              className={cn('text-xs font-bold shrink-0 h-7 px-2.5 rounded-md mr-6',
                 item.decision === 'BUY' ? 'bg-green/20 text-green' :
                 item.decision === 'PENDING' ? 'bg-amber/20 text-amber' :
                 'bg-red/20 text-red'

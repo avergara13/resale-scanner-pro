@@ -756,10 +756,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         {tab === 'chat' && (
           <div className="flex flex-col min-h-full">
             <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4" ref={(el) => {
-              if (el) {
-                (pullToRefresh.containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
-                (chatScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
-              }
+              if (el) (chatScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el?.closest('.overflow-y-auto') as HTMLDivElement ?? el
             }}>
               {chatMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
