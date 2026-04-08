@@ -45,7 +45,11 @@ function makeDecision(
   netProfit: number,
   minMargin: number
 ): 'BUY' | 'PASS' | 'PENDING' {
-  if (sellPrice <= 0) return 'PENDING'
+  if (sellPrice <= 0) {
+    // No market price found: free items default to BUY (any sell price = pure profit)
+    // Items that cost something stay PENDING — can't assess profitability without a sell price
+    return buyPrice === 0 ? 'BUY' : 'PENDING'
+  }
   if (buyPrice === 0) return netProfit > 0 ? 'BUY' : 'PASS'
   return profitMargin > minMargin ? 'BUY' : 'PASS'
 }
@@ -413,35 +417,76 @@ function App() {
                 i === 2 ? { ...s, data: `Market price ~$${researchPrice.toFixed(2)} (Google Search)` } : s
               ))
             } else {
-              // Price extraction failed on the full report — ask Gemini directly for a number
+              // Tier 2: direct price ask — fixed options object so Anthropic can fill in
+              const productLabel = visionResult?.productName || mockProductName
+              const anthropicKey = settings?.anthropicApiKey || import.meta.env.VITE_ANTHROPIC_API_KEY
+              let gotPrice = false
               try {
-                const productLabel = visionResult?.productName || mockProductName
                 const directPriceText = await callLLM(
-                  `What is the current average resale price for "${productLabel}" on eBay or Mercari? Reply with ONLY a single dollar amount, e.g. "$24.99". No other text.`,
-                  geminiKey,
-                  undefined
+                  `What is the current average resale price for "${productLabel}" on eBay or Mercari? Reply with ONLY a single dollar amount like "$24.99".`,
+                  { geminiApiKey: geminiKey, anthropicApiKey: anthropicKey, task: 'chat' }
                 )
                 const directPrice = parseResearchPrice(directPriceText)
                 if (directPrice > 0) {
                   ebayAvgPrice = directPrice
+                  gotPrice = true
                   setPipeline(prev => prev.map((s, i) =>
                     i === 2 ? { ...s, data: `Est. market value ~$${directPrice.toFixed(2)}` } : s
                   ))
-                } else {
+                }
+              } catch { /* fall through to Tier 3 */ }
+
+              if (!gotPrice) {
+                // Tier 3: Claude deep research fallback (task: 'complex' tries Anthropic first)
+                try {
+                  const tier3Text = await callLLM(
+                    `You are a resale expert. Based on eBay, Mercari, and Poshmark sold comps, what is the median resale price for "${productLabel}"? Reply ONLY with: RECOMMENDED_SELL_PRICE: $XX.XX`,
+                    { geminiApiKey: geminiKey, anthropicApiKey: anthropicKey, task: 'complex' }
+                  )
+                  const tier3Price = parseResearchPrice(tier3Text)
+                  if (tier3Price > 0) {
+                    ebayAvgPrice = tier3Price
+                    marketData = { ...(marketData || {}), researchSummary: ((marketData as { researchSummary?: string })?.researchSummary || '') + '\n\n' + tier3Text }
+                    setPipeline(prev => prev.map((s, i) =>
+                      i === 2 ? { ...s, data: `Est. value ~$${tier3Price.toFixed(2)} (AI research)` } : s
+                    ))
+                  } else {
+                    setPipeline(prev => prev.map((s, i) =>
+                      i === 2 ? { ...s, data: 'Market data unavailable — enter price above' } : s
+                    ))
+                  }
+                } catch {
                   setPipeline(prev => prev.map((s, i) =>
-                    i === 2 ? { ...s, data: 'Market data unavailable — enter price manually' } : s
+                    i === 2 ? { ...s, data: 'Market data unavailable — enter price above' } : s
                   ))
                 }
-              } catch {
-                setPipeline(prev => prev.map((s, i) =>
-                  i === 2 ? { ...s, data: 'Market data unavailable — enter price manually' } : s
-                ))
               }
             }
           } catch {
-            setPipeline(prev => prev.map((s, i) =>
-              i === 2 ? { ...s, data: 'Search unavailable — using estimate' } : s
-            ))
+            // Gemini grounded search failed entirely — try Anthropic/Gemini directly
+            const anthropicKey = settings?.anthropicApiKey || import.meta.env.VITE_ANTHROPIC_API_KEY
+            const productLabel = visionResult?.productName || mockProductName
+            let recovered = false
+            try {
+              const fallbackText = await callLLM(
+                `Based on eBay and Mercari sold listings, what is the median resale price for "${productLabel}"? Reply ONLY with: RECOMMENDED_SELL_PRICE: $XX.XX`,
+                { geminiApiKey: geminiKey, anthropicApiKey: anthropicKey, task: 'complex' }
+              )
+              const fallbackPrice = parseResearchPrice(fallbackText)
+              if (fallbackPrice > 0) {
+                ebayAvgPrice = fallbackPrice
+                marketData = { researchSummary: fallbackText }
+                recovered = true
+                setPipeline(prev => prev.map((s, i) =>
+                  i === 2 ? { ...s, data: `Est. value ~$${fallbackPrice.toFixed(2)} (Claude research)` } : s
+                ))
+              }
+            } catch { /* both failed */ }
+            if (!recovered) {
+              setPipeline(prev => prev.map((s, i) =>
+                i === 2 ? { ...s, data: 'Search unavailable — using estimate' } : s
+              ))
+            }
           }
         } else {
           setPipeline(prev => prev.map((s, i) =>
