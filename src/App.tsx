@@ -446,7 +446,7 @@ function App() {
                   const tier3Price = parseResearchPrice(tier3Text)
                   if (tier3Price > 0) {
                     ebayAvgPrice = tier3Price
-                    marketData = { ...(marketData || {}), researchSummary: ((marketData as { researchSummary?: string })?.researchSummary || '') + '\n\n' + tier3Text }
+                    marketData = { ...(marketData || {}), researchSummary: (marketData?.researchSummary || '') + '\n\n' + tier3Text }
                     setPipeline(prev => prev.map((s, i) =>
                       i === 2 ? { ...s, data: `Est. value ~$${tier3Price.toFixed(2)} (AI research)` } : s
                     ))
@@ -987,7 +987,7 @@ function App() {
       return
     }
     if (!currentItem?.estimatedSellPrice) {
-      toast.error('No sell price available — scan an item first')
+      toast.error('No sell price found — tap Rescan to re-analyze, or ask AI in Chat')
       return
     }
     const shipping = settings?.defaultShippingCost || 5.0
