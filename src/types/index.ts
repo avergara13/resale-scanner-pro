@@ -1,5 +1,60 @@
 export type Screen = 'session' | 'session-detail' | 'agent' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
 
+export type SoldShippingStatus = '🔴 Need Label' | '🟡 Label Ready' | '📦 Packed' | '✅ Shipped'
+
+export interface ShippingRateQuote {
+  id: string
+  carrier: 'USPS' | 'UPS'
+  service: string
+  amount: number
+  currency: 'USD'
+  eta: string
+  note?: string
+  source: 'guide-estimate'
+  isBestValue?: boolean
+}
+
+export interface SoldItem {
+  id: string
+  salePageId: string
+  inventoryPageId?: string | null
+  title: string
+  imageUrl?: string | null
+  platform: string
+  salePrice?: number | null
+  saleDate?: string | null
+  shippingStatus: SoldShippingStatus
+  trackingNumber?: string | null
+  labelProvider?: string | null
+  labelUrl?: string | null
+  buyerZip?: string | null
+  buyerInfo?: string | null
+  shipFromZip: string
+  packageDims?: string | null
+  itemWeightLbs?: string | null
+  orderNumber?: string | null
+  rawEmailSnippet?: string | null
+  inventoryStatus?: string | null
+  metadataSource: 'inventory' | 'scan' | 'sale'
+}
+
+export interface SoldShippingUpdateInput {
+  shippingStatus: SoldShippingStatus
+  trackingNumber?: string
+  labelProvider?: string
+  labelUrl?: string
+  shipFromZip?: string
+  packageDims?: string
+  itemWeightLbs?: string
+  shipNotes?: string
+}
+
+export interface SoldFeedResponse {
+  items: SoldItem[]
+  warnings: string[]
+  fetchedAt: number
+}
+
 export type ResalePlatform = 'ebay' | 'mercari' | 'poshmark' | 'whatnot' | 'facebook'
 
 export interface PlatformListing {
