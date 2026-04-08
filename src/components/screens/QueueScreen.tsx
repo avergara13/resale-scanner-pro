@@ -1042,7 +1042,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         </div>
         
         <div className="px-0 mb-4">
-          <div className="tab-bar">
+          <div className="tab-bar queue-tab-bar">
             <button 
               onClick={() => setFilter('ALL')}
               className={cn('tab-btn', filter === 'ALL' && 'active')}
