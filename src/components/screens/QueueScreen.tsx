@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
+import { Trash, Eye, Lightning, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -121,11 +121,11 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-2 sm:p-3 border transition-colors",
+        "p-2 sm:p-3 md:p-3.5 border transition-colors",
         isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
       )}
     >
-      <div className="flex gap-2 sm:gap-2.5">
+      <div className="flex gap-2 sm:gap-2.5 md:gap-3">
         {/* Narrow control column: drag handle + checkbox */}
         <div className="flex flex-col gap-1 items-center justify-start pt-0.5 flex-shrink-0">
           <div
@@ -140,7 +140,7 @@ function SortableItem({
             id={`select-${item.id}`}
             checked={isSelected}
             onCheckedChange={() => onToggleSelect(item.id)}
-            className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+            className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
           />
         </div>
         {/* Thumbnail column */}
@@ -148,13 +148,13 @@ function SortableItem({
           <img
             src={item.imageThumbnail || item.imageData}
             alt={item.productName || 'Item'}
-            className="w-14 h-14 sm:w-[68px] sm:h-[68px] object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+            className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
           />
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
+          <div className="flex items-start justify-between gap-1 sm:gap-1.5 md:gap-2 mb-1 sm:mb-1.5 md:mb-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              <h3 className="font-semibold text-t1 text-xs sm:text-sm line-clamp-2 leading-tight">
+              <h3 className="font-semibold text-t1 text-xs sm:text-sm md:text-base line-clamp-2 leading-tight">
                 {item.productName || 'Unknown Item'}
               </h3>
               {isPersonal && (
@@ -177,7 +177,7 @@ function SortableItem({
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-mono text-t3 mb-1.5 sm:mb-2">
+          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 text-[10px] sm:text-[11px] md:text-xs font-mono text-t3 mb-1.5 sm:mb-2 md:mb-2.5">
             <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
             {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
               ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
@@ -219,75 +219,90 @@ function SortableItem({
               })}
             </div>
           )}
-          <div className="flex gap-1 sm:gap-1.5 flex-wrap">
+          <div className="flex gap-1 flex-wrap items-center mt-1 md:mt-1.5">
+            {/* Edit — icon only */}
             <Button
               size="sm"
               onClick={() => onEdit(item)}
               variant="outline"
-              className="h-6 sm:h-7 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+              title="Edit"
+              aria-label="Edit item"
+              className="h-6 w-6 md:h-7 md:w-7 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
             >
-              <PencilSimple size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
-              Edit
+              <PencilSimple size={11} weight="bold" aria-hidden />
             </Button>
+            {/* Detail — icon only */}
             {onOpenDetail && (
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => onOpenDetail(item)}
-                className="h-6 sm:h-7 px-2 text-[10px] sm:text-[11px] text-b1 hover:bg-b1/10"
+                title="View detail"
+                aria-label="View detail"
+                className="h-6 w-6 md:h-7 md:w-7 p-0 text-b1 hover:bg-b1/10"
               >
-                Detail
+                <Eye size={11} weight="bold" aria-hidden />
               </Button>
             )}
-            {(item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
+            {/* Re-analyze — icon only (PENDING, failed analysis, or missing sell price) */}
+            {(item.decision === 'PENDING' || item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => onReanalyze(item.id)}
-                className="h-6 sm:h-7 px-2 text-[10px] sm:text-[11px] border-amber/40 text-amber hover:bg-amber/10"
+                title="Re-analyze"
+                aria-label="Re-analyze item"
+                className="h-6 w-6 md:h-7 md:w-7 p-0 border-amber/40 text-amber hover:bg-amber/10"
               >
-                <ArrowCounterClockwise size={11} weight="bold" className="mr-0.5 sm:w-[13px] sm:h-[13px]" />
-                Re-analyze
+                <ArrowCounterClockwise size={11} weight="bold" aria-hidden />
               </Button>
             )}
             {item.listingStatus === 'published' && onOpenSoldDialog ? (
               <>
+                {/* Mark Sold — text, important action */}
                 <Button
                   size="sm"
                   onClick={() => onOpenSoldDialog(item)}
-                  className="flex-1 bg-green hover:bg-green/90 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
+                  aria-label="Mark as sold"
+                  className="flex-1 bg-green hover:bg-green/90 text-white h-6 md:h-7 text-[10px] md:text-xs font-medium px-2"
                 >
-                  <Tag size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
-                  Mark Sold
+                  Sold
                 </Button>
+                {/* Delist — icon only */}
                 {onDelist && (
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => onDelist(item.id)}
-                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-[11px] text-t3 hover:text-red"
+                    title="Delist"
+                    aria-label="Delist item"
+                    className="h-6 w-6 md:h-7 md:w-7 p-0 text-t3 hover:text-red hover:bg-red/10"
                   >
-                    Delist
+                    <X size={11} weight="bold" aria-hidden />
                   </Button>
                 )}
               </>
             ) : (
+              /* List — text only, important action */
               <Button
                 size="sm"
                 onClick={() => onCreateListing(item.id)}
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
+                aria-label="Create listing"
+                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
               >
-                <ArrowRight size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
                 List
               </Button>
             )}
+            {/* Delete — icon only */}
             <Button
               size="sm"
               variant="ghost"
               onClick={() => onRemove(item.id)}
-              className="h-6 sm:h-7 w-6 sm:w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
+              title="Remove"
+              aria-label="Remove item"
+              className="h-6 w-6 md:h-7 md:w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
             >
-              <Trash size={13} weight="bold" className="sm:w-[15px] sm:h-[15px]" />
+              <Trash size={11} weight="bold" aria-hidden />
             </Button>
           </div>
         </div>
@@ -321,6 +336,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [soldMarketplace, setSoldMarketplace] = useState<'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'>('ebay')
   const [showTrendIndicator, setShowTrendIndicator] = useState(false)
   const [locationInsightsOpen, setLocationInsightsOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -371,13 +387,17 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     }
     
     if (preset.filters?.decision && preset.filters.decision.length === 1) {
-      setFilter(preset.filters.decision[0] as FilterOption)
+      const validFilters: FilterOption[] = ['ALL', 'BUY', 'PASS', 'PENDING']
+      const val = preset.filters.decision[0]
+      setFilter(validFilters.includes(val as FilterOption) ? (val as FilterOption) : 'ALL')
     } else {
       setFilter('ALL')
     }
-    
+
     if (preset.sortBy && preset.sortOrder) {
-      setSortBy(`${preset.sortBy}-${preset.sortOrder}` as SortOption)
+      const candidate = `${preset.sortBy}-${preset.sortOrder}`
+      const validSorts: SortOption[] = ['profit-desc','profit-asc','date-desc','date-asc','category-asc','category-desc','tag-count-desc','tag-count-asc','tag-name-asc','tag-name-desc','manual']
+      setSortBy(validSorts.includes(candidate as SortOption) ? (candidate as SortOption) : 'manual')
     }
     
     setPresetsOpen(false)
@@ -502,26 +522,32 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         return (b.tags?.length || 0) - (a.tags?.length || 0)
       case 'tag-count-asc':
         return (a.tags?.length || 0) - (b.tags?.length || 0)
-      case 'tag-name-asc': {
-        const aFirstTag = a.tags?.[0] ? (allTags || []).find(t => t.id === a.tags![0])?.name || '' : ''
-        const bFirstTag = b.tags?.[0] ? (allTags || []).find(t => t.id === b.tags![0])?.name || '' : ''
-        return aFirstTag.localeCompare(bFirstTag)
-      }
+      case 'tag-name-asc':
       case 'tag-name-desc': {
-        const aFirstTag = a.tags?.[0] ? (allTags || []).find(t => t.id === a.tags![0])?.name || '' : ''
-        const bFirstTag = b.tags?.[0] ? (allTags || []).find(t => t.id === b.tags![0])?.name || '' : ''
-        return bFirstTag.localeCompare(aFirstTag)
+        const getName = (tags?: string[]) =>
+          (allTags || []).find(t => t.id === tags?.[0])?.name || ''
+        const cmp = getName(a.tags).localeCompare(getName(b.tags))
+        return sortBy === 'tag-name-asc' ? cmp : -cmp
       }
       default:
         return 0
     }
   })
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
-  const analyzedItems = queueItems.filter(item => item.productName && item.productName !== 'Quick Draft')
   
   const buyCount = queueItems.filter(item => item.decision === 'BUY').length
   const passCount = queueItems.filter(item => item.decision === 'PASS').length
   const pendingCount = queueItems.filter(item => item.decision === 'PENDING').length
+  const hasActiveAdvancedFilters =
+    (advancedFilters.tags?.length ?? 0) > 0 ||
+    (advancedFilters.locations?.length ?? 0) > 0 ||
+    (advancedFilters.categories?.length ?? 0) > 0 ||
+    !!advancedFilters.profitMarginRange ||
+    !!advancedFilters.dateRange
+
+  const hasActiveFilters = searchQuery.trim() !== ''
+    || sortBy !== 'manual'
+    || hasActiveAdvancedFilters
 
   const handleToggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -991,7 +1017,18 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 Tag ROI
               </Button>
             )}
-            {unanalyzedItems.length > 0 && onBatchAnalyze && (
+            {/* Single unanalyzed item needs onReanalyze; multiple need onBatchAnalyze — never render if handler absent */}
+            {unanalyzedItems.length === 1 && onReanalyze && (
+              <Button
+                onClick={() => onReanalyze(unanalyzedItems[0].id)}
+                disabled={isBatchAnalyzing}
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
+              >
+                <Lightning size={14} weight="fill" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                {isBatchAnalyzing ? 'Analyzing...' : 'Analyze 1'}
+              </Button>
+            )}
+            {unanalyzedItems.length > 1 && onBatchAnalyze && (
               <Button
                 onClick={onBatchAnalyze}
                 disabled={isBatchAnalyzing}
@@ -1033,172 +1070,145 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           </div>
         </div>
         
-        <div className="mb-3 relative">
-          <MagnifyingGlass 
-            size={18} 
-            weight="bold" 
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-s3 pointer-events-none" 
-          />
-          <Input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, description, category..."
-            className="h-10 pl-10 pr-10 bg-bg border-s2 text-t1 placeholder:text-t3 text-sm"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-t3 hover:text-t1 transition-colors"
-            >
-              <X size={16} weight="bold" />
+        {/* Collapsible search / sort / filter panel */}
+        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center justify-between w-full h-9 px-3 mb-2 rounded-lg bg-s1 hover:bg-s2 transition-colors text-left">
+              <div className="flex items-center gap-2">
+                <MagnifyingGlass size={14} weight="bold" className="text-t3" />
+                <span className="text-xs font-semibold text-t2">Search &amp; Filters</span>
+                {hasActiveFilters && (
+                  <span className="w-2 h-2 rounded-full bg-b1 flex-shrink-0" />
+                )}
+              </div>
+              <CaretDown
+                size={14}
+                weight="bold"
+                className={cn('text-t3 transition-transform duration-200', filtersOpen && 'rotate-180')}
+              />
             </button>
-          )}
-        </div>
-        
-        <div className="flex flex-col gap-2 mb-3">
-          {availableLocations.length > 0 && (
+          </CollapsibleTrigger>
+
+          <CollapsibleContent className="space-y-2.5 pb-3">
+            {/* Search */}
+            <div className="relative">
+              <MagnifyingGlass size={16} weight="bold" className="absolute left-3 top-1/2 -translate-y-1/2 text-s3 pointer-events-none" />
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, description, category..."
+                className="h-9 pl-9 pr-9 bg-bg border-s2 text-t1 placeholder:text-t3 text-sm"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-t3 hover:text-t1 transition-colors"
+                >
+                  <X size={14} weight="bold" />
+                </button>
+              )}
+            </div>
+
+            {/* Location filter */}
+            {availableLocations.length > 0 && (
+              <div className="flex items-center gap-2">
+                <MapPin size={14} weight="bold" className="text-s4 flex-shrink-0" />
+                <Select
+                  value={advancedFilters.locations?.[0] || 'all'}
+                  onValueChange={(value) => setAdvancedFilters({ ...advancedFilters, locations: value === 'all' ? undefined : [value] })}
+                >
+                  <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
+                    <SelectValue placeholder="All Locations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">All Locations</SelectItem>
+                    {availableLocations.map(loc => (
+                      <SelectItem key={loc.id} value={loc.id} className="text-xs">{loc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Tag filter */}
+            {(allTags || []).length > 0 && (
+              <div className="flex items-center gap-2">
+                <Tag size={14} weight="bold" className="text-s4 flex-shrink-0" />
+                <Select
+                  value={advancedFilters.tags?.[0] || 'all'}
+                  onValueChange={(value) => setAdvancedFilters({ ...advancedFilters, tags: value === 'all' ? undefined : [value] })}
+                >
+                  <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
+                    <SelectValue placeholder="All Tags" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">All Tags</SelectItem>
+                    {(allTags || []).map(tag => (
+                      <SelectItem key={tag.id} value={tag.id} className="text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                          <span>{tag.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Sort */}
             <div className="flex items-center gap-2">
-              <MapPin size={16} weight="bold" className="text-s4 flex-shrink-0" />
-              <Select
-                value={advancedFilters.locations?.[0] || 'all'}
-                onValueChange={(value) => {
-                  if (value === 'all') {
-                    setAdvancedFilters({ ...advancedFilters, locations: undefined })
-                  } else {
-                    setAdvancedFilters({ ...advancedFilters, locations: [value] })
-                  }
-                }}
-              >
+              <ArrowsDownUp size={14} weight="bold" className="text-s4 flex-shrink-0" />
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
                 <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                  <SelectValue placeholder="All Locations" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-xs">All Locations</SelectItem>
-                  {availableLocations.map(loc => (
-                    <SelectItem key={loc.id} value={loc.id} className="text-xs">
-                      {loc.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="manual" className="text-xs">Manual Order</SelectItem>
+                  <SelectItem value="profit-desc" className="text-xs">Profit ↓</SelectItem>
+                  <SelectItem value="profit-asc" className="text-xs">Profit ↑</SelectItem>
+                  <SelectItem value="date-desc" className="text-xs">Newest First</SelectItem>
+                  <SelectItem value="date-asc" className="text-xs">Oldest First</SelectItem>
+                  <SelectItem value="category-asc" className="text-xs">Category A→Z</SelectItem>
+                  <SelectItem value="category-desc" className="text-xs">Category Z→A</SelectItem>
+                  <SelectItem value="tag-count-desc" className="text-xs">Most Tags First</SelectItem>
+                  <SelectItem value="tag-count-asc" className="text-xs">Fewest Tags First</SelectItem>
+                  <SelectItem value="tag-name-asc" className="text-xs">Tag Name A→Z</SelectItem>
+                  <SelectItem value="tag-name-desc" className="text-xs">Tag Name Z→A</SelectItem>
                 </SelectContent>
               </Select>
+              {sortBy !== 'manual' && (
+                <Button
+                  onClick={() => setSortBy('manual')}
+                  size="sm" variant="ghost"
+                  className="h-9 px-2 text-xs text-t3 hover:text-t1 flex-shrink-0"
+                >
+                  <X size={13} weight="bold" />
+                </Button>
+              )}
             </div>
-          )}
 
-          {(allTags || []).length > 0 && (
+            {/* Advanced filters + presets */}
             <div className="flex items-center gap-2">
-              <Tag size={16} weight="bold" className="text-s4 flex-shrink-0" />
-              <Select
-                value={advancedFilters.tags?.[0] || 'all'}
-                onValueChange={(value) => {
-                  if (value === 'all') {
-                    setAdvancedFilters({ ...advancedFilters, tags: undefined })
-                  } else {
-                    setAdvancedFilters({ ...advancedFilters, tags: [value] })
-                  }
-                }}
-              >
-                <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                  <SelectValue placeholder="All Tags" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">All Tags</SelectItem>
-                  {(allTags || []).map(tag => (
-                    <SelectItem key={tag.id} value={tag.id} className="text-xs">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-2 h-2 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: tag.color }}
-                        />
-                        <span>{tag.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2.5 mb-3">
-          <div className="flex items-center gap-2">
-            <ArrowsDownUp size={16} weight="bold" className="text-s4 flex-shrink-0" />
-            <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-              <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manual" className="text-xs">Manual Order</SelectItem>
-                <SelectItem value="profit-desc" className="text-xs">Profit (High to Low)</SelectItem>
-                <SelectItem value="profit-asc" className="text-xs">Profit (Low to High)</SelectItem>
-                <SelectItem value="date-desc" className="text-xs">Date (Newest First)</SelectItem>
-                <SelectItem value="date-asc" className="text-xs">Date (Oldest First)</SelectItem>
-                <SelectItem value="category-asc" className="text-xs">Category (A to Z)</SelectItem>
-                <SelectItem value="category-desc" className="text-xs">Category (Z to A)</SelectItem>
-                <SelectItem value="tag-count-desc" className="text-xs">Tag Count (Most First)</SelectItem>
-                <SelectItem value="tag-count-asc" className="text-xs">Tag Count (Least First)</SelectItem>
-                <SelectItem value="tag-name-asc" className="text-xs">Tag Name (A to Z)</SelectItem>
-                <SelectItem value="tag-name-desc" className="text-xs">Tag Name (Z to A)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {sortBy !== 'manual' && (
-            <div className="bg-gradient-to-r from-b1/10 to-amber/10 border border-b1/30 rounded-lg px-3 py-2.5 flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-b1 animate-pulse flex-shrink-0" />
-              <span className="text-xs text-t1 font-bold flex-1">
-                Active: {sortBy === 'profit-desc' && '↓ Profit (High to Low)'}
-                {sortBy === 'profit-asc' && '↑ Profit (Low to High)'}
-                {sortBy === 'date-desc' && '↓ Date (Newest First)'}
-                {sortBy === 'date-asc' && '↑ Date (Oldest First)'}
-                {sortBy === 'category-asc' && '↑ Category (A to Z)'}
-                {sortBy === 'category-desc' && '↓ Category (Z to A)'}
-                {sortBy === 'tag-count-desc' && '↓ Tag Count (Most First)'}
-                {sortBy === 'tag-count-asc' && '↑ Tag Count (Least First)'}
-                {sortBy === 'tag-name-asc' && '↑ Tag Name (A to Z)'}
-                {sortBy === 'tag-name-desc' && '↓ Tag Name (Z to A)'}
-              </span>
+              <AdvancedFilters
+                filters={advancedFilters}
+                onFiltersChange={setAdvancedFilters}
+                availableCategories={availableCategories}
+                priceMin={priceRange.min}
+                priceMax={priceRange.max}
+              />
               <Button
-                onClick={() => {
-                  setSortBy('manual')
-                  // silent
-                }}
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-xs font-bold text-b1 hover:bg-b1/20 hover:text-b1 flex-shrink-0"
+                onClick={() => setPresetsOpen(true)}
+                size="sm" variant="outline"
+                className="h-9 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1 flex-1"
               >
-                <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
-                Reset
+                <BookmarkSimple size={14} weight="bold" className="mr-1.5" />
+                Presets
               </Button>
             </div>
-          )}
-          {sortBy !== 'manual' && onReorder && (
-            <div className="bg-s1 border border-s2 rounded-lg px-3 py-2 flex items-center gap-2">
-              <DotsSixVertical size={14} weight="bold" className="text-s3 flex-shrink-0" />
-              <span className="text-xs text-t2 font-medium">
-                Drag items to switch to manual ordering
-              </span>
-            </div>
-          )}
-          
-          <div className="flex items-center gap-2">
-            <AdvancedFilters
-              filters={advancedFilters}
-              onFiltersChange={setAdvancedFilters}
-              availableCategories={availableCategories}
-              priceMin={priceRange.min}
-              priceMax={priceRange.max}
-            />
-            <Button
-              onClick={() => setPresetsOpen(true)}
-              size="sm"
-              variant="outline"
-              className="h-9 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1 flex-1"
-            >
-              <BookmarkSimple size={14} weight="bold" className="mr-1.5" />
-              Presets
-            </Button>
-          </div>
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         <FilterPresetsManager
           isOpen={presetsOpen}
@@ -1366,29 +1376,30 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 return (
                   <Card
                     key={item.id}
-                    className={`p-4 border transition-colors ${
+                    className={cn(
+                      "p-3 sm:p-3.5 md:p-4 border transition-colors",
                       isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
-                    }`}
+                    )}
                   >
-                    <div className="flex gap-3">
-                      <div className="flex flex-col gap-2 items-center justify-start pt-1 flex-shrink-0">
+                    <div className="flex gap-2.5 sm:gap-3 md:gap-3.5">
+                      <div className="flex flex-col gap-2 items-center justify-start pt-0.5 flex-shrink-0">
                         <Checkbox
                           id={`select-${item.id}`}
                           checked={isSelected}
                           onCheckedChange={() => handleToggleSelect(item.id)}
-                          className="w-4 h-4 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+                          className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
                         />
                       </div>
                       {(item.imageThumbnail || item.imageData) && (
                         <img
                           src={item.imageThumbnail || item.imageData}
                           alt={item.productName || 'Item'}
-                          className="w-16 h-16 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+                          className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <h3 className="font-semibold text-t1 text-sm line-clamp-2">
+                        <div className="flex items-start justify-between gap-2 mb-2 md:mb-2.5">
+                          <h3 className="font-semibold text-t1 text-sm md:text-base line-clamp-2">
                             {item.productName || 'Unknown Item'}
                           </h3>
                           {item.profitMargin != null && isFinite(item.profitMargin) && (
@@ -1448,31 +1459,34 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             })}
                           </div>
                         )}
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 items-center mt-1 md:mt-1.5">
                           <Button
                             size="sm"
                             onClick={() => handleEdit(item)}
                             variant="outline"
-                            className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+                            title="Edit"
+                            aria-label="Edit item"
+                            className="h-7 w-7 md:h-8 md:w-8 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
                           >
-                            <PencilSimple size={14} weight="bold" className="mr-1" />
-                            Edit
+                            <PencilSimple size={13} weight="bold" aria-hidden />
                           </Button>
                           <Button
                             size="sm"
                             onClick={() => onCreateListing(item.id)}
-                            className="flex-1 bg-b1 hover:bg-b2 text-white h-8 text-xs font-medium"
+                            aria-label="Create listing"
+                            className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
                           >
-                            <ArrowRight size={14} weight="bold" className="mr-1" />
                             List
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => onRemove(item.id)}
-                            className="h-8 w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
+                            title="Remove"
+                            aria-label="Remove item"
+                            className="h-7 w-7 md:h-8 md:w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
                           >
-                            <Trash size={16} weight="bold" />
+                            <Trash size={13} weight="bold" aria-hidden />
                           </Button>
                         </div>
                       </div>
