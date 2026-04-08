@@ -1307,16 +1307,23 @@ function App() {
     const item = (queue || []).find(i => i.id === itemId)
     if (!item) return
 
-    // Reset to re-analyzable state so handleBatchAnalyze picks it up
-    setQueue(prev => (prev || []).map(i =>
-      i.id === itemId
-        ? { ...i, productName: 'Quick Draft', description: 'Analyzing...', estimatedSellPrice: undefined, profitMargin: undefined }
-        : i
-    ))
+    const imageSource = item.imageData || item.imageThumbnail
+    if (!imageSource) {
+      // No image — navigate to agent with item pre-loaded so user can see it
+      setCurrentItem(item)
+      setPipeline([])
+      setScreen('agent')
+      toast('No image available — re-scan with camera to re-analyze', { duration: 3000 })
+      return
+    }
 
-    // Trigger batch analyze which now includes 'Quick Draft' items
-    await handleBatchAnalyze()
-  }, [queue, setQueue, handleBatchAnalyze])
+    // Remove item from queue, navigate to agent, trigger full pipeline
+    setQueue(prev => (prev || []).filter(i => i.id !== itemId))
+    setCurrentItem(undefined)
+    setPipeline([])
+    setScreen('agent')
+    await handleCapture(imageSource, item.purchasePrice, item.location)
+  }, [queue, setQueue, setCurrentItem, setPipeline, setScreen, handleCapture])
 
   const handleOptimizeForPlatform = useCallback(async (itemId: string, platform: ResalePlatform) => {
     const item = (queue || []).find(i => i.id === itemId)
