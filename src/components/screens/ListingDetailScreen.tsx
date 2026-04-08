@@ -302,7 +302,8 @@ export function ListingDetailScreen({
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const handleQuickAction = useCallback(async (actionType: 'title' | 'description' | 'specifics') => {
-    if (!settings?.geminiApiKey || isChatProcessing) return
+    const apiKey = settings?.geminiApiKey || settings?.anthropicApiKey
+    if (!apiKey || isChatProcessing) return
     setIsChatProcessing(true)
     const prompts = {
       title: `Write an optimized eBay title for: ${item.productName}. Max 80 chars, include brand, model, key specs. Return ONLY the title text.`,
@@ -312,7 +313,8 @@ export function ListingDetailScreen({
     try {
       const result = await callLLM(prompts[actionType], {
         task: 'chat',
-        geminiApiKey: settings.geminiApiKey,
+        geminiApiKey: settings?.geminiApiKey,
+        anthropicApiKey: settings?.anthropicApiKey,
         maxTokens: 600,
         temperature: 0.6,
       })

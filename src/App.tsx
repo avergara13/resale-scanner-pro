@@ -1304,10 +1304,12 @@ function App() {
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
   const handleUpdateCurrentItem = useCallback((updates: Partial<ScannedItem>) => {
-    setCurrentItem(prev => prev ? { ...prev, ...updates } : prev)
-    // Keep queue in sync if the item was already saved there
+    const targetId = currentItem?.id
+    if (!targetId) return
+    // Guard by id so a stale in-flight result never overwrites a different item
+    setCurrentItem(prev => prev?.id === targetId ? { ...prev, ...updates } : prev)
     setQueue(prev => (prev || []).map(i =>
-      i.id === currentItem?.id ? { ...i, ...updates } : i
+      i.id === targetId ? { ...i, ...updates } : i
     ))
   }, [currentItem?.id, setQueue])
 
