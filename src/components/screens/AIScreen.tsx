@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { Robot, Plus, Microphone, Scan, FloppyDisk, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash, ArrowClockwise, ArrowCounterClockwise, XCircle, ShoppingCart } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { callLLM, researchProduct } from '@/lib/llm-service'
+import { callLLM, researchProduct, parseResearchPrice } from '@/lib/llm-service'
 import { useKV } from '@github/spark/hooks'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import { useTabPreference } from '@/hooks/use-tab-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
 import type { ScannedItem, PipelineStep, AppSettings, ChatMessage, SharedTodo } from '@/types'
+import type { GeminiService } from '@/lib/gemini-service'
 
 interface AIScreenProps {
   currentItem?: ScannedItem
@@ -34,6 +35,20 @@ interface AIScreenProps {
   onOpenCamera?: () => void
   pendingMessage?: string | null
   onPendingMessageHandled?: () => void
+  geminiService?: GeminiService | null
+  onUpdateItem?: (updates: Partial<ScannedItem>) => void
+}
+
+function buildUpdateSummary(updates: Partial<ScannedItem>, prev: ScannedItem): string {
+  const lines: string[] = ['✅ Updated the item with what I found:']
+  if (updates.productName)        lines.push(`  • Name: "${updates.productName}"`)
+  if (updates.category && updates.category !== prev.category)
+                                  lines.push(`  • Category: ${updates.category}`)
+  if (updates.estimatedSellPrice) lines.push(`  • Est. sell price: $${updates.estimatedSellPrice.toFixed(2)}`)
+  if (updates.description)        lines.push(`  • Description updated`)
+  if (lines.length === 1)         return "I couldn't extract enough details from the image. Try providing a clearer photo."
+  lines.push('\nReview in Edit if anything needs adjusting, or ask me to research the price.')
+  return lines.join('\n')
 }
 
 function CelebrationParticle({ delay, index }: { delay: number; index: number }) {
@@ -277,7 +292,7 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
   )
 }
 
-export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDraft, onCreateListing, onPassItem, onRecalculate, onRescan, onOpenCamera, pendingMessage, onPendingMessageHandled }: AIScreenProps) {
+export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDraft, onCreateListing, onPassItem, onRecalculate, onRescan, onOpenCamera, pendingMessage, onPendingMessageHandled, geminiService, onUpdateItem }: AIScreenProps) {
   const [tab, setTab] = useTabPreference<'chat' | 'scans' | 'tasks'>('ai-screen-v2', 'chat')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -431,23 +446,78 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
       const lowerInput = chatInput.toLowerCase()
       let response: string
 
-      // Detect research/price questions and use web-grounded search
-      const isResearchQuery = lowerInput.includes('price') || lowerInput.includes('worth') ||
-        lowerInput.includes('value') || lowerInput.includes('research') ||
-        lowerInput.includes('sell for') || lowerInput.includes('market') || lowerInput.includes('how much')
+      // Detect intent to identify / update the current item agentically
+      const isUpdateIntent =
+        lowerInput.includes('fill in') || lowerInput.includes('fill it in') ||
+        lowerInput.includes('find them') || lowerInput.includes('find it') ||
+        lowerInput.includes('identify') || lowerInput.includes('what is this') ||
+        lowerInput.includes('what are these') || lowerInput.includes('what is it') ||
+        lowerInput.includes('fix the details') ||
+        lowerInput.includes('analyze this') || lowerInput.includes('re-analyze') ||
+        (currentItem?.productName === 'Unknown Product' && lowerInput.includes('name'))
 
-      if (isResearchQuery && currentItem?.productName && settings?.geminiApiKey) {
-        response = await researchProduct(
-          currentItem.productName,
-          { purchasePrice: currentItem.purchasePrice, category: currentItem.category },
-          settings.geminiApiKey
-        )
+      if (isUpdateIntent && currentItem) {
+        const imageSource = currentItem.imageData || currentItem.imageThumbnail
+        if (!settings?.geminiApiKey) {
+          response = 'To identify items automatically, add your Gemini API key in ⚙️ Settings → API Keys. Once set, I can analyze images and update the product name, category, and sell price for you.'
+        } else if (!imageSource) {
+          response = "This item has no image attached. Tap Rescan to capture it with the camera, then ask me again — I'll identify it and fill in all the details."
+        } else if (!geminiService) {
+          response = 'Gemini service is not available. Please check your API key in Settings.'
+        } else {
+          // Immediate feedback while working
+          setChatMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: '🔍 Analyzing the image...',
+            timestamp: Date.now()
+          }])
+          try {
+            const visionResult = await geminiService.analyzeProductImage(imageSource, {}, currentItem.purchasePrice)
+            const updates: Partial<ScannedItem> = {}
+            if (visionResult.productName && visionResult.productName !== 'Unknown Product') {
+              updates.productName = visionResult.productName
+            }
+            if (visionResult.description) updates.description = visionResult.description
+            if (visionResult.category)    updates.category = visionResult.category
+
+            // Best-effort market research for price
+            if (updates.productName && settings.geminiApiKey) {
+              try {
+                const research = await researchProduct(
+                  updates.productName,
+                  { purchasePrice: currentItem.purchasePrice, category: updates.category },
+                  settings.geminiApiKey
+                )
+                const price = parseResearchPrice(research)
+                if (price > 0) updates.estimatedSellPrice = price
+              } catch { /* price is best-effort */ }
+            }
+            onUpdateItem?.(updates)
+            response = buildUpdateSummary(updates, currentItem)
+          } catch {
+            response = "I wasn't able to identify the product from the image. Try a clearer photo (tap Rescan), or type the product name and ask me to research its value."
+          }
+        }
       } else {
-        const promptText = `You are an AI assistant for resale business analysis. Context:\n\n${contextData}\n\nUser: ${chatInput}\n\nProvide a helpful, concise response. Reference the scanned item's data. If the user asks about pricing or market value and you don't have data, suggest they tap "Research Item" in the Agent tab for live marketplace search.`
-        response = await callLLM(promptText, {
-          task: 'chat',
-          geminiApiKey: settings?.geminiApiKey,
-        })
+        // Detect research/price questions and use web-grounded search
+        const isResearchQuery = lowerInput.includes('price') || lowerInput.includes('worth') ||
+          lowerInput.includes('value') || lowerInput.includes('research') ||
+          lowerInput.includes('sell for') || lowerInput.includes('market') || lowerInput.includes('how much')
+
+        if (isResearchQuery && currentItem?.productName && settings?.geminiApiKey) {
+          response = await researchProduct(
+            currentItem.productName,
+            { purchasePrice: currentItem.purchasePrice, category: currentItem.category },
+            settings.geminiApiKey
+          )
+        } else {
+          const promptText = `You are an AI assistant for resale business analysis. Context:\n\n${contextData}\n\nUser: ${chatInput}\n\nProvide a helpful, concise response. Reference the scanned item's data. If the user asks about pricing or market value and you don't have data, suggest they tap "Research Item" in the Agent tab for live marketplace search.`
+          response = await callLLM(promptText, {
+            task: 'chat',
+            geminiApiKey: settings?.geminiApiKey,
+          })
+        }
       }
 
       const aiMessage: ChatMessage = {
@@ -475,7 +545,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
   }, [chatInput, isSendingMessage, buildAIContext, settings?.geminiApiKey, currentItem])
 
   return (
-    <div className="flex flex-col w-full h-full min-h-screen bg-bg">
+    <div className="flex flex-col w-full h-full bg-bg">
       <PullToRefreshIndicator
         isPulling={pullToRefresh.isPulling}
         isRefreshing={pullToRefresh.isRefreshing}
@@ -520,9 +590,9 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" ref={pullToRefresh.containerRef}>
         {tab === 'scans' && (
-          <div ref={pullToRefresh.containerRef} className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-52 sm:pb-56">
+          <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-4">
             {pipeline.length === 0 ? (
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
@@ -547,6 +617,18 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
               </div>
             ) : (
               <div className="space-y-3 sm:space-y-4">
+                {currentItem?.productName === 'Unknown Product' && (
+                  <button
+                    onClick={() => { setTab('chat'); setChatInput('Identify this item and fill in the details for me') }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber/10 border border-amber/30 text-left"
+                  >
+                    <span className="text-amber text-lg">🔍</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-amber">Product not identified</p>
+                      <p className="text-[11px] text-t2">Tap to ask AI to identify and fill in the details</p>
+                    </div>
+                  </button>
+                )}
                 <OverallProgress steps={pipeline} />
                 <PipelinePanel steps={pipeline} />
                 
@@ -667,7 +749,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
           </div>
         )}
         {tab === 'chat' && (
-          <div className="flex flex-col min-h-full pb-32 sm:pb-36">
+          <div className="flex flex-col min-h-full">
             <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4" ref={(el) => {
               if (el) {
                 (pullToRefresh.containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
@@ -735,7 +817,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
           </div>
         )}
         {tab === 'tasks' && (
-          <div className="flex flex-col min-h-full pb-32 sm:pb-36">
+          <div className="flex flex-col min-h-full">
             <div className="flex-1 p-3 sm:p-4">
               {(todos || []).length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
@@ -797,7 +879,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         )}
       </div>
 
-      <div className="fixed bottom-[80px] left-0 right-0 max-w-[480px] mx-auto border-t border-s2 bg-fg/95 backdrop-blur-md z-20 safe-bottom">
+      <div className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md safe-bottom">
 
         {tab === 'chat' && (
           <div className="p-2.5 sm:p-3">

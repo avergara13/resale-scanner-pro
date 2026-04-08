@@ -1303,6 +1303,14 @@ function App() {
     toast.success(`Analyzed ${processedCount} items: ${buyCount} BUY, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
+  const handleUpdateCurrentItem = useCallback((updates: Partial<ScannedItem>) => {
+    setCurrentItem(prev => prev ? { ...prev, ...updates } : prev)
+    // Keep queue in sync if the item was already saved there
+    setQueue(prev => (prev || []).map(i =>
+      i.id === currentItem?.id ? { ...i, ...updates } : i
+    ))
+  }, [currentItem?.id, setQueue])
+
   const handleReanalyzeItem = useCallback(async (itemId: string) => {
     const item = (queue || []).find(i => i.id === itemId)
     if (!item) return
@@ -1580,6 +1588,8 @@ function App() {
                 onOpenCamera={() => setCameraOpen(true)}
                 pendingMessage={agentPendingMessage}
                 onPendingMessageHandled={() => setAgentPendingMessage(null)}
+                geminiService={geminiService}
+                onUpdateItem={handleUpdateCurrentItem}
               />
             </motion.div>
           )}
@@ -1632,6 +1642,7 @@ function App() {
                 onOptimize={handleOptimizeItem}
                 onOptimizeForPlatform={handleOptimizeForPlatform}
                 settings={settings}
+                onEdit={handleEditQueueItem}
               />
             ) : null
           })()}
