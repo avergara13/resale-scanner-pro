@@ -226,9 +226,10 @@ function SortableItem({
               onClick={() => onEdit(item)}
               variant="outline"
               title="Edit"
+              aria-label="Edit item"
               className="h-6 w-6 md:h-7 md:w-7 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
             >
-              <PencilSimple size={11} weight="bold" />
+              <PencilSimple size={11} weight="bold" aria-hidden />
             </Button>
             {/* Detail — icon only */}
             {onOpenDetail && (
@@ -237,9 +238,10 @@ function SortableItem({
                 variant="ghost"
                 onClick={() => onOpenDetail(item)}
                 title="View detail"
+                aria-label="View detail"
                 className="h-6 w-6 md:h-7 md:w-7 p-0 text-b1 hover:bg-b1/10"
               >
-                <Eye size={11} weight="bold" />
+                <Eye size={11} weight="bold" aria-hidden />
               </Button>
             )}
             {/* Re-analyze — icon only (PENDING, failed analysis, or missing sell price) */}
@@ -249,9 +251,10 @@ function SortableItem({
                 variant="outline"
                 onClick={() => onReanalyze(item.id)}
                 title="Re-analyze"
+                aria-label="Re-analyze item"
                 className="h-6 w-6 md:h-7 md:w-7 p-0 border-amber/40 text-amber hover:bg-amber/10"
               >
-                <ArrowCounterClockwise size={11} weight="bold" />
+                <ArrowCounterClockwise size={11} weight="bold" aria-hidden />
               </Button>
             )}
             {item.listingStatus === 'published' && onOpenSoldDialog ? (
@@ -260,6 +263,7 @@ function SortableItem({
                 <Button
                   size="sm"
                   onClick={() => onOpenSoldDialog(item)}
+                  aria-label="Mark as sold"
                   className="flex-1 bg-green hover:bg-green/90 text-white h-6 md:h-7 text-[10px] md:text-xs font-medium px-2"
                 >
                   Sold
@@ -271,9 +275,10 @@ function SortableItem({
                     variant="ghost"
                     onClick={() => onDelist(item.id)}
                     title="Delist"
+                    aria-label="Delist item"
                     className="h-6 w-6 md:h-7 md:w-7 p-0 text-t3 hover:text-red hover:bg-red/10"
                   >
-                    <X size={11} weight="bold" />
+                    <X size={11} weight="bold" aria-hidden />
                   </Button>
                 )}
               </>
@@ -282,6 +287,7 @@ function SortableItem({
               <Button
                 size="sm"
                 onClick={() => onCreateListing(item.id)}
+                aria-label="Create listing"
                 className="flex-1 bg-b1 hover:bg-b2 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
               >
                 List
@@ -293,9 +299,10 @@ function SortableItem({
               variant="ghost"
               onClick={() => onRemove(item.id)}
               title="Remove"
+              aria-label="Remove item"
               className="h-6 w-6 md:h-7 md:w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
             >
-              <Trash size={11} weight="bold" />
+              <Trash size={11} weight="bold" aria-hidden />
             </Button>
           </div>
         </div>
@@ -531,9 +538,16 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const buyCount = queueItems.filter(item => item.decision === 'BUY').length
   const passCount = queueItems.filter(item => item.decision === 'PASS').length
   const pendingCount = queueItems.filter(item => item.decision === 'PENDING').length
+  const hasActiveAdvancedFilters =
+    (advancedFilters.tags?.length ?? 0) > 0 ||
+    (advancedFilters.locations?.length ?? 0) > 0 ||
+    (advancedFilters.categories?.length ?? 0) > 0 ||
+    !!advancedFilters.profitMarginRange ||
+    !!advancedFilters.dateRange
+
   const hasActiveFilters = searchQuery.trim() !== ''
     || sortBy !== 'manual'
-    || Object.values(advancedFilters).some(v => v !== undefined && v !== null)
+    || hasActiveAdvancedFilters
 
   const handleToggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -1003,16 +1017,20 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 Tag ROI
               </Button>
             )}
-            {unanalyzedItems.length > 0 && (onBatchAnalyze || onReanalyze) && (
+            {/* Single unanalyzed item needs onReanalyze; multiple need onBatchAnalyze — never render if handler absent */}
+            {unanalyzedItems.length === 1 && onReanalyze && (
               <Button
-                onClick={() => {
-                  // Single unanalyzed item → navigate to agent for full scan experience
-                  if (unanalyzedItems.length === 1 && onReanalyze) {
-                    onReanalyze(unanalyzedItems[0].id)
-                  } else {
-                    onBatchAnalyze?.()
-                  }
-                }}
+                onClick={() => onReanalyze(unanalyzedItems[0].id)}
+                disabled={isBatchAnalyzing}
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
+              >
+                <Lightning size={14} weight="fill" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                {isBatchAnalyzing ? 'Analyzing...' : 'Analyze 1'}
+              </Button>
+            )}
+            {unanalyzedItems.length > 1 && onBatchAnalyze && (
+              <Button
+                onClick={onBatchAnalyze}
                 disabled={isBatchAnalyzing}
                 className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
               >
@@ -1447,13 +1465,15 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             onClick={() => handleEdit(item)}
                             variant="outline"
                             title="Edit"
+                            aria-label="Edit item"
                             className="h-7 w-7 md:h-8 md:w-8 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
                           >
-                            <PencilSimple size={13} weight="bold" />
+                            <PencilSimple size={13} weight="bold" aria-hidden />
                           </Button>
                           <Button
                             size="sm"
                             onClick={() => onCreateListing(item.id)}
+                            aria-label="Create listing"
                             className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
                           >
                             List
@@ -1463,9 +1483,10 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             variant="ghost"
                             onClick={() => onRemove(item.id)}
                             title="Remove"
+                            aria-label="Remove item"
                             className="h-7 w-7 md:h-8 md:w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
                           >
-                            <Trash size={13} weight="bold" />
+                            <Trash size={13} weight="bold" aria-hidden />
                           </Button>
                         </div>
                       </div>

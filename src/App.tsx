@@ -1317,12 +1317,16 @@ function App() {
       return
     }
 
-    // Remove item from queue, navigate to agent, trigger full pipeline
-    setQueue(prev => (prev || []).filter(i => i.id !== itemId))
+    // Navigate to agent first, then trigger pipeline — only remove from queue on success
     setCurrentItem(undefined)
     setPipeline([])
     setScreen('agent')
-    await handleCapture(imageSource, item.purchasePrice, item.location)
+    try {
+      await handleCapture(imageSource, item.purchasePrice, item.location)
+      setQueue(prev => (prev || []).filter(i => i.id !== itemId))
+    } catch {
+      // handleCapture already shows a toast; item stays in queue so no data is lost
+    }
   }, [queue, setQueue, setCurrentItem, setPipeline, setScreen, handleCapture])
 
   const handleOptimizeForPlatform = useCallback(async (itemId: string, platform: ResalePlatform) => {
