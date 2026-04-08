@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, ArrowRight, Lightning, Funnel, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
+import { Trash, Eye, Lightning, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
@@ -140,7 +140,7 @@ function SortableItem({
             id={`select-${item.id}`}
             checked={isSelected}
             onCheckedChange={() => onToggleSelect(item.id)}
-            className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+            className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
           />
         </div>
         {/* Thumbnail column */}
@@ -219,75 +219,83 @@ function SortableItem({
               })}
             </div>
           )}
-          <div className="flex gap-1 sm:gap-1.5 flex-wrap">
+          <div className="flex gap-1 flex-wrap items-center">
+            {/* Edit — icon only */}
             <Button
               size="sm"
               onClick={() => onEdit(item)}
               variant="outline"
-              className="h-6 sm:h-7 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+              title="Edit"
+              className="h-6 w-6 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
             >
-              <PencilSimple size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
-              Edit
+              <PencilSimple size={11} weight="bold" />
             </Button>
+            {/* Detail — icon only */}
             {onOpenDetail && (
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => onOpenDetail(item)}
-                className="h-6 sm:h-7 px-2 text-[10px] sm:text-[11px] text-b1 hover:bg-b1/10"
+                title="View detail"
+                className="h-6 w-6 p-0 text-b1 hover:bg-b1/10"
               >
-                Detail
+                <Eye size={11} weight="bold" />
               </Button>
             )}
-            {(item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
+            {/* Re-analyze — icon only */}
+            {(item.decision === 'PENDING' || item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => onReanalyze(item.id)}
-                className="h-6 sm:h-7 px-2 text-[10px] sm:text-[11px] border-amber/40 text-amber hover:bg-amber/10"
+                title="Re-analyze"
+                className="h-6 w-6 p-0 border-amber/40 text-amber hover:bg-amber/10"
               >
-                <ArrowCounterClockwise size={11} weight="bold" className="mr-0.5 sm:w-[13px] sm:h-[13px]" />
-                Re-analyze
+                <ArrowCounterClockwise size={11} weight="bold" />
               </Button>
             )}
             {item.listingStatus === 'published' && onOpenSoldDialog ? (
               <>
+                {/* Mark Sold — keep text, important action */}
                 <Button
                   size="sm"
                   onClick={() => onOpenSoldDialog(item)}
-                  className="flex-1 bg-green hover:bg-green/90 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
+                  className="flex-1 bg-green hover:bg-green/90 text-white h-6 text-[10px] font-medium px-2"
                 >
-                  <Tag size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
-                  Mark Sold
+                  Sold
                 </Button>
+                {/* Delist — icon only */}
                 {onDelist && (
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => onDelist(item.id)}
-                    className="h-6 sm:h-7 px-2 text-[10px] sm:text-[11px] text-t3 hover:text-red"
+                    title="Delist"
+                    className="h-6 w-6 p-0 text-t3 hover:text-red hover:bg-red/10"
                   >
-                    Delist
+                    <X size={11} weight="bold" />
                   </Button>
                 )}
               </>
             ) : (
+              /* List — text only, no icon, important action */
               <Button
                 size="sm"
                 onClick={() => onCreateListing(item.id)}
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 sm:h-7 text-[10px] sm:text-[11px] font-medium"
+                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 text-[10px] font-semibold px-2"
               >
-                <ArrowRight size={11} weight="bold" className="mr-0.5 sm:mr-1 sm:w-[13px] sm:h-[13px]" />
                 List
               </Button>
             )}
+            {/* Delete — icon only */}
             <Button
               size="sm"
               variant="ghost"
               onClick={() => onRemove(item.id)}
-              className="h-6 sm:h-7 w-6 sm:w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
+              title="Remove"
+              className="h-6 w-6 p-0 text-t2 hover:text-red hover:bg-red/10"
             >
-              <Trash size={13} weight="bold" className="sm:w-[15px] sm:h-[15px]" />
+              <Trash size={11} weight="bold" />
             </Button>
           </div>
         </div>
@@ -1360,7 +1368,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           id={`select-${item.id}`}
                           checked={isSelected}
                           onCheckedChange={() => handleToggleSelect(item.id)}
-                          className="w-4 h-4 border-2 data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+                          className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
                         />
                       </div>
                       {(item.imageThumbnail || item.imageData) && (
@@ -1432,31 +1440,31 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             })}
                           </div>
                         )}
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 items-center">
                           <Button
                             size="sm"
                             onClick={() => handleEdit(item)}
                             variant="outline"
-                            className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+                            title="Edit"
+                            className="h-7 w-7 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
                           >
-                            <PencilSimple size={14} weight="bold" className="mr-1" />
-                            Edit
+                            <PencilSimple size={13} weight="bold" />
                           </Button>
                           <Button
                             size="sm"
                             onClick={() => onCreateListing(item.id)}
-                            className="flex-1 bg-b1 hover:bg-b2 text-white h-8 text-xs font-medium"
+                            className="flex-1 bg-b1 hover:bg-b2 text-white h-7 text-[11px] font-semibold"
                           >
-                            <ArrowRight size={14} weight="bold" className="mr-1" />
                             List
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => onRemove(item.id)}
-                            className="h-8 w-8 p-0 text-t2 hover:text-red hover:bg-red/10"
+                            title="Remove"
+                            className="h-7 w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
                           >
-                            <Trash size={16} weight="bold" />
+                            <Trash size={13} weight="bold" />
                           </Button>
                         </div>
                       </div>
