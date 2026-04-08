@@ -199,53 +199,96 @@ export function parseResearchPrice(text: string): number {
 }
 
 /**
+ * Extract sell-through rate percentage from researchProduct() text output.
+ * Returns 0 if no sell-through rate can be parsed.
+ */
+export function parseSellThroughRate(text: string): number {
+  // Tier 1 — anchored structured line we force Gemini to emit
+  const anchored = text.match(/SELL_THROUGH_RATE:\s*(\d+(?:\.\d+)?)%/)
+  if (anchored) {
+    const v = parseFloat(anchored[1])
+    if (v >= 0 && v <= 100) return Math.round(v)
+  }
+
+  // Tier 2 — prose patterns
+  const prosePatterns = [
+    /sell[\s-]through\s+rate[:\s]+(\d+(?:\.\d+)?)%/i,
+    /sell[\s-]through[:\s]+(\d+(?:\.\d+)?)%/i,
+    /(\d+(?:\.\d+)?)%\s+sell[\s-]through/i,
+    /sold\s+rate[:\s]+(\d+(?:\.\d+)?)%/i,
+  ]
+  for (const p of prosePatterns) {
+    const m = text.match(p)
+    if (m) {
+      const v = parseFloat(m[1])
+      if (v >= 0 && v <= 100) return Math.round(v)
+    }
+  }
+
+  return 0
+}
+
+/**
  * Research a product using Gemini with Google Search grounding.
- * Queries all 5 resale platforms + core retail stores + category-specific specialty stores.
- * Returns structured real-time market intelligence.
+ * One deep, thorough web search covering ALL target stores — resale + retail + big box.
+ * Returns structured real-time market intelligence including sell-through rate.
  */
 export async function researchProduct(
   productName: string,
   context: { purchasePrice?: number; category?: string; brand?: string },
   geminiApiKey: string
 ): Promise<string> {
-  const resalePlatforms = ['ebay.com', 'mercari.com', 'poshmark.com', 'whatnot.com', 'facebook.com/marketplace']
-  const retailStores = ['amazon.com', 'walmart.com', 'bestbuy.com', 'target.com']
   const specialtyStores = getCategorySpecificStores(context.category || '', context.brand)
+  const isFreeItem = context.purchasePrice === 0
 
-  const prompt = `You are a professional resale market analyst for a resale business. Research current pricing for: "${productName}"
+  const prompt = `You are a professional resale market analyst. Perform a deep, comprehensive market research for: "${productName}"
 ${context.category ? `Category: ${context.category}` : ''}
 ${context.brand ? `Brand: ${context.brand}` : ''}
-${context.purchasePrice ? `Purchase price paid: $${context.purchasePrice.toFixed(2)}` : ''}
+${context.purchasePrice != null ? (isFreeItem ? `This item was acquired FREE (purchase price: $0).` : `Purchase price paid: $${context.purchasePrice.toFixed(2)}`) : ''}
 
-Search ALL of the following sources:
+MANDATORY — search ALL of these sources RIGHT NOW before responding:
 
-RESALE PLATFORMS — check SOLD/COMPLETED listings (most important):
-${resalePlatforms.join(' | ')}
+RESALE PLATFORMS (search SOLD/COMPLETED listings + count active listings for sell-through):
+• eBay completed/sold listings — ebay.com (most important: count sold vs active to estimate sell-through)
+• Mercari — mercari.com (sold listings)
+• Poshmark — poshmark.com
+• Whatnot — whatnot.com (auction results)
+• Facebook Marketplace — facebook.com/marketplace (local comps)
 
-RETAIL STORES — check new/MSRP pricing (for resale discount context):
-${retailStores.join(' | ')}
-${specialtyStores.length > 0 ? `\nSPECIALTY STORES for this category:\n${specialtyStores.join(' | ')}` : ''}
+RETAIL / BIG BOX (for MSRP anchor and discount context):
+• Amazon — amazon.com
+• Walmart — walmart.com
+• Best Buy — bestbuy.com
+• Target — target.com
+• Ollie's Bargain Outlet — ollies.us
+${specialtyStores.length > 0 ? `• Specialty: ${specialtyStores.join(', ')}` : ''}
 
-Provide a concise analysis with:
-1. **Resale value range**: low / average / high from actual sold listings
-2. **Retail price** (new): what stores charge for it new (establishes discount %)
-3. **Best resale platform** with reasoning (volume + price)
-4. **Platform pricing guide**:
-   - eBay: $X (12.9% fee)
-   - Mercari: $X (10% fee)
-   - Poshmark: $X (20% fee >$15)
-   - Whatnot: $X (auction — starting bid)
-   - Facebook Marketplace: $X (local, no fees)
-5. **Demand**: high / medium / low — sell-through velocity
-6. **Recommended list price** for best margin + speed
-${context.purchasePrice ? `7. **Verdict**: BUY or PASS at $${context.purchasePrice.toFixed(2)} — with margin estimate` : ''}
+PROVIDE ALL OF THE FOLLOWING:
 
-Be specific with dollar amounts. Cite actual marketplace data found.
+1. **Resale value range** (from actual SOLD listings): Low: $X | Avg: $X | High: $X
+2. **Retail / MSRP price** (new): $X — establishes the discount % buyers expect
+3. **Sell-through rate**: Estimate what % of listed items SELL within 30 days on eBay.
+   - Count or estimate: ~X sold/week, ~Y active listings → Z% sell-through rate
+   - Rate tier: HIGH (>70%) / MEDIUM (40–70%) / LOW (<40%)
+   - Sell velocity: "~X sold per week on eBay"
+4. **Platform pricing breakdown** (with fees deducted from your take-home):
+   - eBay: List $X → you keep ~$X after 12.9% fee + ~$5 shipping
+   - Mercari: List $X → you keep ~$X after 10% fee
+   - Poshmark: List $X → you keep ~$X after 20% fee (items >$15)
+   - Whatnot: List $X → auction starting bid suggestion
+   - Facebook Marketplace: List $X → you keep $X (0% fee, local pickup)
+5. **Demand signal**: HIGH / MEDIUM / LOW — justify with search data
+6. **Best platform recommendation**: [Platform] — because [reason: volume/margin/velocity]
+${context.purchasePrice != null ? `7. **Verdict**: ${isFreeItem ? 'Which platform maximizes net profit for this FREE item (avoid platforms where fees exceed likely sale price)?' : `BUY or PASS at $${context.purchasePrice.toFixed(2)}? Show: sell price - fees - shipping - purchase price = net profit and margin`}` : ''}
 
-REQUIRED — always end your response with this exact line (replace XX.XX with the average resale price you found):
-RECOMMENDED_SELL_PRICE: $XX.XX`
+Be specific with real dollar amounts from your search. Cite actual data found.
 
-  return callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 1500 })
+END your response with EXACTLY these three lines (no extra text on those lines):
+RECOMMENDED_SELL_PRICE: $XX.XX
+SELL_THROUGH_RATE: XX%
+BEST_PLATFORM: [platform name]`
+
+  return callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 2048 })
 }
 
 // ------- Anthropic Claude (secondary — complex tasks only) -------

@@ -31,11 +31,18 @@ export function DecisionSignal({ decision, item }: DecisionSignalProps) {
           Enter buy price + tap Re-analyze, or use Chat to get a market estimate
         </div>
       ) : (
-        item?.profitMargin != null && isFinite(item.profitMargin) && (
-          <div className="text-base font-bold opacity-80">
-            Margin: {item.profitMargin.toFixed(1)}%
-          </div>
-        )
+        <>
+          {item?.profitMargin != null && isFinite(item.profitMargin) && (
+            <div className="text-base font-bold opacity-80">
+              Margin: {item.profitMargin.toFixed(1)}%
+            </div>
+          )}
+          {item?.marketData?.recommendedPlatform && (
+            <div className="mt-1 text-xs font-semibold opacity-80 text-center px-4">
+              💡 Sell on {item.marketData.recommendedPlatform}
+            </div>
+          )}
+        </>
       )}
     </motion.div>
   )
