@@ -2,11 +2,14 @@
   "name": "Resale Scanner Pro",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
   "postCreateCommand": "npm install",
-  "forwardPorts": [5000],
+  "forwardPorts": [5173, 3000],
   "portsAttributes": {
-    "5000": {
-      "label": "Dev Server",
+    "5173": {
+      "label": "Vite Dev Server",
       "onAutoForward": "openBrowser"
+    },
+    "3000": {
+      "label": "Node Server"
     }
   },
   "customizations": {
