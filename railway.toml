@@ -1,7 +1,7 @@
 # rebuild: 2026-04-09-post-pr67-deps-refresh
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci && npm run build"
+buildCommand = "npm run build"
 
 [deploy]
 startCommand = "node server.js"
