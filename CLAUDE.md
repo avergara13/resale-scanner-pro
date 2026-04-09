@@ -19,7 +19,7 @@ All work follows six phases in sequence. No phase is skipped.
 ### Phase 2 — Execute
 - Begins only after user approves the plan.
 - Runs to completion without pausing unless a blocker requires user input.
-- All commits go on the designated feature branch (`claude/<verb>-<subject>-<hash>`).
+- All commits go on the designated feature branch (e.g. `fix/camera-not-opening`, `ui/visual-polish`).
 - Build must pass (`npm run build`) before execution is considered done.
 
 ### Phase 3 — PR Gate (user-controlled pause)
