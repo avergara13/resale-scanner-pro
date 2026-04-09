@@ -1,137 +1,124 @@
-# GitHub Copilot Instructions — Resale Scanner Pro
+# Copilot Instructions — Resale Scanner Pro
 
-You are the **repo guardian** for Resale Scanner Pro. Your job is to catch
-regressions, standards violations, and deployment risks before merges happen.
-Claude Code builds the features; you catch anything that slips through.
+You are a pre-merge assistant, not a gatekeeper. Your job is to catch real
+breakage and either fix it directly or leave a clear, actionable comment for
+Claude Code to address before the PR merges. Do not block on style or opinion.
+
+**Budget note:** Reviews consume premium requests. Only comment when you have
+found something that would break CI, break the deploy pipeline, or violate a
+hard project standard. Skip cosmetic issues entirely.
 
 ---
 
-## Deployment Pipeline — Know It Cold
+## What You Can Auto-Fix (commit the fix directly)
+
+Fix without asking when the issue is unambiguous:
+
+- **Wrong ESLint rule names** in `eslint.config.js` — a misspelled or
+  wrong-prefixed rule name crashes ESLint entirely and blocks CI for everyone.
+  Check that every rule in the `rules` block exists in its plugin. Verify:
+  - `@typescript-eslint/` prefix = must exist in `typescript-eslint` plugin
+  - `react-hooks/` prefix = must exist in `eslint-plugin-react-hooks`
+  - Unprefixed = must be a core ESLint rule
+  If a rule doesn't exist under its stated prefix, correct the name or remove
+  the entry and add a comment explaining why.
+
+- **PR body missing required sections** — if the PR body is missing any of
+  the four required sections, add them as empty scaffolds so the author can
+  fill them in. Required sections: `## Summary`, `## Technical Detail`,
+  `## Test Plan`, `## Risk & Rollback`.
+
+- **Markdown formatting errors** in changed `.md` files — broken links
+  (`[text]()` with empty href), unclosed code fences, or headers that jump
+  more than one level (e.g., `##` directly to `####`).
+
+---
+
+## What to Comment On (leave a clear fix for Claude Code to implement)
+
+Comment with the exact fix needed when:
+
+### CI will fail
+
+- **New TypeScript error introduced** — quote the file and line, explain the
+  type mismatch, and provide the corrected signature or type guard.
+  Common pattern: `unknown` from a catch block or API response used without
+  `instanceof` narrowing before accessing `.message`.
+
+- **Lint error (not warning) introduced** — a new `error`-level violation will
+  fail the `npm run lint` gate. Identify the rule, the file/line, and the
+  one-line fix.
+
+### The deploy pipeline is weakened
+
+- **`fatal: true` removed from a wiring guard** in `scripts/apply-wiring.mjs`
+  — integrity guards like `calculateProfitMetrics` use `fatal: true` because
+  TypeScript cannot catch a missing profit calculation (the code compiles fine).
+  Removing `fatal: true` means a business-logic regression silently ships.
+  Leave a comment explaining why it must stay fatal.
+
+- **Gate step removed from a workflow** — `wire-and-deploy.yml` must run in
+  order: apply-wiring → tsc → lint → push. `ci.yml` must run tsc and lint on
+  every PR to main. Removing or reordering these steps breaks the safety chain.
+
+- **`concurrency: cancel-in-progress` removed** from either workflow — without
+  this, stale deploys pile up and the latest commit is not guaranteed to win.
+
+### Security
+
+- **Hardcoded secret or API key** — flag the exact line and note which GitHub
+  secret/variable should be used instead. The Notion DB ID in
+  `apply-wiring.mjs` is not a secret. Actual auth tokens (API keys, bearer
+  tokens, passwords) must never appear in code or config.
+
+### Wiring anchor drift
+
+- If `App.tsx` renames a function or string that matches a string anchor in
+  `apply-wiring.mjs`, the wiring check will silently miss on the next publish.
+  List which check(s) in `apply-wiring.mjs` need their anchor string updated
+  to match the new name.
+
+---
+
+## What to Ignore
+
+Do not comment on:
+
+- `warn`-level ESLint violations (they are tracked, not blocking)
+- Code style, formatting, or naming conventions not covered above
+- Test coverage, performance speculation, or "consider adding X"
+- Files you weren't asked to review and that weren't changed in the diff
+- Whether the implementation is the best possible approach
+
+---
+
+## PR Body Checklist (check on every PR)
+
+The four required sections are defined in `CLAUDE.md` Section 3. When
+reviewing a PR, verify:
+
+- [ ] `## Summary` — explains the *why*, not just the what; 2–4 bullets max
+- [ ] `## Technical Detail` — every changed file listed with a specific
+  description of what changed (not "updated X" but "renamed X because Y")
+- [ ] `## Test Plan` — specific, reproducible steps; not "tested locally"
+- [ ] `## Risk & Rollback` — risk level stated; rollback command provided
+
+If any section is missing, add the empty scaffold. If a section exists but
+is clearly a placeholder ("TBD", empty bullets), leave one comment asking
+for it to be completed before merge.
+
+---
+
+## Deployment Pipeline Reference
 
 ```
-PR opens → CI / validate (tsc + lint, this file's rules)
-         → merge to main
-         → Wire + Deploy (wiring → tsc → lint → push deploy/production)
-         → Railway builds from deploy/production → live at railway.app
+PR opens
+  → CI / validate: npm ci → tsc --noEmit → npm run lint
+  → must pass before merge (branch protection)
+merge to main
+  → Wire + Deploy: apply-wiring.mjs → tsc → lint → push deploy/production
+  → Railway: npm install && npm run build → live deploy
 ```
 
-**If CI fails, the PR must not merge.** A merge with a broken gate = a broken
-production deploy. Always block and explain.
-
----
-
-## P1 — Block These, Always
-
-Flag as P1 (blocking) when you see:
-
-### 1. New TypeScript errors introduced
-- Prop type mismatches, missing type exports, `any` used where a real type
-  exists, `unknown` narrowed without `instanceof` or type guard.
-- ESLint rule errors (not warnings): a new `error`-level violation means CI
-  fails and the deploy is blocked.
-
-### 2. `eslint.config.js` changes that remove or downgrade error-level rules
-- Downgrading `'react-hooks/rules-of-hooks'` to `warn` is never acceptable.
-- Adding a non-existent rule name (wrong prefix, typo) will crash ESLint and
-  break CI entirely — verify the rule name exists in the installed plugin.
-- Acceptable downgrades: rules with broad pre-existing violations that were
-  introduced by a dependency upgrade, documented with a comment explaining why.
-
-### 3. `scripts/apply-wiring.mjs` changes that remove `fatal: true` guards
-- The `calculateProfitMetrics` guard must remain `fatal: true`. It guards
-  business logic that tsc/lint cannot detect. Removing `fatal: true` from any
-  guard means a business invariant failure will silently ship to production.
-- New guards added without `fatal: true` when they protect business logic
-  (not just wiring anchors) should be flagged.
-
-### 4. Hardcoded secrets or API keys anywhere in the codebase
-- No tokens, keys, passwords, or credentials in code, config, workflow YAML,
-  or documentation. Use GitHub secrets/variables only.
-- Exception: the Notion DB ID in `apply-wiring.mjs` is not a secret (it's a
-  public database ID, not an API key). Flag actual auth tokens.
-
-### 5. Direct pushes to `deploy/production` in workflow YAML
-- Only `wire-and-deploy.yml` should push to `deploy/production`. Any workflow
-  or script that adds a new push to this branch outside the existing gate chain
-  (wiring → tsc → lint) is a deployment bypass.
-
-### 6. `.github/workflows/` changes that remove or skip gate steps
-- `wire-and-deploy.yml` must run in order: apply-wiring → tsc → lint → push.
-  Reordering these (e.g., pushing before tsc) or commenting them out defeats
-  the pipeline safety.
-- `ci.yml` must run tsc and lint on every PR to main. Do not allow removing
-  either step or changing the trigger from `pull_request: branches: [main]`.
-
-### 7. `concurrency: cancel-in-progress` removed from workflows
-- Both `ci.yml` and `wire-and-deploy.yml` use `cancel-in-progress: true`.
-  Removing this means stale deploys pile up and the last-commit-wins guarantee
-  breaks.
-
----
-
-## P2 — Flag These, Explain Why
-
-Flag as P2 (non-blocking suggestion) when you see:
-
-### App.tsx wiring anchor drift
-- If a function or string is renamed in `App.tsx` that matches an anchor in
-  `apply-wiring.mjs` (e.g., `handleSaveDraft`, `createTagSuggestionService`,
-  `tagSuggestionService`), the wiring script anchor will silently miss.
-- Flag the rename and note which check(s) in `apply-wiring.mjs` need updating.
-
-### Business logic moved out of App.tsx without updating wiring guards
-- `calculateProfitMetrics` must remain detectable in `App.tsx`. If it's moved
-  to a separate module and only the call site remains, confirm the guard still
-  detects correctly.
-
-### `useCallback`/`useMemo` dependency arrays that exclude used variables
-- `react-hooks/exhaustive-deps` is set to `warn`. New hooks missing deps are
-  a bug risk. Flag them with a brief explanation.
-
-### `any` type with no justification comment
-- `@typescript-eslint/no-explicit-any` is `warn`. An unexplained `any` is
-  technical debt. Ask for a justification comment or a proper type.
-
-### PR body missing required sections
-- Every PR must have: **Summary**, **Technical Detail**, **Test Plan**,
-  **Risk & Rollback** (see `CLAUDE.md` Section 3 for the exact format).
-- A test plan with "tested locally" but no specific steps is insufficient.
-  Flag and request specific, reproducible steps.
-
----
-
-## P3 — Mention, Don't Block
-
-### `prefer-const` violations (rule is `warn`)
-### Unused variables with `_` prefix (`@typescript-eslint/no-unused-vars` is `warn`)
-### Comments that describe *what* the code does instead of *why*
-
----
-
-## Context About This Codebase
-
-- **Stack:** React + Vite + TypeScript frontend, Railway deploy, Supabase DB
-- **AI:** Gemini (listing optimization), Claude API (agent screen)
-- **Integrations:** Notion (inventory bridge), eBay Sell API
-- **Wiring script:** `scripts/apply-wiring.mjs` patches `src/App.tsx` string
-  anchors to inject service wiring after Spark (the AI design tool) publishes.
-  Structural misses (anchor drift) are non-fatal; integrity guards (`fatal: true`)
-  block the deploy.
-- **ESLint:** Flat config (`eslint.config.js`). React Compiler rules from
-  `react-hooks` v7 are all `warn` due to pre-existing violations. Core rules
-  like `rules-of-hooks` remain `error`.
-- **Branch flow:** `claude/<slug>` → PR → main → `deploy/production` (CI only)
-  Never push to `deploy/production` manually. Never push to `main` directly.
-
----
-
-## How to Write Review Comments
-
-- **Be specific.** Quote the exact line. Explain the mechanism of the bug or
-  risk, not just that it's bad practice.
-- **Badge your severity.** Start with `P1`, `P2`, or `P3` so the author knows
-  what they must fix vs. what's optional.
-- **Suggest the fix.** Don't just flag — provide the corrected code or the
-  correct rule name.
-- **Don't hallucinate pass results.** If you haven't checked something, say so.
-  Do not claim "this looks fine" about code you haven't analyzed.
+Railway watches `deploy/production`. Never push there manually.
+`main` is Spark's branch. `claude/<slug>` branches are Claude Code's work.
