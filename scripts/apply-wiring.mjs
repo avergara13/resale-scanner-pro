@@ -30,7 +30,8 @@ console.log(`📄  Target: src/App.tsx\n`)
 let src = readFileSync(APP, 'utf8')
 let changed = false
 let appliedCount = 0
-let anchorMissCount = 0  // tracks silent patch failures — non-zero means Spark refactored an anchor
+let anchorMissCount = 0  // structural anchor misses — warn only, tsc/lint are the real gate
+let fatalMissCount = 0   // integrity guard failures — always block deploy
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WIRING CHECKS
@@ -172,11 +173,13 @@ const WIRING_CHECKS = [
   },
 
   // ── 7. Profit math integrity guard ────────────────────────────────────────
-  // Detect-only. Does NOT patch. Warns loudly if Spark has removed
-  // calculateProfitMetrics from App.tsx. CI run will show the warning
-  // in the wiring script output. CE-VS or SA-VS should investigate before deploy.
+  // Detect-only. Does NOT patch. Blocks deploy if calculateProfitMetrics is
+  // missing — tsc/lint cannot catch this because the code remains valid without
+  // it. fatal:true means a miss here calls process.exit(1) regardless of
+  // WIRING_STRICT. Only structural anchor misses (wiring patches) are non-fatal.
   {
     name: 'Guard: calculateProfitMetrics present in App.tsx',
+    fatal: true,
     detect: src => src.includes('calculateProfitMetrics'),
     patch: src => {
       console.error('🚨 PROFIT MATH MISSING: calculateProfitMetrics not found in App.tsx.')
@@ -202,6 +205,9 @@ for (const check of WIRING_CHECKS) {
       changed = true
       appliedCount++
       console.log(`  🔧  Applied: ${check.name}`)
+    } else if (check.fatal) {
+      console.error(`  ❌  FATAL guard failed: ${check.name}`)
+      fatalMissCount++
     } else {
       console.log(`  ⚠️   Anchor not found (Spark may have refactored): ${check.name}`)
       anchorMissCount++
@@ -222,6 +228,13 @@ if (anchorMissCount > 0) {
   console.warn(`\n⚠️  ${anchorMissCount} wiring anchor(s) not found in App.tsx.`)
   console.warn('   Spark may have refactored those locations. Update apply-wiring.mjs to match.')
   console.warn('   Deploy will continue — the tsc + lint gates catch any code issues.\n')
+}
+
+if (fatalMissCount > 0) {
+  console.error(`\n❌ DEPLOY BLOCKED: ${fatalMissCount} integrity guard(s) failed.`)
+  console.error('   These guards check invariants that tsc/lint cannot detect.')
+  console.error('   Restore the missing logic in App.tsx before deploying.')
+  process.exit(1)
 }
 
 console.log('🚀  Ready to push to deploy/production')
