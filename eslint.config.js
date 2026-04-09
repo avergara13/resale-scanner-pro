@@ -47,6 +47,10 @@ export default tseslint.config(
       'no-case-declarations': 'warn',
       'no-empty': 'warn',
       'prefer-const': 'warn',
+
+      // New typescript-eslint rules introduced by package upgrade — pre-existing violations
+      '@typescript-eslint/no-useless-assignment': 'warn',
+      '@typescript-eslint/preserve-caught-error': 'warn',
     },
   },
 )
