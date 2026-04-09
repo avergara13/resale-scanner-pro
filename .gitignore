@@ -29,7 +29,7 @@ dist-ssr
 packages
 pids
 .file-manifest
-.devcontainer/
+# .devcontainer/ — removed; devcontainer.json needs to be committed for Codespaces to work
 
 .spark-workbench-id
 
