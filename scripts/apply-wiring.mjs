@@ -245,9 +245,10 @@ const BACKEND_GUARDS = [
 
   // Railway health check — without this Railway marks the service unhealthy
   // and stops routing traffic. Every deploy is dead on arrival without /health.
+  // Confirmed pattern from server.js: if (requestUrl.pathname === '/health')
   {
     name: 'Route: GET /health in server.js',
-    detect: src => src.includes("pathname === '/health'"),
+    detect: src => src.includes("requestUrl.pathname === '/health'"),
   },
 
   // Sold items feed — SoldScreen shows permanent error state without this.
@@ -255,7 +256,7 @@ const BACKEND_GUARDS = [
   //   if (requestUrl.pathname === '/api/sold-items' && req.method === 'GET')
   {
     name: 'Route: GET /api/sold-items in server.js',
-    detect: src => src.includes("pathname === '/api/sold-items'") && src.includes("req.method === 'GET'"),
+    detect: src => src.includes("requestUrl.pathname === '/api/sold-items'") && src.includes("req.method === 'GET'"),
   },
 
   // Shipping update — the label/tracking workflow is broken without this.

@@ -62,6 +62,10 @@ Comment with the exact fix needed when:
   - `pathname === '/health'` — Railway health check; removal = dead deploy
   - `pathname === '/api/sold-items'` + `req.method === 'GET'` — SoldScreen feed
   - `shippingMatch` + `req.method === 'POST'` — shipping update handler
+  Exact detect strings used by `BACKEND_GUARDS` (must match server.js source):
+  - `requestUrl.pathname === '/health'` — Railway health check; removal = dead deploy
+  - `requestUrl.pathname === '/api/sold-items'` + `req.method === 'GET'` — SoldScreen feed
+  - `\/sold-items\/` + `\/shipping` + `req.method === 'POST'` — shipping update handler
   If any of these strings is changed or the handler removed, the wiring script
   exits 1 and blocks the deploy. Leave a P1 comment with the exact string that
   must be restored or updated in both `server.js` and `BACKEND_GUARDS`.
