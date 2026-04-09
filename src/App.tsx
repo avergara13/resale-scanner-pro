@@ -68,6 +68,7 @@ function App() {
   const [soldError, setSoldError] = useState<string | null>(null)
   const [soldSyncedAt, setSoldSyncedAt] = useState<number | null>(null)
 
+  
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -799,6 +800,34 @@ function App() {
     })
   }, [setSettings, setTheme, toggleAmbientLight])
 
+  const loadLiveSoldItems = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) {
+      setSoldLoading(true)
+    }
+
+    try {
+      const response = await fetchSoldItems()
+      setLiveSoldItems(response.items)
+      setSoldWarnings(response.warnings)
+      setSoldSyncedAt(response.fetchedAt)
+      setSoldError(null)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load live sold items.'
+      setSoldError(message)
+      if (!silent) {
+        toast.error(message)
+      }
+    } finally {
+      setSoldLoading(false)
+    }
+  }, [])
+
+  const handleUpdateLiveSoldShipping = useCallback(async (pageId: string, update: SoldShippingUpdateInput) => {
+    await updateSoldItemShipping(pageId, update)
+    await loadLiveSoldItems({ silent: true })
+    toast.success('Shipping details saved')
+  }, [loadLiveSoldItems])
+
   const handleOptimizeItem = useCallback(async (itemId: string) => {
     const item = (queue || []).find(i => i.id === itemId)
     if (!item || item.decision !== 'BUY' || item.optimizedListing) return
@@ -1511,6 +1540,17 @@ function App() {
     if (screen === 'sold') {
       loadLiveSoldItems()
     }
+  }, [screen, loadLiveSoldItems])
+
+  useEffect(() => {
+    if (screen !== 'sold') return undefined
+
+    loadLiveSoldItems()
+    const intervalId = setInterval(() => {
+      loadLiveSoldItems({ silent: true })
+    }, 60000)
+
+    return () => clearInterval(intervalId)
   }, [screen, loadLiveSoldItems])
 
   useEffect(() => {
