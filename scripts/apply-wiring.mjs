@@ -18,8 +18,9 @@ import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dir = dirname(fileURLToPath(import.meta.url))
-const ROOT  = resolve(__dir, '..')
-const APP   = resolve(ROOT, 'src/App.tsx')
+const ROOT   = resolve(__dir, '..')
+const APP    = resolve(ROOT, 'src/App.tsx')
+const SERVER = resolve(ROOT, 'server.js')
 
 const NOTION_DB_ID = process.env.NOTION_DATABASE_ID || '7e49058fa8874889b9f6ae5a6c3bf8e7'
 
@@ -27,11 +28,13 @@ console.log('🔧  Loft OS Wiring Script — Resale Scanner Pro')
 console.log(`📁  Repo: ${ROOT}`)
 console.log(`📄  Target: src/App.tsx\n`)
 
-let src = readFileSync(APP, 'utf8')
+let src       = readFileSync(APP, 'utf8')
+const serverSrc = readFileSync(SERVER, 'utf8')
 let changed = false
 let appliedCount = 0
-let anchorMissCount = 0  // structural anchor misses — warn only, tsc/lint are the real gate
-let fatalMissCount = 0   // integrity guard failures — always block deploy
+let anchorMissCount  = 0  // structural anchor misses — warn only, tsc/lint are the real gate
+let fatalMissCount   = 0  // App.tsx integrity guard failures — always block deploy
+let backendFatalCount = 0 // server.js route guard failures — always block deploy
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WIRING CHECKS
@@ -230,11 +233,70 @@ if (anchorMissCount > 0) {
   console.warn('   Deploy will continue — the tsc + lint gates catch any code issues.\n')
 }
 
-if (fatalMissCount > 0) {
-  console.error(`\n❌ DEPLOY BLOCKED: ${fatalMissCount} integrity guard(s) failed.`)
-  console.error('   These guards check invariants that tsc/lint cannot detect.')
-  console.error('   Restore the missing logic in App.tsx before deploying.')
+// ─────────────────────────────────────────────────────────────────────────────
+// BACKEND GUARDS — detect-only, all fatal, guard server.js routes
+// Runs against serverSrc (separate from App.tsx checks).
+// server.js is plain JS — tsc/lint cannot catch a missing route.
+// A miss here means a required API route has been removed.
+// Add new backend guards here when new server.js routes are added.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BACKEND_GUARDS = [
+
+  // Railway health check — without this Railway marks the service unhealthy
+  // and stops routing traffic. Every deploy is dead on arrival without /health.
+  {
+    name: 'Route: GET /health in server.js',
+    detect: src => src.includes("pathname === '/health'"),
+  },
+
+  // Sold items feed — SoldScreen shows permanent error state without this.
+  // Confirmed pattern from server.js line 514:
+  //   if (requestUrl.pathname === '/api/sold-items' && req.method === 'GET')
+  {
+    name: 'Route: GET /api/sold-items in server.js',
+    detect: src => src.includes("pathname === '/api/sold-items'") && src.includes("req.method === 'GET'"),
+  },
+
+  // Shipping update — the label/tracking workflow is broken without this.
+  // Route is POST (not PATCH — Notion uses PATCH internally but the HTTP
+  // endpoint the client calls is POST via shippingMatch regex).
+  // Confirmed pattern from server.js line 524-525:
+  //   const shippingMatch = requestUrl.pathname.match(...)
+  //   if (shippingMatch && req.method === 'POST')
+  {
+    name: "Route: POST /api/sold-items/:id/shipping in server.js",
+    detect: src => src.includes('shippingMatch') && src.includes("req.method === 'POST'"),
+  },
+
+]
+
+console.log('\n📡  Checking backend routes in server.js...')
+for (const guard of BACKEND_GUARDS) {
+  if (guard.detect(serverSrc)) {
+    console.log(`  ✅  Backend route OK: ${guard.name}`)
+  } else {
+    console.error(`  ❌  FATAL: ${guard.name}`)
+    backendFatalCount++
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FINAL EXIT — all checks have run, report all failures before exiting
+// ─────────────────────────────────────────────────────────────────────────────
+
+const totalFatal = fatalMissCount + backendFatalCount
+if (totalFatal > 0) {
+  if (fatalMissCount > 0) {
+    console.error(`\n❌ DEPLOY BLOCKED: ${fatalMissCount} App.tsx integrity guard(s) failed.`)
+    console.error('   These guards check invariants that tsc/lint cannot detect.')
+    console.error('   Restore the missing logic in App.tsx before deploying.')
+  }
+  if (backendFatalCount > 0) {
+    console.error(`\n❌ DEPLOY BLOCKED: ${backendFatalCount} backend route(s) missing from server.js.`)
+    console.error('   These routes are required by the client. Restore them before deploying.')
+  }
   process.exit(1)
 }
 
-console.log('🚀  Ready to push to deploy/production')
+console.log('\n🚀  Ready to push to deploy/production')

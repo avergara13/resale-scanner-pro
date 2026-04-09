@@ -57,6 +57,15 @@ Comment with the exact fix needed when:
   Removing `fatal: true` means a business-logic regression silently ships.
   Leave a comment explaining why it must stay fatal.
 
+- **Backend route removed or pathname changed in `server.js`** — the script
+  guards three routes with `BACKEND_GUARDS` (all fatal, no bypass):
+  - `pathname === '/health'` — Railway health check; removal = dead deploy
+  - `pathname === '/api/sold-items'` + `req.method === 'GET'` — SoldScreen feed
+  - `shippingMatch` + `req.method === 'POST'` — shipping update handler
+  If any of these strings is changed or the handler removed, the wiring script
+  exits 1 and blocks the deploy. Leave a P1 comment with the exact string that
+  must be restored or updated in both `server.js` and `BACKEND_GUARDS`.
+
 - **Gate step removed from a workflow** — `wire-and-deploy.yml` must run in
   order: apply-wiring → tsc → lint → push. `ci.yml` must run tsc and lint on
   every PR to main. Removing or reordering these steps breaks the safety chain.
@@ -122,3 +131,30 @@ merge to main
 
 Railway watches `deploy/production`. Never push there manually.
 `main` is Spark's branch. `claude/<slug>` branches are Claude Code's work.
+
+---
+
+## Premium Request Budget
+
+**Copilot Pro:** 300 requests/month. **Copilot Pro+:** 1,500 requests/month.
+A PR review costs 1–3 requests. A coding agent task costs 1 request. Resets monthly.
+
+**Codex (chatgpt-codex-connector bot)** is billed separately — it does NOT count
+against your Copilot quota. If it appears in Copilot billing, file a GitHub support
+ticket (known misattribution bug). Let Codex run automatically on every PR.
+
+### When to trigger Copilot review (manual)
+- Once, when the PR is marked "ready for review" — not on every push
+- When Codex flagged something ambiguous and a second read is warranted
+- When a Dependabot grouped PR touches >5 packages
+
+### When NOT to trigger Copilot review
+- PR is still a draft
+- Diff is <10 lines touching only comments or config values
+- Codex already reviewed and Claude Code has addressed all open threads
+
+### Coding agent task rules
+One task = one sentence of instruction. If you cannot describe the fix in one
+sentence, do not use the agent — Claude Code handles it instead.
+Good: "Fix the stale comment at line 179 that references WIRING_STRICT."
+Bad: "Fix all the lint warnings." / "Redesign this section."
