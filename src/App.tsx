@@ -899,9 +899,15 @@ function App() {
   }, [])
 
   const handleUpdateLiveSoldShipping = useCallback(async (pageId: string, update: SoldShippingUpdateInput) => {
-    await updateSoldItemShipping(pageId, update)
-    await loadLiveSoldItems({ silent: true })
-    toast.success('Shipping details saved')
+    try {
+      await updateSoldItemShipping(pageId, update)
+      await loadLiveSoldItems({ silent: true })
+      toast.success('Shipping details saved')
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to save shipping details'
+      toast.error(message)
+      throw e
+    }
   }, [loadLiveSoldItems])
 
   const handleMarkShipped = useCallback((itemId: string, trackingNumber: string, shippingCarrier: string) => {
@@ -1499,6 +1505,13 @@ function App() {
       reset()
     }
   }, [cameraOpen, reset])
+
+  // Auto-load sold items when user navigates to the Sold screen
+  useEffect(() => {
+    if (screen === 'sold') {
+      loadLiveSoldItems()
+    }
+  }, [screen, loadLiveSoldItems])
 
   useEffect(() => {
     if (settings) {
