@@ -20,6 +20,10 @@ env:
   NOTION_VERSION: "2022-06-28"
   LIVE_ACTIVITY_PAGE_ID: "337f99e853ab81929ebbed2fc770352b"
 
+concurrency:
+  group: ${{ github.workflow }}-deploy
+  cancel-in-progress: true
+
 jobs:
   wire-and-deploy:
     runs-on: ubuntu-latest
@@ -35,16 +39,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Configure git identity (used by commit + push steps)
         run: |
           git config user.name  "Loft OS Architect"
           git config user.email "architect@vergara-inc.com"
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Apply wiring
         run: node scripts/apply-wiring.mjs
         env:
           NOTION_DATABASE_ID: ${{ vars.NOTION_DATABASE_ID }}
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
 
       - name: Commit wiring if changed
         run: |
