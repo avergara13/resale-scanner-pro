@@ -175,8 +175,8 @@ const WIRING_CHECKS = [
   // ── 7. Profit math integrity guard ────────────────────────────────────────
   // Detect-only. Does NOT patch. Blocks deploy if calculateProfitMetrics is
   // missing — tsc/lint cannot catch this because the code remains valid without
-  // it. fatal:true means a miss here calls process.exit(1) regardless of
-  // WIRING_STRICT. Only structural anchor misses (wiring patches) are non-fatal.
+  // it. fatal:true means a miss here always blocks deploy. Only structural
+  // anchor misses from wiring patches are non-fatal warnings.
   {
     name: 'Guard: calculateProfitMetrics present in App.tsx',
     fatal: true,
