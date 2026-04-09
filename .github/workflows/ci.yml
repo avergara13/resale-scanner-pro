@@ -1,0 +1,47 @@
+name: CI
+
+# Runs on every PR to main and on every push to main.
+# This is the PRIMARY safety gate — it must pass before any PR can merge.
+#
+# Enable branch protection in GitHub → Settings → Branches → main:
+#   ✅ Require status checks to pass before merging
+#   ✅ Add "CI / validate" as a required check
+#   ✅ Require branches to be up to date before merging
+#
+# With this in place, Dependabot PRs and all other PRs are validated
+# before any code reaches main, preventing broken types or lint from
+# ever landing in the deploy branch.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
