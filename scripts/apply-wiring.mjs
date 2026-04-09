@@ -262,11 +262,13 @@ const BACKEND_GUARDS = [
   // Route is POST (not PATCH — Notion uses PATCH internally but the HTTP
   // endpoint the client calls is POST via shippingMatch regex).
   // Confirmed pattern from server.js line 524-525:
-  //   const shippingMatch = requestUrl.pathname.match(...)
+  //   const shippingMatch = requestUrl.pathname.match(/^\/api\/sold-items\/([^/]+)\/shipping$/)
   //   if (shippingMatch && req.method === 'POST')
+  // Guard checks the actual path strings from the regex (not just the variable name)
+  // so a path change is caught even if the variable name stays the same.
   {
     name: "Route: POST /api/sold-items/:id/shipping in server.js",
-    detect: src => src.includes('shippingMatch') && src.includes("req.method === 'POST'"),
+    detect: src => src.includes('\\/sold-items\\/') && src.includes('\\/shipping') && src.includes("req.method === 'POST'"),
   },
 
 ]
