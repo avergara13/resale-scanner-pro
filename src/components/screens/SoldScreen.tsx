@@ -178,6 +178,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
       <div className="px-4 pt-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
+            <h2 className="text-lg font-black text-t1">Shipping Center</h2>
             <h2 className="text-lg font-black text-t1">Live Sold Command Center</h2>
             <p className="text-xs text-t3">{lastSyncedLabel}</p>
           </div>

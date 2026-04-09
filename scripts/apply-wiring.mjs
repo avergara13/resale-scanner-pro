@@ -215,11 +215,15 @@ if (changed) {
 }
 
 if (anchorMissCount > 0) {
-  console.log(`\n⚠️  WARNING: ${anchorMissCount} anchor(s) not found — Spark may have refactored App.tsx`)
-  console.log('   Review apply-wiring.mjs and update anchors to match current App.tsx structure.')
-  console.log('   Deploy will continue but affected wiring concerns may be missing.\n')
-  // Do NOT exit 1 — allow deploy to continue with partial wiring.
-  // Agent instruction: open apply-wiring.mjs, read App.tsx, update anchors, commit.
+  if (process.env.WIRING_STRICT === 'false') {
+    console.warn(`\n⚠️  WIRING_STRICT=false — bypassing exit on ${anchorMissCount} anchor miss(es). Fix anchors ASAP.`)
+    console.log('🚀  Ready to push to deploy/production')
+  } else {
+    console.error(`\n❌ DEPLOY BLOCKED: ${anchorMissCount} wiring anchor(s) not found in App.tsx.`)
+    console.error('   Spark likely refactored an anchor. Update apply-wiring.mjs to match.')
+    console.error('   Emergency bypass: set WIRING_STRICT=false in GitHub Actions environment.')
+    process.exit(1)
+  }
+} else {
+  console.log('🚀  Ready to push to deploy/production')
 }
-
-console.log('🚀  Ready to push to deploy/production')

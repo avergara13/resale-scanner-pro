@@ -13,7 +13,6 @@ const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   'tag-analytics': 'TAG ANALYTICS',
   'location-insights': 'LOCATIONS',
   'cost-tracking': 'COST TRACKING',
-  ai: 'AI',
 }
 
 interface AppHeaderProps {

@@ -128,6 +128,31 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     onBack()
   }, [onDeleteSession, setAllSessions, sessionId, onBack])
 
+  // Geolocation: detect nearby stores (must be before early return — hooks can't be conditional)
+  const [geoLoading, setGeoLoading] = useState(false)
+  const handleAutoLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error('Location not supported on this device')
+      return
+    }
+    setGeoLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoLoading(false)
+        setEditLocationAddress(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`)
+        setEditingLocation(true)
+        toast.success('Location detected — pick a store')
+      },
+      () => {
+        setGeoLoading(false)
+        // Fallback: just open the location editor
+        startEditLocation()
+        toast.info('Could not detect location — enter manually')
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+  }, [startEditLocation])
+
   if (!session) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -161,31 +186,6 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     { value: 'flea-market', label: 'Flea Market' },
     { value: 'other', label: 'Other' },
   ]
-
-  // Geolocation: detect nearby stores
-  const [geoLoading, setGeoLoading] = useState(false)
-  const handleAutoLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      toast.error('Location not supported on this device')
-      return
-    }
-    setGeoLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeoLoading(false)
-        setEditLocationAddress(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`)
-        setEditingLocation(true)
-        toast.success('Location detected — pick a store')
-      },
-      () => {
-        setGeoLoading(false)
-        // Fallback: just open the location editor
-        startEditLocation()
-        toast.info('Could not detect location — enter manually')
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    )
-  }, [startEditLocation])
 
   return (
     <div className="h-full flex flex-col bg-bg">

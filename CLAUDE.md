@@ -1,3 +1,158 @@
+# Resale Scanner Pro — Engineering Protocol
+
+> Governs Claude Code behavior across all sessions.
+> Source of truth for workflow, PR standards, and deployment gates.
+> Committed to the repo so it persists across sessions and is version-controlled.
+
+---
+
+## 1. Development Workflow
+
+All work follows six phases in sequence. No phase is skipped.
+
+### Phase 1 — Plan
+- All work begins in plan mode.
+- The plan file is written and iterated until the user explicitly approves.
+- No code is written, no files changed, no commands run during planning.
+- `AskUserQuestion` for genuine ambiguity only. `ExitPlanMode` to request approval.
+
+### Phase 2 — Execute
+- Begins only after user approves the plan.
+- Runs to completion without pausing unless a blocker requires user input.
+- All commits go on the designated feature branch (`claude/<verb>-<subject>-<hash>`).
+- Build must pass (`npm run build`) before execution is considered done.
+
+### Phase 3 — PR Gate (user-controlled pause)
+When execution is complete and build is clean, Claude asks:
+> "Build is clean. Ready to open the PR, or do you have more changes to add first?"
+
+Claude does **not** open the PR automatically. The user gives explicit approval.
+
+### Phase 4 — PR Creation
+See Section 3 for PR title and body standards.
+Claude subscribes to PR activity (`subscribe_pr_activity`) immediately after opening the PR.
+
+### Phase 5 — Review Loop (autonomous within bounds)
+When Copilot (CE-VS) or reviewers post comments:
+- **Tractable, unambiguous fix** → Claude implements, commits, pushes, replies to comment.
+- **Ambiguous or architectural** → Claude asks the user before acting.
+- **Already fixed / outdated thread** → Claude notes it and skips.
+
+Claude does **not** merge autonomously.
+
+### Phase 6 — Merge Gate (user-controlled pause)
+When all checks pass and comments are resolved, Claude asks:
+> "All checks are green and review comments are resolved. Ready to merge?"
+
+User gives explicit approval. Claude confirms Wire + Deploy ran successfully after merge.
+
+---
+
+## 2. Branch Strategy
+
+| Branch | Owner | Purpose |
+|--------|-------|---------|
+| `main` | Spark / user | Source of truth. All PRs target this. |
+| `deploy/production` | CI only | Railway watches this. Never push manually. |
+| `claude/<slug>` | Claude Code | One branch per feature/fix. |
+
+**Naming:** `claude/<verb>-<noun>-<4-char-hash>` — e.g., `claude/fix-sold-screen-qbxEA`
+
+**Lifecycle:** branch → commits → PR → merge to main → CI wires and pushes to deploy/production → Railway deploys → branch deleted.
+
+---
+
+## 3. PR Standards
+
+PRs are read by engineers, collaborators, and investors. Every PR must meet this bar.
+
+### Title
+`<type>(<scope>): <what changed and why — max 72 chars>`
+
+Types: `fix` `feat` `refactor` `ci` `chore` `docs`
+
+Good examples:
+- `ci: add type-check and lint gates before Railway deploy`
+- `fix: restore SoldScreen Notion integration, rename title to Shipping Center`
+- `feat: add Pirate Ship label integration and shipping rate card to SOLD screen`
+
+Bad examples (never do these):
+- "Update stuff" — vague
+- "Revolutionary new SOLD screen" — exaggerated
+- "Fixed the bug" — no context
+
+### Body (four required sections)
+
+```
+## Summary
+- <What changed and WHY — not just "changed X" but "changed X because Y was broken">
+- <2–4 bullets maximum — one bullet per coherent logical change>
+
+## Technical Detail
+- `path/to/file.tsx` — what changed and the mechanism by which it fixes the problem
+- Every changed file listed. Non-obvious changes explained.
+
+## Test Plan
+- [ ] <Specific, reproducible step — e.g., "SOLD tab → dark mode → 'Shipping Center' heading visible">
+- [ ] Every claim in Summary has a corresponding checkbox here.
+- No vague entries like "tested on phone" — be specific about what was tested.
+
+## Risk & Rollback
+**Risk:** Low / Medium / High — <one sentence explanation>
+**Rollback:** `git revert <sha>` on main → CI redeploys in ~2 min.
+<Any unknowns or partial confidence disclosed here.>
+```
+
+### Never
+- Hallucinate check results — only report what actually ran
+- Exaggerate ("revolutionary", "completely reimagined", "production-ready")
+- List files that weren't changed
+- Omit the test plan
+- Describe what code does instead of what problem it solves
+
+---
+
+## 4. Deployment Gates
+
+The following must all pass before any code reaches Railway:
+
+| Order | Step | Command | Catches |
+|-------|------|---------|---------|
+| 1 | Wiring validation | `node scripts/apply-wiring.mjs` | Broken App.tsx wiring anchors |
+| 2 | Type check | `npx tsc --noEmit` | Interface drift, prop mismatches, missing types |
+| 3 | Lint | `npm run lint` | Code quality regressions |
+
+**Not in CI gates:** `npm run build` — Railway runs this itself. Duplicating it wastes ~12s per deploy.
+
+**Concurrency:** `cancel-in-progress: true` — the latest commit always wins. Stale in-progress deploys are cancelled automatically.
+
+**Emergency wiring bypass:** Set `WIRING_STRICT=false` in GitHub Actions environment to allow a deploy despite anchor misses. Document why in the commit message. Fix anchors in the next commit.
+
+---
+
+## 5. Commit Standards
+
+- One logical change per commit.
+- Format: `<type>: <what changed and why>`
+- Session URL appended as trailer (Claude Code requirement — do not omit).
+- Never amend published commits. Create a new commit.
+- Never use `--no-verify`.
+
+---
+
+## 6. User Approval Required For
+
+Claude does not do any of the following without explicit user instruction:
+
+| Action | Why it requires approval |
+|--------|--------------------------|
+| Open a PR | User may have more changes to add |
+| Merge a PR | User controls when code goes to production |
+| Push to `main` directly | Bypasses review |
+| Push to `deploy/production` directly | Bypasses CI gates |
+| Force-push any branch | Destructive — can overwrite work |
+| Delete a branch | Irreversible pointer removal |
+| `git reset --hard` / `git clean -f` | Destructive — can lose uncommitted work |
 # Resale Scanner Pro
 
 Project: Resale Scanner Pro (RSP)

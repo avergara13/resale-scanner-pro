@@ -67,6 +67,7 @@ function App() {
   const [soldLoading, setSoldLoading] = useState(false)
   const [soldError, setSoldError] = useState<string | null>(null)
   const [soldSyncedAt, setSoldSyncedAt] = useState<number | null>(null)
+
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
@@ -909,6 +910,35 @@ function App() {
     toast.success('Item marked as sold')
   }, [setQueue, queue, notionService])
 
+  const loadLiveSoldItems = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setSoldLoading(true)
+    try {
+      const response = await fetchSoldItems()
+      setLiveSoldItems(response.items)
+      setSoldWarnings(response.warnings)
+      setSoldSyncedAt(response.fetchedAt)
+      setSoldError(null)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load live sold items.'
+      setSoldError(message)
+      if (!silent) toast.error(message)
+    } finally {
+      setSoldLoading(false)
+    }
+  }, [])
+
+  const handleUpdateLiveSoldShipping = useCallback(async (pageId: string, update: SoldShippingUpdateInput) => {
+    try {
+      await updateSoldItemShipping(pageId, update)
+      await loadLiveSoldItems({ silent: true })
+      toast.success('Shipping details saved')
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to save shipping details'
+      toast.error(message)
+      throw e
+    }
+  }, [loadLiveSoldItems])
+
   const handleMarkShipped = useCallback((itemId: string, trackingNumber: string, shippingCarrier: string) => {
     const shippedDate = Date.now()
     const item = (queue || []).find(i => i.id === itemId)
@@ -1504,6 +1534,13 @@ function App() {
       reset()
     }
   }, [cameraOpen, reset])
+
+  // Auto-load sold items when user navigates to the Sold screen
+  useEffect(() => {
+    if (screen === 'sold') {
+      loadLiveSoldItems()
+    }
+  }, [screen, loadLiveSoldItems])
 
   useEffect(() => {
     if (screen !== 'sold') return undefined

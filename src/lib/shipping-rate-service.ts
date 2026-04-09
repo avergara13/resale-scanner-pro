@@ -166,3 +166,4 @@ export function createPirateShipUrl(input: ShippingRateInput & { title?: string 
   })
   return `https://ship.pirateship.com/ship/single?${params.toString()}`
 }
+}
