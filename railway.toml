@@ -1,4 +1,4 @@
-# rebuild: 2026-04-04-v3-force-deploy
+# rebuild: 2026-04-09-post-pr67-deps-refresh
 [build]
 builder = "NIXPACKS"
 buildCommand = "npm install && npm run build"

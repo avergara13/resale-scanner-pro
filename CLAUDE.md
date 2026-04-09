@@ -126,7 +126,9 @@ The following must all pass before any code reaches Railway:
 
 **Concurrency:** `cancel-in-progress: true` — the latest commit always wins. Stale in-progress deploys are cancelled automatically.
 
-**Emergency wiring bypass:** Set `WIRING_STRICT=false` in GitHub Actions environment to allow a deploy despite anchor misses. Document why in the commit message. Fix anchors in the next commit.
+**Wiring anchor misses** are non-fatal (warn + continue). The tsc + lint gates catch any code issues they introduce. A stale anchor is a maintenance note, not a deploy blocker.
+
+**Fatal failures** (App.tsx integrity guards with `fatal: true`, all backend route guards) always block deploy — no bypass exists. Fix the root cause before deploying.
 
 ---
 
@@ -153,6 +155,54 @@ Claude does not do any of the following without explicit user instruction:
 | Force-push any branch | Destructive — can overwrite work |
 | Delete a branch | Irreversible pointer removal |
 | `git reset --hard` / `git clean -f` | Destructive — can lose uncommitted work |
+
+---
+
+## 7. Core vs Shell Architecture
+
+### The Model
+
+The app has two layers with different stability contracts:
+
+**Core (stable — survives every UI redesign):**
+
+| Layer | Files | Guarded by |
+|-------|-------|------------|
+| Backend API | `server.js` | `apply-wiring.mjs` BACKEND_GUARDS (fatal) |
+| Service layer | `src/lib/*.ts` | tsc type-checking |
+| Type contracts | `src/types/index.ts` | tsc type-checking |
+| Wiring script | `scripts/apply-wiring.mjs` | CI + manual review |
+
+**Shell (interchangeable — redesign freely with Spark or any AI design tool):**
+
+| Layer | Files |
+|-------|-------|
+| App orchestration | `src/App.tsx` |
+| Screen components | `src/components/screens/*.tsx` |
+| UI primitives | `src/components/ui/*.tsx` |
+
+### Replugging After a Shell Redesign
+
+When Spark (or any design tool) publishes a new App.tsx shell:
+
+1. `node scripts/apply-wiring.mjs` — injects standard service wiring; backend guards confirm server.js is intact
+2. Read the anchor-miss ⚠️ warnings — those are the manual reconnection tasks for this shell
+3. `npx tsc --noEmit` — prop mismatches and missing types surface here
+4. `npm run lint` — remaining wiring errors surface here
+5. Fix each anchor miss manually, reconnecting services/handlers to the new component structure
+6. Repeat until clean → open PR → CI gates → merge → deploy
+
+Anchor-miss warnings are the expected "reconnect these" TODO list. They are non-fatal by design.
+
+### Boundary Exception (5 Screens with Direct Service Imports)
+
+These screens import from `src/lib/` directly instead of receiving services as props:
+`AIScreen`, `AgentScreen`, `CostTrackingScreen`, `ListingDetailScreen`, `SoldScreen`
+
+When a design tool redesigns these screens from scratch, the direct imports are lost and must be manually re-added (or the screen refactored to receive the service as a prop from App.tsx). The wiring script does not guard these — tsc will surface missing imports as type errors.
+
+---
+
 # Resale Scanner Pro
 
 Project: Resale Scanner Pro (RSP)
