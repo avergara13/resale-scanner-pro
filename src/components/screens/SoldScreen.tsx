@@ -1,458 +1,436 @@
-import { useState, useMemo, useEffect } from 'react'
-import { Package, Truck, CheckCircle, Tag, TrendUp, CurrencyDollar, ArrowCounterClockwise, Clock, Warning } from '@phosphor-icons/react'
-import { Card } from '@/components/ui/card'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowClockwise, ArrowSquareOut, Package, SpinnerGap, Truck } from '@phosphor-icons/react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { getNetProfit, getShippingUrgency } from '@/lib/profit-utils'
-import type { ScannedItem, AppSettings } from '@/types'
+import { createPirateShipUrl, estimateShippingRates } from '@/lib/shipping-rate-service'
+import type { SoldItem, SoldShippingStatus, SoldShippingUpdateInput } from '@/types'
 
-type FulfillmentFilter = 'all' | 'needs-shipping' | 'shipped' | 'completed' | 'returned'
-type MarketplaceFilter = 'all' | 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
-
-const MARKETPLACE_LABELS: Record<string, string> = {
-  ebay: 'eBay',
-  mercari: 'Mercari',
-  poshmark: 'Poshmark',
-  facebook: 'Facebook',
-  whatnot: 'Whatnot',
-  other: 'Other',
-}
-
-const MARKETPLACE_COLORS: Record<string, string> = {
-  ebay: 'bg-blue-500/10 text-blue-600',
-  mercari: 'bg-red-500/10 text-red-600',
-  poshmark: 'bg-pink-500/10 text-pink-600',
-  facebook: 'bg-blue-700/10 text-blue-800',
-  whatnot: 'bg-purple-500/10 text-purple-700',
-  other: 'bg-s2 text-t3',
-}
-
-const URGENCY_COLORS: Record<string, string> = {
-  ok: 'bg-green/10 text-green',
-  warning: 'bg-amber/10 text-amber',
-  urgent: 'bg-red/10 text-red animate-pulse',
-  overdue: 'bg-red/20 text-red font-black animate-pulse',
-}
-
-// Sort priority for the "All" tab: needs-shipping first (oldest), then shipped, completed, returned
-const STATUS_SORT_ORDER: Record<string, number> = {
-  sold: 0,
-  shipped: 1,
-  completed: 2,
-  returned: 3,
-}
+type FulfillmentFilter = 'all' | 'need-label' | 'label-ready' | 'packed' | 'shipped'
 
 interface SoldScreenProps {
-  soldItems: ScannedItem[]
-  onMarkShipped: (itemId: string, trackingNumber: string, shippingCarrier: string) => void
-  onMarkCompleted: (itemId: string) => void
-  onMarkReturned: (itemId: string, reason?: string) => void
-  onRelistItem: (itemId: string) => void
-  personalSessionIds?: Set<string>
-  settings: AppSettings
+  soldItems: SoldItem[]
+  loading: boolean
+  error: string | null
+  warnings: string[]
+  lastSyncedAt: number | null
+  onRefresh: () => void
+  onUpdateShipping: (pageId: string, update: SoldShippingUpdateInput) => Promise<void>
 }
 
-export function SoldScreen({ soldItems, onMarkShipped, onMarkCompleted, onMarkReturned, onRelistItem, personalSessionIds, settings }: SoldScreenProps) {
+interface SoldItemDraft {
+  shippingStatus: SoldShippingStatus
+  trackingNumber: string
+  labelProvider: string
+  shipFromZip: string
+  packageDims: string
+  itemWeightLbs: string
+  shipNotes: string
+}
+
+const SHIPPING_STATUS_OPTIONS: SoldShippingStatus[] = ['🔴 Need Label', '🟡 Label Ready', '📦 Packed', '✅ Shipped']
+
+const LABEL_PROVIDER_OPTIONS = [
+  '🏴‍☠️ Pirate Ship',
+  '🛒 eBay Label',
+  '📮 USPS Direct',
+  '📦 UPS Direct',
+  '🟠 FedEx Direct',
+]
+
+const STATUS_BADGE_STYLES: Record<SoldShippingStatus, string> = {
+  '🔴 Need Label': 'bg-red/10 text-red border-red/20',
+  '🟡 Label Ready': 'bg-amber/10 text-amber border-amber/20',
+  '📦 Packed': 'bg-blue/10 text-blue border-blue/20',
+  '✅ Shipped': 'bg-green/10 text-green border-green/20',
+}
+
+function formatSaleDate(value?: string | null): string {
+  if (!value) return 'Unknown date'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function formatMoney(value?: number | null): string {
+  if (typeof value !== 'number') return '—'
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function buildDraft(item: SoldItem): SoldItemDraft {
+  return {
+    shippingStatus: item.shippingStatus,
+    trackingNumber: item.trackingNumber || '',
+    labelProvider: item.labelProvider || '🏴‍☠️ Pirate Ship',
+    shipFromZip: item.shipFromZip || '32806',
+    packageDims: item.packageDims || '',
+    itemWeightLbs: item.itemWeightLbs || '',
+    shipNotes: '',
+  }
+}
+
+export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, onRefresh, onUpdateShipping }: SoldScreenProps) {
   const [fulfillmentFilter, setFulfillmentFilter] = useState<FulfillmentFilter>('all')
-  const [marketplaceFilter, setMarketplaceFilter] = useState<MarketplaceFilter>('all')
-  const [shippingItemId, setShippingItemId] = useState<string | null>(null)
-  const [trackingNumber, setTrackingNumber] = useState('')
-  const [shippingCarrier, setShippingCarrier] = useState('')
-  const [returnItemId, setReturnItemId] = useState<string | null>(null)
-  const [returnReason, setReturnReason] = useState('')
-  // Tick forces re-render every 60s so urgency badges stay live
-  const [, setTick] = useState(0)
+  const [drafts, setDrafts] = useState<Record<string, SoldItemDraft>>({})
+  const [savingItemId, setSavingItemId] = useState<string | null>(null)
 
   useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 60000)
-    return () => clearInterval(interval)
-  }, [])
+    setDrafts(() => {
+      const next: Record<string, SoldItemDraft> = {}
+      for (const item of soldItems) {
+        next[item.salePageId] = buildDraft(item)
+      }
+      return next
+    })
+  }, [soldItems])
 
   const filteredItems = useMemo(() => {
-    return soldItems
-      .filter(item => {
-        if (fulfillmentFilter === 'needs-shipping') return item.listingStatus === 'sold'
-        if (fulfillmentFilter === 'shipped') return item.listingStatus === 'shipped'
-        if (fulfillmentFilter === 'completed') return item.listingStatus === 'completed'
-        if (fulfillmentFilter === 'returned') return item.listingStatus === 'returned'
-        return true
-      })
-      .filter(item => {
-        if (marketplaceFilter === 'all') return true
-        return item.soldOn === marketplaceFilter
-      })
-      .sort((a, b) => {
-        const orderA = STATUS_SORT_ORDER[a.listingStatus || ''] ?? 9
-        const orderB = STATUS_SORT_ORDER[b.listingStatus || ''] ?? 9
-        if (orderA !== orderB) return orderA - orderB
-        // Within "sold" (needs shipping): oldest first (most urgent)
-        if (a.listingStatus === 'sold' && b.listingStatus === 'sold') {
-          return (a.soldDate || 0) - (b.soldDate || 0)
-        }
-        // Everything else: newest first
-        return (b.soldDate || 0) - (a.soldDate || 0)
-      })
-  }, [soldItems, fulfillmentFilter, marketplaceFilter])
-
-  const activeItems = useMemo(() =>
-    soldItems.filter(i => i.listingStatus !== 'returned'),
-  [soldItems])
+    return soldItems.filter((item) => {
+      if (fulfillmentFilter === 'all') return true
+      if (fulfillmentFilter === 'need-label') return item.shippingStatus === '🔴 Need Label'
+      if (fulfillmentFilter === 'label-ready') return item.shippingStatus === '🟡 Label Ready'
+      if (fulfillmentFilter === 'packed') return item.shippingStatus === '📦 Packed'
+      return item.shippingStatus === '✅ Shipped'
+    })
+  }, [fulfillmentFilter, soldItems])
 
   const stats = useMemo(() => {
-    const businessActive = activeItems.filter(i =>
-      !i.sessionId || !personalSessionIds?.has(i.sessionId)
-    )
-    const totalSold = activeItems.length
-    const netProfit = businessActive.reduce((s, i) => s + getNetProfit(i, settings).netProfit, 0)
-    const needsShipping = soldItems.filter(i => i.listingStatus === 'sold').length
-    const returnedCount = soldItems.filter(i => i.listingStatus === 'returned').length
-
-    // Avg days to sell (for items with soldDate)
-    const itemsWithSoldDate = activeItems.filter(i => i.soldDate)
-    const avgDaysToSell = itemsWithSoldDate.length > 0
-      ? itemsWithSoldDate.reduce((s, i) => {
-          const listedDate = i.publishedDate ?? i.timestamp
-          return s + ((i.soldDate! - listedDate) / 86400000)
-        }, 0) / itemsWithSoldDate.length
-      : 0
-
-    return { totalSold, netProfit, needsShipping, avgDaysToSell, returnedCount }
-  }, [activeItems, soldItems, personalSessionIds, settings])
-
-  const handleConfirmShipped = (itemId: string) => {
-    onMarkShipped(itemId, trackingNumber.trim(), shippingCarrier.trim())
-    setShippingItemId(null)
-    setTrackingNumber('')
-    setShippingCarrier('')
-  }
-
-  const handleConfirmReturn = (itemId: string) => {
-    onMarkReturned(itemId, returnReason.trim() || undefined)
-    setReturnItemId(null)
-    setReturnReason('')
-  }
-
-  const formatDate = (ts?: number) => {
-    if (!ts) return '—'
-    const d = new Date(ts)
-    const now = new Date()
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
-    if (diffDays === 0) return 'Today'
-    if (diffDays === 1) return 'Yesterday'
-    if (diffDays < 7) return `${diffDays}d ago`
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
-  const getDaysToSell = (item: ScannedItem) => {
-    if (!item.soldDate) return null
-    const listedDate = item.publishedDate ?? item.timestamp
-    return Math.max(0, Math.round((item.soldDate - listedDate) / 86400000))
-  }
-
-  const getStatusBadge = (item: ScannedItem) => {
-    if (item.listingStatus === 'returned') {
-      return <Badge className="text-[9px] bg-purple-500/10 text-purple-500 border-0">Returned</Badge>
+    const totalSales = soldItems.length
+    const totalRevenue = soldItems.reduce((sum, item) => sum + (item.salePrice || 0), 0)
+    return {
+      totalSales,
+      totalRevenue,
+      needLabel: soldItems.filter((item) => item.shippingStatus === '🔴 Need Label').length,
+      shipped: soldItems.filter((item) => item.shippingStatus === '✅ Shipped').length,
     }
-    if (item.listingStatus === 'completed') {
-      return <Badge className="text-[9px] bg-green/10 text-green border-0">Completed</Badge>
-    }
-    if (item.listingStatus === 'shipped') {
-      return <Badge className="text-[9px] bg-blue/10 text-blue border-0">Shipped</Badge>
-    }
-    return <Badge className="text-[9px] bg-amber/10 text-amber border-0">Needs Shipping</Badge>
+  }, [soldItems])
+
+  const lastSyncedLabel = useMemo(() => {
+    if (!lastSyncedAt) return 'Not synced yet'
+    return `Synced ${new Date(lastSyncedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  }, [lastSyncedAt])
+
+  const handleDraftChange = (pageId: string, key: keyof SoldItemDraft, value: string) => {
+    setDrafts((previous) => ({
+      ...previous,
+      [pageId]: {
+        ...(previous[pageId] || {
+          shippingStatus: '🔴 Need Label',
+          trackingNumber: '',
+          labelProvider: '🏴‍☠️ Pirate Ship',
+          shipFromZip: '32806',
+          packageDims: '',
+          itemWeightLbs: '',
+          shipNotes: '',
+        }),
+        [key]: value,
+      },
+    }))
   }
 
-  if (soldItems.length === 0) {
+  const handleSave = async (item: SoldItem) => {
+    const draft = drafts[item.salePageId] || buildDraft(item)
+    setSavingItemId(item.salePageId)
+    try {
+      await onUpdateShipping(item.salePageId, draft)
+    } finally {
+      setSavingItemId(null)
+    }
+  }
+
+  if (loading && soldItems.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center px-8 text-center">
-        <Tag size={56} weight="duotone" className="text-t3 mb-4 opacity-40" />
-        <h2 className="text-lg font-bold text-t1 mb-2">No Sold Items Yet</h2>
-        <p className="text-sm text-t3 max-w-xs">
-          Mark items as sold from the Listings tab once they sell on your marketplace.
-        </p>
+      <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-8">
+        <SpinnerGap size={28} className="animate-spin text-b1" />
+        <div>
+          <h2 className="text-lg font-bold text-t1">Loading Live Sold Feed</h2>
+          <p className="text-sm text-t3">Reading the current Sales and Inventory data lane.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && soldItems.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-4 text-center px-8">
+        <Truck size={48} className="text-red" weight="duotone" />
+        <div>
+          <h2 className="text-lg font-bold text-t1">Sold Feed Unavailable</h2>
+          <p className="text-sm text-t3 max-w-sm">{error}</p>
+        </div>
+        <Button onClick={onRefresh} className="bg-b1 text-white">
+          <ArrowClockwise size={14} className="mr-1.5" />
+          Retry
+        </Button>
       </div>
     )
   }
 
   return (
     <div className="h-full flex flex-col bg-bg">
-      {/* Page title */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-black text-t1 tracking-tight">Shipping Center</h1>
-          <p className="text-[10px] text-t3 font-medium uppercase tracking-wider mt-0.5">
-            {stats.totalSold} sold · {stats.needsShipping} to ship
-          </p>
-        </div>
-      </div>
-      {/* Stats row — 4 cards */}
-      <div className="px-4 pt-2 pb-3 grid grid-cols-4 gap-1.5">
-        <div className="stat-card p-2.5 text-center">
-          <div className="text-base font-black text-t1">{stats.totalSold}</div>
-          <div className="text-[8px] text-t3 uppercase tracking-wider font-bold mt-0.5">Sold</div>
-        </div>
-        <div className="stat-card p-2.5 text-center">
-          <div className={cn('text-base font-black', stats.netProfit >= 0 ? 'text-green' : 'text-red')}>
-            ${Math.abs(stats.netProfit).toFixed(0)}
+      <div className="px-4 pt-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-t1">Shipping Center</h2>
+            <p className="text-xs text-t3">{lastSyncedLabel}</p>
           </div>
-          <div className="text-[8px] text-t3 uppercase tracking-wider font-bold mt-0.5">Net Profit</div>
+          <Button onClick={onRefresh} variant="outline" className="h-9 border-b1/30 text-b1">
+            <ArrowClockwise size={14} className={cn('mr-1.5', loading && 'animate-spin')} />
+            Refresh
+          </Button>
         </div>
-        <div className="stat-card p-2.5 text-center">
-          <div className={cn('text-base font-black', stats.needsShipping > 0 ? 'text-amber' : 'text-t3')}>
-            {stats.needsShipping}
-          </div>
-          <div className="text-[8px] text-t3 uppercase tracking-wider font-bold mt-0.5">Ship</div>
-        </div>
-        <div className="stat-card p-2.5 text-center">
-          <div className="text-base font-black text-t1">{stats.avgDaysToSell > 0 ? `${stats.avgDaysToSell.toFixed(1)}` : '—'}</div>
-          <div className="text-[8px] text-t3 uppercase tracking-wider font-bold mt-0.5">Avg Days</div>
-        </div>
-      </div>
 
-      {/* Fulfillment filter tabs */}
-      <div className="px-4 pb-2 flex gap-1.5">
-        {(['all', 'needs-shipping', 'shipped', 'completed', 'returned'] as FulfillmentFilter[]).map(f => {
-          const isShipTab = f === 'needs-shipping'
-          const label = f === 'all' ? 'All'
-            : f === 'needs-shipping' ? (stats.needsShipping > 0 ? `Ship (${stats.needsShipping})` : 'Ship')
-            : f === 'shipped' ? 'Shipped'
-            : f === 'completed' ? 'Done'
-            : stats.returnedCount > 0 ? `Returns (${stats.returnedCount})` : 'Returns'
-          return (
+        {warnings.length > 0 && (
+          <Card className="border-amber/20 bg-amber/5 p-3 text-xs text-amber space-y-1">
+            {warnings.map((warning) => (
+              <p key={warning}>{warning}</p>
+            ))}
+          </Card>
+        )}
+
+        <div className="grid grid-cols-4 gap-2">
+          <Card className="p-3 text-center border-s2">
+            <div className="text-lg font-black text-t1">{stats.totalSales}</div>
+            <div className="text-[10px] uppercase tracking-wide text-t3">Sold</div>
+          </Card>
+          <Card className="p-3 text-center border-s2">
+            <div className="text-lg font-black text-t1">{formatMoney(stats.totalRevenue)}</div>
+            <div className="text-[10px] uppercase tracking-wide text-t3">Revenue</div>
+          </Card>
+          <Card className="p-3 text-center border-s2">
+            <div className="text-lg font-black text-red">{stats.needLabel}</div>
+            <div className="text-[10px] uppercase tracking-wide text-t3">Need Label</div>
+          </Card>
+          <Card className="p-3 text-center border-s2">
+            <div className="text-lg font-black text-green">{stats.shipped}</div>
+            <div className="text-[10px] uppercase tracking-wide text-t3">Shipped</div>
+          </Card>
+        </div>
+
+        <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
+          {([
+            ['all', 'All'],
+            ['need-label', 'Need Label'],
+            ['label-ready', 'Label Ready'],
+            ['packed', 'Packed'],
+            ['shipped', 'Shipped'],
+          ] as Array<[FulfillmentFilter, string]>).map(([filter, label]) => (
             <button
-              key={f}
-              onClick={() => setFulfillmentFilter(f)}
+              key={filter}
+              onClick={() => setFulfillmentFilter(filter)}
               className={cn(
-                'flex-1 py-1.5 text-[9px] font-bold uppercase rounded-lg transition-all',
-                fulfillmentFilter === f
-                  ? (isShipTab && stats.needsShipping > 0 ? 'bg-amber text-white' : 'bg-b1 text-white')
-                  : (isShipTab && stats.needsShipping > 0 ? 'bg-amber/15 text-amber' : 'bg-s1 text-t3')
+                'flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase transition-colors',
+                fulfillmentFilter === filter ? 'bg-b1 text-white' : 'bg-s1 text-t3',
               )}
             >
               {label}
             </button>
-          )
-        })}
+          ))}
+        </div>
       </div>
 
-      {/* Marketplace filter */}
-      <div className="px-4 pb-3 flex gap-1 overflow-x-auto scrollbar-hide">
-        {(['all', 'ebay', 'mercari', 'poshmark', 'facebook', 'whatnot', 'other'] as MarketplaceFilter[]).map(m => (
-          <button
-            key={m}
-            onClick={() => setMarketplaceFilter(m)}
-            className={cn(
-              'flex-shrink-0 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase transition-all',
-              marketplaceFilter === m ? 'bg-b1 text-white' : 'bg-s1 text-t3'
-            )}
-          >
-            {m === 'all' ? 'All' : MARKETPLACE_LABELS[m]}
-          </button>
-        ))}
-      </div>
-
-      {/* Items list */}
-      <div className="flex-1 overflow-y-auto px-4 pb-28 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 pb-28 pt-3 space-y-4">
         {filteredItems.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-sm text-t3">No items match this filter</p>
+          <div className="h-full flex flex-col items-center justify-center text-center px-8">
+            <Package size={48} className="text-t3 opacity-40 mb-4" weight="duotone" />
+            <h3 className="text-lg font-bold text-t1">No Live Sales Yet</h3>
+            <p className="text-sm text-t3 max-w-sm">
+              The Sales database is connected, but there are no sold records matching this filter yet.
+            </p>
           </div>
         ) : (
-          filteredItems.map(item => {
-            const { netProfit } = getNetProfit(item, settings)
-            const urgency = item.listingStatus === 'sold' ? getShippingUrgency(item.soldDate) : null
-            const daysToSell = getDaysToSell(item)
-            const isShippingExpanded = shippingItemId === item.id
-            const isReturnExpanded = returnItemId === item.id
+          filteredItems.map((item) => {
+            const draft = drafts[item.salePageId] || buildDraft(item)
+            const quotes = estimateShippingRates({
+              itemWeightLbs: draft.itemWeightLbs,
+              packageDims: draft.packageDims,
+              originZip: draft.shipFromZip,
+              destinationZip: item.buyerZip,
+              platform: item.platform,
+            })
+            const pirateShipUrl = createPirateShipUrl({
+              title: item.title,
+              itemWeightLbs: draft.itemWeightLbs,
+              packageDims: draft.packageDims,
+              originZip: draft.shipFromZip,
+              destinationZip: item.buyerZip,
+              platform: item.platform,
+            })
 
             return (
-              <Card key={item.id} className={cn('p-4 border-s2', urgency?.level === 'overdue' && 'border-red/40 bg-red/5')}>
-                {/* Item header row */}
-                <div className="flex items-start gap-3 mb-3">
-                  {(item.imageThumbnail || item.imageData) ? (
-                    <img
-                      src={item.imageThumbnail || item.imageData}
-                      alt={item.productName || 'Item'}
-                      className="w-14 h-14 rounded-lg object-cover bg-s1 flex-shrink-0"
-                    />
+              <Card key={item.salePageId} className="border-s2 p-4 space-y-4">
+                <div className="flex gap-3">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.title} className="h-16 w-16 rounded-xl object-cover bg-s1" />
                   ) : (
-                    <div className="w-14 h-14 rounded-lg bg-s1 flex items-center justify-center flex-shrink-0">
+                    <div className="h-16 w-16 rounded-xl bg-s1 flex items-center justify-center">
                       <Package size={20} className="text-t3" />
                     </div>
                   )}
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-t1 truncate">{item.productName || 'Unknown Item'}</p>
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      {getStatusBadge(item)}
-                      {urgency && urgency.label && (
-                        <Badge className={cn('text-[8px] border-0 font-bold', URGENCY_COLORS[urgency.level])}>
-                          {urgency.level === 'urgent' || urgency.level === 'overdue'
-                            ? <Warning size={9} weight="fill" className="mr-0.5 inline" />
-                            : <Clock size={9} className="mr-0.5 inline" />
-                          }
-                          {urgency.label}
-                        </Badge>
-                      )}
-                      {item.soldOn && (
-                        <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-md', MARKETPLACE_COLORS[item.soldOn] || MARKETPLACE_COLORS.other)}>
-                          {MARKETPLACE_LABELS[item.soldOn] || item.soldOn}
-                        </span>
-                      )}
-                      <span className="text-[9px] text-t3">{formatDate(item.soldDate)}</span>
-                      {daysToSell !== null && item.listingStatus !== 'sold' && item.listingStatus !== 'returned' && (
-                        <span className="text-[8px] text-t3 font-mono">Sold in {daysToSell}d</span>
-                      )}
-                      {item.sessionId && personalSessionIds?.has(item.sessionId) && (
-                        <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase">Personal</span>
-                      )}
-                    </div>
-                    {item.listingStatus === 'returned' && item.returnReason && (
-                      <p className="text-[10px] text-t3 mt-1 italic">Reason: {item.returnReason}</p>
-                    )}
-                  </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-black text-t1 leading-tight">{item.title}</h3>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <Badge className={cn('border text-[10px]', STATUS_BADGE_STYLES[draft.shippingStatus])}>
+                            {draft.shippingStatus}
+                          </Badge>
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-t3">{item.platform}</span>
+                          <span className="text-[10px] text-t3">Sold {formatSaleDate(item.saleDate)}</span>
+                          <span className="text-[10px] text-t3">Source: {item.metadataSource}</span>
+                        </div>
+                      </div>
 
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-black text-t1">${(item.soldPrice || 0).toFixed(2)}</div>
-                    <div className={cn('text-[10px] font-bold flex items-center gap-0.5 justify-end mt-0.5', netProfit >= 0 ? 'text-green' : 'text-red')}>
-                      {netProfit >= 0 ? <TrendUp size={10} /> : <CurrencyDollar size={10} />}
-                      {netProfit >= 0 ? '+' : '-'}${Math.abs(netProfit).toFixed(2)}
+                      <div className="text-right">
+                        <div className="text-lg font-black text-t1">{formatMoney(item.salePrice)}</div>
+                        {item.orderNumber && <div className="text-[10px] text-t3">Order {item.orderNumber}</div>}
+                      </div>
                     </div>
-                    <div className="text-[8px] text-t3 mt-0.5">net</div>
+
+                    <div className="grid grid-cols-2 gap-2 mt-3 text-[11px] text-t2">
+                      <div>
+                        <span className="text-t3">Buyer ZIP:</span> {item.buyerZip || 'Pending sync'}
+                      </div>
+                      <div>
+                        <span className="text-t3">Buyer:</span> {item.buyerInfo || 'Pending sync'}
+                      </div>
+                      <div>
+                        <span className="text-t3">Tracking:</span> {item.trackingNumber || 'Not set'}
+                      </div>
+                      <div>
+                        <span className="text-t3">Label:</span> {item.labelProvider || 'Not set'}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Shipping info if shipped */}
-                {item.trackingNumber && (
-                  <div className="mb-3 px-3 py-2 bg-s1 rounded-lg text-[10px] text-t2">
-                    <span className="font-bold text-t3 uppercase tracking-wide">Tracking: </span>
-                    {item.shippingCarrier && <span className="font-bold">{item.shippingCarrier} — </span>}
-                    <span className="font-mono">{item.trackingNumber}</span>
-                  </div>
-                )}
-
-                {/* Shipping expand form */}
-                {isShippingExpanded && (
-                  <div className="mb-3 p-3 bg-s1 rounded-lg space-y-2">
-                    <Label className="text-[10px] uppercase tracking-wide text-t3">Shipping Info (optional)</Label>
-                    <Input
-                      value={shippingCarrier}
-                      onChange={e => setShippingCarrier(e.target.value)}
-                      placeholder="Carrier (USPS, UPS, FedEx…)"
-                      className="h-8 text-sm"
-                    />
-                    <Input
-                      value={trackingNumber}
-                      onChange={e => setTrackingNumber(e.target.value)}
-                      placeholder="Tracking number"
-                      className="h-8 text-sm font-mono"
-                    />
-                    <div className="flex gap-2 pt-1">
-                      <Button size="sm" onClick={() => handleConfirmShipped(item.id)} className="bg-b1 text-white text-xs h-8 flex-1">
-                        Mark Shipped
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setShippingItemId(null)} className="text-xs h-8">
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Return expand form */}
-                {isReturnExpanded && (
-                  <div className="mb-3 p-3 bg-s1 rounded-lg space-y-2">
-                    <Label className="text-[10px] uppercase tracking-wide text-t3">Return Reason (optional)</Label>
-                    <Input
-                      value={returnReason}
-                      onChange={e => setReturnReason(e.target.value)}
-                      placeholder="e.g. Defective, buyer remorse…"
-                      className="h-8 text-sm"
-                      autoFocus
-                    />
-                    <div className="flex gap-2 pt-1">
-                      <Button size="sm" onClick={() => handleConfirmReturn(item.id)} className="bg-red/80 text-white text-xs h-8 flex-1">
-                        Confirm Return
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setReturnItemId(null); setReturnReason('') }} className="text-xs h-8">
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Action buttons */}
-                <div className="flex gap-2">
-                  {item.listingStatus === 'sold' && !isShippingExpanded && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setShippingItemId(item.id)
-                        setTrackingNumber('')
-                        setShippingCarrier('')
-                      }}
-                      className={cn(
-                        'flex-1 h-8 text-[10px]',
-                        urgency?.level === 'overdue' || urgency?.level === 'urgent'
-                          ? 'border-red/40 text-red bg-red/5'
-                          : 'border-b1/30 text-b1'
-                      )}
-                    >
-                      <Truck size={12} weight="bold" className="mr-1" />
-                      {urgency?.level === 'overdue' ? 'SHIP NOW' : 'Mark Shipped'}
-                    </Button>
-                  )}
-                  {item.listingStatus === 'shipped' && !isReturnExpanded && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onMarkCompleted(item.id)}
-                        className="flex-1 h-8 text-[10px] border-green/30 text-green"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-3 rounded-xl bg-s1 p-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase tracking-wide text-t3">Shipping Status</Label>
+                      <select
+                        aria-label={`Shipping status for ${item.title}`}
+                        value={draft.shippingStatus}
+                        onChange={(event) => handleDraftChange(item.salePageId, 'shippingStatus', event.target.value)}
+                        className="h-9 w-full rounded-lg border border-s2 bg-bg px-3 text-sm text-t1"
                       >
-                        <CheckCircle size={12} className="mr-1" />
-                        Complete
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => { setReturnItemId(item.id); setReturnReason('') }}
-                        className="h-8 text-[10px] text-t3"
-                      >
-                        Return
-                      </Button>
-                    </>
-                  )}
-                  {item.listingStatus === 'completed' && !isReturnExpanded && (
-                    <div className="flex-1 flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-[10px] text-green font-bold">
-                        <CheckCircle size={14} weight="fill" />
-                        Transaction Complete
+                        {SHIPPING_STATUS_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase tracking-wide text-t3">Ship From ZIP</Label>
+                        <Input value={draft.shipFromZip} onChange={(event) => handleDraftChange(item.salePageId, 'shipFromZip', event.target.value)} />
                       </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase tracking-wide text-t3">Buyer ZIP</Label>
+                        <Input value={item.buyerZip || ''} readOnly className="text-t3" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase tracking-wide text-t3">Weight lbs</Label>
+                        <Input value={draft.itemWeightLbs} onChange={(event) => handleDraftChange(item.salePageId, 'itemWeightLbs', event.target.value)} placeholder="1.25" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase tracking-wide text-t3">Package Dims</Label>
+                        <Input value={draft.packageDims} onChange={(event) => handleDraftChange(item.salePageId, 'packageDims', event.target.value)} placeholder="10 x 6 x 4" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase tracking-wide text-t3">Tracking Number</Label>
+                        <Input value={draft.trackingNumber} onChange={(event) => handleDraftChange(item.salePageId, 'trackingNumber', event.target.value)} placeholder="9400..." />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] uppercase tracking-wide text-t3">Label Provider</Label>
+                        <select
+                          aria-label={`Label provider for ${item.title}`}
+                          value={draft.labelProvider}
+                          onChange={(event) => handleDraftChange(item.salePageId, 'labelProvider', event.target.value)}
+                          className="h-9 w-full rounded-lg border border-s2 bg-bg px-3 text-sm text-t1"
+                        >
+                          {LABEL_PROVIDER_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase tracking-wide text-t3">Ship Notes</Label>
+                      <Input value={draft.shipNotes} onChange={(event) => handleDraftChange(item.salePageId, 'shipNotes', event.target.value)} placeholder="Pickup, box type, or handoff notes" />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pt-1">
                       <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => { setReturnItemId(item.id); setReturnReason('') }}
-                        className="h-7 text-[9px] text-t3 px-2"
+                        onClick={() => handleSave(item)}
+                        className="bg-b1 text-white"
+                        disabled={savingItemId === item.salePageId}
                       >
-                        Return
+                        {savingItemId === item.salePageId && <SpinnerGap size={14} className="mr-1.5 animate-spin" />}
+                        Save Shipping
+                      </Button>
+                      <Button asChild variant="outline" className="border-b1/30 text-b1">
+                        <a href={pirateShipUrl} target="_blank" rel="noreferrer">
+                          <ArrowSquareOut size={14} className="mr-1.5" />
+                          Pirate Ship
+                        </a>
                       </Button>
                     </div>
-                  )}
-                  {item.listingStatus === 'returned' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onRelistItem(item.id)}
-                      className="flex-1 h-8 text-[10px] border-b1/30 text-b1"
-                    >
-                      <ArrowCounterClockwise size={12} className="mr-1" />
-                      Re-list
-                    </Button>
-                  )}
+                  </div>
+
+                  <div className="space-y-3 rounded-xl bg-s1 p-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-t3">Shipping Rate Card</p>
+                      <h4 className="text-sm font-black text-t1 mt-1">Top 3 cheapest guide-based options</h4>
+                    </div>
+
+                    <div className="space-y-2">
+                      {quotes.map((quote) => (
+                        <div
+                          key={quote.id}
+                          className={cn(
+                            'rounded-xl border p-3',
+                            quote.isBestValue ? 'border-green/30 bg-green/5' : 'border-s2 bg-bg',
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-bold text-t1">{quote.carrier} {quote.service}</p>
+                                {quote.isBestValue && <Badge className="border-0 bg-green text-white text-[10px]">Best</Badge>}
+                              </div>
+                              <p className="text-[11px] text-t3 mt-1">{quote.eta} • {quote.note}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-black text-t1">{formatMoney(quote.amount)}</p>
+                              <p className="text-[10px] text-t3">Guide estimate</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-xl border border-s2 bg-bg p-3 text-[11px] text-t2 space-y-1">
+                      <p><span className="text-t3">Fallback:</span> live guide-based estimate from the 32806 shipping matrix.</p>
+                      <p><span className="text-t3">Rule:</span> Flat Rate usually wins when the item is heavy and actually fits the box.</p>
+                      <p><span className="text-t3">Platform adjustment:</span> eBay rates get the built-in commercial-label discount.</p>
+                    </div>
+                  </div>
                 </div>
               </Card>
             )

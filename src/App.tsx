@@ -27,6 +27,7 @@ import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
 import { createListingOptimizationService } from './lib/listing-optimization-service'
 import { createNotionService } from './lib/notion-service'
+import { fetchSoldItems, updateSoldItemShipping } from './lib/sold-service'
 import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
 import { useImageOptimization } from './hooks/use-image-optimization'
@@ -34,7 +35,7 @@ import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { BarcodeProduct } from './lib/barcode-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform, SoldItem, SoldShippingUpdateInput } from './types'
 import { cn } from './lib/utils'
 
 /** Pure helper — determines BUY/PASS/PENDING from profit metrics */
@@ -61,7 +62,12 @@ function App() {
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
-  
+  const [liveSoldItems, setLiveSoldItems] = useState<SoldItem[]>([])
+  const [soldWarnings, setSoldWarnings] = useState<string[]>([])
+  const [soldLoading, setSoldLoading] = useState(false)
+  const [soldError, setSoldError] = useState<string | null>(null)
+  const [soldSyncedAt, setSoldSyncedAt] = useState<number | null>(null)
+
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
@@ -874,6 +880,29 @@ function App() {
     }
     toast.success('Item marked as sold')
   }, [setQueue, queue, notionService])
+
+  const loadLiveSoldItems = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setSoldLoading(true)
+    try {
+      const response = await fetchSoldItems()
+      setLiveSoldItems(response.items)
+      setSoldWarnings(response.warnings)
+      setSoldSyncedAt(response.fetchedAt)
+      setSoldError(null)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load live sold items.'
+      setSoldError(message)
+      if (!silent) toast.error(message)
+    } finally {
+      setSoldLoading(false)
+    }
+  }, [])
+
+  const handleUpdateLiveSoldShipping = useCallback(async (pageId: string, update: SoldShippingUpdateInput) => {
+    await updateSoldItemShipping(pageId, update)
+    await loadLiveSoldItems({ silent: true })
+    toast.success('Shipping details saved')
+  }, [loadLiveSoldItems])
 
   const handleMarkShipped = useCallback((itemId: string, trackingNumber: string, shippingCarrier: string) => {
     const shippedDate = Date.now()
@@ -1700,15 +1729,13 @@ function App() {
               className="w-full h-full"
             >
               <SoldScreen
-                soldItems={(queue || []).filter(i =>
-                  i.listingStatus === 'sold' || i.listingStatus === 'shipped' || i.listingStatus === 'completed' || i.listingStatus === 'returned'
-                )}
-                onMarkShipped={handleMarkShipped}
-                onMarkCompleted={handleMarkCompleted}
-                onMarkReturned={handleMarkReturned}
-                onRelistItem={handleRelistItem}
-                personalSessionIds={personalSessionIds}
-                settings={settings}
+                soldItems={liveSoldItems}
+                loading={soldLoading}
+                error={soldError}
+                warnings={soldWarnings}
+                lastSyncedAt={soldSyncedAt}
+                onRefresh={() => loadLiveSoldItems()}
+                onUpdateShipping={handleUpdateLiveSoldShipping}
               />
             </motion.div>
           )}
