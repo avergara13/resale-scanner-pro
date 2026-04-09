@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { marked } from 'marked'
 import { Robot, Plus, Microphone, Scan, FloppyDisk, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash, ArrowClockwise, ArrowCounterClockwise, XCircle, ShoppingCart } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -797,7 +798,18 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                         : "bg-fg border border-s2 text-t1"
                     )}
                   >
-                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    {msg.role === 'user' ? (
+                      <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    ) : (
+                      <div
+                        className="text-xs sm:text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_strong]:font-semibold"
+                        dangerouslySetInnerHTML={{ __html: marked.parse(
+                          msg.content
+                            .replace(/^([A-Z_]+):\s*N\/A\s*$/gm, '')
+                            .trim()
+                        ) as string }}
+                      />
+                    )}
                     <p className={cn(
                       "text-[10px] sm:text-xs mt-1 sm:mt-1.5",
                       msg.role === 'user' ? "text-white/70" : "text-t3"
