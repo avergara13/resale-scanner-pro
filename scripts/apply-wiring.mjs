@@ -158,9 +158,13 @@ const WIRING_CHECKS = [
   },
 
   // ── 6. AgentScreen JSX props ───────────────────────────────────────────────
+  // Guard: only patch if <AgentScreen is actually rendered in App.tsx.
+  // App.tsx currently uses <AIScreen for the agent tab (a different component
+  // that does not accept onOptimizeItem/onPushToNotion). Skip this check when
+  // AgentScreen is absent so we don't add props to the wrong component.
   {
     name: 'JSX: AgentScreen onOptimizeItem + onPushToNotion props',
-    detect: src => src.includes('onOptimizeItem={handleOptimizeItem}'),
+    detect: src => !src.includes('<AgentScreen') || src.includes('onOptimizeItem={handleOptimizeItem}'),
     patch: src => src.replace(
       /(<AgentScreen[\s\S]*?)(onNavigateToQueue=\{[^}]+\})/,
       '$1onOptimizeItem={handleOptimizeItem}\n                onPushToNotion={handlePushToNotion}\n                $2'
