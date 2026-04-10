@@ -111,12 +111,14 @@ function App() {
   const { state: retryState, startRetry, updateRetry, completeRetry } = useRetryTracker()
 
   const ebayService = useMemo(() => {
-    return createEbayService(
-      settings?.ebayAppId,
-      settings?.ebayDevId,
-      settings?.ebayCertId,
-      settings?.ebayApiKey
-    )
+    // Prefer stored settings (so the user can override per-device), fall back
+    // to env vars so fresh installs auto-pick up sandbox credentials without
+    // the user having to copy them into Settings.
+    const appId  = settings?.ebayAppId  || import.meta.env.VITE_EBAY_APP_ID
+    const devId  = settings?.ebayDevId  || import.meta.env.VITE_EBAY_DEV_ID
+    const certId = settings?.ebayCertId || import.meta.env.VITE_EBAY_CERT_ID
+    const oauth  = settings?.ebayApiKey // no env fallback — OAuth token is runtime-issued
+    return createEbayService(appId, devId, certId, oauth)
   }, [settings?.ebayAppId, settings?.ebayDevId, settings?.ebayCertId, settings?.ebayApiKey])
 
   const geminiService = useMemo(() => {
@@ -666,15 +668,20 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
-    const now = new Date()
-    const hour = now.getHours()
-    const timeOfDay = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
-    const dayName = now.toLocaleDateString('en-US', { weekday: 'short' })
-    const monthDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const name = `${dayName} ${timeOfDay} — ${monthDay}`
+    // Compute next session number by scanning existing sessions. Defensively
+    // coerces missing/invalid numbers to 0 so the counter can never regress.
+    // This is the value shown as the default session title (#001) and also
+    // the key written to Notion as "Session #" for tax/financial rollups.
+    const nextNumber = ((allSessions || []).reduce((max, s) => {
+      const n = typeof s.sessionNumber === 'number' && Number.isFinite(s.sessionNumber) ? s.sessionNumber : 0
+      return n > max ? n : max
+    }, 0)) + 1
+    const paddedNumber = String(nextNumber).padStart(3, '0')
+    const name = `#${paddedNumber}`
     const id = Date.now().toString()
     const newSession: Session = {
       id,
+      sessionNumber: nextNumber,
       name,
       startTime: Date.now(),
       itemsScanned: 0,
@@ -688,8 +695,8 @@ function App() {
     setSession(newSession)
     setSelectedSessionId(id)
     setScreen('session-detail')
-    toast.success('Session started')
-  }, [setSession, setAllSessions, setSelectedSessionId, setScreen])
+    toast.success(`Session ${name} started`)
+  }, [allSessions, setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -852,6 +859,14 @@ function App() {
       ? listing.price - item.purchasePrice
       : (item.estimatedSellPrice || 0) - item.purchasePrice
 
+    // Look up the session this item belongs to so Notion receives the full
+    // business/personal expense classification for tax records.
+    const itemSession = item.sessionId
+      ? (allSessions || []).find(s => s.id === item.sessionId)
+      : undefined
+    const expenseType: 'Business' | 'Personal' =
+      itemSession?.sessionType === 'personal' ? 'Personal' : 'Business'
+
     const result = await notionService.pushListing({
       title: listing?.title || item.productName || 'Unknown Item',
       description: listing?.description || item.description || '',
@@ -868,6 +883,9 @@ function App() {
       timestamp: item.timestamp,
       location: item.location?.name,
       notes: item.notes,
+      sessionId: itemSession?.id,
+      sessionNumber: itemSession?.sessionNumber,
+      expenseType,
     })
 
     if (result.success) {
@@ -884,7 +902,7 @@ function App() {
     } else {
       toast.error(`Notion error: ${result.error}`)
     }
-  }, [queue, setQueue, notionService])
+  }, [queue, setQueue, notionService, allSessions])
 
   const handleMarkAsSold = useCallback((
     itemId: string,

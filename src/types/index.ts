@@ -274,6 +274,8 @@ export interface MarketData {
 
 export interface Session {
   id: string
+  /** Stable sequential number (1, 2, 3...) — used as default name (#001) and Notion session key */
+  sessionNumber?: number
   name?: string
   startTime: number
   endTime?: number

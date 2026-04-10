@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CheckCircle, XCircle, TrendUp, Target, Package, PencilSimple, Check, X, MapPin } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, TrendUp, Package, PencilSimple, Check, X } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -191,81 +191,93 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     <div className="h-full flex flex-col bg-bg">
       <div className="flex-1 overflow-y-auto pb-28">
         <div className="px-4 pt-3 pb-6">
-          {/* Header — session name + compact action buttons */}
+          {/* Header — session name on its own row, emoji action pills underneath */}
           <div className="mb-4">
-            <div className="flex items-center justify-between mb-1">
-              {editingName ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="h-8 text-lg font-black"
-                    placeholder="Session name"
-                    autoFocus
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setEditName('') } }}
-                  />
-                  <button onClick={handleSaveName} className="text-green p-2"><Check size={18} /></button>
-                  <button onClick={() => { setEditingName(false); setEditName('') }} className="text-red p-2"><X size={18} /></button>
-                </div>
-              ) : (
-                <button onClick={startEditName} className="flex items-center gap-2 active:opacity-70 transition-opacity">
-                  <h1 className="text-lg font-black tracking-tight text-t1">
-                    {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </h1>
-                  <PencilSimple size={14} className="text-t3" />
-                </button>
-              )}
+            {editingName ? (
+              <div className="flex items-center gap-2 mb-2">
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="h-9 text-lg font-black flex-1"
+                  placeholder="Session name"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setEditName('') } }}
+                />
+                <button onClick={handleSaveName} aria-label="Save name" className="w-10 h-10 flex items-center justify-center text-green active:scale-95 transition-transform"><Check size={20} weight="bold" /></button>
+                <button onClick={() => { setEditingName(false); setEditName('') }} aria-label="Cancel edit" className="w-10 h-10 flex items-center justify-center text-red active:scale-95 transition-transform"><X size={20} weight="bold" /></button>
+              </div>
+            ) : (
+              <button
+                onClick={startEditName}
+                className="flex items-center gap-2 mb-1 active:opacity-70 transition-opacity w-full text-left"
+                aria-label="Edit session name"
+              >
+                <h1 className="text-2xl font-black tracking-tight text-t1 truncate">
+                  {session.name || `#${String(session.sessionNumber ?? 1).padStart(3, '0')}`}
+                </h1>
+                <span className="w-8 h-8 flex items-center justify-center rounded-full bg-s1/60 text-t2 flex-shrink-0">
+                  <PencilSimple size={14} weight="bold" />
+                </span>
+              </button>
+            )}
 
-              {/* Compact action buttons: type, location, goal */}
-              {!editingName && (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => {
-                      const next = session.sessionType === 'personal' ? 'business' : 'personal'
-                      updateSession({ sessionType: next })
-                    }}
-                    className={cn(
-                      'w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all active:scale-95',
-                      session.sessionType === 'personal' ? 'bg-purple-500/10' : 'bg-b1/10'
-                    )}
-                  >
-                    {session.sessionType === 'personal' ? '👤' : '💼'}
-                  </button>
-                  <button
-                    onClick={handleAutoLocation}
-                    disabled={geoLoading}
-                    className={cn(
-                      'h-8 flex items-center justify-center gap-1 px-2 rounded-lg text-[10px] font-bold transition-all active:scale-95',
-                      session.location ? 'bg-green/10 text-green' : 'bg-s1 text-t3'
-                    )}
-                  >
-                    <MapPin size={14} weight={session.location ? 'fill' : 'regular'} />
-                    <span>{geoLoading ? '...' : session.location?.name?.split(' ')[0] || 'Location'}</span>
-                  </button>
-                  <button
-                    onClick={startEditGoal}
-                    className={cn(
-                      'h-8 flex items-center justify-center gap-1 px-2 rounded-lg text-[10px] font-bold transition-all active:scale-95',
-                      session.profitGoal ? 'bg-amber/10 text-amber' : 'bg-s1 text-t3'
-                    )}
-                  >
-                    <Target size={14} weight={session.profitGoal ? 'fill' : 'regular'} />
-                    <span>{session.profitGoal ? `$${session.profitGoal}` : 'Goal'}</span>
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-t3 font-medium uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-[11px] text-t3 font-medium uppercase tracking-wider mb-3">
               <span>{startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
               <span>·</span>
               <span>{startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
               {session.location && (
                 <>
                   <span>·</span>
-                  <span>{session.location.name}</span>
+                  <span className="truncate">{session.location.name}</span>
                 </>
               )}
             </div>
+
+            {/* Emoji action pills — Apple native feel, uniform height, proper spacing */}
+            {!editingName && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    const next = session.sessionType === 'personal' ? 'business' : 'personal'
+                    updateSession({ sessionType: next })
+                    toast.success(next === 'personal' ? '👤 Personal session' : '💼 Business session')
+                  }}
+                  aria-label={`Toggle to ${session.sessionType === 'personal' ? 'business' : 'personal'}`}
+                  className={cn(
+                    'h-9 flex items-center justify-center gap-1.5 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95',
+                    session.sessionType === 'personal'
+                      ? 'bg-purple-500/10 text-purple-500'
+                      : 'bg-b1/10 text-b1'
+                  )}
+                >
+                  <span className="text-base leading-none">{session.sessionType === 'personal' ? '👤' : '💼'}</span>
+                  <span>{session.sessionType === 'personal' ? 'Personal' : 'Business'}</span>
+                </button>
+                <button
+                  onClick={handleAutoLocation}
+                  disabled={geoLoading}
+                  aria-label="Set location"
+                  className={cn(
+                    'h-9 flex items-center justify-center gap-1.5 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95 disabled:opacity-60',
+                    session.location ? 'bg-green/10 text-green' : 'bg-s1 text-t3'
+                  )}
+                >
+                  <span className="text-base leading-none">📍</span>
+                  <span>{geoLoading ? '...' : session.location?.name?.split(' ')[0] || 'Location'}</span>
+                </button>
+                <button
+                  onClick={startEditGoal}
+                  aria-label="Set profit goal"
+                  className={cn(
+                    'h-9 flex items-center justify-center gap-1.5 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95',
+                    session.profitGoal ? 'bg-amber/10 text-amber' : 'bg-s1 text-t3'
+                  )}
+                >
+                  <span className="text-base leading-none">🎯</span>
+                  <span>{session.profitGoal ? `$${session.profitGoal}` : 'Goal'}</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Expandable location editor */}

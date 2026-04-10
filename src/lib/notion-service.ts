@@ -17,6 +17,11 @@ export interface NotionListingData {
   location?: string
   notes?: string
   ebayListingId?: string
+  /** Session traceability — critical for tax/financial records */
+  sessionId?: string
+  sessionNumber?: number
+  /** 'Business' or 'Personal' — determines tax deductibility */
+  expenseType?: 'Business' | 'Personal'
 }
 
 export interface NotionPushResponse {
@@ -47,8 +52,65 @@ export class NotionService {
       }
     }
 
-    try {
-      const data = await retryFetch('https://api.notion.com/v1/pages', {
+    // Base properties — guaranteed to exist in the Notion database schema.
+    const baseProperties: Record<string, unknown> = {
+      'Title': {
+        title: [{ text: { content: listing.title } }]
+      },
+      'Price': { number: listing.price },
+      'Purchase Price': { number: listing.purchasePrice },
+      'Profit': { number: listing.profit },
+      'Profit Margin': { number: listing.profitMargin },
+      'Category': { select: { name: listing.category || 'General' } },
+      'Condition': { select: { name: listing.condition || 'Good' } },
+      'Status': { select: { name: listing.status } },
+      'Tags': { multi_select: listing.tags.map(tag => ({ name: tag })) },
+      'Item ID': {
+        rich_text: [{ text: { content: listing.itemId } }]
+      },
+      'Date Added': {
+        date: { start: new Date(listing.timestamp).toISOString() }
+      },
+    }
+
+    // Session traceability for tax / financial records. Expense Type drives
+    // Business vs Personal bucket in Notion rollups at tax time.
+    // Optional — added only if database has the columns. See retry-without-
+    // session-fields fallback below for schemas that don't yet have them.
+    const sessionProperties: Record<string, unknown> = {}
+    if (listing.expenseType) {
+      sessionProperties['Expense Type'] = { select: { name: listing.expenseType } }
+    }
+    if (typeof listing.sessionNumber === 'number') {
+      sessionProperties['Session #'] = { number: listing.sessionNumber }
+    }
+    if (listing.sessionId) {
+      sessionProperties['Session ID'] = {
+        rich_text: [{ text: { content: listing.sessionId } }]
+      }
+    }
+
+    const children = [
+      {
+        object: 'block',
+        type: 'heading_2',
+        heading_2: {
+          rich_text: [{ text: { content: 'Description' } }]
+        }
+      },
+      {
+        object: 'block',
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [{
+            text: { content: listing.description || 'No description available' }
+          }]
+        }
+      }
+    ]
+
+    const attemptPush = async (properties: Record<string, unknown>) => {
+      return await retryFetch('https://api.notion.com/v1/pages', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
@@ -56,92 +118,9 @@ export class NotionService {
           'Notion-Version': '2022-06-28'
         },
         body: JSON.stringify({
-          parent: {
-            database_id: this.databaseId
-          },
-          properties: {
-            'Title': {
-              title: [
-                {
-                  text: {
-                    content: listing.title
-                  }
-                }
-              ]
-            },
-            'Price': {
-              number: listing.price
-            },
-            'Purchase Price': {
-              number: listing.purchasePrice
-            },
-            'Profit': {
-              number: listing.profit
-            },
-            'Profit Margin': {
-              number: listing.profitMargin
-            },
-            'Category': {
-              select: {
-                name: listing.category || 'General'
-              }
-            },
-            'Condition': {
-              select: {
-                name: listing.condition || 'Good'
-              }
-            },
-            'Status': {
-              select: {
-                name: listing.status
-              }
-            },
-            'Tags': {
-              multi_select: listing.tags.map(tag => ({ name: tag }))
-            },
-            'Item ID': {
-              rich_text: [
-                {
-                  text: {
-                    content: listing.itemId
-                  }
-                }
-              ]
-            },
-            'Date Added': {
-              date: {
-                start: new Date(listing.timestamp).toISOString()
-              }
-            }
-          },
-          children: [
-            {
-              object: 'block',
-              type: 'heading_2',
-              heading_2: {
-                rich_text: [
-                  {
-                    text: {
-                      content: 'Description'
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              object: 'block',
-              type: 'paragraph',
-              paragraph: {
-                rich_text: [
-                  {
-                    text: {
-                      content: listing.description || 'No description available'
-                    }
-                  }
-                ]
-              }
-            }
-          ]
+          parent: { database_id: this.databaseId },
+          properties,
+          children,
         })
       }, {
         maxRetries: 2,
@@ -151,17 +130,43 @@ export class NotionService {
           console.log(`Notion API retry attempt ${attempt} after ${delay}ms:`, error.message)
         }
       })
-      
-      return {
-        success: true,
-        pageId: data.id,
-        url: data.url
-      }
+    }
+
+    try {
+      const data = await attemptPush({ ...baseProperties, ...sessionProperties })
+      return { success: true, pageId: data.id, url: data.url }
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      // Notion rejects requests with unknown property names. If that happened
+      // and we sent session fields, retry without them so the push still
+      // succeeds and the user sees a one-time warning to add the columns.
+      const looksLikeUnknownProperty =
+        Object.keys(sessionProperties).length > 0 &&
+        (msg.includes('property') || msg.includes('validation_error') || msg.includes('400'))
+
+      if (looksLikeUnknownProperty) {
+        console.warn(
+          '[notion] Push succeeded WITHOUT session fields. Add these columns ' +
+          'to your Notion database for business/personal tax tracking: ' +
+          '"Expense Type" (Select: Business, Personal), ' +
+          '"Session #" (Number), "Session ID" (Text)'
+        )
+        try {
+          const data = await attemptPush(baseProperties)
+          return { success: true, pageId: data.id, url: data.url }
+        } catch (retryError) {
+          console.error('Failed to push to Notion (retry):', retryError)
+          return {
+            success: false,
+            error: retryError instanceof Error ? retryError.message : 'Unknown error',
+          }
+        }
+      }
+
       console.error('Failed to push to Notion:', error)
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: msg || 'Unknown error occurred'
       }
     }
   }
