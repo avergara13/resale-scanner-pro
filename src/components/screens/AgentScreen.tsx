@@ -1241,6 +1241,87 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
     </motion.div>
   )
 
+  // Task pill — same fixed position and spring animation as inputBar
+  const taskBar = (
+    <motion.div
+      key="task-pill"
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 80, opacity: 0 }}
+      transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.8 }}
+      style={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
+        zIndex: 50,
+        padding: '0 12px',
+        pointerEvents: 'none',
+      }}
+    >
+      <form
+        onSubmit={e => {
+          e.preventDefault()
+          const text = taskInput.trim()
+          if (!text) return
+          setTodos(prev => [
+            ...(prev || []),
+            { id: Date.now().toString(), text, completed: false, createdBy: 'user' as const, createdAt: Date.now() },
+          ])
+          setTaskInput('')
+        }}
+        className="flex items-center gap-2"
+        style={{
+          pointerEvents: 'auto',
+          background: 'var(--glass-bg)',
+          backdropFilter: 'saturate(180%) blur(24px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(24px)',
+          border: '0.5px solid var(--glass-border)',
+          boxShadow: 'var(--glass-shadow)',
+          borderRadius: '22px',
+          padding: '6px 6px 6px 16px',
+        }}
+      >
+        <input
+          value={taskInput}
+          onChange={e => setTaskInput(e.target.value)}
+          placeholder="Add a task..."
+          style={{
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            fontSize: '15px',
+            color: 'var(--t1)',
+            minWidth: 0,
+          }}
+        />
+        <button
+          type="submit"
+          disabled={!taskInput.trim()}
+          style={{
+            width: '36px',
+            height: '36px',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '18px',
+            background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
+            boxShadow: taskInput.trim() ? 'var(--send-glow)' : 'none',
+            border: 'none',
+            cursor: 'pointer',
+            opacity: taskInput.trim() ? 1 : 0.4,
+            transition: 'opacity 0.15s, box-shadow 0.15s',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Plus size={16} weight="bold" className="text-white" />
+        </button>
+      </form>
+    </motion.div>
+  )
+
   const sortedSessions = useMemo(() =>
     [...(chatSessions || [])].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
   [chatSessions])
@@ -1415,11 +1496,11 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           <div className="p-4 space-y-3 pb-6">
             {sessionScans.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center py-12 px-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-4">
-                  <Camera size={32} weight="duotone" className="text-b1" />
+                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg" style={{ boxShadow: 'var(--send-glow)' }}>
+                  <Camera size={48} weight="duotone" className="text-white" />
                 </div>
-                <h3 className="text-base font-bold text-t1 mb-2">No Scans Yet</h3>
-                <p className="text-xs text-t3 max-w-xs mb-4">
+                <p className="text-base font-semibold text-t1 mb-1">No Scans Yet</p>
+                <p className="text-xs text-t3 max-w-[200px] leading-relaxed mb-4">
                   {currentSession?.active
                     ? 'Tap the camera button to start scanning items this session.'
                     : 'Start a session and tap the camera to scan items.'}
@@ -1532,11 +1613,11 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             <div className="p-4 space-y-1">
               {(todos || []).length === 0 && (
                 <div className="flex flex-col items-center justify-center text-center py-12 px-4">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-4">
-                    <ListChecks size={32} weight="duotone" className="text-b1" />
+                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg" style={{ boxShadow: 'var(--send-glow)' }}>
+                    <ListChecks size={48} weight="duotone" className="text-white" />
                   </div>
-                  <h3 className="text-base font-bold text-t1 mb-2">No Tasks Yet</h3>
-                  <p className="text-xs text-t3 max-w-xs">
+                  <p className="text-base font-semibold text-t1 mb-1">No Tasks Yet</p>
+                  <p className="text-xs text-t3 max-w-[200px] leading-relaxed">
                     Add tasks below, or ask the Agent in Chat to create tasks for you.
                   </p>
                 </div>
@@ -1614,81 +1695,22 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
               )}
             </div>
           </div>
-          {/* Add task input — glass pill matching chat pill */}
-          <div className="flex-shrink-0 px-3 py-2">
-            <form
-              onSubmit={e => {
-                e.preventDefault()
-                const text = taskInput.trim()
-                if (!text) return
-                setTodos(prev => [
-                  ...(prev || []),
-                  {
-                    id: Date.now().toString(),
-                    text,
-                    completed: false,
-                    createdBy: 'user' as const,
-                    createdAt: Date.now(),
-                  },
-                ])
-                setTaskInput('')
-              }}
-              className="flex items-center gap-2"
-              style={{
-                background: 'var(--glass-bg)',
-                backdropFilter: 'saturate(180%) blur(24px)',
-                WebkitBackdropFilter: 'saturate(180%) blur(24px)',
-                border: '0.5px solid var(--glass-border)',
-                boxShadow: 'var(--glass-shadow)',
-                borderRadius: '22px',
-                padding: '6px 6px 6px 16px',
-              }}
-            >
-              <input
-                value={taskInput}
-                onChange={e => setTaskInput(e.target.value)}
-                placeholder="Add a task..."
-                style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: '15px',
-                  color: 'var(--t1)',
-                  minWidth: 0,
-                }}
-              />
-              <button
-                type="submit"
-                disabled={!taskInput.trim()}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '18px',
-                  background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
-                  boxShadow: taskInput.trim() ? 'var(--send-glow)' : 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  opacity: taskInput.trim() ? 1 : 0.4,
-                  transition: 'opacity 0.15s, box-shadow 0.15s',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <Plus size={16} weight="bold" className="text-white" />
-              </button>
-            </form>
-          </div>
+          {/* Task pill is portalled — see taskBar below */}
         </div>
       )}
 
-      {/* Glass input pill — always portalled to body; AnimatePresence drives slide-in/out */}
+      {/* Chat pill — portalled to body to escape will-change containing block */}
       {createPortal(
         <AnimatePresence>
           {isCurrentScreen && activeTab === 'chat' && viewMode === 'chat' && inputBar}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* Task pill — same fixed position as chat pill, slides in/out with tab changes */}
+      {createPortal(
+        <AnimatePresence>
+          {isCurrentScreen && activeTab === 'tasks' && taskBar}
         </AnimatePresence>,
         document.body
       )}
