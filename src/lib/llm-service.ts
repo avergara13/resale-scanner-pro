@@ -286,42 +286,62 @@ ${context.category ? `Category: ${context.category}` : ''}
 ${context.brand ? `Brand: ${context.brand}` : ''}
 ${context.purchasePrice != null ? (isFreeItem ? `This item was acquired FREE (purchase price: $0).` : `Purchase price paid: $${context.purchasePrice.toFixed(2)}`) : ''}
 
-MANDATORY — search ALL of these sources RIGHT NOW before responding:
+Seller ships from Orlando, FL 32806. eBay is the primary platform.
 
-RESALE PLATFORMS (search SOLD/COMPLETED listings + count active listings for sell-through):
-• eBay completed/sold listings — ebay.com (most important: count sold vs active to estimate sell-through)
+## CRITICAL ANTI-HALLUCINATION RULES
+- ONLY report prices you actually found in search results. If you cannot find sold data, say "No sold data found" — do NOT invent prices.
+- If fewer than 3 sold comps exist, flag the data as LOW CONFIDENCE and widen the price range.
+- NEVER exaggerate sell-through rates. If you are unsure, default to MEDIUM (40-70%) and explain why.
+- Distinguish clearly between ASKING prices (what sellers list) and SOLD prices (what actually sold). Base your recommendation on SOLD prices only.
+- Do NOT use retail/MSRP as a basis for resale pricing — use actual completed sale data from resale platforms.
+
+## MANDATORY SOURCES — search ALL of these before responding:
+
+RESALE PLATFORMS (search SOLD/COMPLETED listings + count active listings):
+• eBay completed/sold listings — ebay.com (MOST IMPORTANT: how many sold recently, what prices, how many active right now)
 • Mercari — mercari.com (sold listings)
-• Poshmark — poshmark.com
+• Poshmark — poshmark.com (sold listings)
 • Whatnot — whatnot.com (auction results)
-• Facebook Marketplace — facebook.com/marketplace (local comps)
 
-RETAIL / BIG BOX (for MSRP anchor and discount context):
+RETAIL PRICE CHECK (for market value context only — NOT for setting resale price):
 • Amazon — amazon.com
 • Walmart — walmart.com
-• Best Buy — bestbuy.com
-• Target — target.com
-• Ollie's Bargain Outlet — ollies.us
+• Google Shopping — shopping.google.com (general market overview)
 ${specialtyStores.length > 0 ? `• Specialty: ${specialtyStores.join(', ')}` : ''}
 
-PROVIDE ALL OF THE FOLLOWING:
+## PROVIDE ALL OF THE FOLLOWING:
 
-1. **Resale value range** (from actual SOLD listings): Low: $X | Avg: $X | High: $X
-2. **Retail / MSRP price** (new): $X — establishes the discount % buyers expect
-3. **Sell-through rate**: Estimate what % of listed items SELL within 30 days on eBay.
-   - Count or estimate: ~X sold/week, ~Y active listings → Z% sell-through rate
+1. **Resale value range** (from actual SOLD listings ONLY — not asking prices):
+   Low: $X | Avg: $X | High: $X
+   Data confidence: HIGH (10+ sold comps) / MEDIUM (3-9 comps) / LOW (<3 comps)
+
+2. **Retail / MSRP price** (new): $X — for context only, NOT for pricing
+
+3. **Sell-through analysis** (eBay focus):
+   - Active listings right now: ~Y listings
+   - Recently sold (last 30-90 days): ~X sold
+   - Sell-through rate: Z% (sold / (sold + active))
    - Rate tier: HIGH (>70%) / MEDIUM (40–70%) / LOW (<40%)
    - Sell velocity: "~X sold per week on eBay"
-4. **Platform pricing breakdown** (with fees deducted from your take-home):
-   - eBay: List $X → you keep ~$X after 12.9% fee + ~$5 shipping
-   - Mercari: List $X → you keep ~$X after 10% fee
-   - Poshmark: List $X → you keep ~$X after 20% fee (items >$15)
-   - Whatnot: List $X → auction starting bid suggestion
-   - Facebook Marketplace: List $X → you keep $X (0% fee, local pickup)
-5. **Demand signal**: HIGH / MEDIUM / LOW — justify with search data
-6. **Best platform recommendation**: [Platform] — because [reason: volume/margin/velocity]
-${context.purchasePrice != null ? `7. **Verdict**: ${isFreeItem ? 'Which platform maximizes net profit for this FREE item (avoid platforms where fees exceed likely sale price)?' : `BUY or PASS at $${context.purchasePrice.toFixed(2)}? Show: sell price - fees - shipping - purchase price = net profit and margin`}` : ''}
+   - If data is uncertain, state "estimated" and explain your reasoning
 
-Be specific with real dollar amounts from your search. Cite actual data found.
+4. **Platform pricing breakdown** (net take-home after ALL fees):
+   - eBay: List $X → net ~$X after 12.9% FVF + 3% ad fee + $0.30/order + ~$5 shipping + $0.75 materials
+   - Mercari: List $X → net ~$X after 10% fee
+   - Poshmark: List $X → net ~$X after 20% fee (items >$15)
+   - Whatnot: Auction starting bid suggestion: $X
+
+5. **Demand signal**: HIGH / MEDIUM / LOW — justify with specific search data
+
+6. **Best platform recommendation**: [Platform] — because [reason]
+
+${context.purchasePrice != null ? `7. **BUY/PASS Verdict**: ${isFreeItem ? 'Which platform maximizes net profit for this FREE item?' : `At $${context.purchasePrice.toFixed(2)} purchase price, show the math:
+   Sell price - eBay fee (12.9%) - ad fee (3%) - $0.30 order fee - shipping (~$5) - materials ($0.75) - purchase price = net profit
+   Margin = net profit / sell price × 100
+   Verdict: BUY (if margin ≥ 30%) or PASS (if margin < 30%)`}` : ''}
+
+## PRICING STRATEGY
+Recommend a "middle-high" listing price: above the average sold price but below the highest sold price. This maximizes margin while maintaining reasonable sell-through. The seller can always reduce later.
 
 END your response with EXACTLY these three lines (no extra text on those lines):
 RECOMMENDED_SELL_PRICE: $XX.XX
@@ -330,7 +350,7 @@ BEST_PLATFORM: [platform name]`
 
   const result = await callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 2048 })
   cacheSet(key, result, CACHE_TTL_MS.research)
-  console.info(`[llm-cache] STORE — ${productName} (expires in 30 min)`)
+  console.info(`[llm-cache] STORE — ${productName} (expires in 10 min)`)
   return result
 }
 

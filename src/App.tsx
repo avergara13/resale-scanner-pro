@@ -87,7 +87,9 @@ function App() {
     minProfitMargin: 30,
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
-    paypalFeePercent: 3.49,
+    ebayAdFeePercent: 3.0,
+    shippingMaterialsCost: 0.75,
+    paypalFeePercent: 0,
     preferredAiModel: 'gemini-2.5-flash',
     notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
     imageQuality: { preset: 'balanced' },
@@ -527,12 +529,18 @@ function App() {
         sellPrice,
         settings?.defaultShippingCost || 5.0,
         settings?.ebayFeePercent || 12.9,
-        settings?.paypalFeePercent || 3.49
+        0,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       ) || calculateProfitFallback(
         price,
         sellPrice,
         settings?.defaultShippingCost || 5.0,
-        settings?.ebayFeePercent || 12.9
+        settings?.ebayFeePercent || 12.9,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       )
 
       const minMargin = settings?.minProfitMargin || 30
@@ -786,7 +794,9 @@ function App() {
         minProfitMargin: 30,
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
-        paypalFeePercent: 3.49,
+        ebayAdFeePercent: 3.0,
+        shippingMaterialsCost: 0.75,
+        paypalFeePercent: 0,
         preferredAiModel: 'gemini-2.5-flash',
       }
       const newSettings = { ...(prev || defaults), ...updates }
@@ -1034,8 +1044,10 @@ function App() {
     }
     const shipping = settings?.defaultShippingCost || 5.0
     const feePercent = settings?.ebayFeePercent || 12.9
+    const adFeePercent = settings?.ebayAdFeePercent ?? 3.0
+    const materialsCost = settings?.shippingMaterialsCost ?? 0.75
     const minMargin = settings?.minProfitMargin || 30
-    const profitMetrics = calculateProfitFallback(newPrice, currentItem.estimatedSellPrice, shipping, feePercent)
+    const profitMetrics = calculateProfitFallback(newPrice, currentItem.estimatedSellPrice, shipping, feePercent, 0.30, adFeePercent, materialsCost)
 
     const decision = makeDecision(currentItem.estimatedSellPrice, newPrice, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
 
@@ -1087,7 +1099,8 @@ function App() {
     if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
       const freshMetrics = calculateProfitFallback(
         effectivePrice, currentItem!.estimatedSellPrice,
-        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9,
+        0.30, settings?.ebayAdFeePercent ?? 3.0, settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
       resolvedDecision = makeDecision(currentItem!.estimatedSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
@@ -1147,7 +1160,8 @@ function App() {
     if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
       const freshMetrics = calculateProfitFallback(
         effectivePrice, currentItem!.estimatedSellPrice,
-        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9,
+        0.30, settings?.ebayAdFeePercent ?? 3.0, settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
     }
@@ -1346,12 +1360,18 @@ function App() {
           sellPrice,
           settings?.defaultShippingCost || 5.0,
           settings?.ebayFeePercent || 12.9,
-          settings?.paypalFeePercent || 3.49
+          0,
+          0.30,
+          settings?.ebayAdFeePercent ?? 3.0,
+          settings?.shippingMaterialsCost ?? 0.75
         ) || calculateProfitFallback(
           item.purchasePrice,
           sellPrice,
           settings?.defaultShippingCost || 5.0,
-          settings?.ebayFeePercent || 12.9
+          settings?.ebayFeePercent || 12.9,
+          0.30,
+          settings?.ebayAdFeePercent ?? 3.0,
+          settings?.shippingMaterialsCost ?? 0.75
         )
 
         const minMargin = settings?.minProfitMargin || 30

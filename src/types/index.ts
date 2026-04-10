@@ -348,7 +348,9 @@ export interface AppSettings {
   minProfitMargin: number
   defaultShippingCost: number
   ebayFeePercent: number
-  paypalFeePercent: number
+  ebayAdFeePercent: number
+  shippingMaterialsCost: number
+  paypalFeePercent: number  // Deprecated — kept for backward compat, always 0
   imageQuality?: ImageQualitySettings
   enableLensInBatch?: boolean
   lensSkipConfidence?: number

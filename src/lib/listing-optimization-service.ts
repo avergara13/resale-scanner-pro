@@ -164,10 +164,17 @@ ITEM SPECIFICS:
 - At minimum include: Brand, Model/Style, Condition, Color, Size (if applicable), Material (if applicable)
 
 PRICING:
-- Competitive based on market data and recent sold prices above
-- Consider sell-through rate
-- Account for eBay Managed Payments final value fee (12.9% + $0.30 per order). PayPal is no longer used on eBay.
-- Ensure minimum ${context.item.profitMargin ?? 30}% profit margin
+- Base price on SOLD comps from the market data above — not asking prices or MSRP
+- Aim for middle-high of the sold price range (above average, below highest)
+- Account for ALL seller costs:
+  • eBay final value fee: 12.9% of sale price
+  • eBay Promoted Listings ad fee: 3% of sale price
+  • Per-order fee: $0.30
+  • Shipping: ~$5-8 (seller pays, offers free shipping to buyer)
+  • Shipping materials: $0.75 per item
+- Total effective fee rate: ~15.9% + $1.05 fixed per sale
+- Ensure minimum ${context.item.profitMargin ?? 30}% NET profit margin after ALL costs
+- If sell-through rate is LOW (<40%), consider pricing more aggressively
 
 CONDITION CODES:
 - New with tags (NWT)
