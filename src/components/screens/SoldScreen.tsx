@@ -293,19 +293,12 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           </div>
         </div>
 
-        {/* Action row: Log Manual Sale button + sync time */}
-        <div className="flex items-center justify-between mt-2">
-          <button
-            onClick={() => setShowManualDialog(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gradient-to-br from-b1 to-b2 text-white text-[10px] font-bold active:scale-95 transition-transform"
-          >
-            <Plus size={12} weight="bold" />
-            <span>Log Sale</span>
-          </button>
-          {lastSyncedLabel && (
+        {/* Sync time — compact right-aligned, replaces the full action row */}
+        {lastSyncedLabel && (
+          <div className="flex justify-end mt-1">
             <span className="text-[9px] text-t3">Synced {lastSyncedLabel}</span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Overdue banner — show when anything is overdue */}
         {batchStats.overdueCount > 0 && (
@@ -325,8 +318,20 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
       </div>
 
       {/* ── Scrollable list ───────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* "+" Log Sale — top-right of list area, doesn't scroll */}
+        <div className="flex justify-end px-3 pt-2 pb-1">
+          <button
+            onClick={() => setShowManualDialog(true)}
+            className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center shadow-md active:scale-95 transition-transform"
+            style={{ boxShadow: 'var(--send-glow)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            aria-label="Log Sale"
+          >
+            <Plus size={16} weight="bold" className="text-white" />
+          </button>
+        </div>
       <div
-        className="flex-1 overflow-y-auto px-3 pt-2 space-y-2"
+        className="flex-1 overflow-y-auto px-3 space-y-2"
         style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 88px)' }}
       >
         {filteredItems.length === 0 ? (
@@ -566,6 +571,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
             )
           })
         )}
+      </div>
       </div>
 
       {/* ── Manual Sale Dialog ──────────────────────────────────────── */}
