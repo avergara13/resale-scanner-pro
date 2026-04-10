@@ -625,7 +625,10 @@ function App() {
       delete persistableItem.imageOptimized
       setScanHistory(prev => [persistableItem, ...(prev || []).slice(0, 499)])
 
-      // Auto-land every completed scan in the Scans queue — user can Buy or Pass from there
+      // Land completed scan in the queue so the card is immediately visible on
+      // the Listings (Queue) screen — user can review decision, create listing,
+      // or pass from there. Navigate to Queue after pipeline so the user lands
+      // on the listings page, not the scan analysis page.
       setQueue(prev => {
         const current = prev || []
         const scanItem: ScannedItem = { ...persistableItem, inQueue: true }
@@ -647,8 +650,10 @@ function App() {
           }
         })
       }
-      
-      toast.success(decision === 'BUY' ? '✅ BUY Decision!' : '❌ PASS Decision')
+
+      toast.success(decision === 'BUY' ? '✅ BUY Decision! Sending to Listings…' : '❌ PASS — scan saved')
+      // Navigate to Listings (Queue) screen so the card is immediately visible
+      setScreen('queue')
     } catch (error) {
       console.error('Pipeline error:', error)
       setPipeline(prev => prev.map(s => ({ 
