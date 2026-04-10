@@ -1164,7 +1164,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
                   <span>💬 Chat</span>
                 </button>
                 <button onClick={() => setAgentTab('scan')} className={cn('tab-btn', agentTab === 'scan' && 'active')}>
-                  <span>📷 Scan {queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started')).length > 0 ? `(${queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started')).length})` : ''}</span>
+                  <span>📷 Scan {(() => { const n = queueItems.filter(i => i.decision === 'PENDING' || (i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))).length; return n > 0 ? `(${n})` : '' })()}</span>
                 </button>
                 <button onClick={() => setAgentTab('task')} className={cn('tab-btn', agentTab === 'task' && 'active')}>
                   <span>✅ Task {pendingTodos.length > 0 ? `(${pendingTodos.length})` : ''}</span>
@@ -1267,27 +1267,91 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
             </ScrollArea>
             )}
 
-            {/* ── SCAN TAB — BUY queue with clickable cards that open the scan screen ── */}
+            {/* ── SCAN TAB — all scanned items grouped by stage ── */}
             {agentTab === 'scan' && (() => {
-              const buyQueue = queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))
-              const readyItems = queueItems.filter(i => i.decision === 'BUY' && i.listingStatus && i.listingStatus !== 'not-started' && i.listingStatus !== 'sold')
-              const statusColor: Record<string, string> = {
-                'ready': 'bg-green/15 text-green',
+              // All scans newest-first so the most recent item is always at top
+              const allScans = [...queueItems].reverse()
+              const pendingItems  = allScans.filter(i => i.decision === 'PENDING')
+              const buyQueue      = allScans.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))
+              const inListings    = allScans.filter(i => i.decision === 'BUY' && i.listingStatus && i.listingStatus !== 'not-started' && i.listingStatus !== 'sold')
+              const passItems     = allScans.filter(i => i.decision === 'PASS')
+              const totalScans    = queueItems.length
+
+              const listingStatusColor: Record<string, string> = {
+                'ready':     'bg-green/15 text-green',
                 'published': 'bg-b1/15 text-b1',
                 'not-started': 'bg-s2/40 text-t3',
               }
+
+              // Shared scan card renderer
+              const ScanCard = ({ item, dimmed = false }: { item: ScannedItem; dimmed?: boolean }) => (
+                <button
+                  key={item.id}
+                  onClick={() => onOpenScanItem?.(item)}
+                  className={cn(
+                    'w-full text-left p-3.5 bg-fg/90 border rounded-2xl shadow-sm active:scale-[0.97] transition-all',
+                    dimmed ? 'border-s1/40 opacity-60 hover:opacity-100' : 'border-s2/60 hover:border-b1/30'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="text-sm font-semibold text-t1 flex-1 leading-snug">
+                      {item.productName || 'Unidentified item'}
+                    </span>
+                    {item.decision === 'BUY' && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green/15 text-green flex-shrink-0">BUY</span>
+                    )}
+                    {item.decision === 'PASS' && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-red/15 text-red flex-shrink-0">PASS</span>
+                    )}
+                    {item.decision === 'PENDING' && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-amber/15 text-amber flex-shrink-0">REVIEW</span>
+                    )}
+                    {item.listingStatus && item.listingStatus !== 'not-started' && (
+                      <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-md capitalize flex-shrink-0', listingStatusColor[item.listingStatus] || 'bg-s2/40 text-t3')}>
+                        {item.listingStatus}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] text-t3 mb-1.5">
+                    <span>Cost: <span className="text-t1 font-semibold">${item.purchasePrice.toFixed(2)}</span></span>
+                    {item.estimatedSellPrice ? (
+                      <span>Sell: <span className="text-t1 font-semibold">${item.estimatedSellPrice.toFixed(0)}</span></span>
+                    ) : null}
+                    {item.profitMargin ? (
+                      <span className={item.profitMargin >= 30 ? 'text-green font-semibold' : 'text-amber font-semibold'}>
+                        {item.profitMargin.toFixed(0)}% margin
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {item.category && (
+                        <span className="text-[9px] text-t3 bg-s1 px-1.5 py-0.5 rounded-md">{item.category}</span>
+                      )}
+                      {item.notionPageId && (
+                        <span className="text-[9px] text-b1 font-semibold">✓ Notion</span>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-b1 font-semibold flex-shrink-0">
+                      Tap to open →
+                    </span>
+                  </div>
+                </button>
+              )
+
               return (
               <ScrollArea className="flex-1">
                 <div className="py-3 px-3 space-y-4">
-                  {buyQueue.length === 0 && readyItems.length === 0 ? (
+                  {totalScans === 0 ? (
                     <div className="text-center py-14">
                       <div className="text-4xl mb-3">📷</div>
-                      <h2 className="text-base font-bold text-t1 mb-1">Queue is clear</h2>
-                      <p className="text-xs text-t3 mb-4">Scan items at the thrift store to build your listing pipeline</p>
+                      <h2 className="text-base font-bold text-t1 mb-1">No scans yet</h2>
+                      <p className="text-xs text-t3 mb-4">Scan items at the thrift store to start your pipeline</p>
                       {onOpenCamera && (
                         <button
                           onClick={onOpenCamera}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-b1 text-white text-xs font-bold rounded-xl active:scale-95 transition-all"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-b1 text-white text-xs font-bold rounded-full active:scale-95 transition-all"
+                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                         >
                           <Camera size={14} weight="bold" /> Scan Item
                         </button>
@@ -1295,81 +1359,54 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
                     </div>
                   ) : (
                     <>
-                      {buyQueue.length > 0 && (
+                      {/* Pending Review — most urgent, shown first */}
+                      {pendingItems.length > 0 && (
                         <div>
                           <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber inline-block" />
-                            Needs Listing ({buyQueue.length})
+                            Needs Decision ({pendingItems.length})
                           </div>
                           <div className="space-y-2">
-                            {buyQueue.slice().reverse().map(item => (
-                              <button
-                                key={item.id}
-                                onClick={() => onOpenScanItem?.(item)}
-                                className="w-full text-left p-3.5 bg-fg/90 border border-s2/60 rounded-2xl shadow-sm active:scale-[0.97] transition-all hover:border-b1/30"
-                              >
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <span className="text-sm font-semibold text-t1 flex-1 leading-snug">
-                                    {item.productName || 'Unidentified item'}
-                                  </span>
-                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green/15 text-green flex-shrink-0">BUY</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-[10px] text-t3 mb-2">
-                                  <span>Cost: <span className="text-t1 font-semibold">${item.purchasePrice.toFixed(2)}</span></span>
-                                  {item.estimatedSellPrice ? (
-                                    <span>Sell: <span className="text-t1 font-semibold">${item.estimatedSellPrice.toFixed(0)}</span></span>
-                                  ) : null}
-                                  {item.profitMargin ? (
-                                    <span className={item.profitMargin >= 30 ? 'text-green font-semibold' : 'text-amber font-semibold'}>
-                                      {item.profitMargin.toFixed(0)}% margin
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <div className="flex items-center justify-between gap-2">
-                                  {item.category && (
-                                    <span className="text-[9px] text-t3 bg-s1 px-1.5 py-0.5 rounded-md">{item.category}</span>
-                                  )}
-                                  <span className="ml-auto text-[9px] text-b1 font-semibold flex items-center gap-0.5">
-                                    Tap to open analysis →
-                                  </span>
-                                </div>
-                              </button>
-                            ))}
+                            {pendingItems.map(item => <ScanCard key={item.id} item={item} />)}
                           </div>
                         </div>
                       )}
-                      {readyItems.length > 0 && (
+
+                      {/* BUY — needs listing created */}
+                      {buyQueue.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green inline-block" />
+                            Needs Listing ({buyQueue.length})
+                          </div>
+                          <div className="space-y-2">
+                            {buyQueue.map(item => <ScanCard key={item.id} item={item} />)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* BUY — listing in progress or complete */}
+                      {inListings.length > 0 && (
                         <div>
                           <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-b1 inline-block" />
-                            In Listings ({readyItems.length})
+                            In Listings ({inListings.length})
                           </div>
                           <div className="space-y-2">
-                            {readyItems.slice().reverse().map(item => (
-                              <button
-                                key={item.id}
-                                onClick={() => onOpenScanItem?.(item)}
-                                className="w-full text-left p-3 bg-fg/80 border border-s1 rounded-xl active:scale-[0.97] transition-all hover:border-b1/30"
-                              >
-                                <div className="flex items-center justify-between gap-2 mb-1.5">
-                                  <span className="text-xs font-semibold text-t1 truncate flex-1">
-                                    {item.productName || 'Unidentified item'}
-                                  </span>
-                                  <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-md capitalize flex-shrink-0', statusColor[item.listingStatus || 'not-started'] || 'bg-s2/40 text-t3')}>
-                                    {item.listingStatus || 'draft'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-3 text-[10px] text-t3">
-                                  <span>Cost: <span className="text-t2 font-medium">${item.purchasePrice.toFixed(2)}</span></span>
-                                  {item.estimatedSellPrice ? (
-                                    <span>Sell: <span className="text-t2 font-medium">${item.estimatedSellPrice.toFixed(0)}</span></span>
-                                  ) : null}
-                                  {item.notionPageId && (
-                                    <span className="text-b1 font-semibold">✓ In Notion</span>
-                                  )}
-                                </div>
-                              </button>
-                            ))}
+                            {inListings.map(item => <ScanCard key={item.id} item={item} />)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PASS — dimmed at bottom for reference */}
+                      {passItems.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-t3 inline-block" />
+                            Passed ({passItems.length})
+                          </div>
+                          <div className="space-y-2">
+                            {passItems.map(item => <ScanCard key={item.id} item={item} dimmed />)}
                           </div>
                         </div>
                       )}
