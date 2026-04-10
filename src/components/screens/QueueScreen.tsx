@@ -136,20 +136,29 @@ function SortableItem({
           >
             <DotsSixVertical size={14} weight="bold" className="text-s3" />
           </div>
-          <Checkbox
-            id={`select-${item.id}`}
-            checked={isSelected}
-            onCheckedChange={() => onToggleSelect(item.id)}
-            className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
-          />
+          <label
+            htmlFor={`select-${item.id}`}
+            className="flex items-center justify-center w-10 h-10 -m-2 cursor-pointer"
+          >
+            <Checkbox
+              id={`select-${item.id}`}
+              checked={isSelected}
+              onCheckedChange={() => onToggleSelect(item.id)}
+              className="w-4 h-4 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+            />
+          </label>
         </div>
-        {/* Thumbnail column */}
-        {(item.imageThumbnail || item.imageData) && (
+        {/* Thumbnail column — always rendered for consistent card layout */}
+        {(item.imageThumbnail || item.imageData) ? (
           <img
             src={item.imageThumbnail || item.imageData}
             alt={item.productName || 'Item'}
             className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
           />
+        ) : (
+          <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 rounded-md border border-s2 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
+            <Package size={24} weight="duotone" className="text-s3" />
+          </div>
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-1 sm:gap-1.5 md:gap-2 mb-1 sm:mb-1.5 md:mb-2">
@@ -166,9 +175,9 @@ function SortableItem({
                 variant="secondary"
                 className={cn(
                   "flex-shrink-0 font-mono font-bold text-[9px] sm:text-[10px] h-4 sm:h-5 px-1 sm:px-1.5",
-                  item.profitMargin > 50
+                  item.profitMargin > 40
                     ? 'bg-green/20 text-green'
-                    : item.profitMargin > 20
+                    : item.profitMargin > 25
                     ? 'bg-amber/20 text-amber'
                     : 'bg-red/20 text-red'
                 )}
@@ -1042,30 +1051,30 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         </div>
         
         <div className="px-0 mb-4">
-          <div className="tab-bar queue-tab-bar">
-            <button 
+          <div className="tab-bar">
+            <button
               onClick={() => setFilter('ALL')}
               className={cn('tab-btn', filter === 'ALL' && 'active')}
             >
-              ALL
+              <span>📦 ALL</span>
             </button>
-            <button 
+            <button
               onClick={() => setFilter('BUY')}
               className={cn('tab-btn', filter === 'BUY' && 'active')}
             >
-              BUY {buyCount > 0 && `(${buyCount})`}
+              <span>💰 BUY{buyCount > 0 && ` (${buyCount})`}</span>
             </button>
-            <button 
+            <button
               onClick={() => setFilter('PASS')}
               className={cn('tab-btn', filter === 'PASS' && 'active')}
             >
-              PASS {passCount > 0 && `(${passCount})`}
+              <span>🚫 PASS{passCount > 0 && ` (${passCount})`}</span>
             </button>
-            <button 
+            <button
               onClick={() => setFilter('PENDING')}
               className={cn('tab-btn', filter === 'PENDING' && 'active')}
             >
-              PENDING {pendingCount > 0 && `(${pendingCount})`}
+              <span>⏳ PENDING{pendingCount > 0 && ` (${pendingCount})`}</span>
             </button>
           </div>
         </div>
@@ -1098,7 +1107,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name, description, category..."
-                className="h-9 pl-9 pr-9 bg-bg border-s2 text-t1 placeholder:text-t3 text-sm"
+                className="h-11 pl-9 pr-9 bg-bg border-s2 text-t1 placeholder:text-t3 text-base"
               />
               {searchQuery && (
                 <button
@@ -1383,12 +1392,17 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                   >
                     <div className="flex gap-2.5 sm:gap-3 md:gap-3.5">
                       <div className="flex flex-col gap-2 items-center justify-start pt-0.5 flex-shrink-0">
-                        <Checkbox
-                          id={`select-${item.id}`}
-                          checked={isSelected}
-                          onCheckedChange={() => handleToggleSelect(item.id)}
-                          className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
-                        />
+                        <label
+                          htmlFor={`select-bulk-${item.id}`}
+                          className="flex items-center justify-center w-10 h-10 -m-2 cursor-pointer"
+                        >
+                          <Checkbox
+                            id={`select-bulk-${item.id}`}
+                            checked={isSelected}
+                            onCheckedChange={() => handleToggleSelect(item.id)}
+                            className="w-4 h-4 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+                          />
+                        </label>
                       </div>
                       {(item.imageThumbnail || item.imageData) && (
                         <img

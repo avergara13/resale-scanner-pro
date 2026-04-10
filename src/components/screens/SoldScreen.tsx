@@ -236,7 +236,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-28 pt-3 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 pt-3 space-y-4" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' }}>
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8">
             <Package size={48} className="text-t3 opacity-40 mb-4" weight="duotone" />
@@ -320,7 +320,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                         aria-label={`Shipping status for ${item.title}`}
                         value={draft.shippingStatus}
                         onChange={(event) => handleDraftChange(item.salePageId, 'shippingStatus', event.target.value)}
-                        className="h-9 w-full rounded-lg border border-s2 bg-bg px-3 text-sm text-t1"
+                        className="h-11 w-full rounded-lg border border-s2 bg-bg px-3 text-base text-t1"
                       >
                         {SHIPPING_STATUS_OPTIONS.map((option) => (
                           <option key={option} value={option}>{option}</option>
@@ -361,7 +361,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                           aria-label={`Label provider for ${item.title}`}
                           value={draft.labelProvider}
                           onChange={(event) => handleDraftChange(item.salePageId, 'labelProvider', event.target.value)}
-                          className="h-9 w-full rounded-lg border border-s2 bg-bg px-3 text-sm text-t1"
+                          className="h-11 w-full rounded-lg border border-s2 bg-bg px-3 text-base text-t1"
                         >
                           {LABEL_PROVIDER_OPTIONS.map((option) => (
                             <option key={option} value={option}>{option}</option>

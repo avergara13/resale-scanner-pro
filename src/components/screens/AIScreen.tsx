@@ -595,7 +595,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
             onClick={() => setTab('scans')}
             className={cn('tab-btn', tab === 'scans' && 'active')}
           >
-            <span>📊 SCANS</span>
+            <span>🔎 SCANS</span>
           </button>
           <button
             onClick={() => setTab('tasks')}
@@ -925,7 +925,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                   }
                 }}
                 placeholder="Ask AI anything..."
-                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-sm"
+                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-base"
                 disabled={isSendingMessage}
               />
               <Button
@@ -953,7 +953,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 placeholder="Buy $"
                 value={buyPrice}
                 onChange={(e) => setBuyPrice(e.target.value)}
-                className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
+                className="w-20 sm:w-24 h-11 sm:h-10 font-mono bg-bg border-s2 text-base"
               />
               <div className="flex-1 relative">
                 <Input
@@ -961,7 +961,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Notes..."
-                  className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
+                  className="h-11 sm:h-10 pr-10 bg-bg border-s2 text-base"
                 />
                 {isSupported && (
                   <button
@@ -1034,7 +1034,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 placeholder="Buy $"
                 value={buyPrice}
                 onChange={(e) => setBuyPrice(e.target.value)}
-                className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
+                className="w-20 sm:w-24 h-11 sm:h-10 font-mono bg-bg border-s2 text-base"
               />
               <div className="flex-1 relative">
                 <Input
@@ -1042,7 +1042,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Add notes or description..."
-                  className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
+                  className="h-11 sm:h-10 pr-10 bg-bg border-s2 text-base"
                 />
                 {isSupported && (
                   <button
@@ -1090,7 +1090,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 onChange={(e) => setTaskInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleAddTask() }}
                 placeholder="Add a task..."
-                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-sm"
+                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-base"
               />
               <Button
                 onClick={handleAddTask}

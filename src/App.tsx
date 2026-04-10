@@ -1625,7 +1625,7 @@ function App() {
       <div
         className="flex-1 relative w-full pb-24"
         style={{
-          minHeight: 'calc(100vh - 96px)',
+          minHeight: 'calc(100dvh - 96px)',
         }}
       >
         <AnimatePresence mode="wait">
