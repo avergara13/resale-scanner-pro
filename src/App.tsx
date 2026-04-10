@@ -7,7 +7,7 @@ import { AppHeader } from './components/AppHeader'
 import { CameraOverlay } from './components/CameraOverlay'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
-import { AgentScreen } from './components/screens/AgentScreen'
+import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -1741,27 +1741,21 @@ function App() {
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
-              <AgentScreen
-                queueItems={queue || []}
-                soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
+              <AIScreen
+                currentItem={currentItem}
+                pipeline={pipeline}
                 settings={settings}
+                queueItems={queue || []}
+                onSaveDraft={handleSaveDraft}
+                onCreateListing={handleCreateListingFromScan}
+                onPassItem={handlePassFromScan}
+                onRecalculate={handleRecalculate}
+                onRescan={handleRescan}
+                onOpenCamera={() => setCameraOpen(true)}
                 pendingMessage={agentPendingMessage}
                 onPendingMessageHandled={() => setAgentPendingMessage(null)}
-                onCreateListing={handleOptimizeItem}
-                onOptimizeItem={handleOptimizeItem}
-                onPushToNotion={handlePushToNotion}
-                onBatchAnalyze={handleBatchAnalyze}
-                onEditItem={handleEditQueueItem}
-                onMarkAsSold={handleMarkAsSold}
-                onMarkShipped={handleMarkShipped}
-                onNavigateToQueue={() => setScreen('queue')}
-                onOpenCamera={() => setCameraOpen(true)}
-                onStartSession={handleStartSession}
-                onEndSession={handleEndSession}
-                onEditSession={handleEditSession}
-                allSessions={visibleSessions}
-                scanHistory={scanHistory || []}
-                profitGoals={profitGoals || []}
+                geminiService={geminiService}
+                onUpdateItem={handleUpdateCurrentItem}
               />
             </motion.div>
           )}

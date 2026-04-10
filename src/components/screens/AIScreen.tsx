@@ -528,10 +528,29 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
             settings.geminiApiKey
           )
         } else {
-          const promptText = `You are an AI assistant for resale business analysis. Context:\n\n${contextData}\n\nUser: ${chatInput}\n\nProvide a helpful, concise response. Reference the scanned item's data. If the user asks about pricing or market value and you don't have data, suggest they tap "Research Item" in the Agent tab for live marketplace search.`
+          const systemPrompt = `You are an AI assistant for a resale business shipping from Orlando, FL 32806.
+
+## Fee model (always use for profit math)
+- eBay FVF: 12.9% of sale price
+- Promoted Listings ad fee: 3% of sale price
+- Per-order fee: $0.30
+- Shipping materials: $0.75/item
+- Shipping: ~$5 (seller pays)
+- Total effective: ~15.9% + $1.05 fixed per sale
+
+## Anti-hallucination rules (CRITICAL)
+- NEVER invent prices. If you don't have current market data, say so and suggest the user tap "Research Item" for a live marketplace search.
+- Base pricing on actual SOLD comps only — not asking prices or MSRP.
+- Distinguish sell-through rate tiers: HIGH (>70%) / MEDIUM (40-70%) / LOW (<40%). Default to MEDIUM when uncertain.
+- Prefer conservative profit estimates. Overestimating costs real money.
+- All profit figures must be NET (after ALL fees + shipping + materials).
+
+Be helpful, concise, and specific. Reference the scanned item's data when available.`
+          const promptText = `## App State\n\`\`\`\n${contextData}\n\`\`\`\n\nUser: ${chatInput}`
           response = await callLLM(promptText, {
             task: 'chat',
             geminiApiKey: settings?.geminiApiKey,
+            systemPrompt,
           })
         }
       }
@@ -893,7 +912,10 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         )}
       </div>
 
-      <div className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md safe-bottom">
+      <div
+        className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md"
+        style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 0.5rem)' }}
+      >
 
         {tab === 'chat' && (
           <div className="p-2.5 sm:p-3">

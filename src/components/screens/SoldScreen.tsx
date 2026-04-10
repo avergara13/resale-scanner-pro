@@ -208,7 +208,7 @@ const handleDraftChange = (pageId: string, key: keyof SoldItemDraft, value: stri
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 pt-2 space-y-2" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+      <div className="flex-1 overflow-y-auto px-3 pt-2 space-y-2" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 1rem)' }}>
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8">
             <Package size={48} className="text-t3 opacity-40 mb-4" weight="duotone" />

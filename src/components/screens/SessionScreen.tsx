@@ -219,7 +219,10 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
       <div className="px-4 pt-3 pb-6">
 
       {showTrends ? (
-        <div className="flex-1 overflow-y-auto pb-24">
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 1rem)' }}
+        >
           {/* Back button */}
           <button
             onClick={onCloseTrends}
@@ -287,7 +290,10 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
           )}
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto space-y-4 pb-24">
+        <div
+          className="flex-1 overflow-y-auto space-y-4"
+          style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 1rem)' }}
+        >
           {/* Date */}
           <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
