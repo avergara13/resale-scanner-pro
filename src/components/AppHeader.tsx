@@ -7,7 +7,7 @@ const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   session: 'RESALE SCANNER PRO',
   agent: 'AGENT',
   queue: 'LISTINGS',
-  sold: 'SOLD',
+  sold: 'SHIPPING',
   settings: 'SETTINGS',
   'session-detail': 'SESSION',
   'scan-history': 'SCAN HISTORY',
