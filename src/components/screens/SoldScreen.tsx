@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { createPirateShipUrl, estimateShippingRates } from '@/lib/shipping-rate-service'
 import type { SoldItem, SoldShippingStatus, SoldShippingUpdateInput } from '@/types'
 
-type FulfillmentFilter = 'all' | 'need-label' | 'label-ready' | 'packed' | 'shipped'
+type FulfillmentFilter = 'all' | 'need-label' | 'label-ready' | 'shipped'
 
 interface SoldScreenProps {
   soldItems: SoldItem[]
@@ -96,7 +96,6 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
       if (fulfillmentFilter === 'all') return true
       if (fulfillmentFilter === 'need-label') return item.shippingStatus === '🔴 Need Label'
       if (fulfillmentFilter === 'label-ready') return item.shippingStatus === '🟡 Label Ready'
-      if (fulfillmentFilter === 'packed') return item.shippingStatus === '📦 Packed'
       return item.shippingStatus === '✅ Shipped'
     })
   }, [fulfillmentFilter, soldItems])
@@ -170,58 +169,45 @@ const handleDraftChange = (pageId: string, key: keyof SoldItemDraft, value: stri
 
   return (
     <div className="h-full flex flex-col bg-bg">
-      {/* Compact sticky filter bar — matches Listings/Agent pattern */}
-      <div className="px-3 pt-2 pb-2 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
-        <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+      {/* Compact sticky filter bar — 4 even tabs, matches Listings/Agent */}
+      <div className="px-3 pt-2 pb-0 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
+        <div className="tab-bar">
           {([
             ['all', 'All'],
             ['need-label', 'Need Label'],
             ['label-ready', 'Label Ready'],
-            ['packed', 'Packed'],
             ['shipped', 'Shipped'],
           ] as Array<[FulfillmentFilter, string]>).map(([filter, label]) => (
             <button
               key={filter}
               onClick={() => setFulfillmentFilter(filter)}
-              className={cn(
-                'flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors whitespace-nowrap',
-                fulfillmentFilter === filter ? 'bg-b1 text-white' : 'bg-s1 text-t3',
-              )}
+              className={cn('tab-btn', fulfillmentFilter === filter && 'active')}
             >
-              {label}
+              <span>{label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-3 space-y-3" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' }}>
-        {/* Warning banner — scrolls with content */}
-        {warnings.length > 0 && (
-          <Card className="border-amber/20 bg-amber/5 p-3 text-xs text-amber space-y-1">
-            {warnings.map((warning) => (
-              <p key={warning}>{warning}</p>
-            ))}
-          </Card>
-        )}
-
-        {/* Stats row — compact, scrolls away */}
-        <div className="grid grid-cols-4 gap-2">
-          <Card className="p-2.5 text-center border-s2">
-            <div className="text-base font-black text-t1">{stats.totalSales}</div>
-            <div className="text-[9px] uppercase tracking-wide text-t3">Sold</div>
-          </Card>
-          <Card className="p-2.5 text-center border-s2">
-            <div className="text-base font-black text-t1">{formatMoney(stats.totalRevenue)}</div>
-            <div className="text-[9px] uppercase tracking-wide text-t3">Revenue</div>
-          </Card>
-          <Card className="p-2.5 text-center border-s2">
-            <div className="text-base font-black text-red">{stats.needLabel}</div>
-            <div className="text-[9px] uppercase tracking-wide text-t3">Need Label</div>
-          </Card>
-          <Card className="p-2.5 text-center border-s2">
-            <div className="text-base font-black text-green">{stats.shipped}</div>
-            <div className="text-[9px] uppercase tracking-wide text-t3">Shipped</div>
-          </Card>
+      <div className="flex-1 overflow-y-auto px-3 pt-2 space-y-2" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+        {/* Stats row — very compact inline tiles */}
+        <div className="grid grid-cols-4 gap-1.5">
+          <div className="bg-fg rounded-lg border border-s2 py-1.5 px-1 text-center">
+            <div className="text-sm font-black text-t1 leading-tight">{stats.totalSales}</div>
+            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Sold</div>
+          </div>
+          <div className="bg-fg rounded-lg border border-s2 py-1.5 px-1 text-center">
+            <div className="text-sm font-black text-t1 leading-tight">{formatMoney(stats.totalRevenue)}</div>
+            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Revenue</div>
+          </div>
+          <div className="bg-fg rounded-lg border border-s2 py-1.5 px-1 text-center">
+            <div className="text-sm font-black text-red leading-tight">{stats.needLabel}</div>
+            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Need Label</div>
+          </div>
+          <div className="bg-fg rounded-lg border border-s2 py-1.5 px-1 text-center">
+            <div className="text-sm font-black text-green leading-tight">{stats.shipped}</div>
+            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Shipped</div>
+          </div>
         </div>
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8">
