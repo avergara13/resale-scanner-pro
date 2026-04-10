@@ -1099,7 +1099,7 @@ function App() {
     const shippingChanged =
       draft?.shippingCost != null && draft.shippingCost !== (settings?.defaultShippingCost ?? 5.0)
     let resolvedMargin = currentItem!.profitMargin
-    let resolvedDecision: 'BUY' | 'PASS' | 'PENDING' = currentItem!.decision as 'BUY' | 'PASS' | 'PENDING' ?? 'BUY'
+    let resolvedDecision = currentItem!.decision
     if ((buyPriceChanged || sellPriceChanged || shippingChanged) && effectiveSellPrice) {
       const freshMetrics = calculateProfitFallback(
         effectivePrice, effectiveSellPrice,
@@ -1147,7 +1147,7 @@ function App() {
           : i
       ))
       toast.dismiss(toastId)
-      toast.success('Added to queue — AI optimizing in background')
+      toast.success('Added to queue — listing optimized')
     } catch {
       toast.dismiss(toastId)
       toast.error('Optimization failed — item saved, edit manually in Queue')
