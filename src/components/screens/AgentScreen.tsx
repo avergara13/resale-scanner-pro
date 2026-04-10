@@ -1090,33 +1090,32 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
   // Shared stats bar used in both views
   const statsBar = (
-    <div className="px-4 py-2 bg-s1/30 border-b border-s1">
+    <div
+      className="px-3 py-1.5 border-b border-s1/60"
+      style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)' }}
+    >
       {currentSession?.active && (
-        <div className="text-[9px] font-bold text-b1 mb-1.5 uppercase tracking-wide">
+        <div className="text-[9px] font-bold text-b1 mb-1 uppercase tracking-wide">
           {currentSession.name || 'Active Session'}
         </div>
       )}
       <div className="grid grid-cols-4 gap-1.5">
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>
-          <div className="text-base font-black text-t1">{queueStats.total}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-green font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-            <CheckCircle size={10} weight="fill" /> BUY
-          </div>
-          <div className="text-base font-black text-green">{queueStats.buy}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-red font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-            <Warning size={10} weight="fill" /> PASS
-          </div>
-          <div className="text-base font-black text-red">{queueStats.pass}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Profit</div>
-          <div className="text-xs font-black text-green">${queueStats.totalProfit.toFixed(0)}</div>
-        </Card>
+        <div className="rounded-xl border border-s2/60 py-1.5 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
+          <div className="text-sm font-black text-t1 leading-tight">{queueStats.total}</div>
+          <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Queue</div>
+        </div>
+        <div className="rounded-xl border border-green/30 py-1.5 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--green-bg) 50%, transparent)' }}>
+          <div className="text-sm font-black text-green leading-tight">{queueStats.buy}</div>
+          <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Buy</div>
+        </div>
+        <div className="rounded-xl border border-red/30 py-1.5 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--red-bg) 50%, transparent)' }}>
+          <div className="text-sm font-black text-red leading-tight">{queueStats.pass}</div>
+          <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Pass</div>
+        </div>
+        <div className="rounded-xl border border-s2/60 py-1.5 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
+          <div className="text-sm font-black text-green leading-tight">${queueStats.totalProfit.toFixed(0)}</div>
+          <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Profit</div>
+        </div>
       </div>
     </div>
   )
@@ -1207,7 +1206,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             {statsBar}
 
             <ScrollArea className="flex-1">
-              <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5">
+              <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5 overflow-x-hidden">
                 {/* Quick Actions — always visible */}
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2.5">Quick Actions</div>
@@ -1260,15 +1259,26 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
                 {/* Conversation List */}
                 {sortedSessions.length === 0 ? (
-                  <div className="text-center py-10">
+                  <div
+                    style={{
+                      minHeight: 'calc(100svh - 320px)',
+                      width: '100vw',
+                      marginLeft: '-16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                    }}
+                  >
                     <button
                       onClick={() => inputRef.current?.focus()}
-                      className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
+                      className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform shadow-lg"
                     >
-                      <Sparkle size={32} weight="fill" className="text-white" />
+                      <Sparkle size={28} weight="fill" className="text-white" />
                     </button>
-                    <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
-                    <p className="text-sm text-t3 max-w-xs mx-auto">Start a conversation below</p>
+                    <h2 className="text-lg font-bold text-t1 mb-1.5">Welcome to Agent</h2>
+                    <p className="text-sm text-t3 max-w-[220px] leading-relaxed">Start a conversation below</p>
                   </div>
                 ) : (
                   <div>
