@@ -273,7 +273,7 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
         {item.profitMargin != null && (
           <p className={cn(
             'text-[10px] font-bold',
-            item.profitMargin > 50 ? 'text-green' : item.profitMargin > 20 ? 'text-amber' : 'text-red'
+            item.profitMargin > 40 ? 'text-green' : item.profitMargin > 25 ? 'text-amber' : 'text-red'
           )}>
             {item.profitMargin.toFixed(1)}% margin
           </p>
@@ -678,17 +678,24 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                             <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
                             <p className={cn(
                               "text-base sm:text-lg font-mono font-bold",
-                              (currentItem.profitMargin || 0) > 50 ? "text-green" :
-                              (currentItem.profitMargin || 0) > 20 ? "text-amber" : "text-red"
+                              (currentItem.profitMargin || 0) > 40 ? "text-green" :
+                              (currentItem.profitMargin || 0) > 25 ? "text-amber" : "text-red"
                             )}>
                               {currentItem.profitMargin?.toFixed(1) || '--'}%
                             </p>
                           </div>
                           <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
-                            <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                              ${((currentItem.estimatedSellPrice || 0) - currentItem.purchasePrice).toFixed(2)}
-                            </p>
+                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit <span className="normal-case font-normal">(after fees)</span></p>
+                            {(() => {
+                              const netProfit = currentItem.profitMargin != null && currentItem.estimatedSellPrice
+                                ? (currentItem.profitMargin / 100) * currentItem.estimatedSellPrice
+                                : (currentItem.estimatedSellPrice || 0) - currentItem.purchasePrice
+                              return (
+                                <p className={cn("text-base sm:text-lg font-mono font-bold", netProfit >= 0 ? "text-green" : "text-red")}>
+                                  {netProfit >= 0 ? '+' : ''}${netProfit.toFixed(2)}
+                                </p>
+                              )
+                            })()}
                           </div>
                         </div>
                       </CollapsibleContent>

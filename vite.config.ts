@@ -15,7 +15,7 @@ export default defineConfig({
     tailwindcss(),
     // DO NOT REMOVE
     createIconImportProxy() as PluginOption,
-    sparkPlugin() as PluginOption,
+    sparkPlugin({ port: 5173 }) as PluginOption,
   ],
   resolve: {
     alias: {
@@ -23,5 +23,15 @@ export default defineConfig({
       '@github/spark/spark': resolve(projectRoot, 'src/lib/spark-runtime.ts'),
       '@': resolve(projectRoot, 'src')
     }
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
   },
 });
