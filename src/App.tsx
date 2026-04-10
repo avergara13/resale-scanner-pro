@@ -1661,9 +1661,10 @@ function App() {
       />
 
       <div
-        className="flex-1 relative w-full pb-24"
+        className="flex-1 relative w-full"
         style={{
           minHeight: 'calc(100dvh - 96px)',
+          paddingBottom: 'max(calc(4rem + env(safe-area-inset-bottom, 0px)), 4.5rem)',
         }}
       >
         <AnimatePresence mode="wait">
