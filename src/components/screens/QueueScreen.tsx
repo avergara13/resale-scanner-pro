@@ -1282,7 +1282,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       ) : (
         <div
           className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-5 pt-3 sm:pt-4"
-          style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 1rem)' }}
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
         >
           {onReorder ? (
             <DndContext

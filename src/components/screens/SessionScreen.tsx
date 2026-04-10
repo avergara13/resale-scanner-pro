@@ -221,7 +221,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
       {showTrends ? (
         <div
           className="flex-1 overflow-y-auto"
-          style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 1rem)' }}
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
         >
           {/* Back button */}
           <button
@@ -292,7 +292,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
       ) : (
         <div
           className="flex-1 overflow-y-auto space-y-4"
-          style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 1rem)' }}
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
         >
           {/* Date */}
           <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">

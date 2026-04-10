@@ -432,6 +432,8 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         minProfitMargin: settings?.minProfitMargin,
         defaultShippingCost: settings?.defaultShippingCost,
         ebayFeePercent: settings?.ebayFeePercent,
+        ebayAdFeePercent: settings?.ebayAdFeePercent ?? 3.0,
+        shippingMaterialsCost: settings?.shippingMaterialsCost ?? 0.75,
         preferredAiModel: settings?.preferredAiModel
       }
     }
@@ -914,7 +916,7 @@ Be helpful, concise, and specific. Reference the scanned item's data when availa
 
       <div
         className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md"
-        style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 0.5rem)' }}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}
       >
 
         {tab === 'chat' && (
