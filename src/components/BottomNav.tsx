@@ -74,7 +74,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
         <button
           onClick={onCameraOpen}
           className={cn(
-            'camera-fab-animated flex items-center justify-center rounded-full w-12 h-12 sm:w-14 sm:h-14 -mt-5 shadow-xl transition-all duration-300 active:scale-95 relative z-50',
+            'camera-fab-animated flex items-center justify-center rounded-full w-12 h-12 sm:w-14 sm:h-14 shadow-xl transition-all duration-300 active:scale-95 relative z-50',
             captureState === 'analyzing' && 'camera-analyzing',
             captureState === 'success' && 'camera-success',
             captureState === 'fail' && 'camera-fail'

@@ -569,20 +569,9 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         progress={pullToRefresh.progress}
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
-      <div className="flex-shrink-0 p-3 sm:p-4 border-b border-s2 bg-fg sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-b1 to-amber text-white rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
-              <Robot size={18} weight="fill" className="sm:w-5 sm:h-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-bold text-sm sm:text-base text-t1 truncate">AI Command Center</h2>
-              <p className="text-[9px] sm:text-[10px] text-t3 font-medium tracking-wide truncate">Powered by {settings?.preferredAiModel || 'Gemini'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
-          </div>
+      <div className="flex-shrink-0 px-3 pt-2 pb-0 sm:px-4 border-b border-s2 bg-fg sticky top-0 z-10 shadow-sm">
+        <div className="flex justify-center mb-2">
+          <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
         </div>
         <div className="tab-bar">
           <button
