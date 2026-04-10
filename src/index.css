@@ -35,29 +35,34 @@
 :root {
   --bg: oklch(0.99 0 0);
   --fg: oklch(1 0 0);
-  
+
   --s1: oklch(0.96 0 0);
   --s2: oklch(0.88 0 0);
   --s3: oklch(0.65 0 0);
   --s4: oklch(0.45 0 0);
-  
+
   --b1: oklch(0.55 0.15 250);
   --b2: oklch(0.42 0.12 250);
-  
+
   --t1: oklch(0.25 0 0);
   --t2: oklch(0.45 0 0);
   --t3: oklch(0.50 0 0);
   --t4: oklch(0.55 0 0);
-  
+
   --green: oklch(0.60 0.17 145);
   --green-bg: oklch(0.60 0.17 145 / 0.12);
   --amber: oklch(0.75 0.15 75);
   --red: oklch(0.58 0.20 25);
   --red-bg: oklch(0.58 0.20 25 / 0.12);
   --blue-bg: oklch(0.55 0.15 250 / 0.08);
-  
+
   --border: oklch(0.80 0.05 75);
   --radius: 0.75rem;
+
+  /* Glass pill (input bar) — light mode */
+  --glass-bg: rgba(242, 242, 247, 0.92);
+  --glass-border: rgba(0, 0, 0, 0.10);
+  --glass-shadow: 0 2px 20px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.07);
   
   --capture-color: var(--b1);
   --analyzing-color: var(--amber);
@@ -85,54 +90,65 @@
 }
 
 .dark {
-  --bg: oklch(0.15 0 0);
-  --fg: oklch(0.20 0 0);
-  
-  --s1: oklch(0.25 0 0);
-  --s2: oklch(0.30 0 0);
-  --s3: oklch(0.55 0 0);
-  --s4: oklch(0.70 0 0);
-  
-  --b1: oklch(0.60 0.18 250);
-  --b2: oklch(0.50 0.15 250);
-  
-  --t1: oklch(0.95 0 0);
-  --t2: oklch(0.75 0 0);
-  --t3: oklch(0.65 0 0);
-  --t4: oklch(0.60 0 0);
-  
-  --green: oklch(0.65 0.18 145);
-  --green-bg: oklch(0.65 0.18 145 / 0.15);
-  --amber: oklch(0.80 0.16 75);
-  --red: oklch(0.65 0.22 25);
-  --red-bg: oklch(0.65 0.22 25 / 0.15);
-  --blue-bg: oklch(0.60 0.18 250 / 0.12);
-  
-  --border: oklch(0.35 0 0);
-  
+  /* Deeper base — more contrast between bg and card surfaces */
+  --bg: oklch(0.11 0 0);
+  --fg: oklch(0.19 0.005 250);
+
+  /* Surface steps — bigger jumps for visible depth */
+  --s1: oklch(0.26 0.005 250);
+  --s2: oklch(0.36 0 0);
+  --s3: oklch(0.60 0 0);
+  --s4: oklch(0.76 0 0);
+
+  /* Brand blue — more vivid, higher chroma */
+  --b1: oklch(0.65 0.23 250);
+  --b2: oklch(0.52 0.19 250);
+
+  /* Text — high contrast stack (AA/AAA compliant against dark bg) */
+  --t1: oklch(0.97 0 0);
+  --t2: oklch(0.83 0 0);
+  --t3: oklch(0.70 0 0);
+  --t4: oklch(0.58 0 0);
+
+  /* Semantic colors — brighter, more saturated for dark-mode pop */
+  --green: oklch(0.70 0.23 145);
+  --green-bg: oklch(0.70 0.23 145 / 0.18);
+  --amber: oklch(0.84 0.19 75);
+  --red: oklch(0.70 0.27 25);
+  --red-bg: oklch(0.70 0.27 25 / 0.18);
+  --blue-bg: oklch(0.65 0.23 250 / 0.16);
+
+  /* Visible separator */
+  --border: oklch(0.40 0 0);
+
   --capture-color: var(--b1);
   --analyzing-color: var(--amber);
   --success-color: var(--green);
   --fail-color: var(--red);
-  
-  --background: oklch(0.15 0 0);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.20 0 0);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.18 0 0);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.60 0.18 250);
+
+  /* Glass pill — dark frosted glass */
+  --glass-bg: rgba(26, 26, 34, 0.93);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 4px 24px rgba(0,0,0,0.55), 0 1px 6px rgba(0,0,0,0.30);
+
+  --background: oklch(0.11 0 0);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.19 0.005 250);
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.17 0 0);
+  --popover-foreground: oklch(0.97 0 0);
+  --primary: oklch(0.65 0.23 250);
   --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.30 0 0);
-  --secondary-foreground: oklch(0.90 0 0);
-  --muted: oklch(0.25 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.80 0.16 75);
-  --accent-foreground: oklch(0.15 0 0);
-  --destructive: oklch(0.65 0.22 25);
+  --secondary: oklch(0.26 0.005 250);
+  --secondary-foreground: oklch(0.92 0 0);
+  --muted: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.70 0 0);
+  --accent: oklch(0.84 0.19 75);
+  --accent-foreground: oklch(0.11 0 0);
+  --destructive: oklch(0.70 0.27 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --input: oklch(0.35 0 0);
-  --ring: oklch(0.60 0.18 250);
+  --input: oklch(0.36 0 0);
+  --ring: oklch(0.65 0.23 250);
 
   --radius-sm: calc(var(--radius) * 0.5);
   --radius-md: var(--radius);

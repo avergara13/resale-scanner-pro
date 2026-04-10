@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useKV } from '@github/spark/hooks'
 import {
   Robot,
@@ -1132,31 +1133,75 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
     </div>
   )
 
-  // Shared input bar used in both views
+  // Shared input bar — floating glass pill, sits just above the bottom nav
   const inputBar = (
-    <div className="p-4 bg-fg border-t border-s1 safe-bottom">
+    <div
+      style={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        // Viewport-relative (portal renders outside will-change containing block)
+        // 54px nav height + 8px gap + safe area
+        bottom: 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
+        zIndex: 50,
+        padding: '0 12px',
+        pointerEvents: 'none',
+      }}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault()
           handleSendMessage()
         }}
-        className="flex gap-2"
+        className="flex items-center gap-2"
+        style={{
+          pointerEvents: 'auto',
+          background: 'var(--glass-bg)',
+          backdropFilter: 'saturate(180%) blur(24px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(24px)',
+          border: '0.5px solid var(--glass-border)',
+          boxShadow: 'var(--glass-shadow)',
+          borderRadius: '22px',
+          padding: '6px 6px 6px 16px',
+        }}
       >
-        <Input
+        <input
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask me anything about your resale business..."
+          placeholder="Ask anything..."
           disabled={isProcessing}
-          className="flex-1"
+          style={{
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            fontSize: '15px',
+            color: 'var(--t1)',
+            minWidth: 0,
+          }}
         />
-        <Button
+        <button
           type="submit"
           disabled={!input.trim() || isProcessing}
-          className="w-10 h-10 flex items-center justify-center p-0"
+          style={{
+            width: '36px',
+            height: '36px',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '18px',
+            background: 'linear-gradient(135deg, var(--b1), var(--b2))',
+            border: 'none',
+            cursor: 'pointer',
+            opacity: !input.trim() || isProcessing ? 0.4 : 1,
+            transition: 'opacity 0.15s, transform 0.1s',
+            WebkitTapHighlightColor: 'transparent',
+          }}
         >
-          <PaperPlaneRight size={18} weight="bold" />
-        </Button>
+          <PaperPlaneRight size={16} weight="bold" className="text-white" />
+        </button>
       </form>
     </div>
   )
@@ -1175,32 +1220,35 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
 
-      {/* ── Tab bar ── */}
-      <div className="flex-shrink-0 bg-fg border-b border-s1">
-        <div className="tab-bar px-3">
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={cn('tab-btn', activeTab === 'chat' && 'active')}
-          >
-            <span>💬 CHAT</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('scans')}
-            className={cn('tab-btn', activeTab === 'scans' && 'active')}
-          >
-            <span>
-              📸 SCANS{sessionScans.length > 0 && ` (${sessionScans.length})`}
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveTab('tasks')}
-            className={cn('tab-btn', activeTab === 'tasks' && 'active')}
-          >
-            <span>
-              ✅ TASKS{pendingTodos.length > 0 && ` (${pendingTodos.length})`}
-            </span>
-          </button>
+      {/* ── Sticky chrome: tab bar + stats bar — never scrolls ── */}
+      <div className="flex-shrink-0 sticky z-20 bg-fg" style={{ top: '44px' }}>
+        <div className="border-b border-s1">
+          <div className="tab-bar px-3">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={cn('tab-btn', activeTab === 'chat' && 'active')}
+            >
+              <span>💬 CHAT</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('scans')}
+              className={cn('tab-btn', activeTab === 'scans' && 'active')}
+            >
+              <span>
+                📸 SCANS{sessionScans.length > 0 && ` (${sessionScans.length})`}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('tasks')}
+              className={cn('tab-btn', activeTab === 'tasks' && 'active')}
+            >
+              <span>
+                ✅ TASKS{pendingTodos.length > 0 && ` (${pendingTodos.length})`}
+              </span>
+            </button>
+          </div>
         </div>
+        {statsBar}
       </div>
 
       {/* ── Chat tab ── */}
@@ -1215,8 +1263,6 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0"
           >
-            {statsBar}
-
             {/* Splash — full height, viewport-centered */}
             <div
               className="flex-1 flex flex-col items-center justify-center text-center px-6"
@@ -1241,23 +1287,11 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0"
+            style={{ overflow: 'visible' }}
           >
-            {/* Chat header — back returns to splash */}
-            <div className="flex items-center gap-3 px-4 py-3 bg-fg/85 backdrop-blur-2xl border-b border-s1/40">
-              <button onClick={() => setViewMode('list')} className="w-10 h-10 flex items-center justify-center -ml-2 rounded-lg active:bg-s1 transition-colors">
-                <ArrowLeft size={20} weight="bold" className="text-t1" />
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-t1">Session Assistant</div>
-                <div className="text-[10px] text-t3">{chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''}</div>
-              </div>
-            </div>
-
-            {statsBar}
-
-            {/* Messages */}
+            {/* Messages — pb clears the floating input bar */}
             <ScrollArea className="flex-1 px-4">
-              <div ref={pullToRefresh.containerRef} className="py-4 space-y-4">
+              <div ref={pullToRefresh.containerRef} className="py-4 space-y-4" style={{ paddingBottom: '80px' }}>
                 {chatMessages.map((msg, index) => (
                   <motion.div
                     key={msg.id}
@@ -1314,7 +1348,6 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
               </div>
             </ScrollArea>
 
-            {inputBar}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1563,6 +1596,9 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           </div>
         </div>
       )}
+
+      {/* Glass input pill — portal to body to escape will-change containing block */}
+      {activeTab === 'chat' && viewMode === 'chat' && createPortal(inputBar, document.body)}
 
       {/* Rename dialog */}
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
