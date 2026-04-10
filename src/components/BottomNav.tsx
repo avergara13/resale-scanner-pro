@@ -11,9 +11,11 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureState = 'idle' }: BottomNavProps) {
-  const items: Array<{ id: Screen; icon: any; label: string }> = [
+  const leftItems: Array<{ id: Screen; icon: any; label: string }> = [
     { id: 'session', icon: ChartBar, label: 'Session' },
     { id: 'agent', icon: Robot, label: 'Agent' },
+  ]
+  const rightItems: Array<{ id: Screen; icon: any; label: string }> = [
     { id: 'queue', icon: Stack, label: 'Listings' },
     { id: 'sold', icon: Tag, label: 'Sold' },
   ]
@@ -21,10 +23,8 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-40" /* z-40 > floating agent input (z-[35]) — nav always on top */
+      className="fixed bottom-0 left-0 right-0 z-40"
       style={{
-        maxWidth: '100%',
-        margin: '0 auto',
         paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
         paddingLeft: 'env(safe-area-inset-left, 0px)',
         paddingRight: 'env(safe-area-inset-right, 0px)',
@@ -35,8 +35,16 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
         boxShadow: '0 -0.5px 0 rgba(0,0,0,0.06)',
       }}
     >
-      <div className="relative h-[54px] flex items-center justify-around px-2">
-        {items.slice(0, 2).map((item) => {
+      {/* 5-column grid — each slot is exactly 1/5 of the nav width, pixel-perfect on every iPhone */}
+      <div
+        className="h-[54px]"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          alignItems: 'center',
+        }}
+      >
+        {leftItems.map((item) => {
           const Icon = item.icon
           const isActive = currentScreen === item.id
 
@@ -45,52 +53,54 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl transition-all duration-200 active:scale-90',
+                'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200 active:scale-90',
                 isActive ? 'text-b1' : 'text-t3'
               )}
               style={{
-                minWidth: '62px',
-                minHeight: '48px',
+                height: '54px',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
               <Icon
-                size={23}
+                size={22}
                 weight={isActive ? 'fill' : 'regular'}
                 className="transition-all duration-200"
               />
               <span className={cn(
                 'text-[10px] leading-none tracking-tight transition-all duration-200',
-                isActive ? 'font-bold opacity-100' : 'font-medium opacity-60'
+                isActive ? 'font-semibold opacity-100' : 'font-medium opacity-55'
               )}>
                 {item.label}
               </span>
               {isActive && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-b1" />
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-b1" />
               )}
             </button>
           )
         })}
 
-        {/* Camera — sits flush within the nav bar, static until pressed */}
+        {/* Camera — center column, perfectly flush in the bar */}
         <button
           onClick={onCameraOpen}
           className={cn(
-            'camera-fab-static flex items-center justify-center rounded-full w-11 h-11',
+            'camera-fab-static flex items-center justify-center rounded-full',
             captureState === 'analyzing' && 'camera-analyzing',
             captureState === 'success' && 'camera-success',
             captureState === 'fail' && 'camera-fail'
           )}
           style={{
+            width: '44px',
+            height: '44px',
+            margin: '0 auto',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <Camera size={22} weight="bold" className="text-white relative z-10" />
+          <Camera size={20} weight="bold" className="text-white relative z-10" />
         </button>
 
-        {items.slice(2).map((item) => {
+        {rightItems.map((item) => {
           const Icon = item.icon
           const isActive = currentScreen === item.id
 
@@ -99,29 +109,28 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-0.5 py-1 rounded-xl transition-all duration-200 active:scale-90',
+                'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200 active:scale-90',
                 isActive ? 'text-b1' : 'text-t3'
               )}
               style={{
-                minWidth: '62px',
-                minHeight: '48px',
+                height: '54px',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
               <Icon
-                size={23}
+                size={22}
                 weight={isActive ? 'fill' : 'regular'}
                 className="transition-all duration-200"
               />
               <span className={cn(
                 'text-[10px] leading-none tracking-tight transition-all duration-200',
-                isActive ? 'font-bold opacity-100' : 'font-medium opacity-60'
+                isActive ? 'font-semibold opacity-100' : 'font-medium opacity-55'
               )}>
                 {item.label}
               </span>
               {isActive && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-b1" />
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-b1" />
               )}
             </button>
           )
