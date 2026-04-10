@@ -570,9 +570,6 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
       <div className="flex-shrink-0 px-3 pt-2 pb-0 sm:px-4 border-b border-s2 bg-fg sticky top-0 z-10 shadow-sm">
-        <div className="flex justify-center mb-2">
-          <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
-        </div>
         <div className="tab-bar">
           <button
             onClick={() => setTab('chat')}

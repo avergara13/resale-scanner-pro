@@ -1649,6 +1649,7 @@ function App() {
         onNavigateToSettings={() => setScreen('settings')}
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
+        settings={settings}
         onBack={
           screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
             ? () => setScreen('session')

@@ -1,6 +1,7 @@
 import { GearSix, ChartLine, ArrowLeft } from '@phosphor-icons/react'
 import { ThemeToggle } from './ThemeToggle'
-import type { Screen } from '@/types'
+import { ApiStatusIndicator } from './ApiStatusIndicator'
+import type { Screen, AppSettings } from '@/types'
 
 const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   session: 'RESALE SCANNER PRO',
@@ -21,14 +22,15 @@ interface AppHeaderProps {
   onNavigateToTrends?: () => void
   onBack?: () => void
   showTrends?: boolean
+  settings?: AppSettings
 }
 
-export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, onBack, showTrends }: AppHeaderProps) {
+export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, onBack, showTrends, settings }: AppHeaderProps) {
   const title = SCREEN_TITLES[screen] || ''
   const isSubScreen = !['session', 'agent', 'queue', 'sold'].includes(screen)
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-4 h-11 bg-fg border-b border-s1 flex-shrink-0">
+    <header className="sticky top-0 z-30 relative flex items-center justify-between px-4 h-11 bg-fg border-b border-s1 flex-shrink-0">
       <div className="flex items-center gap-2">
         {isSubScreen && onBack && (
           <button onClick={onBack} className="w-8 h-8 flex items-center justify-center rounded-lg text-t1 hover:bg-s1 transition-colors active:opacity-60 -ml-1">
@@ -37,6 +39,13 @@ export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, on
         )}
         <span className="text-[11px] font-black tracking-widest text-t1 uppercase">{title}</span>
       </div>
+      {/* Status dots — only on Agent screen, pinned to horizontal center */}
+      {screen === 'agent' && (
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto">
+          <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
+        </div>
+      )}
+
       <div className="flex items-center gap-0.5">
         {onNavigateToTrends && (
           <button
