@@ -212,11 +212,13 @@ interface AgentScreenProps {
   allSessions?: Session[]
   scanHistory?: ScannedItem[]
   profitGoals?: ProfitGoal[]
+  /** False when the app has navigated to another tab — triggers pill exit animation */
+  isCurrentScreen?: boolean
 }
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true }: AgentScreenProps) {
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
   const sessionId = currentSession?.id
   const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])
@@ -1162,7 +1164,12 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
   // Shared input bar — floating glass pill, sits just above the bottom nav
   const inputBar = (
-    <div
+    <motion.div
+      key="chat-pill"
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 80, opacity: 0 }}
+      transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.8 }}
       style={{
         position: 'fixed',
         left: 0,
@@ -1231,7 +1238,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           <PaperPlaneRight size={16} weight="bold" className="text-white" />
         </button>
       </form>
-    </div>
+    </motion.div>
   )
 
   const sortedSessions = useMemo(() =>
@@ -1646,8 +1653,13 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
         </div>
       )}
 
-      {/* Glass input pill — portal to body to escape will-change containing block */}
-      {activeTab === 'chat' && viewMode === 'chat' && createPortal(inputBar, document.body)}
+      {/* Glass input pill — always portalled to body; AnimatePresence drives slide-in/out */}
+      {createPortal(
+        <AnimatePresence>
+          {isCurrentScreen && activeTab === 'chat' && viewMode === 'chat' && inputBar}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Rename dialog */}
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>

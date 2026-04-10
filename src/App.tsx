@@ -1771,6 +1771,7 @@ function App() {
               className="w-full h-full"
             >
               <AgentScreen
+                isCurrentScreen={screen === 'agent'}
                 queueItems={queue || []}
                 soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
                 settings={settings}
