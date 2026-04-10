@@ -842,26 +842,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         }
       }
 
-      const recentItems = sessionItems.slice(-3).map(i =>
-        `• ${i.productName || 'Unknown'} — Buy: $${i.purchasePrice.toFixed(2)}, Sell: $${(i.estimatedSellPrice || 0).toFixed(2)}, Margin: ${(i.profitMargin || 0).toFixed(1)}%, Decision: ${i.decision}, Status: ${i.listingStatus || 'not-started'}${i.category ? `, Category: ${i.category}` : ''}`
-      ).join('\n')
-
-      const pastSessionsSummary = allSessions.slice(-3).map(s => {
-        const dur = ((s.endTime || Date.now()) - s.startTime) / 60000
-        return `• ${s.name || new Date(s.startTime).toLocaleDateString()} — ${s.itemsScanned} scans, ${s.buyCount} BUY, $${s.totalPotentialProfit.toFixed(2)} profit, ${Math.round(dur)}min${s.location ? `, at ${s.location.name}` : ''}${s.profitGoal ? `, goal: $${s.profitGoal}` : ''}`
-      }).join('\n')
-
-      const activeGoalsSummary = profitGoals.filter(g => g.active).map(g =>
-        `• ${g.type} goal: $${g.targetAmount.toFixed(2)} (${new Date(g.startDate).toLocaleDateString()} - ${new Date(g.endDate).toLocaleDateString()})`
-      ).join('\n')
-
-      const soldSummaryText = soldItems.length > 0
-        ? soldItems.slice(0, 5).map(i => {
-            const { netProfit } = settings ? getNetProfit(i, settings) : { netProfit: (i.soldPrice || 0) - i.purchasePrice }
-            return `• ${i.productName || 'Unknown'} — Sold $${(i.soldPrice || 0).toFixed(2)} on ${i.soldOn || '?'}, Net Profit: $${netProfit.toFixed(2)}, Status: ${i.listingStatus}`
-          }).join('\n')
-        : 'No sold items yet'
-
       const activeSold = soldItems.filter(i => i.listingStatus !== 'returned')
       const soldStats = {
         total: activeSold.length,
@@ -879,34 +859,74 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
           }`
         : 'No scanning session is active. You are showing all-time global stats across all sessions.'
 
-      // Dynamic context — changes per message, billed per-request
-      const dynamicContext = `${sessionScope}
-
-## Current App State
-
-### ${currentSession?.active ? `Session: ${currentSession.name || 'Active'} — Listings` : 'All Listings (Global)'}
-- ${queueStats.total} items (${queueStats.buy} BUY, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
-- Potential profit: $${(queueStats.totalProfit || 0).toFixed(2)}
-${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
-
-### Sold Items
-- ${soldStats.total} total sold | Revenue: $${soldStats.revenue.toFixed(2)} | Net Profit: $${soldStats.netProfit.toFixed(2)} | Needs Shipping: ${soldStats.needsShipping}
-${soldSummaryText !== 'No sold items yet' ? `\nRecent Sold:\n${soldSummaryText}` : '\nNo sold items yet'}
-
-### Active Session
-${currentSession?.active ? `- ${currentSession.name || 'Unnamed'}: ${currentSession.itemsScanned} scans (${currentSession.buyCount} BUY, ${currentSession.passCount} PASS), $${currentSession.totalPotentialProfit.toFixed(2)} profit${currentSession.profitGoal ? `, goal: $${currentSession.profitGoal} (${Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100)}%)` : ''}${currentSession.location?.name ? `, at ${currentSession.location.name}` : ''}` : 'No active session'}
-
-### Past Sessions
-${pastSessionsSummary || 'None'}
-
-### Goals
-${activeGoalsSummary || 'None'}
-
-### Tasks
-${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} (${t.createdBy})`).join('\n') : 'No pending tasks'}
-
-### Settings
-- Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%`
+      // Dynamic context — JSON-encoded to prevent prompt injection from user-controlled strings
+      // (item names, session names, task text are all user-editable and could contain adversarial content)
+      const dynamicState = {
+        scope: sessionScope,
+        listings: {
+          total: queueStats.total,
+          buy: queueStats.buy,
+          pass: queueStats.pass,
+          pending: queueStats.pending,
+          potentialProfit: Number((queueStats.totalProfit || 0).toFixed(2)),
+          recentItems: sessionItems.slice(-3).map(i => ({
+            name: i.productName || 'Unknown',
+            buyPrice: Number(i.purchasePrice.toFixed(2)),
+            sellPrice: Number((i.estimatedSellPrice || 0).toFixed(2)),
+            margin: Number((i.profitMargin || 0).toFixed(1)),
+            decision: i.decision,
+            status: i.listingStatus || 'not-started',
+            category: i.category || null,
+          })),
+        },
+        sold: {
+          total: soldStats.total,
+          revenue: Number(soldStats.revenue.toFixed(2)),
+          netProfit: Number(soldStats.netProfit.toFixed(2)),
+          needsShipping: soldStats.needsShipping,
+          recentSold: soldItems.slice(0, 5).map(i => {
+            const { netProfit: np } = settings ? getNetProfit(i, settings) : { netProfit: (i.soldPrice || 0) - i.purchasePrice }
+            return {
+              name: i.productName || 'Unknown',
+              soldPrice: Number((i.soldPrice || 0).toFixed(2)),
+              soldOn: i.soldOn || '?',
+              netProfit: Number(np.toFixed(2)),
+              status: i.listingStatus,
+            }
+          }),
+        },
+        activeSession: currentSession?.active ? {
+          name: currentSession.name || 'Unnamed',
+          scans: currentSession.itemsScanned,
+          buy: currentSession.buyCount,
+          pass: currentSession.passCount,
+          profit: Number(currentSession.totalPotentialProfit.toFixed(2)),
+          goal: currentSession.profitGoal || null,
+          goalProgress: currentSession.profitGoal ? Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100) : null,
+          location: currentSession.location?.name || null,
+        } : null,
+        pastSessions: allSessions.slice(-3).map(s => ({
+          name: s.name || new Date(s.startTime).toLocaleDateString(),
+          scans: s.itemsScanned,
+          buy: s.buyCount,
+          profit: Number(s.totalPotentialProfit.toFixed(2)),
+          durationMin: Math.round(((s.endTime || Date.now()) - s.startTime) / 60000),
+          location: s.location?.name || null,
+          goal: s.profitGoal || null,
+        })),
+        goals: profitGoals.filter(g => g.active).map(g => ({
+          type: g.type,
+          target: Number(g.targetAmount.toFixed(2)),
+          period: `${new Date(g.startDate).toLocaleDateString()} - ${new Date(g.endDate).toLocaleDateString()}`,
+        })),
+        tasks: pendingTodos.slice(0, 10).map(t => ({ text: t.text, createdBy: t.createdBy })),
+        settings: {
+          minMargin: settings?.minProfitMargin ?? 30,
+          shipping: settings?.defaultShippingCost ?? 5,
+          ebayFee: settings?.ebayFeePercent ?? 12.9,
+        },
+      }
+      const dynamicContext = `## Current App State\n\`\`\`json\n${JSON.stringify(dynamicState, null, 2)}\n\`\`\``
 
       // Include last 4 messages for conversational continuity
       const recentHistory = chatMessages.slice(-4).map(m =>

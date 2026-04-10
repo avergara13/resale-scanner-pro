@@ -7,7 +7,7 @@ import { AppHeader } from './components/AppHeader'
 import { CameraOverlay } from './components/CameraOverlay'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
-import { AIScreen } from './components/screens/AIScreen'
+import { AgentScreen } from './components/screens/AgentScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -1721,21 +1721,27 @@ function App() {
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
-              <AIScreen
-                currentItem={currentItem}
-                pipeline={pipeline}
-                settings={settings}
+              <AgentScreen
                 queueItems={queue || []}
-                onSaveDraft={handleSaveDraft}
-                onCreateListing={handleCreateListingFromScan}
-                onPassItem={handlePassFromScan}
-                onRecalculate={handleRecalculate}
-                onRescan={handleRescan}
-                onOpenCamera={() => setCameraOpen(true)}
+                soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
+                settings={settings}
                 pendingMessage={agentPendingMessage}
                 onPendingMessageHandled={() => setAgentPendingMessage(null)}
-                geminiService={geminiService}
-                onUpdateItem={handleUpdateCurrentItem}
+                onCreateListing={handleOptimizeItem}
+                onOptimizeItem={handleOptimizeItem}
+                onPushToNotion={handlePushToNotion}
+                onBatchAnalyze={handleBatchAnalyze}
+                onEditItem={handleEditQueueItem}
+                onMarkAsSold={handleMarkAsSold}
+                onMarkShipped={handleMarkShipped}
+                onNavigateToQueue={() => setScreen('queue')}
+                onOpenCamera={() => setCameraOpen(true)}
+                onStartSession={handleStartSession}
+                onEndSession={handleEndSession}
+                onEditSession={handleEditSession}
+                allSessions={visibleSessions}
+                scanHistory={scanHistory || []}
+                profitGoals={profitGoals || []}
               />
             </motion.div>
           )}

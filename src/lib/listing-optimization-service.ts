@@ -166,7 +166,7 @@ ITEM SPECIFICS:
 PRICING:
 - Competitive based on market data and recent sold prices above
 - Consider sell-through rate
-- Account for eBay fees (12.9%) and PayPal fees (3.49%)
+- Account for eBay Managed Payments final value fee (12.9% + $0.30 per order). PayPal is no longer used on eBay.
 - Ensure minimum ${context.item.profitMargin ?? 30}% profit margin
 
 CONDITION CODES:

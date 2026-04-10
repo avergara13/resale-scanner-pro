@@ -700,32 +700,6 @@ input, textarea, select {
   100% { left: 100%; }
 }
 
-@keyframes gradient-flow {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-@keyframes particle-rise {
-  0% {
-    transform: translateY(100%) scale(0);
-    opacity: 0;
-  }
-  20% {
-    opacity: 0.8;
-    transform: translateY(80%) scale(1);
-  }
-  80% {
-    opacity: 0.4;
-  }
-  100% {
-    transform: translateY(-10%) scale(0.5);
-    opacity: 0;
-  }
-}
 
 .pipeline-card.done {
   border-color: var(--green);

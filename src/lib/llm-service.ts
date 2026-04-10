@@ -15,6 +15,38 @@ import { retryFetch } from './retry-service'
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages'
 
+// ------- In-memory research cache -------
+// Prevents duplicate API calls when the same product is scanned multiple times
+// in a session (common at thrift stores). TTLs mirror retry-config.ts definitions.
+
+interface CacheEntry { result: string; expiresAt: number }
+const researchCache = new Map<string, CacheEntry>()
+
+const CACHE_TTL_MS = {
+  research: 10 * 60 * 1000,  // 10 min — balance between API cost and price freshness
+  vision:   5  * 60 * 1000,  // 5 min  — same image, same result
+} as const
+
+function cacheKey(...parts: (string | undefined)[]): string {
+  return parts.map(p => (p ?? '').toLowerCase().trim()).join('|')
+}
+
+function cacheGet(key: string): string | null {
+  const entry = researchCache.get(key)
+  if (!entry) return null
+  if (Date.now() > entry.expiresAt) { researchCache.delete(key); return null }
+  return entry.result
+}
+
+function cacheSet(key: string, result: string, ttl: number): void {
+  // Keep cache bounded — evict oldest entries when over 100 items
+  if (researchCache.size >= 100) {
+    const oldest = [...researchCache.entries()].sort((a, b) => a[1].expiresAt - b[1].expiresAt)[0]
+    if (oldest) researchCache.delete(oldest[0])
+  }
+  researchCache.set(key, { result, expiresAt: Date.now() + ttl })
+}
+
 // ------- Gemini (primary) -------
 
 async function callGemini(
@@ -238,6 +270,14 @@ export async function researchProduct(
   context: { purchasePrice?: number; category?: string; brand?: string },
   geminiApiKey: string
 ): Promise<string> {
+  // Cache hit — same product + category within the last 30 min, skip the API call
+  const key = cacheKey(productName, context.category, context.brand)
+  const cached = cacheGet(key)
+  if (cached) {
+    console.info(`[llm-cache] HIT — ${productName} (${context.category ?? 'general'})`)
+    return cached
+  }
+
   const specialtyStores = getCategorySpecificStores(context.category || '', context.brand)
   const isFreeItem = context.purchasePrice === 0
 
@@ -288,7 +328,10 @@ RECOMMENDED_SELL_PRICE: $XX.XX
 SELL_THROUGH_RATE: XX%
 BEST_PLATFORM: [platform name]`
 
-  return callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 2048 })
+  const result = await callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 2048 })
+  cacheSet(key, result, CACHE_TTL_MS.research)
+  console.info(`[llm-cache] STORE — ${productName} (expires in 30 min)`)
+  return result
 }
 
 // ------- Anthropic Claude (secondary — complex tasks only) -------
