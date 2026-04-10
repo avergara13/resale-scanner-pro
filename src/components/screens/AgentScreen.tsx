@@ -312,22 +312,25 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   }, [chatMessages])
 
   const handleCreateSession = useCallback(() => {
-    const name = `Session ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+    // One-session model: open the existing session if it exists
+    const existing = chatSessions?.[0]
+    if (existing) {
+      setActiveSessionId(existing.id)
+      setViewMode('chat')
+      return
+    }
     const newSession: ChatSession = {
       id: Date.now().toString(),
-      name,
+      name: 'Chat',
       createdAt: Date.now(),
       lastMessageAt: Date.now(),
       messages: [],
       isActive: true,
     }
-    setChatSessions((prev) => {
-      const updated = (prev || []).map(s => ({ ...s, isActive: false }))
-      return [newSession, ...updated]
-    })
+    setChatSessions([newSession])
     setActiveSessionId(newSession.id)
     setViewMode('chat')
-  }, [setChatSessions, setActiveSessionId])
+  }, [chatSessions, setChatSessions, setActiveSessionId])
 
   const handleDeleteSession = useCallback((sessionId: string) => {
     setChatSessions((prev) => (prev || []).filter(s => s.id !== sessionId))
@@ -1073,6 +1076,15 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
     onProcessingChange?.(isProcessing)
   }, [isProcessing, onProcessingChange])
 
+  // Auto-enter chat on mount if there's already a session with messages
+  useEffect(() => {
+    const existing = chatSessions?.[0]
+    if (existing && existing.messages.length > 0) {
+      setActiveSessionId(existing.id)
+      setViewMode('chat')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Handle messages injected from external widgets (e.g. AgentChatWidget)
   useEffect(() => {
     if (pendingMessage && !isProcessing) {
@@ -1205,112 +1217,21 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           >
             {statsBar}
 
-            <ScrollArea className="flex-1">
-              <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5 overflow-x-hidden">
-                {/* Quick Actions — always visible */}
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2.5">Quick Actions</div>
-                  {/* Full-bleed scroll strip — bleeds past px-4 parent so last chip never clips */}
-                  <div className="relative -mx-4">
-                    {/* Right-fade hint — shows there's more to scroll */}
-                    <div
-                      className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 z-10"
-                      style={{ background: 'linear-gradient(to left, var(--bg, #fff) 10%, transparent)' }}
-                    />
-                    <div
-                      className="flex gap-2 px-4 scrollbar-hide"
-                      style={{
-                        overflowX: 'auto',
-                        WebkitOverflowScrolling: 'touch',
-                        overscrollBehavior: 'contain',
-                        paddingRight: '32px', // ensure last chip clears the fade
-                      }}
-                    >
-                      {/* New Chat — primary pill */}
-                      <button
-                        onClick={handleCreateSession}
-                        className="flex-none flex items-center gap-1.5 h-9 px-4 bg-gradient-to-br from-b1 to-b2 rounded-full text-xs font-semibold text-white whitespace-nowrap shadow-sm active:scale-95 transition-all duration-150"
-                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        <Plus size={13} weight="bold" />
-                        <span>New Chat</span>
-                      </button>
-                      {/* Quick action pills */}
-                      {QUICK_ACTIONS.map(action => (
-                        <button
-                          key={action.label}
-                          onClick={() => handleQuickAction(action.prompt)}
-                          className="flex-none flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold text-t1 whitespace-nowrap active:scale-95 transition-all duration-150"
-                          style={{
-                            touchAction: 'manipulation',
-                            WebkitTapHighlightColor: 'transparent',
-                            background: 'color-mix(in oklch, var(--fg) 95%, transparent)',
-                            border: '0.5px solid color-mix(in oklch, var(--s1) 80%, transparent)',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                          }}
-                        >
-                          <span className="text-sm leading-none">{action.emoji}</span>
-                          <span>{action.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Conversation List */}
-                {sortedSessions.length === 0 ? (
-                  <div
-                    style={{
-                      minHeight: 'calc(100svh - 320px)',
-                      width: '100vw',
-                      marginLeft: '-16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <button
-                      onClick={() => inputRef.current?.focus()}
-                      className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform shadow-lg"
-                    >
-                      <Sparkle size={28} weight="fill" className="text-white" />
-                    </button>
-                    <h2 className="text-lg font-bold text-t1 mb-1.5">Welcome to Agent</h2>
-                    <p className="text-sm text-t3 max-w-[220px] leading-relaxed">Start a conversation below</p>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">
-                      <ChatCircle size={12} className="inline mr-1" />
-                      Conversations
-                    </div>
-                    <div className="space-y-2">
-                      {sortedSessions.map(session => (
-                        <button
-                          key={session.id}
-                          onClick={() => handleSwitchSession(session.id)}
-                          className="w-full p-3 bg-fg border border-s1 rounded-xl text-left active:scale-[0.98] transition-all group"
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <span className="text-sm font-bold text-t1 truncate">{session.name}</span>
-                            <span className="text-[9px] text-t3 flex-shrink-0">{relativeTime(session.lastMessageAt)}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[11px] text-t3 truncate flex-1">{lastMessagePreview(session)}</p>
-                            <span className="text-[9px] text-t3 flex-shrink-0">{session.messages.length} msg{session.messages.length !== 1 ? 's' : ''}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-
-            {/* Spacer so last content scrolls above the floating input bar */}
-            <div className="h-16" />
+            {/* Splash — full height, viewport-centered */}
+            <div
+              className="flex-1 flex flex-col items-center justify-center text-center px-6"
+              style={{ paddingBottom: '80px' }}
+            >
+              <button
+                onClick={handleCreateSession}
+                className="inline-flex p-5 bg-gradient-to-br from-b1 to-b2 rounded-3xl mb-5 active:scale-95 transition-transform shadow-xl"
+                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <Sparkle size={32} weight="fill" className="text-white" />
+              </button>
+              <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
+              <p className="text-sm text-t3 max-w-[200px] leading-relaxed">Tap to start your session assistant</p>
+            </div>
           </motion.div>
         ) : (
           <motion.div
@@ -1321,33 +1242,15 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0"
           >
-            {/* Chat header with back button */}
+            {/* Chat header — back returns to splash */}
             <div className="flex items-center gap-3 px-4 py-3 bg-fg/85 backdrop-blur-2xl border-b border-s1/40">
               <button onClick={() => setViewMode('list')} className="w-10 h-10 flex items-center justify-center -ml-2 rounded-lg active:bg-s1 transition-colors">
                 <ArrowLeft size={20} weight="bold" className="text-t1" />
               </button>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-t1 truncate">{activeSession?.name || 'Chat'}</div>
+                <div className="text-sm font-bold text-t1">Session Assistant</div>
                 <div className="text-[10px] text-t3">{chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''}</div>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-1.5 rounded-lg hover:bg-s1 transition-colors">
-                    <DotsThreeVertical size={20} weight="bold" className="text-t3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => activeSessionId && handleOpenRenameDialog(activeSessionId)}>
-                    <PencilSimple size={16} className="mr-2" /> Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => activeSessionId && handleDeleteSession(activeSessionId)}
-                    className="text-red"
-                  >
-                    <Trash size={16} className="mr-2" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
 
             {statsBar}
