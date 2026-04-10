@@ -1645,9 +1645,10 @@ function App() {
     }
   }, [cameraOpen, reset])
 
-  // Auto-load sold items when user navigates to the Sold screen
+  // Auto-load sold items when user navigates to the Sold screen OR the Agent screen
+  // (Agent needs live shipping data for its intelligence & reporting).
   useEffect(() => {
-    if (screen === 'sold') {
+    if (screen === 'sold' || screen === 'agent') {
       loadLiveSoldItems()
     }
   }, [screen, loadLiveSoldItems])
@@ -1829,6 +1830,7 @@ function App() {
               <AgentScreen
                 queueItems={queue || []}
                 soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
+                liveSoldItems={liveSoldItems}
                 settings={settings}
                 pendingMessage={agentPendingMessage}
                 onPendingMessageHandled={() => setAgentPendingMessage(null)}

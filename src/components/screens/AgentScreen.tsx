@@ -44,7 +44,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo } from '@/types'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, SoldItem } from '@/types'
+import { analyzeSoldBatch } from '@/lib/shipping-intelligence'
 
 interface QuickAction {
   emoji: string
@@ -126,11 +127,26 @@ const AGENT_SYSTEM_INSTRUCTIONS = `You are a resale business AI agent with full 
 - When uncertain about a value, flag it as "estimated" and explain your reasoning.
 - Prefer conservative estimates. Overestimating profit margins costs the business real money.
 
+## Live Shipping Context (liveShipping object in state)
+When \`liveShipping\` is present in state, it is the SOURCE OF TRUTH for sold items — it comes directly from the Notion Sales DB populated by email parsing (WF-01). It includes:
+- \`needsLabel\`, \`readyToShip\`, \`shipped\` — counts by status
+- \`overdue\` + \`urgent[]\` — items sold >48h ago still not shipped (critical!)
+- \`estimatedShippingCostOutstanding\` — dollars of shipping you still need to buy
+- \`totalNetIncome\` — after platform fees (the real take-home)
+- \`carrierMix\` — recommended carriers for outstanding shipments
+
+When asked about shipping, sold items, or overdue orders:
+1. ALWAYS reference liveShipping if present — don't use the legacy \`sold\` object
+2. If urgent[] has items, call them out by name and hours overdue
+3. Recommend the best carrier from carrierMix rather than guessing
+4. If liveShipping is null, explain that the Notion Sales DB isn't syncing and suggest using the manual "Log Sale" option
+
 ## Rules
 - Answer from the app state below — never say you can't access it.
 - Reference items by name, price, margin, and category.
 - Be proactive: suggest goals, flag unanalyzed items, warn about overdue shipping.
-- When calculating profit, always include: purchase price + shipping + materials ($0.75) + eBay fee (12.9%) + ad fee (3%) + $0.30 order fee.` as const
+- When calculating profit, always include: purchase price + shipping + materials ($0.75) + eBay fee (12.9%) + ad fee (3%) + $0.30 order fee.
+- Offline resilience: if the user says "no internet" or "API down", remind them manual Log Sale, manual queue editing, and manual shipping status all work without any API.` as const
 
 function formatMessage(text: string): string {
   let formatted = text
@@ -198,7 +214,10 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
 
 interface AgentScreenProps {
   queueItems?: ScannedItem[]
+  /** Legacy: items from the local queue marked as sold (ScannedItem shape) */
   soldItems?: ScannedItem[]
+  /** Live sold feed from Notion Sales DB (populated by WF-01 email parsing) */
+  liveSoldItems?: SoldItem[]
   settings?: AppSettings
   /** Message injected from external widget (e.g. AgentChatWidget on Session screen) */
   pendingMessage?: string | null
@@ -223,7 +242,7 @@ interface AgentScreenProps {
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
   const sessionId = currentSession?.id
   const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])
@@ -909,6 +928,24 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
             }
           }),
         },
+        // Live Notion Sales DB feed — populated by WF-01 email parsing, is the
+        // source of truth for real shipping workflow (what needs labels, what's overdue)
+        liveShipping: liveSoldItems.length > 0 ? (() => {
+          const analysis = analyzeSoldBatch(liveSoldItems)
+          return {
+            totalLiveSales: liveSoldItems.length,
+            needsLabel: analysis.needsLabelCount,
+            readyToShip: analysis.readyCount,
+            shipped: analysis.shippedCount,
+            overdue: analysis.overdueCount,
+            estimatedShippingCostOutstanding: analysis.totalPotentialShippingCost,
+            totalRevenue: analysis.totalRevenue,
+            totalPlatformFees: analysis.totalFees,
+            totalNetIncome: analysis.totalNetIncome,
+            carrierMix: analysis.recommendedCarrierMix,
+            urgent: analysis.urgentItems,
+          }
+        })() : null,
         activeSession: currentSession?.active ? {
           name: currentSession.name || 'Unnamed',
           scans: currentSession.itemsScanned,
@@ -1003,7 +1040,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, setTodos, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, liveSoldItems, chatMessages, pendingTodos, setTodos, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {

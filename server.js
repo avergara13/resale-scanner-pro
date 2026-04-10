@@ -18,8 +18,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const port    = Number(process.env.PORT || 3000)
 const distDir = path.join(__dirname, 'dist')
 const notionApiKey = process.env.NOTION_API_KEY || process.env.VITE_NOTION_API_KEY || ''
-const notionInventoryDbId = process.env.NOTION_INVENTORY_DATABASE_ID || process.env.VITE_NOTION_DATABASE_ID || '7e49058f-a887-4889-b9f6-ae5a6c3bf8e7'
-const notionSalesDbId = process.env.NOTION_SALES_DATABASE_ID || 'a8a86796-187c-4ef8-9ac0-e92d9f8df665'
+// Notion Master Inventory DB — source of truth for listed items (photos, price, SKU).
+// Fallback is the canonical Master Inventory DB ID; Railway env var always wins.
+const notionInventoryDbId = process.env.NOTION_INVENTORY_DATABASE_ID || process.env.VITE_NOTION_DATABASE_ID || '3318ed3e-1385-45d3-9a60-63a628eeefff'
+// Notion Sales DB — source of truth for WF-01 email-parsed sales. Railway env var wins;
+// fallback is the canonical Sales DB ID per the Sold Tab data contract.
+const notionSalesDbId = process.env.NOTION_SALES_DATABASE_ID || '4e7de9b9-c9fc-4219-8a4e-3296c62c7ea6'
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
 
@@ -33,6 +37,11 @@ const VALID_LABEL_PROVIDERS = new Set([
   '📮 USPS Direct',
   '📦 UPS Direct',
   '🟠 FedEx Direct',
+])
+const VALID_DELIST_STATUSES = new Set([
+  '⏳ Pending Delist',
+  '✅ Delisted — All Platforms',
+  '⚠️ Manual Delist Needed',
 ])
 
 const CONTENT_TYPES = {
@@ -211,15 +220,19 @@ function extractSaleItemTitle(name, snippet) {
 
 function normalizeInventoryPage(page) {
   const properties = page.properties || {}
+  // Notion Master Inventory schema — exact property names (case-sensitive):
+  // "Photo Links" is a URL property, not a Files property.
+  // "Listing Price" / "Purchase Price" are the canonical numeric fields.
+  // "Model / SKU" / "eBay Item Number" are the identifier text fields.
   return {
     pageId: page.id,
     title: getPlainText(properties['Item Name']),
-    photoUrl: getFileUrl(properties['Photos']),
+    photoUrl: properties['Photo Links']?.url || null,
     status: getSelectName(properties['Status']),
-    listedPrice: getNumber(properties['Listed Price']),
-    costOfGoods: getNumber(properties['Cost of Goods']),
-    sku: getPlainText(properties['SKU']),
-    ebayListingId: getPlainText(properties['eBay Listing ID']),
+    listedPrice: getNumber(properties['Listing Price']),
+    costOfGoods: getNumber(properties['Purchase Price']),
+    sku: getPlainText(properties['Model / SKU']),
+    ebayListingId: getPlainText(properties['eBay Item Number']),
   }
 }
 
@@ -234,11 +247,14 @@ function normalizeSalePage(page) {
     relationIds: getRelationIds(properties['Item']),
     orderNumber: getPlainText(properties['Order Number']) || null,
     salePrice: getNumber(properties['Sale Price']),
+    platformFee: getNumber(properties['Platform Fee']),
     saleDate: getDateValue(properties['Sale Date']) || null,
     platform: getSelectName(properties['Platform']) || 'Other',
     shippingStatus: getSelectName(properties['Shipping Status']) || (getCheckboxValue(properties['Shipped']) ? '✅ Shipped' : '🔴 Need Label'),
+    delistStatus: getSelectName(properties['Delist Status']) || null,
     trackingNumber: getPlainText(properties['Tracking Number']) || null,
     labelProvider: getSelectName(properties['Label Provider']) || null,
+    labelCost: getPlainText(properties['Label Cost']) || null,
     labelUrl: getPlainText(properties['Label URL']) || null,
     shipFromZip: getPlainText(properties['Ship From ZIP']) || DEFAULT_SHIP_FROM_ZIP,
     buyerZip: getPlainText(properties['Buyer ZIP']) || extractZip(rawSnippet),
@@ -385,6 +401,12 @@ function buildSoldItems(sales, inventoryPages, scans) {
       scansByTitle.get(titleKey) ||
       null
 
+    // Compute net income: sale price minus platform fee minus label cost (best-effort parse)
+    const labelCostNumber = sale.labelCost ? Number.parseFloat(String(sale.labelCost).replace(/[^0-9.]/g, '')) : null
+    const netIncome = typeof sale.salePrice === 'number'
+      ? sale.salePrice - (sale.platformFee || 0) - (Number.isFinite(labelCostNumber) ? labelCostNumber : 0)
+      : null
+
     return {
       id: sale.pageId,
       salePageId: sale.pageId,
@@ -393,10 +415,14 @@ function buildSoldItems(sales, inventoryPages, scans) {
       imageUrl: inventory?.photoUrl || null,
       platform: sale.platform,
       salePrice: sale.salePrice,
+      platformFee: sale.platformFee,
+      netIncome: typeof netIncome === 'number' ? Math.round(netIncome * 100) / 100 : null,
       saleDate: sale.saleDate,
       shippingStatus: VALID_SHIPPING_STATUSES.has(sale.shippingStatus) ? sale.shippingStatus : '🔴 Need Label',
+      delistStatus: VALID_DELIST_STATUSES.has(sale.delistStatus) ? sale.delistStatus : sale.delistStatus || null,
       trackingNumber: sale.trackingNumber,
       labelProvider: sale.labelProvider,
+      labelCost: sale.labelCost,
       labelUrl: sale.labelUrl,
       buyerZip: sale.buyerZip,
       buyerInfo: sale.buyerInfo,
@@ -429,6 +455,10 @@ function buildShippingProperties(update) {
     properties['Label Provider'] = { select: { name: update.labelProvider } }
   }
 
+  if (typeof update.labelCost === 'string') {
+    properties['Label Cost'] = { rich_text: update.labelCost ? [{ text: { content: update.labelCost } }] : [] }
+  }
+
   if (typeof update.labelUrl === 'string') {
     properties['Label URL'] = { url: update.labelUrl || null }
   }
@@ -443,6 +473,10 @@ function buildShippingProperties(update) {
 
   if (typeof update.shipNotes === 'string') {
     properties['Ship Notes'] = { rich_text: update.shipNotes ? [{ text: { content: update.shipNotes } }] : [] }
+  }
+
+  if (typeof update.delistStatus === 'string' && VALID_DELIST_STATUSES.has(update.delistStatus)) {
+    properties['Delist Status'] = { select: { name: update.delistStatus } }
   }
 
   if (update.shippingStatus === '✅ Shipped') {
