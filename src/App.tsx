@@ -8,6 +8,7 @@ import { CameraOverlay } from './components/CameraOverlay'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { AIScreen } from './components/screens/AIScreen'
+import { AgentScreen } from './components/screens/AgentScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -221,8 +222,8 @@ function App() {
       productName: barcodeProduct?.title || undefined,
     }
     setCurrentItem(newItem)
-    setScreen('agent')
-    
+    setScreen('scan-result')
+
     const steps: PipelineStep[] = [
       { id: 'vision', label: 'Vision Analysis', status: 'processing', progress: 0 },
       { id: 'lens', label: 'Google Lens', status: 'pending', progress: 0 },
@@ -1395,18 +1396,18 @@ function App() {
 
     const imageSource = item.imageData || item.imageThumbnail
     if (!imageSource) {
-      // No image — navigate to agent with item pre-loaded so user can see it
+      // No image — navigate to scan-result with item pre-loaded so user can see it
       setCurrentItem(item)
       setPipeline([])
-      setScreen('agent')
+      setScreen('scan-result')
       toast('No image available — re-scan with camera to re-analyze', { duration: 3000 })
       return
     }
 
-    // Navigate to agent first, then trigger pipeline — only remove from queue on success
+    // Navigate to scan-result first, then trigger pipeline — only remove from queue on success
     setCurrentItem(undefined)
     setPipeline([])
-    setScreen('agent')
+    setScreen('scan-result')
     try {
       await handleCapture(imageSource, item.purchasePrice, item.location)
       setQueue(prev => (prev || []).filter(i => i.id !== itemId))
@@ -1663,6 +1664,41 @@ function App() {
           {screen === 'agent' && (
             <motion.div
               key="agent"
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
+              className="w-full h-full"
+            >
+              <AgentScreen
+                queueItems={queue || []}
+                soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
+                settings={settings}
+                pendingMessage={agentPendingMessage}
+                onPendingMessageHandled={() => setAgentPendingMessage(null)}
+                onCreateListing={handleOptimizeItem}
+                onOptimizeItem={handleOptimizeItem}
+                onPushToNotion={handlePushToNotion}
+                onBatchAnalyze={handleBatchAnalyze}
+                onEditItem={handleEditQueueItem}
+                onMarkAsSold={handleMarkAsSold}
+                onMarkShipped={handleMarkShipped}
+                onNavigateToQueue={() => setScreen('queue')}
+                onOpenCamera={() => setCameraOpen(true)}
+                onStartSession={handleStartSession}
+                onEndSession={handleEndSession}
+                onEditSession={handleEditSession}
+                allSessions={allSessions || []}
+                scanHistory={scanHistory || []}
+                profitGoals={profitGoals || []}
+              />
+            </motion.div>
+          )}
+          {screen === 'scan-result' && (
+            <motion.div
+              key="scan-result"
               variants={screenVariants}
               initial="initial"
               animate="animate"

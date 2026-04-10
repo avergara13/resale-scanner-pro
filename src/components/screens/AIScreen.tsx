@@ -310,6 +310,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
   const completedTasks = (todos || []).filter(t => t.completed)
 
   const hasDecision = pipeline.some(p => p.id === 'decision' && p.status === 'complete')
+  const isPipelineRunning = pipeline.length > 0 && pipeline.some(p => p.status === 'processing')
   const decision = currentItem?.decision
   const canSaveDraft = currentItem?.imageData || description.trim().length > 0
 
@@ -379,6 +380,18 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
     }
     prevAIChatCount.current = chatMessages.length
   }, [chatMessages])
+
+  // Auto-scroll to the decision section when the pipeline completes
+  const decisionRef = useRef<HTMLDivElement>(null)
+  const prevHasDecision = useRef(false)
+  useEffect(() => {
+    if (hasDecision && !prevHasDecision.current) {
+      setTimeout(() => {
+        decisionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 400)
+    }
+    prevHasDecision.current = hasDecision
+  }, [hasDecision])
 
   const buildAIContext = useCallback(() => {
     const buyItems = queueItems?.filter(i => i.decision === 'BUY' && i.inQueue) ?? []
@@ -637,8 +650,20 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 <OverallProgress steps={pipeline} />
                 <PipelinePanel steps={pipeline} />
                 
+                {isPipelineRunning && (() => {
+                  const marketStep = pipeline.find(p => p.id === 'market')
+                  const isMarketStuck = marketStep?.status === 'processing' && (marketStep.progress ?? 0) >= 90
+                  if (!isMarketStuck) return null
+                  return (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber/10 border border-amber/30 text-amber text-xs font-medium">
+                      <span className="animate-pulse">⏳</span>
+                      Fetching live market data — this can take up to 30s…
+                    </div>
+                  )
+                })()}
+
                 {hasDecision && decision && (
-                  <div className="mt-3 sm:mt-4">
+                  <div className="mt-3 sm:mt-4" ref={decisionRef}>
                     <DecisionSignal decision={decision} item={currentItem} />
                   </div>
                 )}
@@ -993,63 +1018,74 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         )}
 
         {tab === 'scans' && !hasDecision && (
-          /* Pre-pipeline or in-progress: Save Draft */
+          /* Pre-pipeline or in-progress */
           <div className="p-2.5 sm:p-3 space-y-2">
-            <div className="flex gap-2">
-              <Input
-                id="ai-price"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="Buy $"
-                value={buyPrice}
-                onChange={(e) => setBuyPrice(e.target.value)}
-                className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
-              />
-              <div className="flex-1 relative">
-                <Input
-                  id="ai-describe"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Add notes or description..."
-                  className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
-                />
-                {isSupported && (
-                  <button
-                    onClick={() => startListening((text) => setDescription(text))}
-                    className={cn(
-                      "absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-colors",
-                      isListening
-                        ? "bg-red text-white animate-pulse"
-                        : "bg-s1 hover:bg-s2 text-t3 hover:text-t1"
-                    )}
-                  >
-                    <Microphone size={14} weight="bold" className="sm:w-4 sm:h-4" />
-                  </button>
-                )}
+            {isPipelineRunning ? (
+              /* Pipeline running — no action buttons yet; wait for decision */
+              <div className="flex items-center justify-center gap-2 h-10 text-xs text-t3 font-medium">
+                <span className="w-2 h-2 rounded-full bg-b1 animate-pulse" />
+                Analyzing… decision coming
               </div>
-            </div>
-            <div className="flex gap-2">
-              {currentItem && (
-                <Button
-                  onClick={() => onRescan?.()}
-                  variant="outline"
-                  className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
-                >
-                  <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
-                  Rescan
-                </Button>
-              )}
-              <Button
-                onClick={() => onSaveDraft(parseFloat(buyPrice), description)}
-                disabled={!canSaveDraft}
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
-              >
-                <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
-                SAVE DRAFT TO QUEUE
-              </Button>
-            </div>
+            ) : (
+              /* Pipeline not yet started or failed — allow draft save */
+              <>
+                <div className="flex gap-2">
+                  <Input
+                    id="ai-price"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    placeholder="Buy $"
+                    value={buyPrice}
+                    onChange={(e) => setBuyPrice(e.target.value)}
+                    className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
+                  />
+                  <div className="flex-1 relative">
+                    <Input
+                      id="ai-describe"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Add notes or description..."
+                      className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
+                    />
+                    {isSupported && (
+                      <button
+                        onClick={() => startListening((text) => setDescription(text))}
+                        className={cn(
+                          "absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-colors",
+                          isListening
+                            ? "bg-red text-white animate-pulse"
+                            : "bg-s1 hover:bg-s2 text-t3 hover:text-t1"
+                        )}
+                      >
+                        <Microphone size={14} weight="bold" className="sm:w-4 sm:h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {currentItem && (
+                    <Button
+                      onClick={() => onRescan?.()}
+                      variant="outline"
+                      className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
+                    >
+                      <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
+                      Rescan
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => onSaveDraft(parseFloat(buyPrice), description)}
+                    disabled={!canSaveDraft}
+                    className="flex-1 bg-b1 hover:bg-b2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
+                  >
+                    <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
+                    SAVE DRAFT TO QUEUE
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
