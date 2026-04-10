@@ -49,7 +49,14 @@ export function AppHeader({
     : null
 
   return (
-    <header className="sticky top-0 z-30 relative flex items-center justify-between px-4 h-11 bg-fg border-b border-s1 flex-shrink-0">
+    <header className="sticky top-0 z-30 relative flex items-center justify-between px-4 h-12 flex-shrink-0"
+      style={{
+        background: 'color-mix(in oklch, var(--fg) 85%, transparent)',
+        backdropFilter: 'saturate(180%) blur(28px)',
+        WebkitBackdropFilter: 'saturate(180%) blur(28px)',
+        borderBottom: '0.5px solid color-mix(in oklch, var(--s2) 50%, transparent)',
+      }}
+    >
       <div className="flex items-center gap-2">
         {isSubScreen && onBack && (
           <button onClick={onBack} className="w-10 h-10 flex items-center justify-center rounded-lg text-t1 hover:bg-s1 transition-colors active:opacity-60 -ml-1">

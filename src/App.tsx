@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { PaperPlaneRight } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -56,6 +57,8 @@ function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [showSessionTrends, setShowSessionTrends] = useState(false)
   const [agentPendingMessage, setAgentPendingMessage] = useState<string | null>(null)
+  const [agentInput, setAgentInput] = useState('')
+  const agentInputRef = useRef<HTMLInputElement>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
@@ -2036,7 +2039,60 @@ function App() {
         </AnimatePresence>
       </div>
 
+      {/* Spacer keeps content from hiding under fixed nav + floating input */}
       <div className="h-[80px] sm:h-[88px] flex-shrink-0" />
+
+      {/* ── Floating Agent Input — slides up when on Agent tab ── */}
+      <AnimatePresence>
+        {screen === 'agent' && (
+          <motion.div
+            key="agent-float-input"
+            initial={{ y: 72, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 72, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 36, mass: 0.7 }}
+            className="fixed left-0 right-0 z-[35] px-4"
+            style={{
+              bottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 54px + 6px)',
+            }}
+          >
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const msg = agentInput.trim()
+                if (msg) {
+                  setAgentPendingMessage(msg)
+                  setAgentInput('')
+                }
+              }}
+              className="flex items-center gap-2 rounded-full px-4 py-2.5 border border-s2/50"
+              style={{
+                background: 'color-mix(in oklch, var(--fg) 78%, transparent)',
+                backdropFilter: 'saturate(180%) blur(28px)',
+                WebkitBackdropFilter: 'saturate(180%) blur(28px)',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08)',
+              }}
+            >
+              <input
+                ref={agentInputRef}
+                value={agentInput}
+                onChange={(e) => setAgentInput(e.target.value)}
+                placeholder="Message Agent…"
+                className="flex-1 bg-transparent text-sm text-t1 placeholder:text-t3 outline-none min-w-0"
+                style={{ fontSize: '16px' }}
+              />
+              <motion.button
+                type="submit"
+                disabled={!agentInput.trim()}
+                whileTap={{ scale: 0.85 }}
+                className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-b1 to-b2 disabled:opacity-25 disabled:from-t3 disabled:to-t3 transition-colors"
+              >
+                <PaperPlaneRight size={14} weight="fill" className="text-white translate-x-px" />
+              </motion.button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <BottomNav
         currentScreen={screen}

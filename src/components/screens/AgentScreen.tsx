@@ -1027,29 +1027,32 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
 
   // Shared input bar used in both views
   const inputBar = (
-    <div className="px-4 pt-2 pb-2 bg-fg border-t border-s1 safe-bottom">
+    <div
+      className="px-3 pt-3 bg-fg/80 backdrop-blur-2xl border-t border-s1/30"
+      style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 4rem)' }}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault()
           handleSendMessage()
         }}
-        className="flex gap-2"
+        className="flex items-center gap-2 bg-s1/80 rounded-full px-4 py-2 border border-s1/60 shadow-sm"
       >
-        <Input
+        <input
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask me anything about your resale business..."
+          placeholder="Message Agent…"
           disabled={isProcessing}
-          className="flex-1"
+          className="flex-1 bg-transparent text-sm text-t1 placeholder:text-t3 outline-none min-w-0"
         />
-        <Button
+        <button
           type="submit"
           disabled={!input.trim() || isProcessing}
-          className="w-10 h-10 flex items-center justify-center p-0"
+          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-b1 to-b2 disabled:opacity-30 disabled:from-t3 disabled:to-t3 transition-all active:scale-90"
         >
-          <PaperPlaneRight size={18} weight="bold" />
-        </Button>
+          <PaperPlaneRight size={15} weight="fill" className="text-white translate-x-px" />
+        </button>
       </form>
     </div>
   )
@@ -1124,15 +1127,15 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
 
                 {/* Conversation List */}
                 {sortedSessions.length === 0 ? (
-                  <div className="text-center py-10">
+                  <div className="flex flex-col items-center justify-center py-16 w-full min-h-[45vh]">
                     <button
                       onClick={() => inputRef.current?.focus()}
-                      className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
+                      className="flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
                     >
                       <Sparkle size={32} weight="fill" className="text-white" />
                     </button>
-                    <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
-                    <p className="text-sm text-t3 max-w-xs mx-auto">Start a conversation below</p>
+                    <h2 className="text-xl font-bold text-t1 mb-2 text-center">Welcome to Agent</h2>
+                    <p className="text-sm text-t3 max-w-xs text-center">Start a conversation below</p>
                   </div>
                 ) : (
                   <div>
@@ -1145,7 +1148,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
                         <button
                           key={session.id}
                           onClick={() => handleSwitchSession(session.id)}
-                          className="w-full p-3 bg-fg border border-s1 rounded-xl text-left active:scale-[0.98] transition-all group"
+                          className="w-full p-3.5 bg-fg/90 border border-s2/60 rounded-2xl text-left active:scale-[0.97] transition-all shadow-sm"
                         >
                           <div className="flex items-start justify-between gap-2 mb-1">
                             <span className="text-sm font-bold text-t1 truncate">{session.name}</span>
@@ -1186,7 +1189,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
                           </div>
                           <div className="space-y-2">
                             {buyQueue.slice().reverse().map(item => (
-                              <div key={item.id} className="p-3 bg-fg border border-s1 rounded-xl">
+                              <div key={item.id} className="p-3.5 bg-fg/90 border border-s2/60 rounded-2xl shadow-sm">
                                 <div className="flex items-start justify-between gap-2 mb-1">
                                   <span className="text-sm font-semibold text-t1 truncate flex-1">
                                     {item.productName || 'Unknown item'}
@@ -1300,7 +1303,8 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
             </ScrollArea>
             )}
 
-            {agentTab === 'chat' && inputBar}
+            {/* Spacer so last content scrolls above the floating input bar */}
+            {agentTab === 'chat' && <div className="h-16" />}
           </motion.div>
         ) : (
           <motion.div
@@ -1312,7 +1316,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
             className="flex flex-col flex-1 min-h-0"
           >
             {/* Chat header with back button */}
-            <div className="flex items-center gap-3 px-4 py-3 bg-fg border-b border-s1">
+            <div className="flex items-center gap-3 px-4 py-3 bg-fg/85 backdrop-blur-2xl border-b border-s1/40">
               <button onClick={() => setViewMode('list')} className="p-1.5 -ml-1 rounded-lg active:bg-s1 transition-colors">
                 <ArrowLeft size={20} weight="bold" className="text-t1" />
               </button>
@@ -1399,7 +1403,8 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
               </div>
             </ScrollArea>
 
-            {inputBar}
+            {/* Spacer so messages scroll above the floating input bar */}
+            <div className="h-16 flex-shrink-0" />
           </motion.div>
         )}
       </AnimatePresence>
