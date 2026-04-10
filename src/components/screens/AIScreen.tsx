@@ -1,4 +1,15 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { marked } from 'marked'
+
+// Prevent XSS: escape raw HTML blocks in AI output instead of passing them through.
+// Markdown formatting (bold, lists, etc.) still works — only literal <tags> are neutralised.
+marked.use({
+  renderer: {
+    html({ text }: { text: string }) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    },
+  },
+})
 import { Robot, Plus, Microphone, Scan, FloppyDisk, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash, ArrowClockwise, ArrowCounterClockwise, XCircle, ShoppingCart } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -272,7 +283,7 @@ function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (
         {item.profitMargin != null && (
           <p className={cn(
             'text-[10px] font-bold',
-            item.profitMargin > 50 ? 'text-green' : item.profitMargin > 20 ? 'text-amber' : 'text-red'
+            item.profitMargin > 40 ? 'text-green' : item.profitMargin > 25 ? 'text-amber' : 'text-red'
           )}>
             {item.profitMargin.toFixed(1)}% margin
           </p>
@@ -677,17 +688,24 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                             <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
                             <p className={cn(
                               "text-base sm:text-lg font-mono font-bold",
-                              (currentItem.profitMargin || 0) > 50 ? "text-green" :
-                              (currentItem.profitMargin || 0) > 20 ? "text-amber" : "text-red"
+                              (currentItem.profitMargin || 0) > 40 ? "text-green" :
+                              (currentItem.profitMargin || 0) > 25 ? "text-amber" : "text-red"
                             )}>
                               {currentItem.profitMargin?.toFixed(1) || '--'}%
                             </p>
                           </div>
                           <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
-                            <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                              ${((currentItem.estimatedSellPrice || 0) - currentItem.purchasePrice).toFixed(2)}
-                            </p>
+                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit <span className="normal-case font-normal">(after fees)</span></p>
+                            {(() => {
+                              const netProfit = currentItem.profitMargin != null && currentItem.estimatedSellPrice
+                                ? (currentItem.profitMargin / 100) * currentItem.estimatedSellPrice
+                                : (currentItem.estimatedSellPrice || 0) - currentItem.purchasePrice
+                              return (
+                                <p className={cn("text-base sm:text-lg font-mono font-bold", netProfit >= 0 ? "text-green" : "text-red")}>
+                                  {netProfit >= 0 ? '+' : ''}${netProfit.toFixed(2)}
+                                </p>
+                              )
+                            })()}
                           </div>
                         </div>
                       </CollapsibleContent>
@@ -797,7 +815,18 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                         : "bg-fg border border-s2 text-t1"
                     )}
                   >
-                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    {msg.role === 'user' ? (
+                      <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    ) : (
+                      <div
+                        className="text-xs sm:text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_strong]:font-semibold"
+                        dangerouslySetInnerHTML={{ __html: marked.parse(
+                          msg.content
+                            .replace(/^([A-Z_]+):\s*N\/A\s*$/gm, '')
+                            .trim()
+                        ) as string }}
+                      />
+                    )}
                     <p className={cn(
                       "text-[10px] sm:text-xs mt-1 sm:mt-1.5",
                       msg.role === 'user' ? "text-white/70" : "text-t3"
