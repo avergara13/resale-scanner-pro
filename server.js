@@ -488,13 +488,38 @@ function buildShippingProperties(update) {
 
 async function getSoldFeed() {
   const warnings = []
-  const [sales, inventoryPages, scans, salesProbe] = await Promise.all([
+  // Use allSettled so a single failing source (e.g. Notion integration not
+  // invited to one DB, Supabase creds missing) degrades gracefully instead of
+  // taking the whole sold feed offline.
+  const [salesResult, inventoryResult, scansResult, salesProbeResult] = await Promise.allSettled([
     querySalesPages(),
     queryInventoryPages(),
     querySupabaseScans(),
     probeSupabaseSalesTable(),
   ])
 
+  const sales = salesResult.status === 'fulfilled' ? salesResult.value : []
+  const inventoryPages = inventoryResult.status === 'fulfilled' ? inventoryResult.value : []
+  const scans = scansResult.status === 'fulfilled' ? scansResult.value : []
+  const salesProbe = salesProbeResult.status === 'fulfilled'
+    ? salesProbeResult.value
+    : { available: false, warning: null }
+
+  if (salesResult.status === 'rejected') {
+    const msg = salesResult.reason instanceof Error ? salesResult.reason.message : String(salesResult.reason)
+    console.error('[sold-items] sales DB query failed:', msg)
+    warnings.push(`Notion Sales DB unavailable: ${msg}`)
+  }
+  if (inventoryResult.status === 'rejected') {
+    const msg = inventoryResult.reason instanceof Error ? inventoryResult.reason.message : String(inventoryResult.reason)
+    console.error('[sold-items] inventory DB query failed:', msg)
+    warnings.push(`Notion Inventory DB unavailable: ${msg}`)
+  }
+  if (scansResult.status === 'rejected') {
+    const msg = scansResult.reason instanceof Error ? scansResult.reason.message : String(scansResult.reason)
+    console.error('[sold-items] supabase scans query failed:', msg)
+    warnings.push(`Supabase scans unavailable: ${msg}`)
+  }
   if (salesProbe.warning) {
     warnings.push(salesProbe.warning)
   }
