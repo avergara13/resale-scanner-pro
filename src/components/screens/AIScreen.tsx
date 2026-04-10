@@ -1,5 +1,15 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { marked } from 'marked'
+
+// Prevent XSS: escape raw HTML blocks in AI output instead of passing them through.
+// Markdown formatting (bold, lists, etc.) still works — only literal <tags> are neutralised.
+marked.use({
+  renderer: {
+    html({ text }: { text: string }) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    },
+  },
+})
 import { Robot, Plus, Microphone, Scan, FloppyDisk, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash, ArrowClockwise, ArrowCounterClockwise, XCircle, ShoppingCart } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
