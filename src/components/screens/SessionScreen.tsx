@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
-import { AgentPanel } from '../AgentPanel'
 import { LocationInsights } from '../LocationInsights'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
@@ -307,12 +306,6 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
               <p className="text-[11px] text-t3">Begin tracking scans and profits</p>
             </div>
           </button>
-
-          {/* Agent panel — collapsed by default */}
-          <AgentPanel
-            onSendMessage={onAgentMessage}
-            isProcessing={isAgentProcessing}
-          />
 
           {/* Recently deleted — recoverable within 60s */}
           {deletedSessions.length > 0 && (
