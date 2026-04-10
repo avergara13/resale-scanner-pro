@@ -23,6 +23,8 @@ import {
   Warning,
   ListChecks,
   ChatCircle,
+  Camera,
+  ArrowSquareRight,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -218,6 +220,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>(chatKey, EMPTY_CHAT_SESSIONS)
   const [activeSessionId, setActiveSessionId] = useKV<string | null>(activeKey, null)
   const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', EMPTY_TODOS)
+  const [activeTab, setActiveTab] = useState<'chat' | 'scans' | 'tasks'>('chat')
   const [viewMode, setViewMode] = useState<'list' | 'chat'>('list')
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -225,7 +228,9 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [taskInput, setTaskInput] = useState('')
-  const [showTaskInput, setShowTaskInput] = useState(false)
+  // Direct KV access for scan history mutations in the Scans tab
+  const [scanHistoryKV, setScanHistoryKV] = useKV<ScannedItem[]>('scan-history', [])
+  const [, setQueueKV] = useKV<ScannedItem[]>('queue', [])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const pendingTodos = useMemo(() => (todos || []).filter(t => !t.completed), [todos])
@@ -264,6 +269,29 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
 
     return { total, buy, pass, pending, totalProfit }
   }, [sessionItems])
+
+  // Session-scoped scan cards (most recent first) for the Scans tab
+  const sessionScans = useMemo(() => {
+    const items = scanHistoryKV || []
+    const filtered = currentSession?.id
+      ? items.filter(i => i.sessionId === currentSession.id)
+      : items
+    return [...filtered].sort((a, b) => b.timestamp - a.timestamp).slice(0, 100)
+  }, [scanHistoryKV, currentSession?.id])
+
+  const handleDeleteScan = useCallback((itemId: string) => {
+    setScanHistoryKV(prev => (prev || []).filter(i => i.id !== itemId))
+  }, [setScanHistoryKV])
+
+  const handlePromoteToQueue = useCallback((item: ScannedItem) => {
+    const queueItem: ScannedItem = { ...item, inQueue: true }
+    setQueueKV(prev => {
+      const current = prev || []
+      if (current.some(i => i.id === queueItem.id)) return current
+      return [...current, queueItem]
+    })
+    toast.success(`${item.productName || 'Item'} added to queue`)
+  }, [setQueueKV])
 
   const prevMessageCount = useRef(chatMessages.length)
   const agentHasMounted = useRef(false)
@@ -1063,6 +1091,36 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
 
+      {/* ── Tab bar ── */}
+      <div className="flex-shrink-0 bg-fg border-b border-s1">
+        <div className="tab-bar px-3">
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={cn('tab-btn', activeTab === 'chat' && 'active')}
+          >
+            <span>💬 CHAT</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('scans')}
+            className={cn('tab-btn', activeTab === 'scans' && 'active')}
+          >
+            <span>
+              📸 SCANS{sessionScans.length > 0 && ` (${sessionScans.length})`}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={cn('tab-btn', activeTab === 'tasks' && 'active')}
+          >
+            <span>
+              ✅ TASKS{pendingTodos.length > 0 && ` (${pendingTodos.length})`}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Chat tab ── */}
+      {activeTab === 'chat' && (
       <AnimatePresence mode="wait">
         {viewMode === 'list' ? (
           <motion.div
@@ -1109,51 +1167,6 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                     ))}
                   </div>
                 </div>
-
-                {/* Tasks */}
-                {(pendingTodos.length > 0 || showTaskInput) && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <ListChecks size={14} className="text-t3" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-t3">Tasks</span>
-                        {pendingTodos.length > 0 && (
-                          <span className="text-[8px] bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md font-bold">{pendingTodos.length}</span>
-                        )}
-                      </div>
-                      <button onClick={() => setShowTaskInput(!showTaskInput)} className="text-[10px] text-b1 font-bold">
-                        {showTaskInput ? 'Done' : '+ Add'}
-                      </button>
-                    </div>
-                    {showTaskInput && (
-                      <form onSubmit={(e) => { e.preventDefault(); if (taskInput.trim()) { setTodos(prev => [...(prev || []), { id: Date.now().toString(), text: taskInput.trim(), completed: false, createdBy: 'user' as const, createdAt: Date.now() }]); setTaskInput('') } }} className="flex gap-2 mb-2">
-                        <Input value={taskInput} onChange={e => setTaskInput(e.target.value)} placeholder="Add a task..." className="flex-1 h-8 text-xs" autoFocus />
-                        <Button type="submit" size="sm" disabled={!taskInput.trim()} className="h-8 px-3 text-xs">Add</Button>
-                      </form>
-                    )}
-                    <div className="space-y-1">
-                      {pendingTodos.map(t => (
-                        <div key={t.id} className="flex items-center gap-2 py-1.5 px-2 bg-fg rounded-lg border border-s1 group">
-                          <button onClick={() => setTodos(prev => (prev || []).map(x => x.id === t.id ? { ...x, completed: true } : x))} className="w-4 h-4 rounded border border-s2 flex items-center justify-center flex-shrink-0 hover:border-b1">
-                          </button>
-                          <span className="text-xs text-t1 flex-1 truncate">{t.text}</span>
-                          <span className="text-[8px] text-t3 uppercase">{t.createdBy}</span>
-                          <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash size={12} />
-                          </button>
-                        </div>
-                      ))}
-                      {completedTodos.length > 0 && (
-                        <div className="text-[10px] text-t3 px-2 pt-1">{completedTodos.length} completed</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {pendingTodos.length === 0 && !showTaskInput && (
-                  <button onClick={() => setShowTaskInput(true)} className="flex items-center gap-1.5 text-[10px] text-t3 font-bold">
-                    <ListChecks size={12} /> Add a task
-                  </button>
-                )}
 
                 {/* Conversation List */}
                 {sortedSessions.length === 0 ? (
@@ -1301,6 +1314,251 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           </motion.div>
         )}
       </AnimatePresence>
+      )} {/* end chat tab */}
+
+      {/* ── Scans tab ── */}
+      {activeTab === 'scans' && (
+        <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
+          <div ref={pullToRefresh.containerRef} className="p-4 space-y-3 pb-6">
+            {sessionScans.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-12 px-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-4">
+                  <Camera size={32} weight="duotone" className="text-b1" />
+                </div>
+                <h3 className="text-base font-bold text-t1 mb-2">No Scans Yet</h3>
+                <p className="text-xs text-t3 max-w-xs mb-4">
+                  {currentSession?.active
+                    ? 'Tap the camera button to start scanning items this session.'
+                    : 'Start a session and tap the camera to scan items.'}
+                </p>
+                {onOpenCamera && (
+                  <button
+                    onClick={onOpenCamera}
+                    className="flex items-center gap-2 px-4 py-2 bg-b1 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform"
+                  >
+                    <Camera size={16} weight="bold" />
+                    Open Camera
+                  </button>
+                )}
+              </div>
+            ) : (
+              sessionScans.map(item => {
+                const alreadyQueued = queueItems.some(q => q.id === item.id)
+                const profit =
+                  item.estimatedSellPrice != null
+                    ? item.estimatedSellPrice - item.purchasePrice
+                    : null
+                const decisionColor =
+                  item.decision === 'BUY'
+                    ? 'text-green bg-green/10 border-green/30'
+                    : item.decision === 'PASS'
+                      ? 'text-red bg-red/10 border-red/30'
+                      : 'text-amber bg-amber/10 border-amber/30'
+
+                return (
+                  <Card
+                    key={item.id}
+                    className="p-3 bg-fg border-s2 flex gap-3 items-start"
+                  >
+                    {(item.imageThumbnail || item.imageData) && (
+                      <img
+                        src={item.imageThumbnail || item.imageData}
+                        alt={item.productName || 'Item'}
+                        className="w-14 h-14 rounded-lg object-cover border border-s2 flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className="text-xs font-bold text-t1 truncate">
+                        {item.productName || 'Unknown Item'}
+                      </p>
+                      <div className="flex gap-2 text-[10px] font-mono text-t2 flex-wrap">
+                        <span>Buy ${item.purchasePrice.toFixed(2)}</span>
+                        {item.estimatedSellPrice != null && (
+                          <>
+                            <span>→</span>
+                            <span>Sell ${item.estimatedSellPrice.toFixed(2)}</span>
+                          </>
+                        )}
+                        {profit != null && (
+                          <span className={profit >= 0 ? 'text-green' : 'text-red'}>
+                            ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={cn(
+                            'inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border',
+                            decisionColor,
+                          )}
+                        >
+                          {item.decision}
+                        </span>
+                        {alreadyQueued && (
+                          <span className="inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border text-b1 bg-b1/10 border-b1/30">
+                            In Queue
+                          </span>
+                        )}
+                        {item.category && (
+                          <span className="text-[9px] text-t3 truncate">{item.category}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5 flex-shrink-0">
+                      {!alreadyQueued && (
+                        <button
+                          onClick={() => handlePromoteToQueue(item)}
+                          className="flex items-center gap-1 px-2 py-1.5 bg-b1/10 hover:bg-b1/20 text-b1 rounded-lg text-[10px] font-bold transition-colors active:scale-95"
+                          title="Add to listing queue"
+                        >
+                          <ArrowSquareRight size={12} weight="bold" />
+                          Queue
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteScan(item.id)}
+                        className="flex items-center gap-1 px-2 py-1.5 bg-s1 hover:bg-red/10 text-t3 hover:text-red rounded-lg text-[10px] font-bold transition-colors active:scale-95"
+                        title="Remove from scan history"
+                      >
+                        <Trash size={12} weight="bold" />
+                        Delete
+                      </button>
+                    </div>
+                  </Card>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tasks tab ── */}
+      {activeTab === 'tasks' && (
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4 space-y-1">
+              {(todos || []).length === 0 && (
+                <div className="flex flex-col items-center justify-center text-center py-12 px-4">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-4">
+                    <ListChecks size={32} weight="duotone" className="text-b1" />
+                  </div>
+                  <h3 className="text-base font-bold text-t1 mb-2">No Tasks Yet</h3>
+                  <p className="text-xs text-t3 max-w-xs">
+                    Add tasks below, or ask the Agent in Chat to create tasks for you.
+                  </p>
+                </div>
+              )}
+              {pendingTodos.map(t => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-2.5 py-2.5 px-1 group border-b border-s1 last:border-0"
+                >
+                  <button
+                    onClick={() =>
+                      setTodos(prev =>
+                        (prev || []).map(x =>
+                          x.id === t.id ? { ...x, completed: true } : x,
+                        ),
+                      )
+                    }
+                    className="flex-shrink-0 w-5 h-5 rounded-md border border-s2 hover:border-b1 hover:bg-b1/10 transition-colors"
+                  />
+                  <span className="flex-1 text-sm text-t1 leading-snug">{t.text}</span>
+                  <span
+                    className={cn(
+                      'text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded flex-shrink-0',
+                      t.createdBy === 'agent' ? 'text-b1 bg-b1/10' : 'text-t3 bg-s1',
+                    )}
+                  >
+                    {t.createdBy}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setTodos(prev => (prev || []).filter(x => x.id !== t.id))
+                    }
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red p-1"
+                  >
+                    <Trash size={14} />
+                  </button>
+                </div>
+              ))}
+              {completedTodos.length > 0 && (
+                <>
+                  <div className="pt-3 pb-1">
+                    <p className="text-[10px] text-t3 font-bold uppercase tracking-wide">
+                      Completed ({completedTodos.length})
+                    </p>
+                  </div>
+                  {completedTodos.map(t => (
+                    <div
+                      key={t.id}
+                      className="flex items-center gap-2.5 py-2.5 px-1 group border-b border-s1 last:border-0 opacity-50"
+                    >
+                      <button
+                        onClick={() =>
+                          setTodos(prev =>
+                            (prev || []).map(x =>
+                              x.id === t.id ? { ...x, completed: false } : x,
+                            ),
+                          )
+                        }
+                        className="flex-shrink-0 w-5 h-5 rounded-md bg-green/15 border border-green/40 flex items-center justify-center"
+                      >
+                        <Check size={12} weight="bold" className="text-green" />
+                      </button>
+                      <span className="flex-1 text-sm text-t2 leading-snug line-through">{t.text}</span>
+                      <button
+                        onClick={() =>
+                          setTodos(prev => (prev || []).filter(x => x.id !== t.id))
+                        }
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red p-1"
+                      >
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+          {/* Add task input */}
+          <div className="flex-shrink-0 p-4 bg-fg border-t border-s1 safe-bottom">
+            <form
+              onSubmit={e => {
+                e.preventDefault()
+                const text = taskInput.trim()
+                if (!text) return
+                setTodos(prev => [
+                  ...(prev || []),
+                  {
+                    id: Date.now().toString(),
+                    text,
+                    completed: false,
+                    createdBy: 'user' as const,
+                    createdAt: Date.now(),
+                  },
+                ])
+                setTaskInput('')
+              }}
+              className="flex gap-2"
+            >
+              <Input
+                value={taskInput}
+                onChange={e => setTaskInput(e.target.value)}
+                placeholder="Add a task..."
+                className="flex-1 h-10 bg-bg border-s2 text-sm"
+              />
+              <Button
+                type="submit"
+                disabled={!taskInput.trim()}
+                className="bg-b1 hover:bg-b2 text-white h-10 w-10 p-0 flex-shrink-0 disabled:opacity-40"
+              >
+                <Plus size={18} weight="bold" />
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Rename dialog */}
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>

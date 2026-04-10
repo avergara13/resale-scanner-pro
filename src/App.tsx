@@ -1754,17 +1754,12 @@ function App() {
                 currentItem={currentItem}
                 pipeline={pipeline}
                 settings={settings}
-                queueItems={queue || []}
                 onSaveDraft={handleSaveDraft}
                 onCreateListing={handleCreateListingFromScan}
                 onPassItem={handlePassFromScan}
                 onRecalculate={handleRecalculate}
                 onRescan={handleRescan}
                 onOpenCamera={() => setCameraOpen(true)}
-                pendingMessage={agentPendingMessage}
-                onPendingMessageHandled={() => setAgentPendingMessage(null)}
-                geminiService={geminiService}
-                onUpdateItem={handleUpdateCurrentItem}
               />
             </motion.div>
           )}
