@@ -1178,26 +1178,51 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
               <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5">
                 {/* Quick Actions + New Chat */}
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">Quick Actions</div>
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                    {/* New Chat — first in the row */}
-                    <button
-                      onClick={handleCreateSession}
-                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-gradient-to-br from-b1 to-b2 rounded-xl text-xs font-bold text-white active:scale-95 transition-all"
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2.5">Quick Actions</div>
+                  {/* Full-bleed scroll strip — bleeds past px-4 parent so last chip never clips */}
+                  <div className="relative -mx-4">
+                    {/* Right-fade hint — shows there's more to scroll */}
+                    <div
+                      className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 z-10"
+                      style={{ background: 'linear-gradient(to left, var(--bg, #fff) 10%, transparent)' }}
+                    />
+                    <div
+                      className="flex gap-2 px-4 scrollbar-hide"
+                      style={{
+                        overflowX: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        overscrollBehavior: 'contain',
+                        paddingRight: '32px', // ensure last chip clears the fade
+                      }}
                     >
-                      <Plus size={12} weight="bold" />
-                      <span>New Chat</span>
-                    </button>
-                    {QUICK_ACTIONS.map(action => (
+                      {/* New Chat — primary pill */}
                       <button
-                        key={action.label}
-                        onClick={() => handleQuickAction(action.prompt)}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-fg border border-s1 rounded-xl text-xs font-bold text-t1 active:scale-95 transition-all"
+                        onClick={handleCreateSession}
+                        className="flex-none flex items-center gap-1.5 h-9 px-4 bg-gradient-to-br from-b1 to-b2 rounded-full text-xs font-semibold text-white whitespace-nowrap shadow-sm active:scale-95 transition-all duration-150"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        <span>{action.emoji}</span>
-                        <span>{action.label}</span>
+                        <Plus size={13} weight="bold" />
+                        <span>New Chat</span>
                       </button>
-                    ))}
+                      {/* Quick action pills */}
+                      {QUICK_ACTIONS.map(action => (
+                        <button
+                          key={action.label}
+                          onClick={() => handleQuickAction(action.prompt)}
+                          className="flex-none flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold text-t1 whitespace-nowrap active:scale-95 transition-all duration-150"
+                          style={{
+                            touchAction: 'manipulation',
+                            WebkitTapHighlightColor: 'transparent',
+                            background: 'color-mix(in oklch, var(--fg) 95%, transparent)',
+                            border: '0.5px solid color-mix(in oklch, var(--s1) 80%, transparent)',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                          }}
+                        >
+                          <span className="text-sm leading-none">{action.emoji}</span>
+                          <span>{action.label}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
