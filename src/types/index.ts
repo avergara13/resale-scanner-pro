@@ -1,6 +1,8 @@
-export type Screen = 'session' | 'session-detail' | 'agent' | 'scan-result' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
+export type Screen = 'session' | 'session-detail' | 'agent' | 'scan' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
 
 export type SoldShippingStatus = '🔴 Need Label' | '🟡 Label Ready' | '📦 Packed' | '✅ Shipped'
+
+export type SoldDelistStatus = '⏳ Pending Delist' | '✅ Delisted — All Platforms' | '⚠️ Manual Delist Needed'
 
 export interface ShippingRateQuote {
   id: string
@@ -22,10 +24,18 @@ export interface SoldItem {
   imageUrl?: string | null
   platform: string
   salePrice?: number | null
+  /** Platform fee (commission) extracted from sale email by WF-01 */
+  platformFee?: number | null
+  /** Computed: salePrice − platformFee − labelCost (server-side) */
+  netIncome?: number | null
   saleDate?: string | null
   shippingStatus: SoldShippingStatus
+  /** Cross-platform delist tracking — populated by WF-01 / WF-09 */
+  delistStatus?: string | null
   trackingNumber?: string | null
   labelProvider?: string | null
+  /** What was paid for the postage label (dollar string) */
+  labelCost?: string | null
   labelUrl?: string | null
   buyerZip?: string | null
   buyerInfo?: string | null
@@ -35,18 +45,43 @@ export interface SoldItem {
   orderNumber?: string | null
   rawEmailSnippet?: string | null
   inventoryStatus?: string | null
-  metadataSource: 'inventory' | 'scan' | 'sale'
+  metadataSource: 'inventory' | 'scan' | 'sale' | 'manual'
+  /** True when the item was logged via the manual fallback (no Notion/API) */
+  isManualEntry?: boolean
 }
 
 export interface SoldShippingUpdateInput {
   shippingStatus: SoldShippingStatus
   trackingNumber?: string
   labelProvider?: string
+  labelCost?: string
   labelUrl?: string
   shipFromZip?: string
   packageDims?: string
   itemWeightLbs?: string
   shipNotes?: string
+  delistStatus?: SoldDelistStatus
+}
+
+/** Manual sale entry — used when email-parsing automation isn't running (offline / API down) */
+export interface ManualSaleEntry {
+  id: string
+  createdAt: number
+  title: string
+  platform: string
+  salePrice: number
+  platformFee?: number
+  orderNumber?: string
+  buyerInfo?: string
+  buyerZip?: string
+  saleDate?: string
+  itemWeightLbs?: string
+  packageDims?: string
+  shippingStatus: SoldShippingStatus
+  trackingNumber?: string
+  labelProvider?: string
+  labelCost?: string
+  notes?: string
 }
 
 export interface SoldFeedResponse {
@@ -276,6 +311,8 @@ export interface MarketData {
 
 export interface Session {
   id: string
+  /** Stable sequential number (1, 2, 3...) — used as default name (#001) and Notion session key */
+  sessionNumber?: number
   name?: string
   startTime: number
   endTime?: number
@@ -350,7 +387,9 @@ export interface AppSettings {
   minProfitMargin: number
   defaultShippingCost: number
   ebayFeePercent: number
-  paypalFeePercent: number
+  ebayAdFeePercent: number
+  shippingMaterialsCost: number
+  paypalFeePercent: number  // Deprecated — kept for backward compat, always 0
   imageQuality?: ImageQualitySettings
   enableLensInBatch?: boolean
   lensSkipConfidence?: number

@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Trash, Eye, Lightning, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -65,6 +64,7 @@ interface QueueScreenProps {
   personalSessionIds?: Set<string>
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
+  onBuyItem?: (id: string) => void
 }
 
 type FilterOption = 'ALL' | 'BUY' | 'PASS' | 'PENDING'
@@ -84,6 +84,7 @@ interface SortableItemProps {
   onDelist?: (itemId: string) => void
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
+  onBuyItem?: (id: string) => void
 }
 
 function SortableItem({
@@ -100,6 +101,7 @@ function SortableItem({
   onDelist,
   onReanalyze,
   onOpenDetail,
+  onBuyItem,
 }: SortableItemProps) {
   const {
     attributes,
@@ -125,7 +127,7 @@ function SortableItem({
         isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
       )}
     >
-      <div className="flex gap-2 sm:gap-2.5 md:gap-3">
+      <div className="flex gap-1.5 sm:gap-2.5 md:gap-3">
         {/* Narrow control column: drag handle + checkbox */}
         <div className="flex flex-col gap-1 items-center justify-start pt-0.5 flex-shrink-0">
           <div
@@ -134,27 +136,36 @@ function SortableItem({
             className="cursor-grab active:cursor-grabbing touch-none p-0.5 hover:bg-s1 rounded transition-colors"
             aria-label="Drag to reorder"
           >
-            <DotsSixVertical size={14} weight="bold" className="text-s3" />
+            <DotsSixVertical size={12} weight="bold" className="text-s3" />
           </div>
-          <Checkbox
-            id={`select-${item.id}`}
-            checked={isSelected}
-            onCheckedChange={() => onToggleSelect(item.id)}
-            className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
-          />
+          <label
+            htmlFor={`select-${item.id}`}
+            className="flex items-center justify-center w-8 h-8 -m-1.5 cursor-pointer"
+          >
+            <Checkbox
+              id={`select-${item.id}`}
+              checked={isSelected}
+              onCheckedChange={() => onToggleSelect(item.id)}
+              className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+            />
+          </label>
         </div>
-        {/* Thumbnail column */}
-        {(item.imageThumbnail || item.imageData) && (
+        {/* Thumbnail column — always rendered for consistent card layout */}
+        {(item.imageThumbnail || item.imageData) ? (
           <img
             src={item.imageThumbnail || item.imageData}
             alt={item.productName || 'Item'}
-            className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+            className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
           />
+        ) : (
+          <div className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 rounded-md border border-s2 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
+            <Package size={20} weight="duotone" className="text-s3" />
+          </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-1 sm:gap-1.5 md:gap-2 mb-1 sm:mb-1.5 md:mb-2">
+          <div className="flex items-start justify-between gap-1 sm:gap-1.5 md:gap-2 mb-0.5 sm:mb-1.5 md:mb-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              <h3 className="font-semibold text-t1 text-xs sm:text-sm md:text-base line-clamp-2 leading-tight">
+              <h3 className="font-bold text-t1 text-[11px] sm:text-sm md:text-base line-clamp-2 leading-snug tracking-tight">
                 {item.productName || 'Unknown Item'}
               </h3>
               {isPersonal && (
@@ -166,9 +177,9 @@ function SortableItem({
                 variant="secondary"
                 className={cn(
                   "flex-shrink-0 font-mono font-bold text-[9px] sm:text-[10px] h-4 sm:h-5 px-1 sm:px-1.5",
-                  item.profitMargin > 50
+                  item.profitMargin > 40
                     ? 'bg-green/20 text-green'
-                    : item.profitMargin > 20
+                    : item.profitMargin > 25
                     ? 'bg-amber/20 text-amber'
                     : 'bg-red/20 text-red'
                 )}
@@ -177,7 +188,7 @@ function SortableItem({
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 text-[10px] sm:text-[11px] md:text-xs font-mono text-t3 mb-1.5 sm:mb-2 md:mb-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-3 md:gap-4 text-[10px] sm:text-[11px] md:text-xs font-mono text-t3 mb-1 sm:mb-2 md:mb-2.5">
             <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
             {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
               ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
@@ -282,17 +293,29 @@ function SortableItem({
                   </Button>
                 )}
               </>
-            ) : (
-              /* List — text only, important action */
+            ) : item.decision === 'BUY' ? (
+              /* Already committed — optimize if no listing yet */
+              !item.optimizedListing && (
+                <Button
+                  size="sm"
+                  onClick={() => onCreateListing(item.id)}
+                  aria-label="Optimize listing"
+                  className="flex-1 bg-b1 hover:bg-b2 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
+                >
+                  Optimize
+                </Button>
+              )
+            ) : onBuyItem ? (
+              /* PENDING or PASS — show Buy button */
               <Button
                 size="sm"
-                onClick={() => onCreateListing(item.id)}
-                aria-label="Create listing"
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
+                onClick={() => onBuyItem(item.id)}
+                aria-label="Buy this item"
+                className="flex-1 bg-green hover:opacity-90 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
               >
-                List
+                Buy ✅
               </Button>
-            )}
+            ) : null}
             {/* Delete — icon only */}
             <Button
               size="sm"
@@ -311,7 +334,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -925,85 +948,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           </div>
         </DialogContent>
       </Dialog>
-      <div className="px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 pb-3 sm:pb-4 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
-        <div className="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-4">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <p className="text-[10px] sm:text-[11px] text-t3 font-medium uppercase tracking-wider">
-                  {queueItems.length} Items Total
-                </p>
-                {sortedItems.length !== queueItems.length && (
-                  (() => {
-                    const percentage = Math.round((sortedItems.length / queueItems.length) * 100)
-                    const isHighVisibility = percentage >= 80
-                    const isMediumVisibility = percentage >= 50 && percentage < 80
-                    const isLowVisibility = percentage < 50
-                    
-                    const trendDirection = previousFilteredCount !== null 
-                      ? sortedItems.length > previousFilteredCount 
-                        ? 'up' 
-                        : sortedItems.length < previousFilteredCount 
-                          ? 'down' 
-                          : 'same'
-                      : 'same'
-                    
-                    const getTrendColor = () => {
-                      if (!showTrendIndicator || trendDirection === 'same') {
-                        if (isHighVisibility) return { bg: 'bg-green/15', text: 'text-green', border: 'border-green/30' }
-                        if (isMediumVisibility) return { bg: 'bg-amber/15', text: 'text-amber', border: 'border-amber/30' }
-                        return { bg: 'bg-red/15', text: 'text-red', border: 'border-red/30' }
-                      }
-                      
-                      if (trendDirection === 'up') {
-                        return { bg: 'bg-green/20', text: 'text-green', border: 'border-green/40' }
-                      }
-                      
-                      return { bg: 'bg-red/20', text: 'text-red', border: 'border-red/40' }
-                    }
-                    
-                    const colors = getTrendColor()
-                    
-                    return (
-                      <Badge 
-                        variant="secondary" 
-                        className={cn(
-                          "h-5 px-2 text-[10px] font-bold border transition-all duration-300",
-                          colors.bg,
-                          colors.text,
-                          colors.border,
-                          showTrendIndicator && "animate-pulse shadow-sm",
-                          showTrendIndicator && trendDirection === 'up' && "trend-indicator-up",
-                          showTrendIndicator && trendDirection === 'down' && "trend-indicator-down"
-                        )}
-                      >
-                        <span className="flex items-center gap-1">
-                          {sortedItems.length} visible ({percentage}%)
-                          {showTrendIndicator && trendDirection === 'up' && (
-                            <TrendUp size={12} weight="bold" className="animate-bounce" />
-                          )}
-                          {showTrendIndicator && trendDirection === 'down' && (
-                            <TrendDown size={12} weight="bold" className="animate-bounce" />
-                          )}
-                          {showTrendIndicator && trendDirection === 'same' && (
-                            <Minus size={12} weight="bold" className="opacity-60" />
-                          )}
-                        </span>
-                      </Badge>
-                    )
-                  })()
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+      <div className="px-3 sm:px-4 md:px-5 pt-2 pb-0 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
+        {/* Action buttons — only rendered when at least one is visible */}
+        {((onNavigateToLocationInsights && queueItems.some(item => item.location)) ||
+          (onNavigateToTagAnalytics && (allTags || []).length > 0) ||
+          unanalyzedItems.length > 0) && (
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-2">
             {onNavigateToLocationInsights && queueItems.some(item => item.location) && (
               <Button
                 onClick={onNavigateToLocationInsights}
                 variant="outline"
-                className="h-8 sm:h-9 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
+                className="h-8 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
               >
-                <MapPin size={14} weight="bold" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <MapPin size={14} weight="bold" className="mr-1" />
                 Locations
               </Button>
             )}
@@ -1011,20 +968,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <Button
                 onClick={onNavigateToTagAnalytics}
                 variant="outline"
-                className="h-8 sm:h-9 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
+                className="h-8 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
               >
-                <ChartBar size={14} weight="bold" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <ChartBar size={14} weight="bold" className="mr-1" />
                 Tag ROI
               </Button>
             )}
-            {/* Single unanalyzed item needs onReanalyze; multiple need onBatchAnalyze — never render if handler absent */}
             {unanalyzedItems.length === 1 && onReanalyze && (
               <Button
                 onClick={() => onReanalyze(unanalyzedItems[0].id)}
                 disabled={isBatchAnalyzing}
-                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
               >
-                <Lightning size={14} weight="fill" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <Lightning size={14} weight="fill" className="mr-1" />
                 {isBatchAnalyzing ? 'Analyzing...' : 'Analyze 1'}
               </Button>
             )}
@@ -1032,40 +988,40 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <Button
                 onClick={onBatchAnalyze}
                 disabled={isBatchAnalyzing}
-                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
               >
-                <Lightning size={14} weight="fill" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <Lightning size={14} weight="fill" className="mr-1" />
                 {isBatchAnalyzing ? 'Analyzing...' : `Analyze ${unanalyzedItems.length}`}
               </Button>
             )}
           </div>
-        </div>
-        
-        <div className="px-0 mb-4">
-          <div className="tab-bar queue-tab-bar">
-            <button 
+        )}
+
+        <div className="px-0 mb-2">
+          <div className="tab-bar">
+            <button
               onClick={() => setFilter('ALL')}
               className={cn('tab-btn', filter === 'ALL' && 'active')}
             >
-              ALL
+              <span>📦 ALL</span>
             </button>
-            <button 
+            <button
               onClick={() => setFilter('BUY')}
               className={cn('tab-btn', filter === 'BUY' && 'active')}
             >
-              BUY {buyCount > 0 && `(${buyCount})`}
+              <span>📋 Listed{buyCount > 0 && ` (${buyCount})`}</span>
             </button>
-            <button 
+            <button
               onClick={() => setFilter('PASS')}
               className={cn('tab-btn', filter === 'PASS' && 'active')}
             >
-              PASS {passCount > 0 && `(${passCount})`}
+              <span>❌ Passed{passCount > 0 && ` (${passCount})`}</span>
             </button>
-            <button 
+            <button
               onClick={() => setFilter('PENDING')}
               className={cn('tab-btn', filter === 'PENDING' && 'active')}
             >
-              PENDING {pendingCount > 0 && `(${pendingCount})`}
+              <span>⏳ Pending{pendingCount > 0 && ` (${pendingCount})`}</span>
             </button>
           </div>
         </div>
@@ -1098,7 +1054,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name, description, category..."
-                className="h-9 pl-9 pr-9 bg-bg border-s2 text-t1 placeholder:text-t3 text-sm"
+                className="h-11 pl-9 pr-9 bg-bg border-s2 text-t1 placeholder:text-t3 text-base"
               />
               {searchQuery && (
                 <button
@@ -1224,24 +1180,16 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         
         {filteredItems.length > 0 && (
           <div className="flex items-center gap-2">
-            <Button
+            <button
               onClick={handleSelectAll}
-              size="sm"
-              variant="outline"
-              className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+              className="flex items-center gap-1 h-6 px-2 rounded-full border border-s2 bg-transparent text-[10px] font-semibold text-t3 hover:text-t1 hover:bg-s1 transition-colors flex-shrink-0"
             >
               {allFilteredSelected ? (
-                <>
-                  <CheckSquare size={14} weight="fill" className="mr-1" />
-                  Deselect All
-                </>
+                <><CheckSquare size={11} weight="fill" />Deselect All</>
               ) : (
-                <>
-                  <Square size={14} weight="bold" className="mr-1" />
-                  Select All
-                </>
+                <><Square size={11} weight="bold" />Select All</>
               )}
-            </Button>
+            </button>
             {selectedIds.size > 0 && (
               <div className="flex items-center gap-2 flex-1">
                 <span className="text-xs font-medium text-b1">
@@ -1332,7 +1280,10 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           )}
         </div>
       ) : (
-        <ScrollArea className="flex-1 px-3 sm:px-4 md:px-5 py-3 sm:py-4">
+        <div
+          className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-5 pt-3 sm:pt-4"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
+        >
           {onReorder ? (
             <DndContext
               sensors={sensors}
@@ -1364,6 +1315,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onDelist={onDelist}
                       onReanalyze={onReanalyze}
                       onOpenDetail={onOpenDetail}
+                      onBuyItem={onBuyItem}
                     />
                   ))}
                 </div>
@@ -1377,29 +1329,34 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                   <Card
                     key={item.id}
                     className={cn(
-                      "p-3 sm:p-3.5 md:p-4 border transition-colors",
+                      "p-2 sm:p-3 md:p-4 border transition-colors",
                       isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
                     )}
                   >
-                    <div className="flex gap-2.5 sm:gap-3 md:gap-3.5">
+                    <div className="flex gap-1.5 sm:gap-3 md:gap-3.5">
                       <div className="flex flex-col gap-2 items-center justify-start pt-0.5 flex-shrink-0">
-                        <Checkbox
-                          id={`select-${item.id}`}
-                          checked={isSelected}
-                          onCheckedChange={() => handleToggleSelect(item.id)}
-                          className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
-                        />
+                        <label
+                          htmlFor={`select-bulk-${item.id}`}
+                          className="flex items-center justify-center w-8 h-8 -m-1.5 cursor-pointer"
+                        >
+                          <Checkbox
+                            id={`select-bulk-${item.id}`}
+                            checked={isSelected}
+                            onCheckedChange={() => handleToggleSelect(item.id)}
+                            className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+                          />
+                        </label>
                       </div>
                       {(item.imageThumbnail || item.imageData) && (
                         <img
                           src={item.imageThumbnail || item.imageData}
                           alt={item.productName || 'Item'}
-                          className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+                          className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-2 md:mb-2.5">
-                          <h3 className="font-semibold text-t1 text-sm md:text-base line-clamp-2">
+                        <div className="flex items-start justify-between gap-2 mb-0.5 md:mb-2.5">
+                          <h3 className="font-bold text-t1 text-[11px] sm:text-sm md:text-base line-clamp-2 leading-snug tracking-tight">
                             {item.productName || 'Unknown Item'}
                           </h3>
                           {item.profitMargin != null && isFinite(item.profitMargin) && (
@@ -1417,7 +1374,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-2">
+                        <div className="flex items-center gap-1.5 sm:gap-4 text-[10px] sm:text-xs font-mono text-s4 mb-1 sm:mb-2">
                           <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
                           {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
                             ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
@@ -1470,14 +1427,27 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           >
                             <PencilSimple size={13} weight="bold" aria-hidden />
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => onCreateListing(item.id)}
-                            aria-label="Create listing"
-                            className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
-                          >
-                            List
-                          </Button>
+                          {item.decision === 'BUY' ? (
+                            !item.optimizedListing && (
+                              <Button
+                                size="sm"
+                                onClick={() => onCreateListing(item.id)}
+                                aria-label="Optimize listing"
+                                className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
+                              >
+                                Optimize
+                              </Button>
+                            )
+                          ) : onBuyItem ? (
+                            <Button
+                              size="sm"
+                              onClick={() => onBuyItem(item.id)}
+                              aria-label="Buy this item"
+                              className="flex-1 bg-green hover:opacity-90 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
+                            >
+                              Buy ✅
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -1555,7 +1525,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               </Collapsible>
             )
           })()}
-        </ScrollArea>
+        </div>
       )}
     </div>
   )

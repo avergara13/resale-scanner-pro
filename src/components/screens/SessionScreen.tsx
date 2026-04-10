@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
-import { AgentPanel } from '../AgentPanel'
 import { LocationInsights } from '../LocationInsights'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
@@ -220,7 +219,10 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
       <div className="px-4 pt-3 pb-6">
 
       {showTrends ? (
-        <div className="flex-1 overflow-y-auto pb-24">
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
+        >
           {/* Back button */}
           <button
             onClick={onCloseTrends}
@@ -288,7 +290,10 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
           )}
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto space-y-4 pb-24">
+        <div
+          className="flex-1 overflow-y-auto space-y-4"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
+        >
           {/* Date */}
           <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
@@ -307,12 +312,6 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
               <p className="text-[11px] text-t3">Begin tracking scans and profits</p>
             </div>
           </button>
-
-          {/* Agent panel — collapsed by default */}
-          <AgentPanel
-            onSendMessage={onAgentMessage}
-            isProcessing={isAgentProcessing}
-          />
 
           {/* Recently deleted — recoverable within 60s */}
           {deletedSessions.length > 0 && (

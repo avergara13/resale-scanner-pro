@@ -19,7 +19,7 @@ All work follows six phases in sequence. No phase is skipped.
 ### Phase 2 — Execute
 - Begins only after user approves the plan.
 - Runs to completion without pausing unless a blocker requires user input.
-- All commits go on the designated feature branch (`claude/<verb>-<subject>-<hash>`).
+- All commits go on the designated feature branch (e.g. `fix/camera-not-opening`, `ui/visual-polish`).
 - Build must pass (`npm run build`) before execution is considered done.
 
 ### Phase 3 — PR Gate (user-controlled pause)
@@ -50,15 +50,38 @@ User gives explicit approval. Claude confirms Wire + Deploy ran successfully aft
 
 ## 2. Branch Strategy
 
+### Protected Branches
+
 | Branch | Owner | Purpose |
 |--------|-------|---------|
-| `main` | Spark / user | Source of truth. All PRs target this. |
+| `main` | User | Source of truth. All PRs target this. No direct pushes. |
 | `deploy/production` | CI only | Railway watches this. Never push manually. |
-| `claude/<slug>` | Claude Code | One branch per feature/fix. |
 
-**Naming:** `claude/<verb>-<noun>-<4-char-hash>` — e.g., `claude/fix-sold-screen-qbxEA`
+### Work Branches (one branch = one unit of work)
 
-**Lifecycle:** branch → commits → PR → merge to main → CI wires and pushes to deploy/production → Railway deploys → branch deleted.
+| Prefix | When to use | Example |
+|--------|-------------|---------|
+| `ui/` | Visual changes, layout, styling, dark mode | `ui/visual-polish` |
+| `feature/` | New functionality | `feature/ai-agent-capabilities` |
+| `fix/` | Bug that's breaking something | `fix/camera-not-opening-on-ios` |
+| `refactor/` | Restructuring code without changing behavior | `refactor/split-server-routes` |
+| `chore/` | Maintenance, cleanup, no user impact | `chore/remove-unused-dependencies` |
+| `docs/` | Documentation only | `docs/api-reference` |
+
+### Rules
+
+- **Maximum 3 active branches at any time** — prevents stale branches and merge conflicts.
+- **One concern per branch** — never mix UI changes into a feature branch or vice versa.
+- **Merge or close within one week** — stale branches create conflicts. If a branch goes stale, close it and start fresh.
+- **Branch names must describe the work** — no cryptic hashes or generated slugs. A beginner engineer should understand the branch purpose from the name alone.
+
+### Lifecycle
+
+branch created → commits → PR opened → CI gates pass → Codex + Copilot review → fixes applied → user approves merge → Wire + Deploy pushes to deploy/production → Railway deploys → branch deleted.
+
+### Runtime Agent Teams (future)
+
+When Loft OS Runtime orchestrates autonomous agents, each agent team gets its own branch following the same naming convention. Agent branches go through the same PR → CI → review → merge pipeline as human branches. No shortcuts.
 
 ---
 

@@ -385,6 +385,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, gemini
                     <input
                       id="camera-price"
                       type="number"
+                      min="0"
                       step="0.01"
                       inputMode="decimal"
                       placeholder="0.00"

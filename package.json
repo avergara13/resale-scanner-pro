@@ -9,6 +9,7 @@
     "scripts": {
         "dev": "vite",
         "start": "node server.js",
+        "dev:server": "node --env-file=.env.local server.js",
         "kill": "fuser -k 5000/tcp",
         "build": "tsc -b --noCheck && vite build",
         "lint": "eslint .",
