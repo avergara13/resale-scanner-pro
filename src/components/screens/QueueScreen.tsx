@@ -1003,25 +1003,25 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               onClick={() => setFilter('ALL')}
               className={cn('tab-btn', filter === 'ALL' && 'active')}
             >
-              <span>📦 ALL</span>
+              <span>All</span>
             </button>
             <button
               onClick={() => setFilter('BUY')}
               className={cn('tab-btn', filter === 'BUY' && 'active')}
             >
-              <span>📋 Listed{buyCount > 0 && ` (${buyCount})`}</span>
+              <span>Listed{buyCount > 0 && ` (${buyCount})`}</span>
             </button>
             <button
               onClick={() => setFilter('PASS')}
               className={cn('tab-btn', filter === 'PASS' && 'active')}
             >
-              <span>❌ Passed{passCount > 0 && ` (${passCount})`}</span>
+              <span>Passed{passCount > 0 && ` (${passCount})`}</span>
             </button>
             <button
               onClick={() => setFilter('PENDING')}
               className={cn('tab-btn', filter === 'PENDING' && 'active')}
             >
-              <span>⏳ Pending{pendingCount > 0 && ` (${pendingCount})`}</span>
+              <span>Pending{pendingCount > 0 && ` (${pendingCount})`}</span>
             </button>
           </div>
         </div>

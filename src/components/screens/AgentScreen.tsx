@@ -1122,22 +1122,11 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
       className="px-3 py-1.5 border-b border-s1/60"
       style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)' }}
     >
-      <div className="flex items-center justify-between mb-1">
-        {currentSession?.active ? (
-          <div className="text-[9px] font-bold text-b1 uppercase tracking-wide">
-            {currentSession.name || 'Active Session'}
-          </div>
-        ) : <div />}
-        {viewMode === 'chat' && (
-          <button
-            onClick={handleNewChat}
-            className="text-[9px] font-bold text-b1 uppercase tracking-wide transition-colors active:opacity-60 flex items-center gap-0.5"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          >
-            ↺ New Chat
-          </button>
-        )}
-      </div>
+      {currentSession?.active && (
+        <div className="text-[9px] font-bold text-b1 uppercase tracking-wide mb-1">
+          {currentSession.name || 'Active Session'}
+        </div>
+      )}
       <div className="grid grid-cols-4 gap-1.5">
         <div className="rounded-xl border border-s2/60 py-1.5 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
           <div className="text-sm font-black text-t1 leading-tight">{queueStats.total}</div>
@@ -1156,6 +1145,18 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Profit</div>
         </div>
       </div>
+      {/* ↺ New Chat — below the stats grid, always visible in chat mode */}
+      {viewMode === 'chat' && (
+        <div className="flex justify-end pt-1.5">
+          <button
+            onClick={handleNewChat}
+            className="text-[9px] font-bold text-b1 uppercase tracking-wide transition-colors active:opacity-60 flex items-center gap-0.5"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            ↺ New Chat
+          </button>
+        </div>
+      )}
     </div>
   )
 
@@ -1311,8 +1312,19 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0"
-            style={{ overflow: 'visible' }}
+            style={{ overflow: 'visible', position: 'relative' }}
           >
+            {/* Persistent ↺ new chat — top-right corner of chat window when messages exist */}
+            {chatMessages.length > 0 && (
+              <button
+                onClick={handleNewChat}
+                className="absolute top-2 right-3 z-10 text-[9px] font-bold text-t3 hover:text-b1 uppercase tracking-wide transition-colors active:opacity-60"
+                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                ↺ New Chat
+              </button>
+            )}
+
             {/* Empty state when chat has no messages */}
             {chatMessages.length === 0 && (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
