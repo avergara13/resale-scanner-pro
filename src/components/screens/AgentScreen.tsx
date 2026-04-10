@@ -1328,10 +1328,10 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             {/* Empty state when chat has no messages */}
             {chatMessages.length === 0 && (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-b1/15 to-b2/10 flex items-center justify-center mb-3">
-                  <Robot size={22} weight="duotone" className="text-b1" />
+                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg" style={{ boxShadow: 'var(--send-glow)' }}>
+                  <Robot size={48} weight="duotone" className="text-white" />
                 </div>
-                <p className="text-sm font-semibold text-t1 mb-1">Session Assistant</p>
+                <p className="text-base font-semibold text-t1 mb-1">Session Assistant</p>
                 <p className="text-xs text-t3 max-w-[200px] leading-relaxed">Ask about your queue, pricing, listings, or what to do next.</p>
               </div>
             )}
