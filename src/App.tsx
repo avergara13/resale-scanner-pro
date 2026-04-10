@@ -1881,6 +1881,11 @@ function App() {
                 allSessions={visibleSessions}
                 scanHistory={scanHistory || []}
                 profitGoals={profitGoals || []}
+                onOpenScanItem={(item) => {
+                  setCurrentItem(item)
+                  setPipeline([])
+                  setScreen('scan')
+                }}
               />
             </motion.div>
           )}
