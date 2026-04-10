@@ -21,7 +21,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-40"
+      className="fixed bottom-0 left-0 right-0 z-40" /* z-40 > floating agent input (z-[35]) — nav always on top */
       style={{
         maxWidth: '100%',
         margin: '0 auto',

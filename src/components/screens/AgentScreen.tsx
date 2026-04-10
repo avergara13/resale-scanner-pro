@@ -7,7 +7,6 @@ import {
   Trash,
   DotsThreeVertical,
   PencilSimple,
-  PaperPlaneRight,
   ArrowLeft,
   CaretDown,
   CaretUp,
@@ -242,7 +241,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   const [taskInput, setTaskInput] = useState('')
   const [showTaskInput, setShowTaskInput] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+
   const pendingTodos = useMemo(() => (todos || []).filter(t => !t.completed), [todos])
   const completedTodos = useMemo(() => (todos || []).filter(t => t.completed), [todos])
 
@@ -1022,40 +1021,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)
-    inputRef.current?.focus()
   }, [])
-
-  // Shared input bar used in both views
-  const inputBar = (
-    <div
-      className="px-3 pt-3 bg-fg/80 backdrop-blur-2xl border-t border-s1/30"
-      style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 4rem)' }}
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          handleSendMessage()
-        }}
-        className="flex items-center gap-2 bg-s1/80 rounded-full px-4 py-2 border border-s1/60 shadow-sm"
-      >
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Message Agent…"
-          disabled={isProcessing}
-          className="flex-1 bg-transparent text-sm text-t1 placeholder:text-t3 outline-none min-w-0"
-        />
-        <button
-          type="submit"
-          disabled={!input.trim() || isProcessing}
-          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-b1 to-b2 disabled:opacity-30 disabled:from-t3 disabled:to-t3 transition-all active:scale-90"
-        >
-          <PaperPlaneRight size={15} weight="fill" className="text-white translate-x-px" />
-        </button>
-      </form>
-    </div>
-  )
 
   const sortedSessions = useMemo(() =>
     [...(chatSessions || [])].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
@@ -1129,8 +1095,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
                 {sortedSessions.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 w-full min-h-[45vh]">
                     <button
-                      onClick={() => inputRef.current?.focus()}
-                      className="flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
+                      className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
                     >
                       <Sparkle size={32} weight="fill" className="text-white" />
                     </button>

@@ -1727,6 +1727,11 @@ function App() {
     return () => clearTimeout(timer)
   }, [screen])
 
+  // Clear floating agent input when navigating away from the Agent tab
+  useEffect(() => {
+    if (screen !== 'agent') setAgentInput('')
+  }, [screen])
+
   return (
     <div 
       id="app-container" 
@@ -2039,8 +2044,10 @@ function App() {
         </AnimatePresence>
       </div>
 
-      {/* Spacer keeps content from hiding under fixed nav + floating input */}
-      <div className="h-[80px] sm:h-[88px] flex-shrink-0" />
+      {/* Spacer keeps content from hiding under fixed nav + floating input.
+          BottomNav = 54px + safe-area-inset-bottom (~34px on iPhone with home indicator).
+          Use h-[88px] flat — correct for home-indicator iPhones (54+34=88). */}
+      <div className="h-[88px] flex-shrink-0" />
 
       {/* ── Floating Agent Input — slides up when on Agent tab ── */}
       <AnimatePresence>
