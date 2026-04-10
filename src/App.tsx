@@ -1086,15 +1086,20 @@ function App() {
       draft?.estimatedSellPrice && draft.estimatedSellPrice > 0
         ? draft.estimatedSellPrice
         : currentItem!.estimatedSellPrice
-    // If the user changed the buy price without tapping Recalculate, recompute metrics inline
-    // so stored profitMargin/decision are never stale relative to purchasePrice
+    // Recompute profitMargin/decision whenever buy price, sell price, OR shipping differs
+    // from the analyzed values — any of these changes makes the stored metrics stale
+    const effectiveShipping = draft?.shippingCost ?? settings?.defaultShippingCost ?? 5.0
+    const buyPriceChanged = effectivePrice !== currentItem!.purchasePrice
+    const sellPriceChanged =
+      effectiveSellPrice != null && effectiveSellPrice !== currentItem!.estimatedSellPrice
+    const shippingChanged =
+      draft?.shippingCost != null && draft.shippingCost !== (settings?.defaultShippingCost ?? 5.0)
     let resolvedMargin = currentItem!.profitMargin
     let resolvedDecision: 'BUY' | 'PASS' | 'PENDING' = currentItem!.decision as 'BUY' | 'PASS' | 'PENDING' ?? 'BUY'
-    if (effectivePrice !== currentItem!.purchasePrice && effectiveSellPrice) {
-      const shipping = draft?.shippingCost ?? settings?.defaultShippingCost ?? 5.0
+    if ((buyPriceChanged || sellPriceChanged || shippingChanged) && effectiveSellPrice) {
       const freshMetrics = calculateProfitFallback(
         effectivePrice, effectiveSellPrice,
-        shipping, settings?.ebayFeePercent || 12.9
+        effectiveShipping, settings?.ebayFeePercent || 12.9
       )
       resolvedMargin = freshMetrics.profitMargin
       resolvedDecision = makeDecision(effectiveSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
@@ -1108,7 +1113,9 @@ function App() {
       inQueue: true,
       ...(draft?.productName && { productName: draft.productName }),
       ...(draft?.category && { category: draft.category }),
+      ...(draft?.condition && { condition: draft.condition }),
       ...(draft?.description && { description: draft.description }),
+      ...(draft?.platform && { preferredPlatform: draft.platform }),
       ...(effectiveSellPrice !== currentItem!.estimatedSellPrice && { estimatedSellPrice: effectiveSellPrice }),
     }
     setQueue(prev => {

@@ -135,6 +135,8 @@ export interface ScannedItem {
   productName?: string
   description?: string
   category?: string
+  condition?: string
+  preferredPlatform?: string
   tags?: string[]
   estimatedSellPrice?: number
   profitMargin?: number
