@@ -19,13 +19,10 @@ import {
   MagnifyingGlass,
   Globe,
   Stack,
-  CheckCircle,
-  Warning,
   ListChecks,
   ChatCircle,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
@@ -1027,39 +1024,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
     inputRef.current?.focus()
   }, [])
 
-  // Shared stats bar used in both views
-  const statsBar = (
-    <div className="px-4 py-2 bg-s1/30 border-b border-s1">
-      {currentSession?.active && (
-        <div className="text-[9px] font-bold text-b1 mb-1.5 uppercase tracking-wide">
-          {currentSession.name || 'Active Session'}
-        </div>
-      )}
-      <div className="grid grid-cols-4 gap-1.5">
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>
-          <div className="text-base font-black text-t1">{queueStats.total}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-green font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-            <CheckCircle size={10} weight="fill" /> BUY
-          </div>
-          <div className="text-base font-black text-green">{queueStats.buy}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-red font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-            <Warning size={10} weight="fill" /> PASS
-          </div>
-          <div className="text-base font-black text-red">{queueStats.pass}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Profit</div>
-          <div className="text-xs font-black text-green">${queueStats.totalProfit.toFixed(0)}</div>
-        </Card>
-      </div>
-    </div>
-  )
-
   // Shared input bar used in both views
   const inputBar = (
     <div className="p-4 bg-fg border-t border-s1 safe-bottom">
@@ -1128,8 +1092,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
                 <Plus size={14} weight="bold" className="mr-1" /> New Chat
               </Button>
             </div>
-
-            {statsBar}
 
             <ScrollArea className="flex-1">
               <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5">
@@ -1275,8 +1237,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-
-            {statsBar}
 
             {/* Messages */}
             <ScrollArea className="flex-1 px-4">
