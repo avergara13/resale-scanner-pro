@@ -1147,8 +1147,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Profit</div>
         </div>
       </div>
-      {/* ↺ New Chat — below the stats grid, always visible in chat mode */}
-      {viewMode === 'chat' && (
+      {/* ↺ New Chat — below the stats grid, only visible on Chat tab */}
+      {activeTab === 'chat' && viewMode === 'chat' && (
         <div className="flex justify-end pt-1.5">
           <button
             onClick={handleNewChat}
