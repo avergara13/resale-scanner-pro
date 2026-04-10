@@ -140,9 +140,9 @@
   --radius-xl: calc(var(--radius) * 2);
   --radius-2xl: calc(var(--radius) * 3);
   --radius-full: 9999px;
-  --font-sans: IBM Plex Sans;
-  --font-serif: Noto Serif;
-  --font-mono: Source Code Pro;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", ui-sans-serif, system-ui;
+  --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
   --chart-1: oklch(0.58 0.15 65);
   --chart-2: oklch(0.78 0.12 45);
   --chart-3: oklch(0.68 0.10 85);
@@ -203,7 +203,7 @@
 }
 
 body {
-  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", ui-sans-serif, system-ui, "Helvetica Neue", Arial, sans-serif;
   background-color: var(--bg);
   color: var(--t1);
   -webkit-font-smoothing: antialiased;
@@ -357,7 +357,7 @@ body {
 }
 
 .font-mono {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: ui-monospace, "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
 }
 
 html {
@@ -496,10 +496,6 @@ input, textarea, select {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Scope higher contrast to Listing Queue only — AIScreen keeps default t3 */
-.queue-tab-bar .tab-btn:not(.active) {
-  color: var(--t2);
-}
 
 .tab-btn:hover:not(.active) {
   color: var(--b1);

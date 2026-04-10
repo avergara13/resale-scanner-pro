@@ -21,18 +21,19 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 bg-fg/95 backdrop-blur-md border-t border-s1 z-40"
+      className="fixed bottom-0 left-0 right-0 bg-fg/92 backdrop-blur-2xl border-t border-s1/40 z-40"
       style={{
         maxWidth: '100%',
         margin: '0 auto',
         paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
         paddingLeft: 'env(safe-area-inset-left, 0px)',
         paddingRight: 'env(safe-area-inset-right, 0px)',
-        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
-        WebkitBackdropFilter: 'blur(12px)'
+        /* Subtle top shadow — matches iOS tab bar feel */
+        boxShadow: '0 -0.5px 0 rgba(0,0,0,0.10), 0 -8px 32px rgba(0,0,0,0.05)',
+        WebkitBackdropFilter: 'blur(24px)'
       }}
     >
-      <div className="relative h-16 sm:h-18 flex items-center justify-around px-2 sm:px-4">
+      <div className="relative h-16 flex items-center justify-around px-1 sm:px-4">
         {items.slice(0, 2).map((item) => {
           const Icon = item.icon
           const isActive = currentScreen === item.id
@@ -42,29 +43,26 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={cn(
-                'touch-target flex flex-col items-center justify-center gap-1 px-3 sm:px-4 py-2 rounded-xl transition-all duration-200 relative',
-                isActive 
-                  ? 'text-b1 bg-blue-bg scale-105' 
-                  : 'text-t2 hover:text-t1 hover:bg-s1/50 active:scale-95'
+                'flex flex-col items-center justify-center gap-[3px] px-4 py-2 rounded-2xl transition-all duration-200',
+                isActive
+                  ? 'text-b1'
+                  : 'text-t3 active:opacity-60'
               )}
-              style={{ 
-                minWidth: '64px', 
+              style={{
+                minWidth: '60px',
                 minHeight: '48px',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent'
               }}
             >
-              <Icon 
-                size={22} 
-                weight={isActive ? 'fill' : 'regular'} 
-                className={cn(
-                  "relative z-10 transition-all duration-200 sm:w-[24px] sm:h-[24px]",
-                  isActive && "scale-110"
-                )} 
+              <Icon
+                size={23}
+                weight={isActive ? 'fill' : 'regular'}
+                className="transition-all duration-150"
               />
               <span className={cn(
-                "text-[10px] sm:text-[11px] font-bold relative z-10 uppercase tracking-wider",
-                isActive && "font-extrabold"
+                "text-[10px] leading-none tracking-tight",
+                isActive ? 'font-semibold' : 'font-medium'
               )}>
                 {item.label}
               </span>
@@ -72,20 +70,21 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
           )
         })}
 
+        {/* Camera FAB — gradient bubble, sits slightly above nav */}
         <button
           onClick={onCameraOpen}
           className={cn(
-            'camera-fab-animated flex items-center justify-center rounded-full w-14 h-14 sm:w-16 sm:h-16 -mt-8 shadow-lg transition-all duration-300 active:scale-95 relative z-50',
+            'camera-fab-animated flex items-center justify-center rounded-full w-12 h-12 sm:w-14 sm:h-14 -mt-5 shadow-xl transition-all duration-300 active:scale-95 relative z-50',
             captureState === 'analyzing' && 'camera-analyzing',
             captureState === 'success' && 'camera-success',
             captureState === 'fail' && 'camera-fail'
           )}
-          style={{ 
+          style={{
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent'
           }}
         >
-          <Camera size={28} weight="bold" className="text-white relative z-10" />
+          <Camera size={24} weight="bold" className="text-white relative z-10" />
         </button>
 
         {items.slice(2).map((item) => {
@@ -97,29 +96,26 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={cn(
-                'touch-target flex flex-col items-center justify-center gap-1 px-3 sm:px-4 py-2 rounded-xl transition-all duration-200 relative',
-                isActive 
-                  ? 'text-b1 bg-blue-bg scale-105' 
-                  : 'text-t2 hover:text-t1 hover:bg-s1/50 active:scale-95'
+                'flex flex-col items-center justify-center gap-[3px] px-4 py-2 rounded-2xl transition-all duration-200',
+                isActive
+                  ? 'text-b1'
+                  : 'text-t3 active:opacity-60'
               )}
-              style={{ 
-                minWidth: '64px', 
+              style={{
+                minWidth: '60px',
                 minHeight: '48px',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent'
               }}
             >
-              <Icon 
-                size={22} 
-                weight={isActive ? 'fill' : 'regular'} 
-                className={cn(
-                  "relative z-10 transition-all duration-200 sm:w-[24px] sm:h-[24px]",
-                  isActive && "scale-110"
-                )} 
+              <Icon
+                size={23}
+                weight={isActive ? 'fill' : 'regular'}
+                className="transition-all duration-150"
               />
               <span className={cn(
-                "text-[10px] sm:text-[11px] font-bold relative z-10 uppercase tracking-wider",
-                isActive && "font-extrabold"
+                "text-[10px] leading-none tracking-tight",
+                isActive ? 'font-semibold' : 'font-medium'
               )}>
                 {item.label}
               </span>
