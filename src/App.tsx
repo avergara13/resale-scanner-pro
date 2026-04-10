@@ -1005,7 +1005,6 @@ function App() {
       return [...current, draftItem]
     })
     toast.success('Draft saved to queue')
-    setScreen('queue')
   }, [currentItem, setQueue])
 
   const handleRescan = useCallback(() => {
@@ -1063,7 +1062,19 @@ function App() {
     toast.success(`Recalculated: ${decision} — ${profitMetrics.profitMargin.toFixed(1)}% margin`)
   }, [currentItem, settings, triggerSuccess, triggerFail])
 
-  const handleCreateListingFromScan = useCallback(async (price: number, notes: string) => {
+  const handleCreateListingFromScan = useCallback(async (
+    price: number,
+    notes: string,
+    draft?: {
+      productName?: string
+      category?: string
+      condition?: string
+      description?: string
+      estimatedSellPrice?: number
+      shippingCost?: number
+      platform?: string
+    },
+  ) => {
     if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
       toast.error('No image to save')
       return
@@ -1071,25 +1082,34 @@ function App() {
     const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
     // NaN means the field was left empty — fall back to the analyzed price
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
+    const effectiveSellPrice =
+      draft?.estimatedSellPrice && draft.estimatedSellPrice > 0
+        ? draft.estimatedSellPrice
+        : currentItem!.estimatedSellPrice
     // If the user changed the buy price without tapping Recalculate, recompute metrics inline
     // so stored profitMargin/decision are never stale relative to purchasePrice
     let resolvedMargin = currentItem!.profitMargin
     let resolvedDecision: 'BUY' | 'PASS' | 'PENDING' = currentItem!.decision as 'BUY' | 'PASS' | 'PENDING' ?? 'BUY'
-    if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
+    if (effectivePrice !== currentItem!.purchasePrice && effectiveSellPrice) {
+      const shipping = draft?.shippingCost ?? settings?.defaultShippingCost ?? 5.0
       const freshMetrics = calculateProfitFallback(
-        effectivePrice, currentItem!.estimatedSellPrice,
-        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+        effectivePrice, effectiveSellPrice,
+        shipping, settings?.ebayFeePercent || 12.9
       )
       resolvedMargin = freshMetrics.profitMargin
-      resolvedDecision = makeDecision(currentItem!.estimatedSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
+      resolvedDecision = makeDecision(effectiveSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
     }
     const listingItem: ScannedItem = {
       ...lightweight,
       purchasePrice: effectivePrice,
       profitMargin: resolvedMargin,
-      decision: resolvedDecision === 'PASS' ? 'BUY' : resolvedDecision, // user chose Create Listing — treat as BUY intent
+      decision: resolvedDecision === 'PASS' ? 'BUY' : resolvedDecision, // user chose Add to Queue — treat as BUY intent
       notes: notes || currentItem!.notes,
       inQueue: true,
+      ...(draft?.productName && { productName: draft.productName }),
+      ...(draft?.category && { category: draft.category }),
+      ...(draft?.description && { description: draft.description }),
+      ...(effectiveSellPrice !== currentItem!.estimatedSellPrice && { estimatedSellPrice: effectiveSellPrice }),
     }
     setQueue(prev => {
       const current = prev || []
@@ -1098,9 +1118,7 @@ function App() {
       }
       return [...current, listingItem]
     })
-    setDetailItemId(listingItem.id)
-    setScreen('queue')
-    const toastId = toast.loading('Creating listing...')
+    const toastId = toast.loading('Adding to queue…')
     // Optimize directly with listingItem — avoids stale queue closure read
     // (handleOptimizeItem looks up the item from queue, which hasn't committed yet)
     try {
@@ -1118,12 +1136,12 @@ function App() {
           : i
       ))
       toast.dismiss(toastId)
-      toast.success('Listing created')
+      toast.success('Added to queue — AI optimizing in background')
     } catch {
       toast.dismiss(toastId)
-      toast.error('Listing optimization failed — you can edit it manually')
+      toast.error('Optimization failed — item saved, edit manually in Queue')
     }
-  }, [currentItem, setQueue, listingOptimizationService])
+  }, [currentItem, setQueue, listingOptimizationService, settings])
 
   const handlePassFromScan = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData && !currentItem?.imageThumbnail) {

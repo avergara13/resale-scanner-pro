@@ -1,8 +1,22 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Microphone, CaretDown, ChartBar, Image, ArrowClockwise, ArrowCounterClockwise, XCircle, ShoppingCart, Scan, FloppyDisk } from '@phosphor-icons/react'
+import {
+  Microphone,
+  CaretDown,
+  ChartBar,
+  Image,
+  ArrowClockwise,
+  ArrowCounterClockwise,
+  XCircle,
+  ShoppingCart,
+  Scan,
+  FloppyDisk,
+  CheckCircle,
+  ClipboardText,
+} from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Card } from '@/components/ui/card'
@@ -17,12 +31,36 @@ import { useCollapsePreference } from '@/hooks/use-collapse-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CONDITIONS = ['New', 'Like New', 'Very Good', 'Good', 'Acceptable', 'For Parts'] as const
+
+const PLATFORMS = [
+  { id: 'ebay', label: 'eBay' },
+  { id: 'mercari', label: 'Mercari' },
+  { id: 'poshmark', label: 'Poshmark' },
+  { id: 'facebook', label: 'FB Mkt' },
+  { id: 'whatnot', label: 'Whatnot' },
+] as const
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ListingDraftOverrides {
+  productName?: string
+  category?: string
+  condition?: string
+  description?: string
+  estimatedSellPrice?: number
+  shippingCost?: number
+  platform?: string
+}
+
 interface AIScreenProps {
   currentItem?: ScannedItem
   pipeline: PipelineStep[]
   settings?: AppSettings
   onSaveDraft: (price: number, notes: string) => void
-  onCreateListing: (price: number, notes: string) => void
+  onCreateListing: (price: number, notes: string, draft: ListingDraftOverrides) => void
   onPassItem: (price: number, notes: string) => void
   onRecalculate?: (price: number) => void
   onRescan?: () => void
@@ -196,9 +234,19 @@ export function AIScreen({
   onRescan,
   onOpenCamera,
 }: AIScreenProps) {
-  const [description, setDescription] = useState('')
+  // ── Listing form state ──
   const [buyPrice, setBuyPrice] = useState('')
-  const [summaryOpen, setSummaryOpen] = useCollapsePreference('ai-summary', true)
+  const [itemName, setItemName] = useState('')
+  const [category, setCategory] = useState('')
+  const [condition, setCondition] = useState('')
+  const [estSellPrice, setEstSellPrice] = useState('')
+  const [shippingCost, setShippingCost] = useState('')
+  const [description, setDescription] = useState('')
+  const [platform, setPlatform] = useState('ebay')
+  const [listingAdded, setListingAdded] = useState(false)
+
+  const [formOpen, setFormOpen] = useCollapsePreference('ai-listing-form', true)
+  const [summaryOpen, setSummaryOpen] = useCollapsePreference('ai-summary', false)
   const [imageOpen, setImageOpen] = useCollapsePreference('ai-image', false)
   const { isListening, startListening, isSupported } = useVoiceInput()
 
@@ -211,12 +259,39 @@ export function AIScreen({
     await new Promise(resolve => setTimeout(resolve, 600))
   }, [])
 
-  // Pre-fill buy price when currentItem arrives (never override user edits)
+  // Reset all form fields when a new scan starts (currentItem.id changes)
   useEffect(() => {
-    if (currentItem?.purchasePrice != null && buyPrice === '') {
+    setItemName('')
+    setCategory('')
+    setCondition('')
+    setBuyPrice('')
+    setEstSellPrice('')
+    setShippingCost('')
+    setDescription('')
+    setListingAdded(false)
+  }, [currentItem?.id])
+
+  // Pre-fill form once the decision step completes
+  // if-guards on each field prevent overwriting user edits
+  useEffect(() => {
+    if (!hasDecision || !currentItem) return
+    if (itemName === '') setItemName(currentItem.productName || '')
+    if (category === '') setCategory(currentItem.category || '')
+    if (condition === '') setCondition('Good')
+    if (buyPrice === '' && (currentItem.purchasePrice ?? 0) > 0) {
       setBuyPrice(String(currentItem.purchasePrice))
     }
-  }, [currentItem?.purchasePrice, buyPrice])
+    if (estSellPrice === '' && currentItem.estimatedSellPrice) {
+      setEstSellPrice(currentItem.estimatedSellPrice.toFixed(2))
+    }
+    if (shippingCost === '' && settings?.defaultShippingCost) {
+      setShippingCost(String(settings.defaultShippingCost))
+    }
+    if (description === '' && currentItem.description) {
+      setDescription(currentItem.description)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasDecision, currentItem?.id]) // minimal deps — if-guards prevent overwrites
 
   // Auto-scroll to decision when it first appears
   const decisionRef = useRef<HTMLDivElement>(null)
@@ -229,6 +304,19 @@ export function AIScreen({
     }
     prevHasDecision.current = hasDecision
   }, [hasDecision])
+
+  const handleAddToQueue = useCallback(() => {
+    onCreateListing(parseFloat(buyPrice) || 0, description, {
+      productName: itemName || undefined,
+      category: category || undefined,
+      condition: condition || undefined,
+      description: description || undefined,
+      estimatedSellPrice: parseFloat(estSellPrice) > 0 ? parseFloat(estSellPrice) : undefined,
+      shippingCost: parseFloat(shippingCost) > 0 ? parseFloat(shippingCost) : undefined,
+      platform,
+    })
+    setListingAdded(true)
+  }, [buyPrice, description, itemName, category, condition, estSellPrice, shippingCost, platform, onCreateListing])
 
   const pullToRefresh = usePullToRefresh({ onRefresh: handleRefresh, threshold: 80, enabled: true })
 
@@ -295,6 +383,198 @@ export function AIScreen({
                 <div className="mt-3 sm:mt-4" ref={decisionRef}>
                   <DecisionSignal decision={decision} item={currentItem} />
                 </div>
+              )}
+
+              {/* ── Listing draft form ── */}
+              {hasDecision && !listingAdded && (
+                <Collapsible open={formOpen} onOpenChange={setFormOpen}>
+                  <Card className="mt-3 p-3 sm:p-4 bg-fg border-s2">
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <ClipboardText size={18} weight="bold" className="text-b1" />
+                          <h3 className="text-xs font-bold uppercase tracking-wide text-t1">
+                            LISTING DRAFT
+                          </h3>
+                        </div>
+                        <CaretDown
+                          size={16}
+                          weight="bold"
+                          className={cn(
+                            'text-t3 transition-transform duration-200 flex-shrink-0',
+                            formOpen && 'rotate-180',
+                          )}
+                        />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="space-y-2.5 mt-2">
+                        {/* Item name */}
+                        <div>
+                          <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                            Item Name
+                          </label>
+                          <Input
+                            value={itemName}
+                            onChange={e => setItemName(e.target.value)}
+                            placeholder="e.g. Nike Air Max 90 White/Black"
+                            className="h-9 bg-bg border-s2 text-sm"
+                          />
+                        </div>
+
+                        {/* Category + Condition */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Category
+                            </label>
+                            <Input
+                              value={category}
+                              onChange={e => setCategory(e.target.value)}
+                              placeholder="e.g. Sneakers"
+                              className="h-9 bg-bg border-s2 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Condition
+                            </label>
+                            <select
+                              value={condition}
+                              onChange={e => setCondition(e.target.value)}
+                              className="w-full h-9 rounded-md border border-s2 bg-bg px-2 text-sm text-t1 focus:outline-none focus:ring-2 focus:ring-b1/50"
+                            >
+                              <option value="">Select…</option>
+                              {CONDITIONS.map(c => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Price row */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Buy $
+                            </label>
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={buyPrice}
+                              onChange={e => setBuyPrice(e.target.value)}
+                              className="h-9 bg-bg border-s2 text-sm font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Sell $
+                            </label>
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={estSellPrice}
+                              onChange={e => setEstSellPrice(e.target.value)}
+                              className="h-9 bg-bg border-s2 text-sm font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Ship $
+                            </label>
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={shippingCost}
+                              onChange={e => setShippingCost(e.target.value)}
+                              className="h-9 bg-bg border-s2 text-sm font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                          <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 flex items-center justify-between">
+                            <span>Description / Notes</span>
+                            {isSupported && (
+                              <button
+                                onClick={() =>
+                                  startListening(text =>
+                                    setDescription(prev => (prev ? prev + ' ' + text : text)),
+                                  )
+                                }
+                                className={cn(
+                                  'p-1 rounded-md transition-colors',
+                                  isListening
+                                    ? 'text-red animate-pulse'
+                                    : 'text-t3 hover:text-t1',
+                                )}
+                              >
+                                <Microphone size={12} weight="bold" />
+                              </button>
+                            )}
+                          </label>
+                          <Textarea
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            placeholder="Brand, model, size, color, notable features, flaws…"
+                            rows={3}
+                            className="bg-bg border-s2 text-sm resize-none"
+                          />
+                        </div>
+
+                        {/* Platform selector */}
+                        <div>
+                          <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1.5 block">
+                            List On
+                          </label>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {PLATFORMS.map(p => (
+                              <button
+                                key={p.id}
+                                onClick={() => setPlatform(p.id)}
+                                className={cn(
+                                  'px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors',
+                                  platform === p.id
+                                    ? 'bg-b1 text-white border-b1'
+                                    : 'bg-bg text-t2 border-s2 hover:border-b1/50',
+                                )}
+                              >
+                                {p.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {/* Added-to-queue success banner */}
+              {listingAdded && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-green/10 border border-green/30"
+                >
+                  <CheckCircle size={20} weight="fill" className="text-green flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-green">Added to Queue</p>
+                    <p className="text-[10px] text-t3 mt-0.5">
+                      AI is optimizing the listing in the background
+                    </p>
+                  </div>
+                </motion.div>
               )}
 
               {/* Quick Summary */}
@@ -410,93 +690,70 @@ export function AIScreen({
       {/* ── Bottom action bar ── */}
       <div className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md safe-bottom">
         {hasDecision ? (
-          /* Pipeline done — full action bar */
-          <div className="p-2.5 sm:p-3 space-y-2">
-            {/* Price + notes row */}
-            <div className="flex gap-2">
-              <Input
-                id="ai-price"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="Buy $"
-                value={buyPrice}
-                onChange={e => setBuyPrice(e.target.value)}
-                className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
-              />
-              <div className="flex-1 relative">
-                <Input
-                  id="ai-describe"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="Notes..."
-                  className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
-                />
-                {isSupported && (
-                  <button
-                    onClick={() => startListening(text => setDescription(text))}
-                    className={cn(
-                      'absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-colors',
-                      isListening
-                        ? 'bg-red text-white animate-pulse'
-                        : 'bg-s1 hover:bg-s2 text-t3 hover:text-t1',
-                    )}
-                  >
-                    <Microphone size={14} weight="bold" className="sm:w-4 sm:h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Recalculate — only when buy price has changed */}
-            {buyPrice !== '' && parseFloat(buyPrice) !== currentItem?.purchasePrice && (
-              <Button
-                onClick={() => onRecalculate?.(parseFloat(buyPrice))}
-                className="w-full bg-amber hover:opacity-90 text-white h-9 sm:h-10 font-semibold text-xs sm:text-sm"
-              >
-                <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
-                ♻️ Recalculate with new price
-              </Button>
-            )}
-
-            {/* Rescan / Pass / Create Listing */}
-            <div className="flex gap-2">
+          listingAdded ? (
+            /* Success state — offer to scan another item */
+            <div className="p-2.5 sm:p-3">
               <Button
                 onClick={() => onRescan?.()}
-                variant="outline"
-                className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
+                className="w-full h-9 sm:h-10 bg-b1 hover:bg-b2 text-white font-semibold text-xs sm:text-sm"
               >
-                <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
-                Rescan
-              </Button>
-              <Button
-                onClick={() => onPassItem(parseFloat(buyPrice), description)}
-                disabled={!canSaveDraft}
-                variant="outline"
-                className="flex-1 h-9 sm:h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
-              >
-                <XCircle size={15} weight="bold" className="mr-1" />
-                Pass
-              </Button>
-              <Button
-                onClick={() => onCreateListing(parseFloat(buyPrice), description)}
-                disabled={!canSaveDraft}
-                className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
-              >
-                <ShoppingCart size={15} weight="bold" className="mr-1" />
-                Create Listing
+                <Scan size={15} weight="bold" className="mr-1.5" />
+                Scan Another Item
               </Button>
             </div>
-          </div>
+          ) : (
+            /* Decision available — main action bar */
+            <div className="p-2.5 sm:p-3 space-y-2">
+              {/* Recalculate — only when buy price has diverged from analyzed price */}
+              {buyPrice !== '' &&
+                parseFloat(buyPrice) !== currentItem?.purchasePrice && (
+                  <Button
+                    onClick={() => onRecalculate?.(parseFloat(buyPrice))}
+                    className="w-full bg-amber hover:opacity-90 text-white h-9 sm:h-10 font-semibold text-xs sm:text-sm"
+                  >
+                    <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
+                    ♻️ Recalculate with new price
+                  </Button>
+                )}
+
+              {/* Rescan / Pass / Add to Queue */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => onRescan?.()}
+                  variant="outline"
+                  className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
+                >
+                  <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
+                  Rescan
+                </Button>
+                <Button
+                  onClick={() => onPassItem(parseFloat(buyPrice) || 0, description)}
+                  disabled={!canSaveDraft}
+                  variant="outline"
+                  className="flex-1 h-9 sm:h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                >
+                  <XCircle size={15} weight="bold" className="mr-1" />
+                  Pass
+                </Button>
+                <Button
+                  onClick={handleAddToQueue}
+                  disabled={!canSaveDraft}
+                  className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                >
+                  <ShoppingCart size={15} weight="bold" className="mr-1" />
+                  Add to Queue
+                </Button>
+              </div>
+            </div>
+          )
         ) : isPipelineRunning ? (
-          /* Pipeline in progress — hold the bar */
+          /* Pipeline in progress */
           <div className="flex items-center justify-center gap-2 h-12 text-xs text-t3 font-medium">
             <span className="w-2 h-2 rounded-full bg-b1 animate-pulse" />
             Analyzing… decision coming
           </div>
         ) : pipeline.length > 0 ? (
-          /* Pipeline ended without a decision (error path) — allow rescan */
+          /* Pipeline ended without a decision (error path) */
           <div className="p-2.5 sm:p-3">
             <Button
               onClick={() => onRescan?.()}
@@ -508,7 +765,7 @@ export function AIScreen({
             </Button>
           </div>
         ) : (
-          /* No pipeline yet — allow manual draft save */
+          /* No pipeline yet — quick draft capture */
           <div className="p-2.5 sm:p-3 space-y-2">
             <div className="flex gap-2">
               <Input
