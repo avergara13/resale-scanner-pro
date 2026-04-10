@@ -41,8 +41,8 @@
   --s3: oklch(0.65 0 0);
   --s4: oklch(0.45 0 0);
 
-  --b1: oklch(0.55 0.15 250);
-  --b2: oklch(0.42 0.12 250);
+  --b1: oklch(0.56 0.21 250);
+  --b2: oklch(0.43 0.17 250);
 
   --t1: oklch(0.25 0 0);
   --t2: oklch(0.45 0 0);
@@ -58,6 +58,9 @@
 
   --border: oklch(0.80 0.05 75);
   --radius: 0.75rem;
+
+  /* Send button glow */
+  --send-glow: 0 2px 12px oklch(0.56 0.21 250 / 0.40);
 
   /* Glass pill (input bar) — light mode */
   --glass-bg: rgba(242, 242, 247, 0.92);
@@ -125,6 +128,9 @@
   --analyzing-color: var(--amber);
   --success-color: var(--green);
   --fail-color: var(--red);
+
+  /* Send button glow */
+  --send-glow: 0 2px 14px oklch(0.65 0.23 250 / 0.55);
 
   /* Glass pill — dark frosted glass */
   --glass-bg: rgba(26, 26, 34, 0.93);

@@ -1077,10 +1077,10 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
     onProcessingChange?.(isProcessing)
   }, [isProcessing, onProcessingChange])
 
-  // Auto-enter chat on mount if there's already a session with messages
+  // Auto-enter chat on mount whenever a session exists (persists for life of session)
   useEffect(() => {
     const existing = chatSessions?.[0]
-    if (existing && existing.messages.length > 0) {
+    if (existing) {
       setActiveSessionId(existing.id)
       setViewMode('chat')
     }
@@ -1101,17 +1101,43 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
     handleSendMessage(prompt)
   }, [handleSendMessage])
 
+  // Clear messages and start a fresh chat within the same session
+  const handleNewChat = useCallback(() => {
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      name: 'Chat',
+      createdAt: Date.now(),
+      lastMessageAt: Date.now(),
+      messages: [],
+      isActive: true,
+    }
+    setChatSessions([newSession])
+    setActiveSessionId(newSession.id)
+    setViewMode('chat')
+  }, [setChatSessions, setActiveSessionId])
+
   // Shared stats bar used in both views
   const statsBar = (
     <div
       className="px-3 py-1.5 border-b border-s1/60"
       style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)' }}
     >
-      {currentSession?.active && (
-        <div className="text-[9px] font-bold text-b1 mb-1 uppercase tracking-wide">
-          {currentSession.name || 'Active Session'}
-        </div>
-      )}
+      <div className="flex items-center justify-between mb-1">
+        {currentSession?.active ? (
+          <div className="text-[9px] font-bold text-b1 uppercase tracking-wide">
+            {currentSession.name || 'Active Session'}
+          </div>
+        ) : <div />}
+        {viewMode === 'chat' && chatMessages.length > 0 && (
+          <button
+            onClick={handleNewChat}
+            className="text-[9px] font-bold text-t3 hover:text-b1 uppercase tracking-wide transition-colors active:opacity-60"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            ↺ New Chat
+          </button>
+        )}
+      </div>
       <div className="grid grid-cols-4 gap-1.5">
         <div className="rounded-xl border border-s2/60 py-1.5 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
           <div className="text-sm font-black text-t1 leading-tight">{queueStats.total}</div>
@@ -1192,11 +1218,12 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: '18px',
-            background: 'linear-gradient(135deg, var(--b1), var(--b2))',
+            background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
+            boxShadow: !input.trim() || isProcessing ? 'none' : 'var(--send-glow)',
             border: 'none',
             cursor: 'pointer',
             opacity: !input.trim() || isProcessing ? 0.4 : 1,
-            transition: 'opacity 0.15s, transform 0.1s',
+            transition: 'opacity 0.15s, transform 0.1s, box-shadow 0.15s',
             WebkitTapHighlightColor: 'transparent',
           }}
         >
