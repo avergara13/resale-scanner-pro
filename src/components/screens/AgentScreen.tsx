@@ -1128,10 +1128,10 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             {currentSession.name || 'Active Session'}
           </div>
         ) : <div />}
-        {viewMode === 'chat' && chatMessages.length > 0 && (
+        {viewMode === 'chat' && (
           <button
             onClick={handleNewChat}
-            className="text-[9px] font-bold text-t3 hover:text-b1 uppercase tracking-wide transition-colors active:opacity-60"
+            className="text-[9px] font-bold text-b1 uppercase tracking-wide transition-colors active:opacity-60 flex items-center gap-0.5"
             style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           >
             ↺ New Chat
@@ -1247,8 +1247,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
 
-      {/* ── Sticky chrome: tab bar + stats bar — never scrolls ── */}
-      <div className="flex-shrink-0 sticky z-20 bg-fg" style={{ top: '44px' }}>
+      {/* ── Chrome: tab bar + stats bar — flex-shrink-0 keeps it out of scroll ── */}
+      <div className="flex-shrink-0 z-20 bg-fg">
         <div className="border-b border-s1">
           <div className="tab-bar px-3">
             <button
@@ -1290,11 +1290,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0"
           >
-            {/* Splash — full height, viewport-centered */}
-            <div
-              className="flex-1 flex flex-col items-center justify-center text-center px-6"
-              style={{ paddingBottom: '80px' }}
-            >
+            {/* Splash — vertically centered */}
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
               <button
                 onClick={handleCreateSession}
                 className="inline-flex p-5 bg-gradient-to-br from-b1 to-b2 rounded-3xl mb-5 active:scale-95 transition-transform shadow-xl"
@@ -1316,7 +1313,19 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             className="flex flex-col flex-1 min-h-0"
             style={{ overflow: 'visible' }}
           >
+            {/* Empty state when chat has no messages */}
+            {chatMessages.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-b1/15 to-b2/10 flex items-center justify-center mb-3">
+                  <Robot size={22} weight="duotone" className="text-b1" />
+                </div>
+                <p className="text-sm font-semibold text-t1 mb-1">Session Assistant</p>
+                <p className="text-xs text-t3 max-w-[200px] leading-relaxed">Ask about your queue, pricing, listings, or what to do next.</p>
+              </div>
+            )}
+
             {/* Messages — pb clears the floating input bar */}
+            {chatMessages.length > 0 && (
             <ScrollArea className="flex-1 px-4">
               <div ref={pullToRefresh.containerRef} className="py-4 space-y-4" style={{ paddingBottom: '80px' }}>
                 {chatMessages.map((msg, index) => (
@@ -1374,6 +1383,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
+            )}
 
           </motion.div>
         )}
