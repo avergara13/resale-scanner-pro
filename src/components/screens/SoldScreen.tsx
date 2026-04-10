@@ -169,9 +169,9 @@ const handleDraftChange = (pageId: string, key: keyof SoldItemDraft, value: stri
 
   return (
     <div className="h-full flex flex-col bg-bg">
-      {/* Compact sticky filter bar — 4 even tabs, matches Listings/Agent */}
-      <div className="px-3 pt-2 pb-0 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
-        <div className="tab-bar">
+      {/* Compact sticky header — filter tabs + stats row */}
+      <div className="px-3 pt-2 pb-2 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
+        <div className="tab-bar mb-2">
           {([
             ['all', 'All'],
             ['need-label', 'Need Label'],
@@ -187,28 +187,28 @@ const handleDraftChange = (pageId: string, key: keyof SoldItemDraft, value: stri
             </button>
           ))}
         </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-3 pt-2 space-y-2" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
-        {/* Stats row — very compact inline tiles */}
+        {/* Stats row — pinned below tabs, always visible */}
         <div className="grid grid-cols-4 gap-1.5">
-          <div className="bg-fg rounded-lg border border-s2 py-1.5 px-1 text-center">
+          <div className="bg-bg rounded-lg border border-s2 py-1.5 px-1 text-center">
             <div className="text-sm font-black text-t1 leading-tight">{stats.totalSales}</div>
             <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Sold</div>
           </div>
-          <div className="bg-fg rounded-lg border border-s2 py-1.5 px-1 text-center">
+          <div className="bg-bg rounded-lg border border-s2 py-1.5 px-1 text-center">
             <div className="text-sm font-black text-t1 leading-tight">{formatMoney(stats.totalRevenue)}</div>
             <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Revenue</div>
           </div>
-          <div className="bg-fg rounded-lg border border-s2 py-1.5 px-1 text-center">
+          <div className="bg-bg rounded-lg border border-s2 py-1.5 px-1 text-center">
             <div className="text-sm font-black text-red leading-tight">{stats.needLabel}</div>
             <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Need Label</div>
           </div>
-          <div className="bg-fg rounded-lg border border-s2 py-1.5 px-1 text-center">
+          <div className="bg-bg rounded-lg border border-s2 py-1.5 px-1 text-center">
             <div className="text-sm font-black text-green leading-tight">{stats.shipped}</div>
             <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Shipped</div>
           </div>
         </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3 pt-2 space-y-2" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8">
             <Package size={48} className="text-t3 opacity-40 mb-4" weight="duotone" />
