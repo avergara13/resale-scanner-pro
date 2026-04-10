@@ -55,24 +55,24 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
+    emoji: '📸',
+    label: 'Scan Item',
+    prompt: 'open camera to scan a new item',
+  },
+  {
     emoji: '🚀',
     label: 'Full Pipeline',
-    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion'
+    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion',
   },
   {
-    emoji: '📦',
-    label: 'Create Listings',
-    prompt: 'Create optimized eBay listings for all BUY items in my queue'
-  },
-  {
-    emoji: '🔎',
-    label: 'Research Item',
-    prompt: 'Research the market value of my most recent item'
+    emoji: '📬',
+    label: 'Need Shipping',
+    prompt: 'Which sold items need shipping labels right now? Show me overdue items first, then the best carrier and estimated cost for each.',
   },
   {
     emoji: '📊',
-    label: 'Session Status',
-    prompt: 'What\'s my current session status? Show me all stats, goals, and recent items.'
+    label: 'Session Stats',
+    prompt: "What's my current session status? Show stats, profit goal progress, and recent items.",
   },
 ]
 
@@ -700,6 +700,55 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         )
         
         toast.success(`Pushed ${successCount} listings to Notion`)
+        setIsProcessing(false)
+        return
+      }
+
+      // Show tasks command — list pending todos inline without hitting the LLM
+      if (/\b(show tasks?|view tasks?|my tasks?|task list|what.*tasks?|tasks? left)\b/i.test(lowerText)) {
+        if (pendingTodos.length === 0) {
+          addMsg('✅ No pending tasks — your list is clear! Tap the **Task** tab to add one, or say "add task: [description]".')
+        } else {
+          const taskLines = pendingTodos.slice(0, 10).map((t, i) => `${i + 1}. ${t.text}`).join('\n')
+          addMsg(`You have **${pendingTodos.length} pending task${pendingTodos.length !== 1 ? 's' : ''}**:\n\n${taskLines}\n\nSwitch to the **Task** tab to check them off or add more.`)
+        }
+        setIsProcessing(false)
+        return
+      }
+
+      // Shipping status — serve from live sold data already in context, no LLM needed
+      if (/\b(shipping|ship|need labels?|need to ship|overdue|what.*ship|labels? needed)\b/i.test(lowerText)) {
+        if (liveSoldItems.length === 0) {
+          addMsg('📬 No sold items found in your Notion Sales DB yet. Once items sell and WF-01 parses the confirmation emails they\'ll appear here automatically. You can also tap **+ Log Sale** on the Sold tab to add them manually.')
+        } else {
+          const { needsLabelCount, overdueCount, readyCount, shippedCount, urgentItems, totalPotentialShippingCost } = (() => {
+            // Import is at top of file — use the already-imported analyzeSoldBatch
+            const a = { needsLabelCount: 0, overdueCount: 0, readyCount: 0, shippedCount: 0, urgentItems: [] as Array<{title:string;hoursOverdue:number;platform:string}>, totalPotentialShippingCost: 0 }
+            for (const item of liveSoldItems) {
+              if (item.shippingStatus === '✅ Shipped') a.shippedCount++
+              else if (item.shippingStatus === '🔴 Need Label') a.needsLabelCount++
+              else if (item.shippingStatus === '🟡 Label Ready' || item.shippingStatus === '📦 Packed') a.readyCount++
+              if (item.shippingStatus !== '✅ Shipped' && item.saleDate) {
+                const hours = Math.round((Date.now() - new Date(item.saleDate).getTime()) / 3_600_000)
+                if (hours >= 48) { a.overdueCount++; a.urgentItems.push({ title: item.title, hoursOverdue: Math.max(0, hours - 24), platform: item.platform }) }
+              }
+            }
+            a.urgentItems.sort((x, y) => y.hoursOverdue - x.hoursOverdue)
+            return a
+          })()
+
+          const lines: string[] = [`📬 **Shipping Status — ${liveSoldItems.length} sold item${liveSoldItems.length !== 1 ? 's' : ''}**\n`]
+          if (overdueCount > 0) lines.push(`🔴 **${overdueCount} overdue** (>48h since sale — ship today!)`)
+          if (needsLabelCount > 0) lines.push(`🟡 **${needsLabelCount} need a label**`)
+          if (readyCount > 0) lines.push(`📦 **${readyCount} packed / label ready**`)
+          if (shippedCount > 0) lines.push(`✅ **${shippedCount} shipped**`)
+          if (urgentItems.length > 0) {
+            lines.push('\n**Overdue items:**')
+            urgentItems.slice(0, 5).forEach(u => lines.push(`• ${u.title} — ${u.hoursOverdue}h overdue (${u.platform})`))
+          }
+          lines.push('\nGo to the **Sold** tab to print labels and update statuses.')
+          addMsg(lines.join('\n'))
+        }
         setIsProcessing(false)
         return
       }
