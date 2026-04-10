@@ -627,9 +627,6 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                     </button>
                   )}
                 </div>
-                <div className="px-2 sm:px-4">
-                  <ApiStatusIndicator settings={settings} />
-                </div>
               </div>
             ) : (
               <div className="space-y-3 sm:space-y-4">
