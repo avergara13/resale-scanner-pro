@@ -988,6 +988,25 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       ).join('\n\n')
       const historyBlock = recentHistory ? `\n\n## Recent Conversation\n${recentHistory}` : ''
 
+      // Guard: ensure at least one API key is configured before hitting callLLM
+      // (callLLM throws on missing keys but the error message may not reach the user clearly)
+      if (!settings?.geminiApiKey && !settings?.anthropicApiKey) {
+        const noKeyMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: '⚙️ No AI API key configured. Go to **Settings → AI Configuration** and add your Gemini or Claude API key to start chatting.',
+          timestamp: Date.now(),
+        }
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === sessionId
+              ? { ...s, messages: [...s.messages, noKeyMsg], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+        return
+      }
+
       // Static instructions → Gemini systemInstruction (cached across requests)
       // Dynamic context + history + user message → contents (billed per-request)
       const userPrompt = `${dynamicContext}${historyBlock}\n\nUser: ${text}`
