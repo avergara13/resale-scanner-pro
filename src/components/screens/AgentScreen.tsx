@@ -1614,8 +1614,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
               )}
             </div>
           </div>
-          {/* Add task input */}
-          <div className="flex-shrink-0 p-4 bg-fg border-t border-s1 safe-bottom">
+          {/* Add task input — glass pill matching chat pill */}
+          <div className="flex-shrink-0 px-3 py-2">
             <form
               onSubmit={e => {
                 e.preventDefault()
@@ -1633,21 +1633,53 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                 ])
                 setTaskInput('')
               }}
-              className="flex gap-2"
+              className="flex items-center gap-2"
+              style={{
+                background: 'var(--glass-bg)',
+                backdropFilter: 'saturate(180%) blur(24px)',
+                WebkitBackdropFilter: 'saturate(180%) blur(24px)',
+                border: '0.5px solid var(--glass-border)',
+                boxShadow: 'var(--glass-shadow)',
+                borderRadius: '22px',
+                padding: '6px 6px 6px 16px',
+              }}
             >
-              <Input
+              <input
                 value={taskInput}
                 onChange={e => setTaskInput(e.target.value)}
                 placeholder="Add a task..."
-                className="flex-1 h-10 bg-bg border-s2 text-sm"
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: '15px',
+                  color: 'var(--t1)',
+                  minWidth: 0,
+                }}
               />
-              <Button
+              <button
                 type="submit"
                 disabled={!taskInput.trim()}
-                className="bg-b1 hover:bg-b2 text-white h-10 w-10 p-0 flex-shrink-0 disabled:opacity-40"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '18px',
+                  background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
+                  boxShadow: taskInput.trim() ? 'var(--send-glow)' : 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  opacity: taskInput.trim() ? 1 : 0.4,
+                  transition: 'opacity 0.15s, box-shadow 0.15s',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
               >
-                <Plus size={18} weight="bold" />
-              </Button>
+                <Plus size={16} weight="bold" className="text-white" />
+              </button>
             </form>
           </div>
         </div>
