@@ -1649,8 +1649,12 @@ function App() {
   // Auto-load sold items when user navigates to the Sold screen OR the Agent screen
   // (Agent needs live shipping data for its intelligence & reporting).
   useEffect(() => {
-    if (screen === 'sold' || screen === 'agent') {
+    if (screen === 'sold') {
       loadLiveSoldItems()
+    } else if (screen === 'agent') {
+      // Agent needs live sold data for intelligence/reporting, but should never
+      // surface a toast — errors here would leak onto unrelated tabs.
+      loadLiveSoldItems({ silent: true })
     }
   }, [screen, loadLiveSoldItems])
 

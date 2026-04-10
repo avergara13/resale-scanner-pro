@@ -340,7 +340,7 @@ async function queryInventoryPages() {
       page_size: 100,
       filter: {
         or: [
-          { property: 'Status', select: { equals: 'Sold' } },
+          { property: 'Status', select: { equals: '✅ Sold' } },
           { property: 'Date Sold', date: { is_not_empty: true } },
         ],
       },
