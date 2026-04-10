@@ -627,4 +627,9 @@ server.listen(port, '0.0.0.0', () => {
     console.error(`🔍 Resale Scanner Pro · http://localhost:${port}`)
     console.error(`❌ dist/ NOT found at ${distDir} — app will serve 404. Check that the build step ran and the output was preserved in the runtime image.`)
   }
+
+  // Integration diagnostics — log which env vars are present so Railway logs
+  // make it obvious whether the Sold tab / Notion sync will work at runtime.
+  console.log(`🗄️  Notion: ${notionApiKey ? '✅ API key set' : '❌ NO API KEY — Sold tab will fail'} | Sales DB: ${notionSalesDbId} | Inventory DB: ${notionInventoryDbId}`)
+  console.log(`🔌 Supabase: ${supabaseUrl && supabaseAnonKey ? '✅ credentials set' : '⚠️  credentials missing — scan history merge disabled'}`)
 })
