@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowClockwise, ArrowSquareOut, Package, SpinnerGap, Truck, Plus, Warning, Sparkle, X } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { Badge } from '@/components/ui/badge'
@@ -293,46 +294,12 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           </div>
         </div>
 
-        {/* Sync time — compact right-aligned, replaces the full action row */}
-        {lastSyncedLabel && (
-          <div className="flex justify-end mt-1">
-            <span className="text-[9px] text-t3">Synced {lastSyncedLabel}</span>
-          </div>
-        )}
-
-        {/* Overdue banner — show when anything is overdue */}
-        {batchStats.overdueCount > 0 && (
-          <div className="mt-2 rounded-xl border border-amber/40 px-3 py-1.5 flex items-center gap-2"
-            style={{ background: 'color-mix(in oklch, var(--amber) 12%, transparent)' }}>
-            <Warning size={14} weight="fill" className="text-amber flex-shrink-0" />
-            <span className="text-[11px] text-t1 font-semibold">
-              {batchStats.overdueCount} {batchStats.overdueCount === 1 ? 'item is' : 'items are'} overdue (&gt;48h)
-            </span>
-          </div>
-        )}
-
-        {/* Warnings from server (e.g., Supabase sales table missing) */}
-        {warnings.length > 0 && (
-          <div className="mt-2 text-[9px] text-t3 italic">{warnings[0]}</div>
-        )}
       </div>
 
       {/* ── Scrollable list ───────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* "+" Log Sale — top-right of list area, doesn't scroll */}
-        <div className="flex justify-end px-3 pt-2 pb-1">
-          <button
-            onClick={() => setShowManualDialog(true)}
-            className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center shadow-md active:scale-95 transition-transform"
-            style={{ boxShadow: 'var(--send-glow)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-            aria-label="Log Sale"
-          >
-            <Plus size={16} weight="bold" className="text-white" />
-          </button>
-        </div>
       <div
-        className="flex-1 overflow-y-auto px-3 space-y-2"
-        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 88px)' }}
+        className="flex-1 overflow-y-auto px-3 pt-2 space-y-2"
+        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 108px)' }}
       >
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8 py-16">
@@ -572,7 +539,71 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           })
         )}
       </div>
-      </div>
+
+      {/* ── Glass bottom pill — overdue indicator + Log Sale button ─── */}
+      {createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
+            zIndex: 50,
+            padding: '0 12px',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            className="flex items-center"
+            style={{
+              pointerEvents: 'auto',
+              background: 'var(--glass-bg)',
+              backdropFilter: 'saturate(180%) blur(24px)',
+              WebkitBackdropFilter: 'saturate(180%) blur(24px)',
+              border: '0.5px solid var(--glass-border)',
+              boxShadow: 'var(--glass-shadow)',
+              borderRadius: '20px',
+              padding: '5px 5px 5px 14px',
+              gap: '8px',
+            }}
+          >
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {batchStats.overdueCount > 0 ? (
+                <>
+                  <Warning size={13} weight="fill" className="text-amber flex-shrink-0" />
+                  <span style={{ fontSize: '12px', color: 'var(--amber)', fontWeight: 600 }}>
+                    {batchStats.overdueCount} {batchStats.overdueCount === 1 ? 'item' : 'items'} overdue
+                  </span>
+                </>
+              ) : lastSyncedLabel ? (
+                <span style={{ fontSize: '11px', color: 'var(--t3)' }}>Synced {lastSyncedLabel}</span>
+              ) : null}
+            </div>
+            <button
+              onClick={() => setShowManualDialog(true)}
+              style={{
+                width: '32px',
+                height: '32px',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '16px',
+                background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
+                boxShadow: 'var(--send-glow)',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'opacity 0.15s, transform 0.1s',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+              aria-label="Log Sale"
+            >
+              <Plus size={15} weight="bold" className="text-white" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Manual Sale Dialog ──────────────────────────────────────── */}
       <ManualSaleDialog
