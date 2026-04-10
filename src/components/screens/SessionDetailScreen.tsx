@@ -7,7 +7,6 @@ import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { AgentPanel } from '../AgentPanel'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { Session, ScannedItem, ThriftStoreLocation } from '@/types'
@@ -450,9 +449,6 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               </div>
             </div>
           )}
-
-          {/* Profit Goals */}
-          <AgentPanel sessionId={sessionId} />
 
           {/* End Session — only when active */}
           {session.active && onEndSession && (

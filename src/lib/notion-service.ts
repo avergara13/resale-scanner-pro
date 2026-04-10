@@ -20,8 +20,8 @@ export interface NotionListingData {
   /** Session traceability — critical for tax/financial records */
   sessionId?: string
   sessionNumber?: number
-  /** 'Business' or 'Personal' — determines tax deductibility */
-  expenseType?: 'Business' | 'Personal'
+  /** Exact Notion Select option name — emoji prefix required for field match */
+  expenseType?: '💼 Business' | '🏡 Personal'
 }
 
 export interface NotionPushResponse {
