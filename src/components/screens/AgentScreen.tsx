@@ -240,6 +240,16 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const [, setQueueKV] = useKV<ScannedItem[]>('queue', [])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Tracks whether the component is still mounted so long-running async
+  // handlers (multi-step pipeline, research, optimizer) can bail out on
+  // unmount instead of dispatching state updates into a dead tree.
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
   const pendingTodos = useMemo(() => (todos || []).filter(t => !t.completed), [todos])
   const completedTodos = useMemo(() => (todos || []).filter(t => t.completed), [todos])
 
@@ -1045,6 +1055,9 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
         )
       )
     } catch (error) {
+      // Bail out silently if the user navigated away mid-flight — no point
+      // dispatching state updates or toasts into an unmounted tree.
+      if (!isMountedRef.current) return
       const msg = error instanceof Error ? error.message : 'Unknown error'
       console.error('Agent AI error:', msg)
       // Only show error toast for actionable issues (API key missing, safety block)
@@ -1070,7 +1083,9 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
         )
       }
     } finally {
-      setIsProcessing(false)
+      // Safe to always run — React 18 no-ops state updates on unmounted components,
+      // but short-circuit here as well to avoid the dev-mode warning.
+      if (isMountedRef.current) setIsProcessing(false)
     }
   }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, setTodos, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 

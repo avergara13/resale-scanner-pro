@@ -6,6 +6,20 @@ import type { AdvancedFilterOptions } from './AdvancedFilters'
 import type { ItemTag } from '@/types'
 import { cn } from '@/lib/utils'
 
+// Guards against `RangeError: Invalid time value` from date-fns when a
+// dateRange loaded from persisted storage (or a partial preset) is missing
+// start/end or contains NaN. Returns null if the value can't be formatted.
+function safeFormat(ts: unknown, fmt: string): string | null {
+  if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return null
+  try {
+    return format(d, fmt)
+  } catch {
+    return null
+  }
+}
+
 interface ActiveFiltersSummaryProps {
   filters: AdvancedFilterOptions
   onRemoveFilter: (filterKey: keyof AdvancedFilterOptions, value?: string) => void
@@ -46,17 +60,25 @@ export function ActiveFiltersSummary({ filters, onRemoveFilter, className }: Act
         </Badge>
       )}
 
-      {filters.dateRange && (
-        <Badge
-          className="bg-amber/10 text-amber border border-amber/30 hover:bg-amber/20 text-xs font-semibold px-2 py-1 flex items-center gap-1.5 cursor-pointer transition-all group"
-          onClick={() => onRemoveFilter('dateRange')}
-        >
-          <span>
-            {format(filters.dateRange.start, 'MMM d')} - {format(filters.dateRange.end, 'MMM d, yyyy')}
-          </span>
-          <X size={12} weight="bold" className="group-hover:scale-110 transition-transform" />
-        </Badge>
-      )}
+      {filters.dateRange && (() => {
+        const startLabel = safeFormat(filters.dateRange.start, 'MMM d')
+        const endLabel = safeFormat(filters.dateRange.end, 'MMM d, yyyy')
+        // Drop the badge entirely if neither endpoint is valid — better than
+        // crashing the whole screen on a corrupt persisted filter.
+        if (!startLabel && !endLabel) return null
+        const label = startLabel && endLabel
+          ? `${startLabel} - ${endLabel}`
+          : (startLabel || endLabel)
+        return (
+          <Badge
+            className="bg-amber/10 text-amber border border-amber/30 hover:bg-amber/20 text-xs font-semibold px-2 py-1 flex items-center gap-1.5 cursor-pointer transition-all group"
+            onClick={() => onRemoveFilter('dateRange')}
+          >
+            <span>{label}</span>
+            <X size={12} weight="bold" className="group-hover:scale-110 transition-transform" />
+          </Badge>
+        )
+      })()}
 
       {filters.categories && filters.categories.map((category) => (
         <Badge

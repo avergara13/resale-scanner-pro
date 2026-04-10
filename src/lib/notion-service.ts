@@ -313,6 +313,8 @@ export class NotionService {
       if (update.returnReason)            properties['Return Reason']     = rt(update.returnReason)
       if (update.delistedDate)            properties['Delisted Date']     = { date: { start: new Date(update.delistedDate).toISOString() } }
 
+      // Status updates are the most-visible Notion writes (Sold → Shipped → Delisted chain).
+      // Bump retries + widen backoff so transient 429/503s don't strand an item in the wrong state.
       await retryFetch(`https://api.notion.com/v1/pages/${pageId}`, {
         method: 'PATCH',
         headers: {
@@ -321,7 +323,7 @@ export class NotionService {
           'Notion-Version': '2022-06-28',
         },
         body: JSON.stringify({ properties }),
-      }, { maxRetries: 2, initialDelay: 1000, timeout: 15000 })
+      }, { maxRetries: 4, initialDelay: 1000, maxDelay: 8000, timeout: 20000 })
 
       return { success: true, pageId }
     } catch (error) {

@@ -593,7 +593,11 @@ function App() {
           setQueue(prev => (prev || []).map(i =>
             i.id === itemId ? { ...i, marketData: { ...i.marketData, researchSummary: researchText } } : i
           ))
-        }).catch(() => {/* silent — non-blocking enrichment */})
+        }).catch((err: unknown) => {
+          // Non-blocking enrichment — log for ops visibility but never surface to UI
+          const msg = err instanceof Error ? err.message : String(err)
+          console.warn('[research] Non-blocking enrichment failed for', newItem.id, '—', msg)
+        })
       }
 
       const tagSuggestions = tagSuggestionService.suggestTags(updatedItem)
@@ -1252,7 +1256,9 @@ function App() {
     let buyCount = 0
     let passCount = 0
     let totalNewProfit = 0
-    const failedItems: string[] = []
+    // Capture root cause for each failure so we can give the user a specific
+    // diagnosis instead of a blind "X items failed" count.
+    const failedItems: Array<{ id: string; reason: string }> = []
     const skippedItems: string[] = []
     const updatedItemsMap = new Map<string, ScannedItem>()
 
@@ -1370,8 +1376,9 @@ function App() {
 
         await new Promise(resolve => setTimeout(resolve, 500))
       } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
         console.error('Failed to analyze item:', item.id, error)
-        failedItems.push(item.id)
+        failedItems.push({ id: item.id, reason: reason.slice(0, 200) })
       }
     }
 
@@ -1399,7 +1406,17 @@ function App() {
     setBatchProgress({ current: 0, total: 0, currentItemName: '' })
 
     if (failedItems.length > 0) {
-      toast.warning(`${failedItems.length} item(s) failed analysis`)
+      // Surface the dominant failure reason so the user knows *why* batch failed
+      // (API key missing, rate limit, timeout, etc.) rather than just a count.
+      const reasonCounts = new Map<string, number>()
+      for (const f of failedItems) {
+        reasonCounts.set(f.reason, (reasonCounts.get(f.reason) || 0) + 1)
+      }
+      const [topReason] = [...reasonCounts.entries()].sort((a, b) => b[1] - a[1])
+      toast.warning(
+        `${failedItems.length} item(s) failed analysis`,
+        topReason ? { description: topReason[0] } : undefined,
+      )
     }
     if (skippedItems.length > 0) {
       toast.info(`${skippedItems.length} item(s) skipped (no image)`)
