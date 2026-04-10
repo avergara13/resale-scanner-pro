@@ -1318,8 +1318,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
       {/* ── Scans tab ── */}
       {activeTab === 'scans' && (
-        <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
-          <div ref={pullToRefresh.containerRef} className="p-4 space-y-3 pb-6">
+        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 overflow-y-auto">
+          <div className="p-4 space-y-3 pb-6">
             {sessionScans.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center py-12 px-4">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-4">
