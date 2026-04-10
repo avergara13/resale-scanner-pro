@@ -611,6 +611,16 @@ function App() {
       delete persistableItem.imageOptimized
       setScanHistory(prev => [persistableItem, ...(prev || []).slice(0, 499)])
 
+      // Auto-land every completed scan in the Scans queue — user can Buy or Pass from there
+      setQueue(prev => {
+        const current = prev || []
+        const scanItem: ScannedItem = { ...persistableItem, inQueue: true }
+        if (current.some(i => i.id === scanItem.id)) {
+          return current.map(i => i.id === scanItem.id ? scanItem : i)
+        }
+        return [...current, scanItem]
+      })
+
       if (session?.active) {
         setSession((prev) => {
           if (!prev) return prev
@@ -1161,6 +1171,34 @@ function App() {
     toast.success('Passed — heavy image data will be removed at session end')
   }, [currentItem, setQueue])
 
+  const handleBuyItem = useCallback(async (itemId: string) => {
+    // Mark as BUY immediately so the card moves to the Listed tab
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId ? { ...i, decision: 'BUY' as const } : i
+    ))
+    setScreen('queue')
+    const toastId = toast.loading('Generating listing details...')
+    try {
+      const item = (queue || []).find(i => i.id === itemId)
+      if (!item) { toast.dismiss(toastId); return }
+      const optimized = await listingOptimizationService.generateOptimizedListing({
+        item: { ...item, decision: 'BUY' as const },
+        marketData: item.marketData,
+      })
+      const mergedTags = Array.from(new Set([...(item.tags || []), ...(optimized.suggestedTags || [])]))
+      setQueue(prev => (prev || []).map(i =>
+        i.id === itemId
+          ? { ...i, decision: 'BUY' as const, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' as const }
+          : i
+      ))
+      toast.dismiss(toastId)
+      toast.success('✅ Added to Listings — tap the Listed tab')
+    } catch {
+      toast.dismiss(toastId)
+      toast.error('Listing generation failed — item moved to Listed, optimize from detail view')
+    }
+  }, [queue, setQueue, listingOptimizationService, setScreen])
+
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
 
@@ -1704,6 +1742,7 @@ function App() {
                 queueItems={queue || []}
                 onRemove={handleRemoveFromQueue}
                 onCreateListing={handleOptimizeItem}
+                onBuyItem={handleBuyItem}
                 onEdit={handleEditQueueItem}
                 onReorder={handleReorderQueue}
                 onBatchAnalyze={handleBatchAnalyze}

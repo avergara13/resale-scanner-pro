@@ -1012,7 +1012,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
               >
                 <ShoppingCart size={15} weight="bold" className="mr-1" />
-                Create Listing
+                Buy ✅
               </Button>
             </div>
           </div>
@@ -1068,12 +1068,12 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 </Button>
               )}
               <Button
-                onClick={() => onSaveDraft(parseFloat(buyPrice), description)}
+                onClick={() => onCreateListing(parseFloat(buyPrice), description)}
                 disabled={!canSaveDraft}
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
+                className="flex-1 bg-b1 hover:bg-b2 text-white h-11 sm:h-10 font-semibold disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
               >
-                <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
-                SAVE DRAFT TO QUEUE
+                <ShoppingCart size={16} weight="bold" className="mr-1.5 sm:mr-2" />
+                Buy ✅
               </Button>
             </div>
           </div>

@@ -14,7 +14,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
   const items: Array<{ id: Screen; icon: any; label: string }> = [
     { id: 'session', icon: ChartBar, label: 'Session' },
     { id: 'agent', icon: Robot, label: 'Agent' },
-    { id: 'queue', icon: Stack, label: 'Listings' },
+    { id: 'queue', icon: Stack, label: 'Scans' },
     { id: 'sold', icon: Tag, label: 'Sold' },
   ]
 

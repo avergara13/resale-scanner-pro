@@ -65,6 +65,7 @@ interface QueueScreenProps {
   personalSessionIds?: Set<string>
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
+  onBuyItem?: (id: string) => void
 }
 
 type FilterOption = 'ALL' | 'BUY' | 'PASS' | 'PENDING'
@@ -84,6 +85,7 @@ interface SortableItemProps {
   onDelist?: (itemId: string) => void
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
+  onBuyItem?: (id: string) => void
 }
 
 function SortableItem({
@@ -100,6 +102,7 @@ function SortableItem({
   onDelist,
   onReanalyze,
   onOpenDetail,
+  onBuyItem,
 }: SortableItemProps) {
   const {
     attributes,
@@ -291,17 +294,29 @@ function SortableItem({
                   </Button>
                 )}
               </>
-            ) : (
-              /* List — text only, important action */
+            ) : item.decision === 'BUY' ? (
+              /* Already committed — optimize if no listing yet */
+              !item.optimizedListing && (
+                <Button
+                  size="sm"
+                  onClick={() => onCreateListing(item.id)}
+                  aria-label="Optimize listing"
+                  className="flex-1 bg-b1 hover:bg-b2 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
+                >
+                  Optimize
+                </Button>
+              )
+            ) : onBuyItem ? (
+              /* PENDING or PASS — show Buy button */
               <Button
                 size="sm"
-                onClick={() => onCreateListing(item.id)}
-                aria-label="Create listing"
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
+                onClick={() => onBuyItem(item.id)}
+                aria-label="Buy this item"
+                className="flex-1 bg-green hover:opacity-90 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
               >
-                List
+                Buy ✅
               </Button>
-            )}
+            ) : null}
             {/* Delete — icon only */}
             <Button
               size="sm"
@@ -320,7 +335,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -1062,19 +1077,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               onClick={() => setFilter('BUY')}
               className={cn('tab-btn', filter === 'BUY' && 'active')}
             >
-              <span>💰 BUY{buyCount > 0 && ` (${buyCount})`}</span>
+              <span>📋 Listed{buyCount > 0 && ` (${buyCount})`}</span>
             </button>
             <button
               onClick={() => setFilter('PASS')}
               className={cn('tab-btn', filter === 'PASS' && 'active')}
             >
-              <span>🚫 PASS{passCount > 0 && ` (${passCount})`}</span>
+              <span>❌ Passed{passCount > 0 && ` (${passCount})`}</span>
             </button>
             <button
               onClick={() => setFilter('PENDING')}
               className={cn('tab-btn', filter === 'PENDING' && 'active')}
             >
-              <span>⏳ PENDING{pendingCount > 0 && ` (${pendingCount})`}</span>
+              <span>⏳ Pending{pendingCount > 0 && ` (${pendingCount})`}</span>
             </button>
           </div>
         </div>
@@ -1373,6 +1388,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onDelist={onDelist}
                       onReanalyze={onReanalyze}
                       onOpenDetail={onOpenDetail}
+                      onBuyItem={onBuyItem}
                     />
                   ))}
                 </div>
@@ -1484,14 +1500,27 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           >
                             <PencilSimple size={13} weight="bold" aria-hidden />
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => onCreateListing(item.id)}
-                            aria-label="Create listing"
-                            className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
-                          >
-                            List
-                          </Button>
+                          {item.decision === 'BUY' ? (
+                            !item.optimizedListing && (
+                              <Button
+                                size="sm"
+                                onClick={() => onCreateListing(item.id)}
+                                aria-label="Optimize listing"
+                                className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
+                              >
+                                Optimize
+                              </Button>
+                            )
+                          ) : onBuyItem ? (
+                            <Button
+                              size="sm"
+                              onClick={() => onBuyItem(item.id)}
+                              aria-label="Buy this item"
+                              className="flex-1 bg-green hover:opacity-90 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
+                            >
+                              Buy ✅
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="ghost"
