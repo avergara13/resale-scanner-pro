@@ -50,7 +50,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo } from '@/types'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, SoldItem } from '@/types'
 
 interface QuickAction {
   emoji: string
@@ -188,6 +188,7 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
 interface AgentScreenProps {
   queueItems?: ScannedItem[]
   soldItems?: ScannedItem[]
+  liveSoldItems?: SoldItem[]
   settings?: AppSettings
   /** Message injected from external widget (e.g. AgentChatWidget on Session screen) */
   pendingMessage?: string | null
@@ -230,6 +231,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [taskInput, setTaskInput] = useState('')
+  const [showTaskInput, setShowTaskInput] = useState(false)
   // Direct KV access for scan history mutations in the Scans tab
   const [scanHistoryKV, setScanHistoryKV] = useKV<ScannedItem[]>('scan-history', [])
   const [, setQueueKV] = useKV<ScannedItem[]>('queue', [])
@@ -1202,24 +1204,6 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0"
           >
-            {/* Tab bar — matches Listings page tab-bar / tab-btn style */}
-            <div className="px-3 pt-3 pb-2 bg-fg border-b border-s1">
-              <div className="tab-bar">
-                <button onClick={() => setAgentTab('chat')} className={cn('tab-btn', agentTab === 'chat' && 'active')}>
-                  <span>💬 Chat</span>
-                </button>
-                <button onClick={() => setAgentTab('scan')} className={cn('tab-btn', agentTab === 'scan' && 'active')}>
-                  <span>📷 Scan {(() => { const n = queueItems.filter(i => i.decision === 'PENDING' || (i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))).length; return n > 0 ? `(${n})` : '' })()}</span>
-                </button>
-                <button onClick={() => setAgentTab('task')} className={cn('tab-btn', agentTab === 'task' && 'active')}>
-                  <span>✅ Task {pendingTodos.length > 0 ? `(${pendingTodos.length})` : ''}</span>
-                </button>
-              </div>
-              <Button size="sm" onClick={handleCreateSession} className="h-8 px-3 text-xs">
-                <Plus size={14} weight="bold" className="mr-1" /> New Chat
-              </Button>
-            </div>
-
             {statsBar}
 
             <ScrollArea className="flex-1">
@@ -1315,220 +1299,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
               </div>
             </ScrollArea>
 
-            {/* ── SCAN TAB — all scanned items grouped by stage ── */}
-            {agentTab === 'scan' && (() => {
-              // All scans newest-first so the most recent item is always at top
-              const allScans = [...queueItems].reverse()
-              const pendingItems  = allScans.filter(i => i.decision === 'PENDING')
-              const buyQueue      = allScans.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))
-              const inListings    = allScans.filter(i => i.decision === 'BUY' && i.listingStatus && i.listingStatus !== 'not-started' && i.listingStatus !== 'sold')
-              const passItems     = allScans.filter(i => i.decision === 'PASS')
-              const totalScans    = queueItems.length
-
-              const listingStatusColor: Record<string, string> = {
-                'ready':     'bg-green/15 text-green',
-                'published': 'bg-b1/15 text-b1',
-                'not-started': 'bg-s2/40 text-t3',
-              }
-
-              // Shared scan card renderer
-              const ScanCard = ({ item, dimmed = false }: { item: ScannedItem; dimmed?: boolean }) => (
-                <button
-                  key={item.id}
-                  onClick={() => onOpenScanItem?.(item)}
-                  className={cn(
-                    'w-full text-left p-3.5 bg-fg/90 border rounded-2xl shadow-sm active:scale-[0.97] transition-all',
-                    dimmed ? 'border-s1/40 opacity-60 hover:opacity-100' : 'border-s2/60 hover:border-b1/30'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="text-sm font-semibold text-t1 flex-1 leading-snug">
-                      {item.productName || 'Unidentified item'}
-                    </span>
-                    {item.decision === 'BUY' && (
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green/15 text-green flex-shrink-0">BUY</span>
-                    )}
-                    {item.decision === 'PASS' && (
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-red/15 text-red flex-shrink-0">PASS</span>
-                    )}
-                    {item.decision === 'PENDING' && (
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-amber/15 text-amber flex-shrink-0">REVIEW</span>
-                    )}
-                    {item.listingStatus && item.listingStatus !== 'not-started' && (
-                      <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-md capitalize flex-shrink-0', listingStatusColor[item.listingStatus] || 'bg-s2/40 text-t3')}>
-                        {item.listingStatus}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-[10px] text-t3 mb-1.5">
-                    <span>Cost: <span className="text-t1 font-semibold">${item.purchasePrice.toFixed(2)}</span></span>
-                    {item.estimatedSellPrice ? (
-                      <span>Sell: <span className="text-t1 font-semibold">${item.estimatedSellPrice.toFixed(0)}</span></span>
-                    ) : null}
-                    {item.profitMargin ? (
-                      <span className={item.profitMargin >= 30 ? 'text-green font-semibold' : 'text-amber font-semibold'}>
-                        {item.profitMargin.toFixed(0)}% margin
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {item.category && (
-                        <span className="text-[9px] text-t3 bg-s1 px-1.5 py-0.5 rounded-md">{item.category}</span>
-                      )}
-                      {item.notionPageId && (
-                        <span className="text-[9px] text-b1 font-semibold">✓ Notion</span>
-                      )}
-                    </div>
-                    <span className="text-[9px] text-b1 font-semibold flex-shrink-0">
-                      Tap to open →
-                    </span>
-                  </div>
-                </button>
-              )
-
-              return (
-              <ScrollArea className="flex-1">
-                <div className="py-3 px-3 space-y-4">
-                  {totalScans === 0 ? (
-                    <div className="text-center py-14">
-                      <div className="text-4xl mb-3">📷</div>
-                      <h2 className="text-base font-bold text-t1 mb-1">No scans yet</h2>
-                      <p className="text-xs text-t3 mb-4">Scan items at the thrift store to start your pipeline</p>
-                      {onOpenCamera && (
-                        <button
-                          onClick={onOpenCamera}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-b1 text-white text-xs font-bold rounded-full active:scale-95 transition-all"
-                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                        >
-                          <Camera size={14} weight="bold" /> Scan Item
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {/* Pending Review — most urgent, shown first */}
-                      {pendingItems.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber inline-block" />
-                            Needs Decision ({pendingItems.length})
-                          </div>
-                          <div className="space-y-2">
-                            {pendingItems.map(item => <ScanCard key={item.id} item={item} />)}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* BUY — needs listing created */}
-                      {buyQueue.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green inline-block" />
-                            Needs Listing ({buyQueue.length})
-                          </div>
-                          <div className="space-y-2">
-                            {buyQueue.map(item => <ScanCard key={item.id} item={item} />)}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* BUY — listing in progress or complete */}
-                      {inListings.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-b1 inline-block" />
-                            In Listings ({inListings.length})
-                          </div>
-                          <div className="space-y-2">
-                            {inListings.map(item => <ScanCard key={item.id} item={item} />)}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* PASS — dimmed at bottom for reference */}
-                      {passItems.length > 0 && (
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-t3 inline-block" />
-                            Passed ({passItems.length})
-                          </div>
-                          <div className="space-y-2">
-                            {passItems.map(item => <ScanCard key={item.id} item={item} dimmed />)}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </ScrollArea>
-              )
-            })()}
-
-            {/* ── TASK TAB ── */}
-            {agentTab === 'task' && (
-            <ScrollArea className="flex-1">
-              <div className="py-4 px-4 space-y-3">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 flex items-center gap-1.5">
-                    <ListChecks size={12} /> Tasks
-                    {pendingTodos.length > 0 && (
-                      <span className="text-[8px] bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md font-black">{pendingTodos.length}</span>
-                    )}
-                  </div>
-                  <button onClick={() => setShowTaskInput(!showTaskInput)} className="text-[10px] text-b1 font-bold">
-                    {showTaskInput ? 'Done' : '+ Add'}
-                  </button>
-                </div>
-                {showTaskInput && (
-                  <form onSubmit={(e) => { e.preventDefault(); if (taskInput.trim()) { setTodos(prev => [...(prev || []), { id: Date.now().toString(), text: taskInput.trim(), completed: false, createdBy: 'user' as const, createdAt: Date.now() }]); setTaskInput('') } }} className="flex gap-2">
-                    <Input value={taskInput} onChange={e => setTaskInput(e.target.value)} placeholder="Add a task..." className="flex-1 h-8 text-xs" autoFocus />
-                    <Button type="submit" size="sm" disabled={!taskInput.trim()} className="h-8 px-3 text-xs">Add</Button>
-                  </form>
-                )}
-                {pendingTodos.length === 0 && !showTaskInput ? (
-                  <div className="text-center py-12">
-                    <div className="text-3xl mb-3">✅</div>
-                    <h2 className="text-base font-bold text-t1 mb-1">No tasks yet</h2>
-                    <p className="text-xs text-t3">Tap "+ Add" to create a task, or ask the agent to add one</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {pendingTodos.map(t => (
-                      <div key={t.id} className="flex items-center gap-2 py-2 px-3 bg-fg rounded-xl border border-s1 group">
-                        <button onClick={() => setTodos(prev => (prev || []).map(x => x.id === t.id ? { ...x, completed: true } : x))} className="w-5 h-5 rounded-full border-2 border-s2 flex items-center justify-center flex-shrink-0 hover:border-b1 active:bg-b1/10 transition-colors">
-                        </button>
-                        <span className="text-sm text-t1 flex-1">{t.text}</span>
-                        <span className="text-[8px] text-t3 uppercase flex-shrink-0">{t.createdBy}</span>
-                        <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red transition-colors p-1">
-                          <Trash size={13} />
-                        </button>
-                      </div>
-                    ))}
-                    {completedTodos.length > 0 && (
-                      <div className="pt-2 border-t border-s1">
-                        <div className="text-[10px] text-t3 mb-2 font-semibold">{completedTodos.length} completed</div>
-                        {completedTodos.map(t => (
-                          <div key={t.id} className="flex items-center gap-2 py-1.5 px-3 rounded-lg opacity-50">
-                            <div className="w-5 h-5 rounded-full bg-b1/20 flex items-center justify-center flex-shrink-0">
-                              <span className="text-[8px] text-b1">✓</span>
-                            </div>
-                            <span className="text-xs text-t3 line-through flex-1">{t.text}</span>
-                            <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red transition-colors p-1">
-                              <Trash size={11} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-            )}
-
             {/* Spacer so last content scrolls above the floating input bar */}
-            {agentTab === 'chat' && <div className="h-16" />}
+            <div className="h-16" />
           </motion.div>
         ) : (
           <motion.div

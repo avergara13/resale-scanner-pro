@@ -9,7 +9,6 @@ import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { AIScreen } from './components/screens/AIScreen'
 import { AgentScreen } from './components/screens/AgentScreen'
-import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -1750,17 +1749,12 @@ function App() {
                 currentItem={currentItem}
                 pipeline={pipeline}
                 settings={settings}
-                queueItems={queue || []}
                 onSaveDraft={handleSaveDraft}
                 onCreateListing={handleCreateListingFromScan}
                 onPassItem={handlePassFromScan}
                 onRecalculate={handleRecalculate}
                 onRescan={handleRescan}
                 onOpenCamera={() => setCameraOpen(true)}
-                pendingMessage={agentPendingMessage}
-                onPendingMessageHandled={() => setAgentPendingMessage(null)}
-                geminiService={geminiService}
-                onUpdateItem={handleUpdateCurrentItem}
               />
             </motion.div>
           )}
