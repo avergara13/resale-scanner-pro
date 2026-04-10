@@ -1496,24 +1496,19 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           <div className="p-4 space-y-3 pb-6">
             {sessionScans.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center py-12 px-4">
-                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg" style={{ boxShadow: 'var(--send-glow)' }}>
+                <button
+                  onClick={onOpenCamera}
+                  className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg active:scale-95 transition-transform"
+                  style={{ boxShadow: 'var(--send-glow)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                >
                   <Camera size={48} weight="duotone" className="text-white" />
-                </div>
+                </button>
                 <p className="text-base font-semibold text-t1 mb-1">No Scans Yet</p>
-                <p className="text-xs text-t3 max-w-[200px] leading-relaxed mb-4">
+                <p className="text-xs text-t3 max-w-[200px] leading-relaxed">
                   {currentSession?.active
-                    ? 'Tap the camera button to start scanning items this session.'
-                    : 'Start a session and tap the camera to scan items.'}
+                    ? 'Tap the icon to start scanning items.'
+                    : 'Start a session and tap the icon to scan items.'}
                 </p>
-                {onOpenCamera && (
-                  <button
-                    onClick={onOpenCamera}
-                    className="flex items-center gap-2 px-4 py-2 bg-b1 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform"
-                  >
-                    <Camera size={16} weight="bold" />
-                    Open Camera
-                  </button>
-                )}
               </div>
             ) : (
               sessionScans.map(item => {
