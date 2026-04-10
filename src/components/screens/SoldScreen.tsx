@@ -112,12 +112,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
     }
   }, [soldItems])
 
-  const lastSyncedLabel = useMemo(() => {
-    if (!lastSyncedAt) return 'Not synced yet'
-    return `Synced ${new Date(lastSyncedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-  }, [lastSyncedAt])
-
-  const handleDraftChange = (pageId: string, key: keyof SoldItemDraft, value: string) => {
+const handleDraftChange = (pageId: string, key: keyof SoldItemDraft, value: string) => {
     setDrafts((previous) => ({
       ...previous,
       [pageId]: {
@@ -175,46 +170,9 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
 
   return (
     <div className="h-full flex flex-col bg-bg">
-      <div className="px-4 pt-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black text-t1">Shipping Center</h2>
-            <p className="text-xs text-t3">{lastSyncedLabel}</p>
-          </div>
-          <Button onClick={onRefresh} variant="outline" className="h-9 border-b1/30 text-b1">
-            <ArrowClockwise size={14} className={cn('mr-1.5', loading && 'animate-spin')} />
-            Refresh
-          </Button>
-        </div>
-
-        {warnings.length > 0 && (
-          <Card className="border-amber/20 bg-amber/5 p-3 text-xs text-amber space-y-1">
-            {warnings.map((warning) => (
-              <p key={warning}>{warning}</p>
-            ))}
-          </Card>
-        )}
-
-        <div className="grid grid-cols-4 gap-2">
-          <Card className="p-3 text-center border-s2">
-            <div className="text-lg font-black text-t1">{stats.totalSales}</div>
-            <div className="text-[10px] uppercase tracking-wide text-t3">Sold</div>
-          </Card>
-          <Card className="p-3 text-center border-s2">
-            <div className="text-lg font-black text-t1">{formatMoney(stats.totalRevenue)}</div>
-            <div className="text-[10px] uppercase tracking-wide text-t3">Revenue</div>
-          </Card>
-          <Card className="p-3 text-center border-s2">
-            <div className="text-lg font-black text-red">{stats.needLabel}</div>
-            <div className="text-[10px] uppercase tracking-wide text-t3">Need Label</div>
-          </Card>
-          <Card className="p-3 text-center border-s2">
-            <div className="text-lg font-black text-green">{stats.shipped}</div>
-            <div className="text-[10px] uppercase tracking-wide text-t3">Shipped</div>
-          </Card>
-        </div>
-
-        <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
+      {/* Compact sticky filter bar — matches Listings/Agent pattern */}
+      <div className="px-3 pt-2 pb-2 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
+        <div className="flex gap-1 overflow-x-auto scrollbar-hide">
           {([
             ['all', 'All'],
             ['need-label', 'Need Label'],
@@ -226,7 +184,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
               key={filter}
               onClick={() => setFulfillmentFilter(filter)}
               className={cn(
-                'flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase transition-colors',
+                'flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors whitespace-nowrap',
                 fulfillmentFilter === filter ? 'bg-b1 text-white' : 'bg-s1 text-t3',
               )}
             >
@@ -236,7 +194,35 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-3 space-y-4" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' }}>
+      <div className="flex-1 overflow-y-auto px-4 pt-3 space-y-3" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' }}>
+        {/* Warning banner — scrolls with content */}
+        {warnings.length > 0 && (
+          <Card className="border-amber/20 bg-amber/5 p-3 text-xs text-amber space-y-1">
+            {warnings.map((warning) => (
+              <p key={warning}>{warning}</p>
+            ))}
+          </Card>
+        )}
+
+        {/* Stats row — compact, scrolls away */}
+        <div className="grid grid-cols-4 gap-2">
+          <Card className="p-2.5 text-center border-s2">
+            <div className="text-base font-black text-t1">{stats.totalSales}</div>
+            <div className="text-[9px] uppercase tracking-wide text-t3">Sold</div>
+          </Card>
+          <Card className="p-2.5 text-center border-s2">
+            <div className="text-base font-black text-t1">{formatMoney(stats.totalRevenue)}</div>
+            <div className="text-[9px] uppercase tracking-wide text-t3">Revenue</div>
+          </Card>
+          <Card className="p-2.5 text-center border-s2">
+            <div className="text-base font-black text-red">{stats.needLabel}</div>
+            <div className="text-[9px] uppercase tracking-wide text-t3">Need Label</div>
+          </Card>
+          <Card className="p-2.5 text-center border-s2">
+            <div className="text-base font-black text-green">{stats.shipped}</div>
+            <div className="text-[9px] uppercase tracking-wide text-t3">Shipped</div>
+          </Card>
+        </div>
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8">
             <Package size={48} className="text-t3 opacity-40 mb-4" weight="duotone" />

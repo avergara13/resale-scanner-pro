@@ -1651,6 +1651,9 @@ function App() {
         showTrends={showSessionTrends}
         settings={settings}
         queueItemCount={screen === 'queue' ? (queue || []).length : undefined}
+        onRefresh={screen === 'sold' ? () => loadLiveSoldItems() : undefined}
+        soldLoading={soldLoading}
+        soldSyncedAt={soldSyncedAt}
         onBack={
           screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
             ? () => setScreen('session')

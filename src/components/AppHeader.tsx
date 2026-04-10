@@ -1,4 +1,4 @@
-import { GearSix, ChartLine, ArrowLeft } from '@phosphor-icons/react'
+import { GearSix, ChartLine, ArrowLeft, ArrowClockwise } from '@phosphor-icons/react'
 import { ThemeToggle } from './ThemeToggle'
 import { ApiStatusIndicator } from './ApiStatusIndicator'
 import type { Screen, AppSettings } from '@/types'
@@ -24,11 +24,29 @@ interface AppHeaderProps {
   showTrends?: boolean
   settings?: AppSettings
   queueItemCount?: number
+  onRefresh?: () => void
+  soldLoading?: boolean
+  soldSyncedAt?: number | null
 }
 
-export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, onBack, showTrends, settings, queueItemCount }: AppHeaderProps) {
+export function AppHeader({
+  screen,
+  onNavigateToSettings,
+  onNavigateToTrends,
+  onBack,
+  showTrends,
+  settings,
+  queueItemCount,
+  onRefresh,
+  soldLoading,
+  soldSyncedAt,
+}: AppHeaderProps) {
   const title = SCREEN_TITLES[screen] || ''
   const isSubScreen = !['session', 'agent', 'queue', 'sold'].includes(screen)
+
+  const soldSyncedLabel = soldSyncedAt
+    ? new Date(soldSyncedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : null
 
   return (
     <header className="sticky top-0 z-30 relative flex items-center justify-between px-4 h-11 bg-fg border-b border-s1 flex-shrink-0">
@@ -40,14 +58,15 @@ export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, on
         )}
         <span className="text-[11px] font-black tracking-widest text-t1 uppercase">{title}</span>
       </div>
-      {/* Status dots — only on Agent screen, pinned to horizontal center */}
+
+      {/* Status dots — Agent screen, pinned to horizontal center */}
       {screen === 'agent' && (
         <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto">
           <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
         </div>
       )}
 
-      {/* Item count — only on Listings screen, pinned to horizontal center */}
+      {/* Item count — Listings screen, pinned to horizontal center */}
       {screen === 'queue' && queueItemCount !== undefined && (
         <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none select-none">
           <span className="text-[10px] font-semibold text-t3 uppercase tracking-widest">
@@ -56,7 +75,30 @@ export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, on
         </div>
       )}
 
+      {/* Sync time — Sold screen, pinned to horizontal center */}
+      {screen === 'sold' && soldSyncedLabel && (
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none select-none">
+          <span className="text-[10px] font-semibold text-t3 tracking-wide">
+            {soldSyncedLabel}
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center gap-0.5">
+        {/* Refresh — Sold screen only */}
+        {screen === 'sold' && onRefresh && (
+          <button
+            onClick={onRefresh}
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-t3 hover:text-t1 hover:bg-s1 transition-colors"
+            aria-label="Refresh sold items"
+          >
+            <ArrowClockwise
+              size={18}
+              weight="bold"
+              className={soldLoading ? 'animate-spin text-b1' : ''}
+            />
+          </button>
+        )}
         {onNavigateToTrends && (
           <button
             onClick={onNavigateToTrends}
