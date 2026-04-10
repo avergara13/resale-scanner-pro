@@ -77,7 +77,7 @@ function App() {
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
-  const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
+  const [allTags] = useKV<ItemTag[]>('all-tags', [])
   const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [settings, setSettings] = useKV<AppSettings>('settings', {
     voiceEnabled: true,
@@ -109,10 +109,10 @@ function App() {
   })
   
   const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
-  const { theme, themeMode, setTheme, useAmbientLight, toggleAmbientLight } = useTheme()
+  const { themeMode, setTheme, toggleAmbientLight } = useTheme()
   const imageQualityPreset = settings?.imageQuality?.preset || 'balanced'
-  const { optimizeAndCache, isOptimizing: isOptimizingImage } = useImageOptimization(imageQualityPreset)
-  const { state: retryState, startRetry, updateRetry, completeRetry } = useRetryTracker()
+  const { optimizeAndCache } = useImageOptimization(imageQualityPreset)
+  const { state: retryState } = useRetryTracker()
 
   const ebayService = useMemo(() => {
     // Prefer stored settings (so the user can override per-device), fall back
@@ -303,11 +303,6 @@ function App() {
       if (googleLensService && !skipLens) {
         try {
           lensAnalysis = await googleLensService.searchByImage(imageData, visionResult?.productName || mockProductName)
-          
-          const resultCount = lensAnalysis.results.length
-          const priceInfo = lensAnalysis.priceRange 
-            ? `$${lensAnalysis.priceRange.min.toFixed(2)}-$${lensAnalysis.priceRange.max.toFixed(2)}` 
-            : 'No prices'
           
           completeStep(1)
           await new Promise(resolve => setTimeout(resolve, 100))

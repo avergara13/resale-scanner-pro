@@ -1493,7 +1493,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
           >
             {/* Chat header with back button */}
             <div className="flex items-center gap-3 px-4 py-3 bg-fg/85 backdrop-blur-2xl border-b border-s1/40">
-              <button onClick={() => setViewMode('list')} className="p-1.5 -ml-1 rounded-lg active:bg-s1 transition-colors">
+              <button onClick={() => setViewMode('list')} className="w-10 h-10 flex items-center justify-center -ml-2 rounded-lg active:bg-s1 transition-colors">
                 <ArrowLeft size={20} weight="bold" className="text-t1" />
               </button>
               <div className="flex-1 min-w-0">
