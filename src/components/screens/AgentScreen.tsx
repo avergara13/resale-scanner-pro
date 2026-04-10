@@ -1057,8 +1057,10 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   }, [pendingMessage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleQuickAction = useCallback((prompt: string) => {
-    setInput(prompt)
-  }, [])
+    // Send immediately — don't pre-fill the floating input bar (which lives in App.tsx
+    // and has its own state, so setInput here would never reach the send button)
+    handleSendMessage(prompt)
+  }, [handleSendMessage])
 
   const sortedSessions = useMemo(() =>
     [...(chatSessions || [])].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
