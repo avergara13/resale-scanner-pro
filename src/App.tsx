@@ -1650,6 +1650,7 @@ function App() {
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
         settings={settings}
+        queueItemCount={screen === 'queue' ? (queue || []).length : undefined}
         onBack={
           screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
             ? () => setScreen('session')

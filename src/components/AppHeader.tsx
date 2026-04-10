@@ -6,7 +6,7 @@ import type { Screen, AppSettings } from '@/types'
 const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   session: 'RESALE SCANNER PRO',
   agent: 'AGENT',
-  queue: 'LISTING QUEUE',
+  queue: 'LISTINGS',
   sold: 'SOLD',
   settings: 'SETTINGS',
   'session-detail': 'SESSION',
@@ -23,9 +23,10 @@ interface AppHeaderProps {
   onBack?: () => void
   showTrends?: boolean
   settings?: AppSettings
+  queueItemCount?: number
 }
 
-export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, onBack, showTrends, settings }: AppHeaderProps) {
+export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, onBack, showTrends, settings, queueItemCount }: AppHeaderProps) {
   const title = SCREEN_TITLES[screen] || ''
   const isSubScreen = !['session', 'agent', 'queue', 'sold'].includes(screen)
 
@@ -43,6 +44,15 @@ export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, on
       {screen === 'agent' && (
         <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto">
           <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
+        </div>
+      )}
+
+      {/* Item count — only on Listings screen, pinned to horizontal center */}
+      {screen === 'queue' && queueItemCount !== undefined && (
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none select-none">
+          <span className="text-[10px] font-semibold text-t3 uppercase tracking-widest">
+            {queueItemCount} {queueItemCount === 1 ? 'item' : 'items'}
+          </span>
         </div>
       )}
 

@@ -948,85 +948,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           </div>
         </DialogContent>
       </Dialog>
-      <div className="px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 pb-3 sm:pb-4 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
-        <div className="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-4">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <p className="text-[10px] sm:text-[11px] text-t3 font-medium uppercase tracking-wider">
-                  {queueItems.length} Items Total
-                </p>
-                {sortedItems.length !== queueItems.length && (
-                  (() => {
-                    const percentage = Math.round((sortedItems.length / queueItems.length) * 100)
-                    const isHighVisibility = percentage >= 80
-                    const isMediumVisibility = percentage >= 50 && percentage < 80
-                    const isLowVisibility = percentage < 50
-                    
-                    const trendDirection = previousFilteredCount !== null 
-                      ? sortedItems.length > previousFilteredCount 
-                        ? 'up' 
-                        : sortedItems.length < previousFilteredCount 
-                          ? 'down' 
-                          : 'same'
-                      : 'same'
-                    
-                    const getTrendColor = () => {
-                      if (!showTrendIndicator || trendDirection === 'same') {
-                        if (isHighVisibility) return { bg: 'bg-green/15', text: 'text-green', border: 'border-green/30' }
-                        if (isMediumVisibility) return { bg: 'bg-amber/15', text: 'text-amber', border: 'border-amber/30' }
-                        return { bg: 'bg-red/15', text: 'text-red', border: 'border-red/30' }
-                      }
-                      
-                      if (trendDirection === 'up') {
-                        return { bg: 'bg-green/20', text: 'text-green', border: 'border-green/40' }
-                      }
-                      
-                      return { bg: 'bg-red/20', text: 'text-red', border: 'border-red/40' }
-                    }
-                    
-                    const colors = getTrendColor()
-                    
-                    return (
-                      <Badge 
-                        variant="secondary" 
-                        className={cn(
-                          "h-5 px-2 text-[10px] font-bold border transition-all duration-300",
-                          colors.bg,
-                          colors.text,
-                          colors.border,
-                          showTrendIndicator && "animate-pulse shadow-sm",
-                          showTrendIndicator && trendDirection === 'up' && "trend-indicator-up",
-                          showTrendIndicator && trendDirection === 'down' && "trend-indicator-down"
-                        )}
-                      >
-                        <span className="flex items-center gap-1">
-                          {sortedItems.length} visible ({percentage}%)
-                          {showTrendIndicator && trendDirection === 'up' && (
-                            <TrendUp size={12} weight="bold" className="animate-bounce" />
-                          )}
-                          {showTrendIndicator && trendDirection === 'down' && (
-                            <TrendDown size={12} weight="bold" className="animate-bounce" />
-                          )}
-                          {showTrendIndicator && trendDirection === 'same' && (
-                            <Minus size={12} weight="bold" className="opacity-60" />
-                          )}
-                        </span>
-                      </Badge>
-                    )
-                  })()
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+      <div className="px-3 sm:px-4 md:px-5 pt-2 pb-0 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
+        {/* Action buttons — only rendered when at least one is visible */}
+        {((onNavigateToLocationInsights && queueItems.some(item => item.location)) ||
+          (onNavigateToTagAnalytics && (allTags || []).length > 0) ||
+          unanalyzedItems.length > 0) && (
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-2">
             {onNavigateToLocationInsights && queueItems.some(item => item.location) && (
               <Button
                 onClick={onNavigateToLocationInsights}
                 variant="outline"
-                className="h-8 sm:h-9 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
+                className="h-8 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
               >
-                <MapPin size={14} weight="bold" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <MapPin size={14} weight="bold" className="mr-1" />
                 Locations
               </Button>
             )}
@@ -1034,20 +968,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <Button
                 onClick={onNavigateToTagAnalytics}
                 variant="outline"
-                className="h-8 sm:h-9 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
+                className="h-8 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
               >
-                <ChartBar size={14} weight="bold" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <ChartBar size={14} weight="bold" className="mr-1" />
                 Tag ROI
               </Button>
             )}
-            {/* Single unanalyzed item needs onReanalyze; multiple need onBatchAnalyze — never render if handler absent */}
             {unanalyzedItems.length === 1 && onReanalyze && (
               <Button
                 onClick={() => onReanalyze(unanalyzedItems[0].id)}
                 disabled={isBatchAnalyzing}
-                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
               >
-                <Lightning size={14} weight="fill" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <Lightning size={14} weight="fill" className="mr-1" />
                 {isBatchAnalyzing ? 'Analyzing...' : 'Analyze 1'}
               </Button>
             )}
@@ -1055,16 +988,16 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <Button
                 onClick={onBatchAnalyze}
                 disabled={isBatchAnalyzing}
-                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
               >
-                <Lightning size={14} weight="fill" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <Lightning size={14} weight="fill" className="mr-1" />
                 {isBatchAnalyzing ? 'Analyzing...' : `Analyze ${unanalyzedItems.length}`}
               </Button>
             )}
           </div>
-        </div>
-        
-        <div className="px-0 mb-4">
+        )}
+
+        <div className="px-0 mb-2">
           <div className="tab-bar">
             <button
               onClick={() => setFilter('ALL')}
