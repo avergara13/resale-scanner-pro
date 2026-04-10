@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { PaperPlaneRight } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -7,7 +8,7 @@ import { AppHeader } from './components/AppHeader'
 import { CameraOverlay } from './components/CameraOverlay'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
-import { AIScreen } from './components/screens/AIScreen'
+import { AgentScreen } from './components/screens/AgentScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -56,6 +57,8 @@ function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [showSessionTrends, setShowSessionTrends] = useState(false)
   const [agentPendingMessage, setAgentPendingMessage] = useState<string | null>(null)
+  const [agentInput, setAgentInput] = useState('')
+  const agentInputRef = useRef<HTMLInputElement>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
@@ -87,7 +90,9 @@ function App() {
     minProfitMargin: 30,
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
-    paypalFeePercent: 3.49,
+    ebayAdFeePercent: 3.0,
+    shippingMaterialsCost: 0.75,
+    paypalFeePercent: 0,
     preferredAiModel: 'gemini-2.5-flash',
     notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
     imageQuality: { preset: 'balanced' },
@@ -109,12 +114,14 @@ function App() {
   const { state: retryState, startRetry, updateRetry, completeRetry } = useRetryTracker()
 
   const ebayService = useMemo(() => {
-    return createEbayService(
-      settings?.ebayAppId,
-      settings?.ebayDevId,
-      settings?.ebayCertId,
-      settings?.ebayApiKey
-    )
+    // Prefer stored settings (so the user can override per-device), fall back
+    // to env vars so fresh installs auto-pick up sandbox credentials without
+    // the user having to copy them into Settings.
+    const appId  = settings?.ebayAppId  || import.meta.env.VITE_EBAY_APP_ID
+    const devId  = settings?.ebayDevId  || import.meta.env.VITE_EBAY_DEV_ID
+    const certId = settings?.ebayCertId || import.meta.env.VITE_EBAY_CERT_ID
+    const oauth  = settings?.ebayApiKey // no env fallback — OAuth token is runtime-issued
+    return createEbayService(appId, devId, certId, oauth)
   }, [settings?.ebayAppId, settings?.ebayDevId, settings?.ebayCertId, settings?.ebayApiKey])
 
   const geminiService = useMemo(() => {
@@ -527,12 +534,18 @@ function App() {
         sellPrice,
         settings?.defaultShippingCost || 5.0,
         settings?.ebayFeePercent || 12.9,
-        settings?.paypalFeePercent || 3.49
+        0,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       ) || calculateProfitFallback(
         price,
         sellPrice,
         settings?.defaultShippingCost || 5.0,
-        settings?.ebayFeePercent || 12.9
+        settings?.ebayFeePercent || 12.9,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       )
 
       const minMargin = settings?.minProfitMargin || 30
@@ -611,6 +624,16 @@ function App() {
       delete persistableItem.imageOptimized
       setScanHistory(prev => [persistableItem, ...(prev || []).slice(0, 499)])
 
+      // Auto-land every completed scan in the Scans queue — user can Buy or Pass from there
+      setQueue(prev => {
+        const current = prev || []
+        const scanItem: ScannedItem = { ...persistableItem, inQueue: true }
+        if (current.some(i => i.id === scanItem.id)) {
+          return current.map(i => i.id === scanItem.id ? scanItem : i)
+        }
+        return [...current, scanItem]
+      })
+
       if (session?.active) {
         setSession((prev) => {
           if (!prev) return prev
@@ -648,15 +671,20 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
-    const now = new Date()
-    const hour = now.getHours()
-    const timeOfDay = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
-    const dayName = now.toLocaleDateString('en-US', { weekday: 'short' })
-    const monthDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const name = `${dayName} ${timeOfDay} — ${monthDay}`
+    // Compute next session number by scanning existing sessions. Defensively
+    // coerces missing/invalid numbers to 0 so the counter can never regress.
+    // This is the value shown as the default session title (#001) and also
+    // the key written to Notion as "Session #" for tax/financial rollups.
+    const nextNumber = ((allSessions || []).reduce((max, s) => {
+      const n = typeof s.sessionNumber === 'number' && Number.isFinite(s.sessionNumber) ? s.sessionNumber : 0
+      return n > max ? n : max
+    }, 0)) + 1
+    const paddedNumber = String(nextNumber).padStart(3, '0')
+    const name = `#${paddedNumber}`
     const id = Date.now().toString()
     const newSession: Session = {
       id,
+      sessionNumber: nextNumber,
       name,
       startTime: Date.now(),
       itemsScanned: 0,
@@ -670,8 +698,8 @@ function App() {
     setSession(newSession)
     setSelectedSessionId(id)
     setScreen('session-detail')
-    toast.success('Session started')
-  }, [setSession, setAllSessions, setSelectedSessionId, setScreen])
+    toast.success(`Session ${name} started`)
+  }, [allSessions, setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -776,7 +804,9 @@ function App() {
         minProfitMargin: 30,
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
-        paypalFeePercent: 3.49,
+        ebayAdFeePercent: 3.0,
+        shippingMaterialsCost: 0.75,
+        paypalFeePercent: 0,
         preferredAiModel: 'gemini-2.5-flash',
       }
       const newSettings = { ...(prev || defaults), ...updates }
@@ -832,8 +862,47 @@ function App() {
       ? listing.price - item.purchasePrice
       : (item.estimatedSellPrice || 0) - item.purchasePrice
 
+    // Look up the session this item belongs to so Notion receives the full
+    // business/personal expense classification for tax records.
+    const itemSession = item.sessionId
+      ? (allSessions || []).find(s => s.id === item.sessionId)
+      : undefined
+    // Must match Notion Select option names exactly — emoji prefix is required
+    const expenseType: '💼 Business' | '🏡 Personal' =
+      itemSession?.sessionType === 'personal' ? '🏡 Personal' : '💼 Business'
+
+    // Extract item specifics from optimized listing for Notion fields
+    const specs = listing?.itemSpecifics || {}
+    const brand    = specs['Brand'] || specs['brand'] || undefined
+    const modelSku = specs['Model'] || specs['Model Number'] || specs['MPN'] || undefined
+    const mpn      = specs['MPN'] || specs['Manufacturer Part Number'] || undefined
+    const color    = specs['Color'] || specs['Colour'] || undefined
+    const material = specs['Material'] || undefined
+    const country  = specs['Country of Manufacture'] || specs['Country'] || undefined
+    const barcode  = item.marketData?.barcodeProduct?.barcode || undefined
+
+    // Build pipe-separated item specifics string for Notion "Item Specifics" field
+    const itemSpecificsRaw = Object.entries(specs)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}:${v}`)
+      .join('|') || undefined
+
+    // Market data for comp pricing fields
+    const md = item.marketData
+    const ebayAvgSold = md?.ebayAvgSold ?? md?.ebayMedianSold
+    const ebayHigh    = md?.ebayPriceRange?.max
+    const ebayLow     = md?.ebayPriceRange?.min
+
+    // AI confidence from lens analysis match quality
+    const aiConfidence: 'High' | 'Medium' | 'Low' | 'Needs Review' =
+      (item.lensAnalysis?.bestMatch || (md?.ebayAvgSold && md.ebayAvgSold > 0))
+        ? 'High'
+        : item.decision === 'BUY' ? 'Medium' : 'Needs Review'
+
     const result = await notionService.pushListing({
-      title: listing?.title || item.productName || 'Unknown Item',
+      // Core
+      title: item.productName || listing?.title || 'Unknown Item',
+      seoTitle: listing?.title || undefined,
       description: listing?.description || item.description || '',
       price: listing?.price || item.estimatedSellPrice || 0,
       purchasePrice: item.purchasePrice,
@@ -846,8 +915,39 @@ function App() {
       status: 'ready',
       itemId: item.id,
       timestamp: item.timestamp,
-      location: item.location?.name,
       notes: item.notes,
+      hasImage: !!(item.imageData || item.imageUrl),
+      photoCount: (item.imageData || item.imageUrl) ? 1 : 0,
+
+      // Item specifics
+      brand,
+      modelSku,
+      mpn,
+      upcEanGtin: barcode,
+      color,
+      material,
+      countryOfManufacture: country,
+      itemSpecificsRaw,
+
+      // Market / pricing
+      ebayAvgSold,
+      ebayHigh,
+      ebayLow,
+      minAcceptablePrice: +(item.purchasePrice * 1.35).toFixed(2),
+      bestOfferMin: ebayLow ? String(Math.max(item.purchasePrice * 1.1, ebayLow * 0.8).toFixed(2)) : undefined,
+
+      // Shipping
+      shipFromZip: settings?.defaultShippingCost !== undefined ? '32806' : '32806',
+
+      // Research
+      aiConfidence,
+      marketNotes: md?.researchSummary || undefined,
+
+      // Source / session
+      sourceVendor: item.location?.name,
+      sessionId: itemSession?.id,
+      sessionNumber: itemSession?.sessionNumber,
+      expenseType,
     })
 
     if (result.success) {
@@ -864,7 +964,7 @@ function App() {
     } else {
       toast.error(`Notion error: ${result.error}`)
     }
-  }, [queue, setQueue, notionService])
+  }, [queue, setQueue, notionService, allSessions])
 
   const handleMarkAsSold = useCallback((
     itemId: string,
@@ -1024,8 +1124,10 @@ function App() {
     }
     const shipping = settings?.defaultShippingCost || 5.0
     const feePercent = settings?.ebayFeePercent || 12.9
+    const adFeePercent = settings?.ebayAdFeePercent ?? 3.0
+    const materialsCost = settings?.shippingMaterialsCost ?? 0.75
     const minMargin = settings?.minProfitMargin || 30
-    const profitMetrics = calculateProfitFallback(newPrice, currentItem.estimatedSellPrice, shipping, feePercent)
+    const profitMetrics = calculateProfitFallback(newPrice, currentItem.estimatedSellPrice, shipping, feePercent, 0.30, adFeePercent, materialsCost)
 
     const decision = makeDecision(currentItem.estimatedSellPrice, newPrice, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
 
@@ -1077,7 +1179,8 @@ function App() {
     if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
       const freshMetrics = calculateProfitFallback(
         effectivePrice, currentItem!.estimatedSellPrice,
-        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9,
+        0.30, settings?.ebayAdFeePercent ?? 3.0, settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
       resolvedDecision = makeDecision(currentItem!.estimatedSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
@@ -1137,7 +1240,8 @@ function App() {
     if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
       const freshMetrics = calculateProfitFallback(
         effectivePrice, currentItem!.estimatedSellPrice,
-        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9,
+        0.30, settings?.ebayAdFeePercent ?? 3.0, settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
     }
@@ -1160,6 +1264,34 @@ function App() {
     setPipeline([])
     toast.success('Passed — heavy image data will be removed at session end')
   }, [currentItem, setQueue])
+
+  const handleBuyItem = useCallback(async (itemId: string) => {
+    // Mark as BUY immediately so the card moves to the Listed tab
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId ? { ...i, decision: 'BUY' as const } : i
+    ))
+    setScreen('queue')
+    const toastId = toast.loading('Generating listing details...')
+    try {
+      const item = (queue || []).find(i => i.id === itemId)
+      if (!item) { toast.dismiss(toastId); return }
+      const optimized = await listingOptimizationService.generateOptimizedListing({
+        item: { ...item, decision: 'BUY' as const },
+        marketData: item.marketData,
+      })
+      const mergedTags = Array.from(new Set([...(item.tags || []), ...(optimized.suggestedTags || [])]))
+      setQueue(prev => (prev || []).map(i =>
+        i.id === itemId
+          ? { ...i, decision: 'BUY' as const, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' as const }
+          : i
+      ))
+      toast.dismiss(toastId)
+      toast.success('✅ Added to Listings — tap the Listed tab')
+    } catch {
+      toast.dismiss(toastId)
+      toast.error('Listing generation failed — item moved to Listed, optimize from detail view')
+    }
+  }, [queue, setQueue, listingOptimizationService, setScreen])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
@@ -1308,12 +1440,18 @@ function App() {
           sellPrice,
           settings?.defaultShippingCost || 5.0,
           settings?.ebayFeePercent || 12.9,
-          settings?.paypalFeePercent || 3.49
+          0,
+          0.30,
+          settings?.ebayAdFeePercent ?? 3.0,
+          settings?.shippingMaterialsCost ?? 0.75
         ) || calculateProfitFallback(
           item.purchasePrice,
           sellPrice,
           settings?.defaultShippingCost || 5.0,
-          settings?.ebayFeePercent || 12.9
+          settings?.ebayFeePercent || 12.9,
+          0.30,
+          settings?.ebayAdFeePercent ?? 3.0,
+          settings?.shippingMaterialsCost ?? 0.75
         )
 
         const minMargin = settings?.minProfitMargin || 30
@@ -1507,9 +1645,10 @@ function App() {
     }
   }, [cameraOpen, reset])
 
-  // Auto-load sold items when user navigates to the Sold screen
+  // Auto-load sold items when user navigates to the Sold screen OR the Agent screen
+  // (Agent needs live shipping data for its intelligence & reporting).
   useEffect(() => {
-    if (screen === 'sold') {
+    if (screen === 'sold' || screen === 'agent') {
       loadLiveSoldItems()
     }
   }, [screen, loadLiveSoldItems])
@@ -1589,6 +1728,11 @@ function App() {
     return () => clearTimeout(timer)
   }, [screen])
 
+  // Clear floating agent input when navigating away from the Agent tab
+  useEffect(() => {
+    if (screen !== 'agent') setAgentInput('')
+  }, [screen])
+
   return (
     <div 
       id="app-container" 
@@ -1611,6 +1755,11 @@ function App() {
         onNavigateToSettings={() => setScreen('settings')}
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
+        settings={settings}
+        queueItemCount={screen === 'queue' ? (queue || []).length : undefined}
+        onRefresh={screen === 'sold' ? () => loadLiveSoldItems() : undefined}
+        soldLoading={soldLoading}
+        soldSyncedAt={soldSyncedAt}
         onBack={
           screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
             ? () => setScreen('session')
@@ -1623,9 +1772,16 @@ function App() {
       />
 
       <div
-        className="flex-1 relative w-full pb-24"
+        className="flex-1 relative w-full"
         style={{
-          minHeight: 'calc(100vh - 96px)',
+          minHeight: 'calc(100dvh - 96px)',
+          // Main screens (agent, session, queue, sold) carry their own internal bottom
+          // padding so the last item scrolls above the nav bar — no outer padding needed.
+          // Sub-screens (settings, detail views, etc.) may not have internal clearance,
+          // so keep the nav-clearance padding for those.
+          paddingBottom: ['agent', 'session', 'queue', 'sold'].includes(screen)
+            ? 0
+            : 'max(calc(4rem + env(safe-area-inset-bottom, 0px)), 4.5rem)',
         }}
       >
         <AnimatePresence mode="wait">
@@ -1671,21 +1827,28 @@ function App() {
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
-              <AIScreen
-                currentItem={currentItem}
-                pipeline={pipeline}
-                settings={settings}
+              <AgentScreen
                 queueItems={queue || []}
-                onSaveDraft={handleSaveDraft}
-                onCreateListing={handleCreateListingFromScan}
-                onPassItem={handlePassFromScan}
-                onRecalculate={handleRecalculate}
-                onRescan={handleRescan}
-                onOpenCamera={() => setCameraOpen(true)}
+                soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
+                liveSoldItems={liveSoldItems}
+                settings={settings}
                 pendingMessage={agentPendingMessage}
                 onPendingMessageHandled={() => setAgentPendingMessage(null)}
-                geminiService={geminiService}
-                onUpdateItem={handleUpdateCurrentItem}
+                onCreateListing={handleOptimizeItem}
+                onOptimizeItem={handleOptimizeItem}
+                onPushToNotion={handlePushToNotion}
+                onBatchAnalyze={handleBatchAnalyze}
+                onEditItem={handleEditQueueItem}
+                onMarkAsSold={handleMarkAsSold}
+                onMarkShipped={handleMarkShipped}
+                onNavigateToQueue={() => setScreen('queue')}
+                onOpenCamera={() => setCameraOpen(true)}
+                onStartSession={handleStartSession}
+                onEndSession={handleEndSession}
+                onEditSession={handleEditSession}
+                allSessions={visibleSessions}
+                scanHistory={scanHistory || []}
+                profitGoals={profitGoals || []}
               />
             </motion.div>
           )}
@@ -1704,6 +1867,7 @@ function App() {
                 queueItems={queue || []}
                 onRemove={handleRemoveFromQueue}
                 onCreateListing={handleOptimizeItem}
+                onBuyItem={handleBuyItem}
                 onEdit={handleEditQueueItem}
                 onReorder={handleReorderQueue}
                 onBatchAnalyze={handleBatchAnalyze}
@@ -1882,7 +2046,62 @@ function App() {
         </AnimatePresence>
       </div>
 
-      <div className="h-[80px] sm:h-[88px] flex-shrink-0" />
+      {/* Spacer keeps content from hiding under fixed nav + floating input.
+          BottomNav = 54px + safe-area-inset-bottom (~34px on iPhone with home indicator).
+          Use h-[88px] flat — correct for home-indicator iPhones (54+34=88). */}
+      <div className="h-[88px] flex-shrink-0" />
+
+      {/* ── Floating Agent Input — slides up when on Agent tab ── */}
+      <AnimatePresence>
+        {screen === 'agent' && (
+          <motion.div
+            key="agent-float-input"
+            initial={{ y: 72, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 72, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 36, mass: 0.7 }}
+            className="fixed left-0 right-0 z-[35] px-4"
+            style={{
+              bottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 54px + 6px)',
+            }}
+          >
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const msg = agentInput.trim()
+                if (msg) {
+                  setAgentPendingMessage(msg)
+                  setAgentInput('')
+                }
+              }}
+              className="flex items-center gap-2 rounded-full px-4 py-2.5 border border-s2/50"
+              style={{
+                background: 'color-mix(in oklch, var(--fg) 78%, transparent)',
+                backdropFilter: 'saturate(180%) blur(28px)',
+                WebkitBackdropFilter: 'saturate(180%) blur(28px)',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08)',
+              }}
+            >
+              <input
+                ref={agentInputRef}
+                value={agentInput}
+                onChange={(e) => setAgentInput(e.target.value)}
+                placeholder="Message Agent…"
+                className="flex-1 bg-transparent text-sm text-t1 placeholder:text-t3 outline-none min-w-0"
+                style={{ fontSize: '16px' }}
+              />
+              <motion.button
+                type="submit"
+                disabled={!agentInput.trim()}
+                whileTap={{ scale: 0.85 }}
+                className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-b1 to-b2 disabled:opacity-25 disabled:from-t3 disabled:to-t3 transition-colors"
+              >
+                <PaperPlaneRight size={14} weight="fill" className="text-white translate-x-px" />
+              </motion.button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <BottomNav
         currentScreen={screen}

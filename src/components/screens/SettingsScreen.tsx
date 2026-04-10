@@ -85,7 +85,9 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
       minProfitMargin: 30,
       defaultShippingCost: 5.0,
       ebayFeePercent: 12.9,
-      paypalFeePercent: 3.49,
+      ebayAdFeePercent: 3.0,
+      shippingMaterialsCost: 0.75,
+      paypalFeePercent: 0,
       preferredAiModel: 'gemini-2.5-flash',
       imageQuality: { preset: 'balanced' },
       ...preservedKeys,
@@ -827,7 +829,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                     <div className="flex items-start gap-2">
                       <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
                       <div className="text-xs text-t2">
-                        <strong className="text-t1">Profit Calculator:</strong> Net profit after eBay fees, PayPal fees, and shipping
+                        <strong className="text-t1">Profit Calculator:</strong> Net profit after eBay fees, ad fees, shipping &amp; materials
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
@@ -1283,17 +1285,32 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                 </div>
 
                 <div>
-                  <Label htmlFor="paypal-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
-                    PayPal Fee (%)
+                  <Label htmlFor="ad-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                    Ad Fee (%)
                   </Label>
                   <Input
-                    id="paypal-fee"
+                    id="ad-fee"
                     type="number"
-                    step="0.01"
+                    step="0.1"
+                    min="0"
+                    max="15"
+                    value={settings.ebayAdFeePercent ?? 3.0}
+                    onChange={(e) => onUpdate({ ebayAdFeePercent: parseFloat(e.target.value) || 0 })}
+                    className="font-mono"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="materials-cost" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                    Materials ($/item)
+                  </Label>
+                  <Input
+                    id="materials-cost"
+                    type="number"
+                    step="0.25"
                     min="0"
                     max="10"
-                    value={settings.paypalFeePercent}
-                    onChange={(e) => onUpdate({ paypalFeePercent: parseFloat(e.target.value) || 0 })}
+                    value={settings.shippingMaterialsCost ?? 0.75}
+                    onChange={(e) => onUpdate({ shippingMaterialsCost: parseFloat(e.target.value) || 0 })}
                     className="font-mono"
                   />
                 </div>

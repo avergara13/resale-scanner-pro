@@ -432,6 +432,8 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         minProfitMargin: settings?.minProfitMargin,
         defaultShippingCost: settings?.defaultShippingCost,
         ebayFeePercent: settings?.ebayFeePercent,
+        ebayAdFeePercent: settings?.ebayAdFeePercent ?? 3.0,
+        shippingMaterialsCost: settings?.shippingMaterialsCost ?? 0.75,
         preferredAiModel: settings?.preferredAiModel
       }
     }
@@ -528,10 +530,29 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
             settings.geminiApiKey
           )
         } else {
-          const promptText = `You are an AI assistant for resale business analysis. Context:\n\n${contextData}\n\nUser: ${chatInput}\n\nProvide a helpful, concise response. Reference the scanned item's data. If the user asks about pricing or market value and you don't have data, suggest they tap "Research Item" in the Agent tab for live marketplace search.`
+          const systemPrompt = `You are an AI assistant for a resale business shipping from Orlando, FL 32806.
+
+## Fee model (always use for profit math)
+- eBay FVF: 12.9% of sale price
+- Promoted Listings ad fee: 3% of sale price
+- Per-order fee: $0.30
+- Shipping materials: $0.75/item
+- Shipping: ~$5 (seller pays)
+- Total effective: ~15.9% + $1.05 fixed per sale
+
+## Anti-hallucination rules (CRITICAL)
+- NEVER invent prices. If you don't have current market data, say so and suggest the user tap "Research Item" for a live marketplace search.
+- Base pricing on actual SOLD comps only — not asking prices or MSRP.
+- Distinguish sell-through rate tiers: HIGH (>70%) / MEDIUM (40-70%) / LOW (<40%). Default to MEDIUM when uncertain.
+- Prefer conservative profit estimates. Overestimating costs real money.
+- All profit figures must be NET (after ALL fees + shipping + materials).
+
+Be helpful, concise, and specific. Reference the scanned item's data when available.`
+          const promptText = `## App State\n\`\`\`\n${contextData}\n\`\`\`\n\nUser: ${chatInput}`
           response = await callLLM(promptText, {
             task: 'chat',
             geminiApiKey: settings?.geminiApiKey,
+            systemPrompt,
           })
         }
       }
@@ -569,21 +590,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         progress={pullToRefresh.progress}
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
-      <div className="flex-shrink-0 p-3 sm:p-4 border-b border-s2 bg-fg sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-b1 to-amber text-white rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
-              <Robot size={18} weight="fill" className="sm:w-5 sm:h-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-bold text-sm sm:text-base text-t1 truncate">AI Command Center</h2>
-              <p className="text-[9px] sm:text-[10px] text-t3 font-medium tracking-wide truncate">Powered by {settings?.preferredAiModel || 'Gemini'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
-          </div>
-        </div>
+      <div className="flex-shrink-0 px-3 pt-2 pb-0 sm:px-4 border-b border-s2 bg-fg sticky top-0 z-10 shadow-sm">
         <div className="tab-bar">
           <button
             onClick={() => setTab('chat')}
@@ -595,7 +602,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
             onClick={() => setTab('scans')}
             className={cn('tab-btn', tab === 'scans' && 'active')}
           >
-            <span>📊 SCANS</span>
+            <span>🔎 SCANS</span>
           </button>
           <button
             onClick={() => setTab('tasks')}
@@ -626,9 +633,6 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                       Scan an Item
                     </button>
                   )}
-                </div>
-                <div className="px-2 sm:px-4">
-                  <ApiStatusIndicator settings={settings} />
                 </div>
               </div>
             ) : (
@@ -910,7 +914,10 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         )}
       </div>
 
-      <div className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md safe-bottom">
+      <div
+        className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}
+      >
 
         {tab === 'chat' && (
           <div className="p-2.5 sm:p-3">
@@ -925,7 +932,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                   }
                 }}
                 placeholder="Ask AI anything..."
-                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-sm"
+                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-base"
                 disabled={isSendingMessage}
               />
               <Button
@@ -953,7 +960,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 placeholder="Buy $"
                 value={buyPrice}
                 onChange={(e) => setBuyPrice(e.target.value)}
-                className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
+                className="w-20 sm:w-24 h-11 sm:h-10 font-mono bg-bg border-s2 text-base"
               />
               <div className="flex-1 relative">
                 <Input
@@ -961,7 +968,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Notes..."
-                  className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
+                  className="h-11 sm:h-10 pr-10 bg-bg border-s2 text-base"
                 />
                 {isSupported && (
                   <button
@@ -1015,7 +1022,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
               >
                 <ShoppingCart size={15} weight="bold" className="mr-1" />
-                Create Listing
+                Buy ✅
               </Button>
             </div>
           </div>
@@ -1034,7 +1041,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 placeholder="Buy $"
                 value={buyPrice}
                 onChange={(e) => setBuyPrice(e.target.value)}
-                className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
+                className="w-20 sm:w-24 h-11 sm:h-10 font-mono bg-bg border-s2 text-base"
               />
               <div className="flex-1 relative">
                 <Input
@@ -1042,7 +1049,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Add notes or description..."
-                  className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
+                  className="h-11 sm:h-10 pr-10 bg-bg border-s2 text-base"
                 />
                 {isSupported && (
                   <button
@@ -1071,12 +1078,12 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 </Button>
               )}
               <Button
-                onClick={() => onSaveDraft(parseFloat(buyPrice), description)}
+                onClick={() => onCreateListing(parseFloat(buyPrice), description)}
                 disabled={!canSaveDraft}
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
+                className="flex-1 bg-b1 hover:bg-b2 text-white h-11 sm:h-10 font-semibold disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
               >
-                <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
-                SAVE DRAFT TO QUEUE
+                <ShoppingCart size={16} weight="bold" className="mr-1.5 sm:mr-2" />
+                Buy ✅
               </Button>
             </div>
           </div>
@@ -1090,7 +1097,7 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
                 onChange={(e) => setTaskInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleAddTask() }}
                 placeholder="Add a task..."
-                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-sm"
+                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-base"
               />
               <Button
                 onClick={handleAddTask}

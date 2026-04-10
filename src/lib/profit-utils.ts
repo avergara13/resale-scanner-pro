@@ -11,6 +11,8 @@ export function getNetProfit(
   // Only eBay has configured fees; other marketplaces default to 0% for now
   const feePercent = item.soldOn === 'ebay' ? (settings.ebayFeePercent ?? 12.9) : 0
   const perOrderFee = item.soldOn === 'ebay' ? 0.30 : 0
+  const adFeePercent = item.soldOn === 'ebay' ? (settings.ebayAdFeePercent ?? 3.0) : 0
+  const materialsCost = settings.shippingMaterialsCost ?? 0.75
 
   const { netProfit, totalFees } = calculateProfitFallback(
     item.purchasePrice,
@@ -18,6 +20,8 @@ export function getNetProfit(
     shippingCost,
     feePercent,
     perOrderFee,
+    adFeePercent,
+    materialsCost,
   )
   return { netProfit, totalFees, shippingCost }
 }

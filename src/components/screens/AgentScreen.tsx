@@ -7,7 +7,6 @@ import {
   Trash,
   DotsThreeVertical,
   PencilSimple,
-  PaperPlaneRight,
   ArrowLeft,
   CaretDown,
   CaretUp,
@@ -19,13 +18,10 @@ import {
   MagnifyingGlass,
   Globe,
   Stack,
-  CheckCircle,
-  Warning,
   ListChecks,
   ChatCircle,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
@@ -48,7 +44,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo } from '@/types'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, SoldItem } from '@/types'
+import { analyzeSoldBatch } from '@/lib/shipping-intelligence'
 
 interface QuickAction {
   emoji: string
@@ -103,21 +100,53 @@ function relativeTime(ts: number): string {
 // Static system instructions — module-level constant, allocated once.
 // Gemini API caches identical prefixes across calls, so keeping this
 // stable and at the front of every prompt reduces per-request cost.
-const AGENT_SYSTEM_INSTRUCTIONS = `You are a resale business AI agent with full app state access. You help research products, analyze profit, create eBay listings, manage sessions, and track sold items. All profit figures are NET (after fees + shipping). The user offers 1-day shipping — flag overdue items.
+const AGENT_SYSTEM_INSTRUCTIONS = `You are a resale business AI agent with full app state access. You help research products, analyze profit, create eBay listings, manage sessions, and track sold items.
+
+## Business Model
+- Primary platform: eBay (seller ships from Orlando, FL 32806)
+- Fee structure: 12.9% eBay FVF + 3% Promoted Listings ad fee + $0.30/order
+- Materials cost: $0.75 per item (box, tape, poly mailer)
+- Shipping: ~$5-8 average (seller pays, offers free shipping)
+- Total effective cost: ~15.9% + ~$6.05 fixed per sale
+- All profit figures you report must be NET (after ALL fees, shipping, and materials)
+- The user offers 1-day shipping — flag any items sold >12 hours ago as urgent
 
 ## Commands
-- "Research [product]" — live marketplace search
+- "Research [product]" — live marketplace search across eBay, Mercari, Poshmark, Whatnot, Amazon, Walmart, Google Shopping
 - "Create listings" / "Full pipeline" — optimize + publish BUY items
-- "Push to Notion" — publish ready listings
+- "Push to Notion" — publish ready listings to Notion database
 - "Mark [item] sold on [marketplace] for $X" — record a sale
-- "Add tracking [number]" / "Mark shipped" — update shipping
+- "Add tracking [number]" / "Mark shipped" — update shipping status
 - "Start/End session" — manage scanning sessions
 - "Set goal $X" / "Set location [name]" — session settings
+
+## Anti-Hallucination Rules
+- NEVER invent prices. If you don't have data, say "I don't have current market data for this item — let me research it."
+- When reporting sell-through rates, distinguish between HIGH (>70%), MEDIUM (40-70%), LOW (<40%).
+- Base ALL pricing recommendations on actual SOLD/completed listing data — never on asking prices or MSRP.
+- When uncertain about a value, flag it as "estimated" and explain your reasoning.
+- Prefer conservative estimates. Overestimating profit margins costs the business real money.
+
+## Live Shipping Context (liveShipping object in state)
+When \`liveShipping\` is present in state, it is the SOURCE OF TRUTH for sold items — it comes directly from the Notion Sales DB populated by email parsing (WF-01). It includes:
+- \`needsLabel\`, \`readyToShip\`, \`shipped\` — counts by status
+- \`overdue\` + \`urgent[]\` — items sold >48h ago still not shipped (critical!)
+- \`estimatedShippingCostOutstanding\` — dollars of shipping you still need to buy
+- \`totalNetIncome\` — after platform fees (the real take-home)
+- \`carrierMix\` — recommended carriers for outstanding shipments
+
+When asked about shipping, sold items, or overdue orders:
+1. ALWAYS reference liveShipping if present — don't use the legacy \`sold\` object
+2. If urgent[] has items, call them out by name and hours overdue
+3. Recommend the best carrier from carrierMix rather than guessing
+4. If liveShipping is null, explain that the Notion Sales DB isn't syncing and suggest using the manual "Log Sale" option
 
 ## Rules
 - Answer from the app state below — never say you can't access it.
 - Reference items by name, price, margin, and category.
-- Be proactive: suggest goals, flag unanalyzed items, warn about overdue shipping.` as const
+- Be proactive: suggest goals, flag unanalyzed items, warn about overdue shipping.
+- When calculating profit, always include: purchase price + shipping + materials ($0.75) + eBay fee (12.9%) + ad fee (3%) + $0.30 order fee.
+- Offline resilience: if the user says "no internet" or "API down", remind them manual Log Sale, manual queue editing, and manual shipping status all work without any API.` as const
 
 function formatMessage(text: string): string {
   let formatted = text
@@ -185,7 +214,10 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
 
 interface AgentScreenProps {
   queueItems?: ScannedItem[]
+  /** Legacy: items from the local queue marked as sold (ScannedItem shape) */
   soldItems?: ScannedItem[]
+  /** Live sold feed from Notion Sales DB (populated by WF-01 email parsing) */
+  liveSoldItems?: SoldItem[]
   settings?: AppSettings
   /** Message injected from external widget (e.g. AgentChatWidget on Session screen) */
   pendingMessage?: string | null
@@ -210,7 +242,7 @@ interface AgentScreenProps {
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
   const sessionId = currentSession?.id
   const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])
@@ -219,6 +251,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   const [activeSessionId, setActiveSessionId] = useKV<string | null>(activeKey, null)
   const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', EMPTY_TODOS)
   const [viewMode, setViewMode] = useState<'list' | 'chat'>('list')
+  const [agentTab, setAgentTab] = useState<'chat' | 'scan' | 'task'>('chat')
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [showRenameDialog, setShowRenameDialog] = useState(false)
@@ -227,7 +260,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   const [taskInput, setTaskInput] = useState('')
   const [showTaskInput, setShowTaskInput] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+
   const pendingTodos = useMemo(() => (todos || []).filter(t => !t.completed), [todos])
   const completedTodos = useMemo(() => (todos || []).filter(t => t.completed), [todos])
 
@@ -842,26 +875,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         }
       }
 
-      const recentItems = sessionItems.slice(-3).map(i =>
-        `• ${i.productName || 'Unknown'} — Buy: $${i.purchasePrice.toFixed(2)}, Sell: $${(i.estimatedSellPrice || 0).toFixed(2)}, Margin: ${(i.profitMargin || 0).toFixed(1)}%, Decision: ${i.decision}, Status: ${i.listingStatus || 'not-started'}${i.category ? `, Category: ${i.category}` : ''}`
-      ).join('\n')
-
-      const pastSessionsSummary = allSessions.slice(-3).map(s => {
-        const dur = ((s.endTime || Date.now()) - s.startTime) / 60000
-        return `• ${s.name || new Date(s.startTime).toLocaleDateString()} — ${s.itemsScanned} scans, ${s.buyCount} BUY, $${s.totalPotentialProfit.toFixed(2)} profit, ${Math.round(dur)}min${s.location ? `, at ${s.location.name}` : ''}${s.profitGoal ? `, goal: $${s.profitGoal}` : ''}`
-      }).join('\n')
-
-      const activeGoalsSummary = profitGoals.filter(g => g.active).map(g =>
-        `• ${g.type} goal: $${g.targetAmount.toFixed(2)} (${new Date(g.startDate).toLocaleDateString()} - ${new Date(g.endDate).toLocaleDateString()})`
-      ).join('\n')
-
-      const soldSummaryText = soldItems.length > 0
-        ? soldItems.slice(0, 5).map(i => {
-            const { netProfit } = settings ? getNetProfit(i, settings) : { netProfit: (i.soldPrice || 0) - i.purchasePrice }
-            return `• ${i.productName || 'Unknown'} — Sold $${(i.soldPrice || 0).toFixed(2)} on ${i.soldOn || '?'}, Net Profit: $${netProfit.toFixed(2)}, Status: ${i.listingStatus}`
-          }).join('\n')
-        : 'No sold items yet'
-
       const activeSold = soldItems.filter(i => i.listingStatus !== 'returned')
       const soldStats = {
         total: activeSold.length,
@@ -879,34 +892,95 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
           }`
         : 'No scanning session is active. You are showing all-time global stats across all sessions.'
 
-      // Dynamic context — changes per message, billed per-request
-      const dynamicContext = `${sessionScope}
-
-## Current App State
-
-### ${currentSession?.active ? `Session: ${currentSession.name || 'Active'} — Listings` : 'All Listings (Global)'}
-- ${queueStats.total} items (${queueStats.buy} BUY, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
-- Potential profit: $${(queueStats.totalProfit || 0).toFixed(2)}
-${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
-
-### Sold Items
-- ${soldStats.total} total sold | Revenue: $${soldStats.revenue.toFixed(2)} | Net Profit: $${soldStats.netProfit.toFixed(2)} | Needs Shipping: ${soldStats.needsShipping}
-${soldSummaryText !== 'No sold items yet' ? `\nRecent Sold:\n${soldSummaryText}` : '\nNo sold items yet'}
-
-### Active Session
-${currentSession?.active ? `- ${currentSession.name || 'Unnamed'}: ${currentSession.itemsScanned} scans (${currentSession.buyCount} BUY, ${currentSession.passCount} PASS), $${currentSession.totalPotentialProfit.toFixed(2)} profit${currentSession.profitGoal ? `, goal: $${currentSession.profitGoal} (${Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100)}%)` : ''}${currentSession.location?.name ? `, at ${currentSession.location.name}` : ''}` : 'No active session'}
-
-### Past Sessions
-${pastSessionsSummary || 'None'}
-
-### Goals
-${activeGoalsSummary || 'None'}
-
-### Tasks
-${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} (${t.createdBy})`).join('\n') : 'No pending tasks'}
-
-### Settings
-- Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%`
+      // Dynamic context — JSON-encoded to prevent prompt injection from user-controlled strings
+      // (item names, session names, task text are all user-editable and could contain adversarial content)
+      const dynamicState = {
+        scope: sessionScope,
+        listings: {
+          total: queueStats.total,
+          buy: queueStats.buy,
+          pass: queueStats.pass,
+          pending: queueStats.pending,
+          potentialProfit: Number((queueStats.totalProfit || 0).toFixed(2)),
+          recentItems: sessionItems.slice(-3).map(i => ({
+            name: i.productName || 'Unknown',
+            buyPrice: Number(i.purchasePrice.toFixed(2)),
+            sellPrice: Number((i.estimatedSellPrice || 0).toFixed(2)),
+            margin: Number((i.profitMargin || 0).toFixed(1)),
+            decision: i.decision,
+            status: i.listingStatus || 'not-started',
+            category: i.category || null,
+          })),
+        },
+        sold: {
+          total: soldStats.total,
+          revenue: Number(soldStats.revenue.toFixed(2)),
+          netProfit: Number(soldStats.netProfit.toFixed(2)),
+          needsShipping: soldStats.needsShipping,
+          recentSold: soldItems.slice(0, 5).map(i => {
+            const { netProfit: np } = settings ? getNetProfit(i, settings) : { netProfit: (i.soldPrice || 0) - i.purchasePrice }
+            return {
+              name: i.productName || 'Unknown',
+              soldPrice: Number((i.soldPrice || 0).toFixed(2)),
+              soldOn: i.soldOn || '?',
+              netProfit: Number(np.toFixed(2)),
+              status: i.listingStatus,
+            }
+          }),
+        },
+        // Live Notion Sales DB feed — populated by WF-01 email parsing, is the
+        // source of truth for real shipping workflow (what needs labels, what's overdue)
+        liveShipping: liveSoldItems.length > 0 ? (() => {
+          const analysis = analyzeSoldBatch(liveSoldItems)
+          return {
+            totalLiveSales: liveSoldItems.length,
+            needsLabel: analysis.needsLabelCount,
+            readyToShip: analysis.readyCount,
+            shipped: analysis.shippedCount,
+            overdue: analysis.overdueCount,
+            estimatedShippingCostOutstanding: analysis.totalPotentialShippingCost,
+            totalRevenue: analysis.totalRevenue,
+            totalPlatformFees: analysis.totalFees,
+            totalNetIncome: analysis.totalNetIncome,
+            carrierMix: analysis.recommendedCarrierMix,
+            urgent: analysis.urgentItems,
+          }
+        })() : null,
+        activeSession: currentSession?.active ? {
+          name: currentSession.name || 'Unnamed',
+          scans: currentSession.itemsScanned,
+          buy: currentSession.buyCount,
+          pass: currentSession.passCount,
+          profit: Number(currentSession.totalPotentialProfit.toFixed(2)),
+          goal: currentSession.profitGoal || null,
+          goalProgress: currentSession.profitGoal ? Math.round((currentSession.totalPotentialProfit / currentSession.profitGoal) * 100) : null,
+          location: currentSession.location?.name || null,
+        } : null,
+        pastSessions: allSessions.slice(-3).map(s => ({
+          name: s.name || new Date(s.startTime).toLocaleDateString(),
+          scans: s.itemsScanned,
+          buy: s.buyCount,
+          profit: Number(s.totalPotentialProfit.toFixed(2)),
+          durationMin: Math.round(((s.endTime || Date.now()) - s.startTime) / 60000),
+          location: s.location?.name || null,
+          goal: s.profitGoal || null,
+        })),
+        goals: profitGoals.filter(g => g.active).map(g => ({
+          type: g.type,
+          target: Number(g.targetAmount.toFixed(2)),
+          period: `${new Date(g.startDate).toLocaleDateString()} - ${new Date(g.endDate).toLocaleDateString()}`,
+        })),
+        tasks: pendingTodos.slice(0, 10).map(t => ({ text: t.text, createdBy: t.createdBy })),
+        settings: {
+          minMargin: settings?.minProfitMargin ?? 30,
+          shipping: settings?.defaultShippingCost ?? 5,
+          ebayFee: settings?.ebayFeePercent ?? 12.9,
+          adFee: settings?.ebayAdFeePercent ?? 3.0,
+          materials: settings?.shippingMaterialsCost ?? 0.75,
+          shipFromZip: '32806',
+        },
+      }
+      const dynamicContext = `## Current App State\n\`\`\`json\n${JSON.stringify(dynamicState, null, 2)}\n\`\`\``
 
       // Include last 4 messages for conversational continuity
       const recentHistory = chatMessages.slice(-4).map(m =>
@@ -966,7 +1040,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, setTodos, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, liveSoldItems, chatMessages, pendingTodos, setTodos, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {
@@ -984,70 +1058,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
   const handleQuickAction = useCallback((prompt: string) => {
     setInput(prompt)
-    inputRef.current?.focus()
   }, [])
-
-  // Shared stats bar used in both views
-  const statsBar = (
-    <div className="px-4 py-2 bg-s1/30 border-b border-s1">
-      {currentSession?.active && (
-        <div className="text-[9px] font-bold text-b1 mb-1.5 uppercase tracking-wide">
-          {currentSession.name || 'Active Session'}
-        </div>
-      )}
-      <div className="grid grid-cols-4 gap-1.5">
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>
-          <div className="text-base font-black text-t1">{queueStats.total}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-green font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-            <CheckCircle size={10} weight="fill" /> BUY
-          </div>
-          <div className="text-base font-black text-green">{queueStats.buy}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-red font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-            <Warning size={10} weight="fill" /> PASS
-          </div>
-          <div className="text-base font-black text-red">{queueStats.pass}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Profit</div>
-          <div className="text-xs font-black text-green">${queueStats.totalProfit.toFixed(0)}</div>
-        </Card>
-      </div>
-    </div>
-  )
-
-  // Shared input bar used in both views
-  const inputBar = (
-    <div className="p-4 bg-fg border-t border-s1 safe-bottom">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          handleSendMessage()
-        }}
-        className="flex gap-2"
-      >
-        <Input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask me anything about your resale business..."
-          disabled={isProcessing}
-          className="flex-1"
-        />
-        <Button
-          type="submit"
-          disabled={!input.trim() || isProcessing}
-          className="w-10 h-10 flex items-center justify-center p-0"
-        >
-          <PaperPlaneRight size={18} weight="bold" />
-        </Button>
-      </form>
-    </div>
-  )
 
   const sortedSessions = useMemo(() =>
     [...(chatSessions || [])].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
@@ -1073,30 +1084,37 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0"
           >
-            {/* List header */}
-            <div className="flex items-center justify-between px-4 py-4 bg-fg border-b border-s1">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-b1 to-b2 rounded-xl">
-                  <Robot size={24} weight="bold" className="text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-t1">Agent</h1>
-                  <p className="text-xs text-t3">AI Research & Automation</p>
-                </div>
+            {/* Tab bar — matches Listings page tab-bar / tab-btn style */}
+            <div className="px-3 pt-3 pb-2 bg-fg border-b border-s1">
+              <div className="tab-bar">
+                <button onClick={() => setAgentTab('chat')} className={cn('tab-btn', agentTab === 'chat' && 'active')}>
+                  <span>💬 Chat</span>
+                </button>
+                <button onClick={() => setAgentTab('scan')} className={cn('tab-btn', agentTab === 'scan' && 'active')}>
+                  <span>📷 Scan {queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started')).length > 0 ? `(${queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started')).length})` : ''}</span>
+                </button>
+                <button onClick={() => setAgentTab('task')} className={cn('tab-btn', agentTab === 'task' && 'active')}>
+                  <span>✅ Task {pendingTodos.length > 0 ? `(${pendingTodos.length})` : ''}</span>
+                </button>
               </div>
-              <Button size="sm" onClick={handleCreateSession} className="h-8 px-3 text-xs">
-                <Plus size={14} weight="bold" className="mr-1" /> New Chat
-              </Button>
             </div>
 
-            {statsBar}
-
+            {/* ── CHAT TAB ── */}
+            {agentTab === 'chat' && (
             <ScrollArea className="flex-1">
               <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5">
-                {/* Quick Actions — always visible */}
+                {/* Quick Actions + New Chat */}
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">Quick Actions</div>
                   <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                    {/* New Chat — first in the row */}
+                    <button
+                      onClick={handleCreateSession}
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-gradient-to-br from-b1 to-b2 rounded-xl text-xs font-bold text-white active:scale-95 transition-all"
+                    >
+                      <Plus size={12} weight="bold" />
+                      <span>New Chat</span>
+                    </button>
                     {QUICK_ACTIONS.map(action => (
                       <button
                         key={action.label}
@@ -1110,62 +1128,16 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                   </div>
                 </div>
 
-                {/* Tasks */}
-                {(pendingTodos.length > 0 || showTaskInput) && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <ListChecks size={14} className="text-t3" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-t3">Tasks</span>
-                        {pendingTodos.length > 0 && (
-                          <span className="text-[8px] bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md font-bold">{pendingTodos.length}</span>
-                        )}
-                      </div>
-                      <button onClick={() => setShowTaskInput(!showTaskInput)} className="text-[10px] text-b1 font-bold">
-                        {showTaskInput ? 'Done' : '+ Add'}
-                      </button>
-                    </div>
-                    {showTaskInput && (
-                      <form onSubmit={(e) => { e.preventDefault(); if (taskInput.trim()) { setTodos(prev => [...(prev || []), { id: Date.now().toString(), text: taskInput.trim(), completed: false, createdBy: 'user' as const, createdAt: Date.now() }]); setTaskInput('') } }} className="flex gap-2 mb-2">
-                        <Input value={taskInput} onChange={e => setTaskInput(e.target.value)} placeholder="Add a task..." className="flex-1 h-8 text-xs" autoFocus />
-                        <Button type="submit" size="sm" disabled={!taskInput.trim()} className="h-8 px-3 text-xs">Add</Button>
-                      </form>
-                    )}
-                    <div className="space-y-1">
-                      {pendingTodos.map(t => (
-                        <div key={t.id} className="flex items-center gap-2 py-1.5 px-2 bg-fg rounded-lg border border-s1 group">
-                          <button onClick={() => setTodos(prev => (prev || []).map(x => x.id === t.id ? { ...x, completed: true } : x))} className="w-4 h-4 rounded border border-s2 flex items-center justify-center flex-shrink-0 hover:border-b1">
-                          </button>
-                          <span className="text-xs text-t1 flex-1 truncate">{t.text}</span>
-                          <span className="text-[8px] text-t3 uppercase">{t.createdBy}</span>
-                          <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash size={12} />
-                          </button>
-                        </div>
-                      ))}
-                      {completedTodos.length > 0 && (
-                        <div className="text-[10px] text-t3 px-2 pt-1">{completedTodos.length} completed</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {pendingTodos.length === 0 && !showTaskInput && (
-                  <button onClick={() => setShowTaskInput(true)} className="flex items-center gap-1.5 text-[10px] text-t3 font-bold">
-                    <ListChecks size={12} /> Add a task
-                  </button>
-                )}
-
                 {/* Conversation List */}
                 {sortedSessions.length === 0 ? (
-                  <div className="text-center py-10">
+                  <div className="flex flex-col items-center justify-center py-16 w-full min-h-[45vh]">
                     <button
-                      onClick={() => inputRef.current?.focus()}
-                      className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
+                      className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
                     >
                       <Sparkle size={32} weight="fill" className="text-white" />
                     </button>
-                    <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
-                    <p className="text-sm text-t3 max-w-xs mx-auto">Start a conversation below</p>
+                    <h2 className="text-xl font-bold text-t1 mb-2 text-center">Welcome to Agent</h2>
+                    <p className="text-sm text-t3 max-w-xs text-center">Start a conversation below</p>
                   </div>
                 ) : (
                   <div>
@@ -1178,7 +1150,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                         <button
                           key={session.id}
                           onClick={() => handleSwitchSession(session.id)}
-                          className="w-full p-3 bg-fg border border-s1 rounded-xl text-left active:scale-[0.98] transition-all group"
+                          className="w-full p-3.5 bg-fg/90 border border-s2/60 rounded-2xl text-left active:scale-[0.97] transition-all shadow-sm"
                         >
                           <div className="flex items-start justify-between gap-2 mb-1">
                             <span className="text-sm font-bold text-t1 truncate">{session.name}</span>
@@ -1195,8 +1167,146 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                 )}
               </div>
             </ScrollArea>
+            )}
 
-            {inputBar}
+            {/* ── SCAN TAB — BUY queue awaiting listing ── */}
+            {agentTab === 'scan' && (() => {
+              const buyQueue = queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))
+              const readyItems = queueItems.filter(i => i.decision === 'BUY' && i.listingStatus && i.listingStatus !== 'not-started' && i.listingStatus !== 'sold')
+              return (
+              <ScrollArea className="flex-1">
+                <div className="py-3 px-3 space-y-3">
+                  {buyQueue.length === 0 && readyItems.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="text-3xl mb-3">📷</div>
+                      <h2 className="text-base font-bold text-t1 mb-1">Queue is clear</h2>
+                      <p className="text-xs text-t3">Scan items to build your listing queue</p>
+                    </div>
+                  ) : (
+                    <>
+                      {buyQueue.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">
+                            📥 Needs Listing ({buyQueue.length})
+                          </div>
+                          <div className="space-y-2">
+                            {buyQueue.slice().reverse().map(item => (
+                              <div key={item.id} className="p-3.5 bg-fg/90 border border-s2/60 rounded-2xl shadow-sm">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <span className="text-sm font-semibold text-t1 truncate flex-1">
+                                    {item.productName || 'Unknown item'}
+                                  </span>
+                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green/15 text-green flex-shrink-0">BUY</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-[10px] text-t3">
+                                  <span>Cost: <span className="text-t1 font-semibold">${item.purchasePrice.toFixed(2)}</span></span>
+                                  {item.estimatedSellPrice ? (
+                                    <span>Est sell: <span className="text-t1 font-semibold">${item.estimatedSellPrice.toFixed(0)}</span></span>
+                                  ) : null}
+                                  {item.profitMargin ? (
+                                    <span className={item.profitMargin >= 30 ? 'text-green font-semibold' : 'text-t2'}>
+                                      {item.profitMargin.toFixed(0)}% margin
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {item.category && (
+                                  <div className="mt-1 text-[9px] text-t3">{item.category}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {readyItems.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">
+                            📋 In Listings ({readyItems.length})
+                          </div>
+                          <div className="space-y-2">
+                            {readyItems.slice().reverse().map(item => (
+                              <div key={item.id} className="p-2.5 bg-fg/50 border border-s1/50 rounded-xl opacity-70">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-medium text-t2 truncate flex-1">
+                                    {item.productName || 'Unknown item'}
+                                  </span>
+                                  <span className="text-[9px] text-t3 capitalize flex-shrink-0">{item.listingStatus}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </ScrollArea>
+              )
+            })()}
+
+            {/* ── TASK TAB ── */}
+            {agentTab === 'task' && (
+            <ScrollArea className="flex-1">
+              <div className="py-4 px-4 space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 flex items-center gap-1.5">
+                    <ListChecks size={12} /> Tasks
+                    {pendingTodos.length > 0 && (
+                      <span className="text-[8px] bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md font-black">{pendingTodos.length}</span>
+                    )}
+                  </div>
+                  <button onClick={() => setShowTaskInput(!showTaskInput)} className="text-[10px] text-b1 font-bold">
+                    {showTaskInput ? 'Done' : '+ Add'}
+                  </button>
+                </div>
+                {showTaskInput && (
+                  <form onSubmit={(e) => { e.preventDefault(); if (taskInput.trim()) { setTodos(prev => [...(prev || []), { id: Date.now().toString(), text: taskInput.trim(), completed: false, createdBy: 'user' as const, createdAt: Date.now() }]); setTaskInput('') } }} className="flex gap-2">
+                    <Input value={taskInput} onChange={e => setTaskInput(e.target.value)} placeholder="Add a task..." className="flex-1 h-8 text-xs" autoFocus />
+                    <Button type="submit" size="sm" disabled={!taskInput.trim()} className="h-8 px-3 text-xs">Add</Button>
+                  </form>
+                )}
+                {pendingTodos.length === 0 && !showTaskInput ? (
+                  <div className="text-center py-12">
+                    <div className="text-3xl mb-3">✅</div>
+                    <h2 className="text-base font-bold text-t1 mb-1">No tasks yet</h2>
+                    <p className="text-xs text-t3">Tap "+ Add" to create a task, or ask the agent to add one</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {pendingTodos.map(t => (
+                      <div key={t.id} className="flex items-center gap-2 py-2 px-3 bg-fg rounded-xl border border-s1 group">
+                        <button onClick={() => setTodos(prev => (prev || []).map(x => x.id === t.id ? { ...x, completed: true } : x))} className="w-5 h-5 rounded-full border-2 border-s2 flex items-center justify-center flex-shrink-0 hover:border-b1 active:bg-b1/10 transition-colors">
+                        </button>
+                        <span className="text-sm text-t1 flex-1">{t.text}</span>
+                        <span className="text-[8px] text-t3 uppercase flex-shrink-0">{t.createdBy}</span>
+                        <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red transition-colors p-1">
+                          <Trash size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    {completedTodos.length > 0 && (
+                      <div className="pt-2 border-t border-s1">
+                        <div className="text-[10px] text-t3 mb-2 font-semibold">{completedTodos.length} completed</div>
+                        {completedTodos.map(t => (
+                          <div key={t.id} className="flex items-center gap-2 py-1.5 px-3 rounded-lg opacity-50">
+                            <div className="w-5 h-5 rounded-full bg-b1/20 flex items-center justify-center flex-shrink-0">
+                              <span className="text-[8px] text-b1">✓</span>
+                            </div>
+                            <span className="text-xs text-t3 line-through flex-1">{t.text}</span>
+                            <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red transition-colors p-1">
+                              <Trash size={11} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+            )}
+
+            {/* Spacer so last content scrolls above the floating input bar */}
+            {agentTab === 'chat' && <div className="h-16" />}
           </motion.div>
         ) : (
           <motion.div
@@ -1208,7 +1318,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             className="flex flex-col flex-1 min-h-0"
           >
             {/* Chat header with back button */}
-            <div className="flex items-center gap-3 px-4 py-3 bg-fg border-b border-s1">
+            <div className="flex items-center gap-3 px-4 py-3 bg-fg/85 backdrop-blur-2xl border-b border-s1/40">
               <button onClick={() => setViewMode('list')} className="p-1.5 -ml-1 rounded-lg active:bg-s1 transition-colors">
                 <ArrowLeft size={20} weight="bold" className="text-t1" />
               </button>
@@ -1235,8 +1345,6 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-
-            {statsBar}
 
             {/* Messages */}
             <ScrollArea className="flex-1 px-4">
@@ -1297,7 +1405,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
               </div>
             </ScrollArea>
 
-            {inputBar}
+            {/* Spacer so messages scroll above the floating input bar */}
+            <div className="h-16 flex-shrink-0" />
           </motion.div>
         )}
       </AnimatePresence>
