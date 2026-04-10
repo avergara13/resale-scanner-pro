@@ -371,6 +371,12 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
     onPendingMessageHandled?.()
   }, [pendingMessage, onPendingMessageHandled, setTab])
 
+  // Auto-switch to Scans tab when a new capture arrives so the user sees
+  // the pipeline running — not the last-used tab (which is persisted and defaults to chat)
+  useEffect(() => {
+    if (currentItem) setTab('scans')
+  }, [currentItem?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const pullToRefresh = usePullToRefresh({
     onRefresh: handleRefresh,
     threshold: 80,

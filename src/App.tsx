@@ -1782,7 +1782,7 @@ function App() {
           // padding so the last item scrolls above the nav bar — no outer padding needed.
           // Sub-screens (settings, detail views, etc.) may not have internal clearance,
           // so keep the nav-clearance padding for those.
-          paddingBottom: ['agent', 'scan', 'session', 'queue', 'sold'].includes(screen)
+          paddingBottom: ['agent', 'session', 'queue', 'sold'].includes(screen)
             ? 0
             : 'max(calc(4rem + env(safe-area-inset-bottom, 0px)), 4.5rem)',
         }}
