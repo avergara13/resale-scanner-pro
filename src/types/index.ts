@@ -1,4 +1,4 @@
-export type Screen = 'session' | 'session-detail' | 'agent' | 'scan' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
+export type Screen = 'session' | 'session-detail' | 'agent' | 'scan' | 'scan-result' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
 
 export type SoldShippingStatus = '🔴 Need Label' | '🟡 Label Ready' | '📦 Packed' | '✅ Shipped'
 
@@ -170,6 +170,8 @@ export interface ScannedItem {
   productName?: string
   description?: string
   category?: string
+  condition?: string
+  preferredPlatform?: string
   tags?: string[]
   estimatedSellPrice?: number
   profitMargin?: number

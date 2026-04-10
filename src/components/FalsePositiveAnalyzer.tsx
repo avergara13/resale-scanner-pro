@@ -305,7 +305,7 @@ export function FalsePositiveAnalyzerPanel() {
                   </div>
                   {Array.from(report.optimalThresholds.perCategory.entries())
                     .slice(0, 5)
-                    .map(([category, threshold]) => (
+                    .map(([category, threshold]: [string, number]) => (
                       <div key={category} className="flex items-center justify-between p-2 bg-s1 rounded">
                         <span className="text-xs text-s4">{category}</span>
                         <Badge variant="outline" className="font-mono text-xs border-s3">

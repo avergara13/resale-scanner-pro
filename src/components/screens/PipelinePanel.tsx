@@ -36,9 +36,9 @@ const phaseConfig = {
     progressTiming: [0, 0.2, 0.5, 0.8, 1],
     gradient: 'from-cyan-500/20 via-teal-500/20 to-emerald-500/20'
   },
-  profit: { 
-    icon: Calculator, 
-    label: '4. EBAY MATH', 
+  profit: {
+    icon: Calculator,
+    label: '4. ANALYZING',
     detail: 'Fees, shipping & net profit...',
     duration: 1.8,
     progressSteps: [0, 0.40, 0.70, 0.90, 0.95],

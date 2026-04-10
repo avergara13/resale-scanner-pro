@@ -367,8 +367,8 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         duration={duration}
                         buyRate={buyRate}
                         formatDuration={formatDuration}
-                        onDelete={() => onDeleteSession?.(s.id)}
-                        onViewDetail={() => onResumeSession?.(s.id)}
+                        onDelete={() => { onDeleteSession?.(s.id) }}
+                        onViewDetail={() => { onResumeSession?.(s.id) }}
                       />
                     )
                   })}
@@ -405,8 +405,8 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         duration={duration}
                         buyRate={buyRate}
                         formatDuration={formatDuration}
-                        onDelete={() => onDeleteSession?.(s.id)}
-                        onViewDetail={() => onViewSessionDetail?.(s.id)}
+                        onDelete={() => { onDeleteSession?.(s.id) }}
+                        onViewDetail={() => { onViewSessionDetail?.(s.id) }}
                       />
                     )
                   })}
