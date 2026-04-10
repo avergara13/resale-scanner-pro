@@ -371,6 +371,12 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
     onPendingMessageHandled?.()
   }, [pendingMessage, onPendingMessageHandled, setTab])
 
+  // Auto-switch to Scans tab when a new capture arrives so the user sees
+  // the pipeline running — not the last-used tab (which is persisted and defaults to chat)
+  useEffect(() => {
+    if (currentItem) setTab('scans')
+  }, [currentItem?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const pullToRefresh = usePullToRefresh({
     onRefresh: handleRefresh,
     threshold: 80,
@@ -548,12 +554,18 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
 - All profit figures must be NET (after ALL fees + shipping + materials).
 
 Be helpful, concise, and specific. Reference the scanned item's data when available.`
-          const promptText = `## App State\n\`\`\`\n${contextData}\n\`\`\`\n\nUser: ${chatInput}`
-          response = await callLLM(promptText, {
-            task: 'chat',
-            geminiApiKey: settings?.geminiApiKey,
-            systemPrompt,
-          })
+          // Guard: surface missing API key as a friendly in-chat message instead
+          // of throwing an opaque error that gets swallowed by the generic catch.
+          if (!settings?.geminiApiKey && !settings?.anthropicApiKey) {
+            response = '⚙️ No AI API key configured. Go to **Settings → AI Configuration** and add your Gemini or Claude API key to start chatting.'
+          } else {
+            const promptText = `## App State\n\`\`\`\n${contextData}\n\`\`\`\n\nUser: ${chatInput}`
+            response = await callLLM(promptText, {
+              task: 'chat',
+              geminiApiKey: settings?.geminiApiKey,
+              systemPrompt,
+            })
+          }
         }
       }
 
@@ -567,12 +579,18 @@ Be helpful, concise, and specific. Reference the scanned item's data when availa
       setChatMessages(prev => [...prev, aiMessage])
     } catch (error) {
       console.error('AI chat error:', error)
-      toast.error('Failed to get AI response')
-      
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      // Surface actionable errors (API key, safety block) as toasts;
+      // transient errors get an inline message so the user can simply retry
+      if (errorMsg.includes('API key') || errorMsg.includes('configure') || errorMsg.includes('unavailable')) {
+        toast.error(errorMsg)
+      }
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'I apologize, but I encountered an error processing your request. Please try again.',
+        content: errorMsg.includes('API key') || errorMsg.includes('configure')
+          ? '⚙️ No AI API key configured. Go to **Settings → AI Configuration** and add your Gemini or Claude API key.'
+          : 'I had trouble with that request. Please try again.',
         timestamp: Date.now()
       }
       setChatMessages(prev => [...prev, errorMessage])

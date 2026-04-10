@@ -9,6 +9,7 @@ import { CameraOverlay } from './components/CameraOverlay'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { AgentScreen } from './components/screens/AgentScreen'
+import { AIScreen } from './components/screens/AIScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -228,8 +229,8 @@ function App() {
       productName: barcodeProduct?.title || undefined,
     }
     setCurrentItem(newItem)
-    setScreen('agent')
-    
+    setScreen('scan')
+
     const steps: PipelineStep[] = [
       { id: 'vision', label: 'Vision Analysis', status: 'processing', progress: 0 },
       { id: 'lens', label: 'Google Lens', status: 'pending', progress: 0 },
@@ -1533,18 +1534,18 @@ function App() {
 
     const imageSource = item.imageData || item.imageThumbnail
     if (!imageSource) {
-      // No image — navigate to agent with item pre-loaded so user can see it
+      // No image — navigate to scan screen with item pre-loaded so user can see it
       setCurrentItem(item)
       setPipeline([])
-      setScreen('agent')
+      setScreen('scan')
       toast('No image available — re-scan with camera to re-analyze', { duration: 3000 })
       return
     }
 
-    // Navigate to agent first, then trigger pipeline — only remove from queue on success
+    // Navigate to scan screen first, then trigger pipeline — only remove from queue on success
     setCurrentItem(undefined)
     setPipeline([])
-    setScreen('agent')
+    setScreen('scan')
     try {
       await handleCapture(imageSource, item.purchasePrice, item.location)
       setQueue(prev => (prev || []).filter(i => i.id !== itemId))
@@ -1761,7 +1762,9 @@ function App() {
         soldLoading={soldLoading}
         soldSyncedAt={soldSyncedAt}
         onBack={
-          screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
+          screen === 'scan'
+            ? () => setScreen('session')
+            : screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
             ? () => setScreen('session')
             : screen === 'tag-analytics' || screen === 'location-insights'
             ? () => setScreen('queue')
@@ -1816,6 +1819,35 @@ function App() {
               />
             </motion.div>
           )}
+          {screen === 'scan' && (
+            <motion.div
+              key="scan"
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
+              className="w-full h-full"
+            >
+              <AIScreen
+                currentItem={currentItem}
+                pipeline={pipeline}
+                settings={settings}
+                queueItems={queue || []}
+                onSaveDraft={handleSaveDraft}
+                onCreateListing={handleCreateListingFromScan}
+                onPassItem={handlePassFromScan}
+                onRecalculate={handleRecalculate}
+                onRescan={handleRescan}
+                onOpenCamera={() => setCameraOpen(true)}
+                pendingMessage={agentPendingMessage}
+                onPendingMessageHandled={() => setAgentPendingMessage(null)}
+                geminiService={geminiService}
+                onUpdateItem={handleUpdateCurrentItem}
+              />
+            </motion.div>
+          )}
           {screen === 'agent' && (
             <motion.div
               key="agent"
@@ -1849,6 +1881,11 @@ function App() {
                 allSessions={visibleSessions}
                 scanHistory={scanHistory || []}
                 profitGoals={profitGoals || []}
+                onOpenScanItem={(item) => {
+                  setCurrentItem(item)
+                  setPipeline([])
+                  setScreen('scan')
+                }}
               />
             </motion.div>
           )}

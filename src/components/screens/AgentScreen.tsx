@@ -20,6 +20,7 @@ import {
   Stack,
   ListChecks,
   ChatCircle,
+  Camera,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,24 +56,24 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
+    emoji: '📸',
+    label: 'Scan Item',
+    prompt: 'open camera to scan a new item',
+  },
+  {
     emoji: '🚀',
     label: 'Full Pipeline',
-    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion'
+    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion',
   },
   {
-    emoji: '📦',
-    label: 'Create Listings',
-    prompt: 'Create optimized eBay listings for all BUY items in my queue'
-  },
-  {
-    emoji: '🔎',
-    label: 'Research Item',
-    prompt: 'Research the market value of my most recent item'
+    emoji: '📬',
+    label: 'Need Shipping',
+    prompt: 'Which sold items need shipping labels right now? Show me overdue items first, then the best carrier and estimated cost for each.',
   },
   {
     emoji: '📊',
-    label: 'Session Status',
-    prompt: 'What\'s my current session status? Show me all stats, goals, and recent items.'
+    label: 'Session Stats',
+    prompt: "What's my current session status? Show stats, profit goal progress, and recent items.",
   },
 ]
 
@@ -231,6 +232,8 @@ interface AgentScreenProps {
   onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
   onMarkShipped?: (itemId: string, trackingNumber: string, shippingCarrier: string) => void
   onNavigateToQueue?: () => void
+  /** Open a specific queue item in the scan analysis screen (loads it as currentItem) */
+  onOpenScanItem?: (item: ScannedItem) => void
   onOpenCamera?: () => void
   onStartSession?: () => void
   onEndSession?: () => void
@@ -242,7 +245,7 @@ interface AgentScreenProps {
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
   const sessionId = currentSession?.id
   const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])
@@ -704,6 +707,55 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         return
       }
 
+      // Show tasks command — list pending todos inline without hitting the LLM
+      if (/\b(show tasks?|view tasks?|my tasks?|task list|what.*tasks?|tasks? left)\b/i.test(lowerText)) {
+        if (pendingTodos.length === 0) {
+          addMsg('✅ No pending tasks — your list is clear! Tap the **Task** tab to add one, or say "add task: [description]".')
+        } else {
+          const taskLines = pendingTodos.slice(0, 10).map((t, i) => `${i + 1}. ${t.text}`).join('\n')
+          addMsg(`You have **${pendingTodos.length} pending task${pendingTodos.length !== 1 ? 's' : ''}**:\n\n${taskLines}\n\nSwitch to the **Task** tab to check them off or add more.`)
+        }
+        setIsProcessing(false)
+        return
+      }
+
+      // Shipping status — serve from live sold data already in context, no LLM needed
+      if (/\b(shipping|ship|need labels?|need to ship|overdue|what.*ship|labels? needed)\b/i.test(lowerText)) {
+        if (liveSoldItems.length === 0) {
+          addMsg('📬 No sold items found in your Notion Sales DB yet. Once items sell and WF-01 parses the confirmation emails they\'ll appear here automatically. You can also tap **+ Log Sale** on the Sold tab to add them manually.')
+        } else {
+          const { needsLabelCount, overdueCount, readyCount, shippedCount, urgentItems, totalPotentialShippingCost } = (() => {
+            // Import is at top of file — use the already-imported analyzeSoldBatch
+            const a = { needsLabelCount: 0, overdueCount: 0, readyCount: 0, shippedCount: 0, urgentItems: [] as Array<{title:string;hoursOverdue:number;platform:string}>, totalPotentialShippingCost: 0 }
+            for (const item of liveSoldItems) {
+              if (item.shippingStatus === '✅ Shipped') a.shippedCount++
+              else if (item.shippingStatus === '🔴 Need Label') a.needsLabelCount++
+              else if (item.shippingStatus === '🟡 Label Ready' || item.shippingStatus === '📦 Packed') a.readyCount++
+              if (item.shippingStatus !== '✅ Shipped' && item.saleDate) {
+                const hours = Math.round((Date.now() - new Date(item.saleDate).getTime()) / 3_600_000)
+                if (hours >= 48) { a.overdueCount++; a.urgentItems.push({ title: item.title, hoursOverdue: Math.max(0, hours - 24), platform: item.platform }) }
+              }
+            }
+            a.urgentItems.sort((x, y) => y.hoursOverdue - x.hoursOverdue)
+            return a
+          })()
+
+          const lines: string[] = [`📬 **Shipping Status — ${liveSoldItems.length} sold item${liveSoldItems.length !== 1 ? 's' : ''}**\n`]
+          if (overdueCount > 0) lines.push(`🔴 **${overdueCount} overdue** (>48h since sale — ship today!)`)
+          if (needsLabelCount > 0) lines.push(`🟡 **${needsLabelCount} need a label**`)
+          if (readyCount > 0) lines.push(`📦 **${readyCount} packed / label ready**`)
+          if (shippedCount > 0) lines.push(`✅ **${shippedCount} shipped**`)
+          if (urgentItems.length > 0) {
+            lines.push('\n**Overdue items:**')
+            urgentItems.slice(0, 5).forEach(u => lines.push(`• ${u.title} — ${u.hoursOverdue}h overdue (${u.platform})`))
+          }
+          lines.push('\nGo to the **Sold** tab to print labels and update statuses.')
+          addMsg(lines.join('\n'))
+        }
+        setIsProcessing(false)
+        return
+      }
+
       // Research command — uses Gemini with Google Search grounding for real market data
       if ((lowerText.includes('research') || lowerText.includes('look up') || lowerText.includes('double check') || lowerText.includes('price check') || lowerText.includes('market value')) && settings?.geminiApiKey) {
         // Find the most recently discussed item or the most recent queue item
@@ -988,6 +1040,25 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       ).join('\n\n')
       const historyBlock = recentHistory ? `\n\n## Recent Conversation\n${recentHistory}` : ''
 
+      // Guard: ensure at least one API key is configured before hitting callLLM
+      // (callLLM throws on missing keys but the error message may not reach the user clearly)
+      if (!settings?.geminiApiKey && !settings?.anthropicApiKey) {
+        const noKeyMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: '⚙️ No AI API key configured. Go to **Settings → AI Configuration** and add your Gemini or Claude API key to start chatting.',
+          timestamp: Date.now(),
+        }
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === sessionId
+              ? { ...s, messages: [...s.messages, noKeyMsg], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+        return
+      }
+
       // Static instructions → Gemini systemInstruction (cached across requests)
       // Dynamic context + history + user message → contents (billed per-request)
       const userPrompt = `${dynamicContext}${historyBlock}\n\nUser: ${text}`
@@ -1057,8 +1128,10 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   }, [pendingMessage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleQuickAction = useCallback((prompt: string) => {
-    setInput(prompt)
-  }, [])
+    // Send immediately — don't pre-fill the floating input bar (which lives in App.tsx
+    // and has its own state, so setInput here would never reach the send button)
+    handleSendMessage(prompt)
+  }, [handleSendMessage])
 
   const sortedSessions = useMemo(() =>
     [...(chatSessions || [])].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
@@ -1091,7 +1164,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
                   <span>💬 Chat</span>
                 </button>
                 <button onClick={() => setAgentTab('scan')} className={cn('tab-btn', agentTab === 'scan' && 'active')}>
-                  <span>📷 Scan {queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started')).length > 0 ? `(${queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started')).length})` : ''}</span>
+                  <span>📷 Scan {(() => { const n = queueItems.filter(i => i.decision === 'PENDING' || (i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))).length; return n > 0 ? `(${n})` : '' })()}</span>
                 </button>
                 <button onClick={() => setAgentTab('task')} className={cn('tab-btn', agentTab === 'task' && 'active')}>
                   <span>✅ Task {pendingTodos.length > 0 ? `(${pendingTodos.length})` : ''}</span>
@@ -1105,26 +1178,51 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
               <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5">
                 {/* Quick Actions + New Chat */}
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">Quick Actions</div>
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                    {/* New Chat — first in the row */}
-                    <button
-                      onClick={handleCreateSession}
-                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-gradient-to-br from-b1 to-b2 rounded-xl text-xs font-bold text-white active:scale-95 transition-all"
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2.5">Quick Actions</div>
+                  {/* Full-bleed scroll strip — bleeds past px-4 parent so last chip never clips */}
+                  <div className="relative -mx-4">
+                    {/* Right-fade hint — shows there's more to scroll */}
+                    <div
+                      className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 z-10"
+                      style={{ background: 'linear-gradient(to left, var(--bg, #fff) 10%, transparent)' }}
+                    />
+                    <div
+                      className="flex gap-2 px-4 scrollbar-hide"
+                      style={{
+                        overflowX: 'auto',
+                        WebkitOverflowScrolling: 'touch',
+                        overscrollBehavior: 'contain',
+                        paddingRight: '32px', // ensure last chip clears the fade
+                      }}
                     >
-                      <Plus size={12} weight="bold" />
-                      <span>New Chat</span>
-                    </button>
-                    {QUICK_ACTIONS.map(action => (
+                      {/* New Chat — primary pill */}
                       <button
-                        key={action.label}
-                        onClick={() => handleQuickAction(action.prompt)}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-fg border border-s1 rounded-xl text-xs font-bold text-t1 active:scale-95 transition-all"
+                        onClick={handleCreateSession}
+                        className="flex-none flex items-center gap-1.5 h-9 px-4 bg-gradient-to-br from-b1 to-b2 rounded-full text-xs font-semibold text-white whitespace-nowrap shadow-sm active:scale-95 transition-all duration-150"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        <span>{action.emoji}</span>
-                        <span>{action.label}</span>
+                        <Plus size={13} weight="bold" />
+                        <span>New Chat</span>
                       </button>
-                    ))}
+                      {/* Quick action pills */}
+                      {QUICK_ACTIONS.map(action => (
+                        <button
+                          key={action.label}
+                          onClick={() => handleQuickAction(action.prompt)}
+                          className="flex-none flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-semibold text-t1 whitespace-nowrap active:scale-95 transition-all duration-150"
+                          style={{
+                            touchAction: 'manipulation',
+                            WebkitTapHighlightColor: 'transparent',
+                            background: 'color-mix(in oklch, var(--fg) 95%, transparent)',
+                            border: '0.5px solid color-mix(in oklch, var(--s1) 80%, transparent)',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                          }}
+                        >
+                          <span className="text-sm leading-none">{action.emoji}</span>
+                          <span>{action.label}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -1169,70 +1267,146 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
             </ScrollArea>
             )}
 
-            {/* ── SCAN TAB — BUY queue awaiting listing ── */}
+            {/* ── SCAN TAB — all scanned items grouped by stage ── */}
             {agentTab === 'scan' && (() => {
-              const buyQueue = queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))
-              const readyItems = queueItems.filter(i => i.decision === 'BUY' && i.listingStatus && i.listingStatus !== 'not-started' && i.listingStatus !== 'sold')
+              // All scans newest-first so the most recent item is always at top
+              const allScans = [...queueItems].reverse()
+              const pendingItems  = allScans.filter(i => i.decision === 'PENDING')
+              const buyQueue      = allScans.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))
+              const inListings    = allScans.filter(i => i.decision === 'BUY' && i.listingStatus && i.listingStatus !== 'not-started' && i.listingStatus !== 'sold')
+              const passItems     = allScans.filter(i => i.decision === 'PASS')
+              const totalScans    = queueItems.length
+
+              const listingStatusColor: Record<string, string> = {
+                'ready':     'bg-green/15 text-green',
+                'published': 'bg-b1/15 text-b1',
+                'not-started': 'bg-s2/40 text-t3',
+              }
+
+              // Shared scan card renderer
+              const ScanCard = ({ item, dimmed = false }: { item: ScannedItem; dimmed?: boolean }) => (
+                <button
+                  key={item.id}
+                  onClick={() => onOpenScanItem?.(item)}
+                  className={cn(
+                    'w-full text-left p-3.5 bg-fg/90 border rounded-2xl shadow-sm active:scale-[0.97] transition-all',
+                    dimmed ? 'border-s1/40 opacity-60 hover:opacity-100' : 'border-s2/60 hover:border-b1/30'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="text-sm font-semibold text-t1 flex-1 leading-snug">
+                      {item.productName || 'Unidentified item'}
+                    </span>
+                    {item.decision === 'BUY' && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green/15 text-green flex-shrink-0">BUY</span>
+                    )}
+                    {item.decision === 'PASS' && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-red/15 text-red flex-shrink-0">PASS</span>
+                    )}
+                    {item.decision === 'PENDING' && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-amber/15 text-amber flex-shrink-0">REVIEW</span>
+                    )}
+                    {item.listingStatus && item.listingStatus !== 'not-started' && (
+                      <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-md capitalize flex-shrink-0', listingStatusColor[item.listingStatus] || 'bg-s2/40 text-t3')}>
+                        {item.listingStatus}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] text-t3 mb-1.5">
+                    <span>Cost: <span className="text-t1 font-semibold">${item.purchasePrice.toFixed(2)}</span></span>
+                    {item.estimatedSellPrice ? (
+                      <span>Sell: <span className="text-t1 font-semibold">${item.estimatedSellPrice.toFixed(0)}</span></span>
+                    ) : null}
+                    {item.profitMargin ? (
+                      <span className={item.profitMargin >= 30 ? 'text-green font-semibold' : 'text-amber font-semibold'}>
+                        {item.profitMargin.toFixed(0)}% margin
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {item.category && (
+                        <span className="text-[9px] text-t3 bg-s1 px-1.5 py-0.5 rounded-md">{item.category}</span>
+                      )}
+                      {item.notionPageId && (
+                        <span className="text-[9px] text-b1 font-semibold">✓ Notion</span>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-b1 font-semibold flex-shrink-0">
+                      Tap to open →
+                    </span>
+                  </div>
+                </button>
+              )
+
               return (
               <ScrollArea className="flex-1">
-                <div className="py-3 px-3 space-y-3">
-                  {buyQueue.length === 0 && readyItems.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="text-3xl mb-3">📷</div>
-                      <h2 className="text-base font-bold text-t1 mb-1">Queue is clear</h2>
-                      <p className="text-xs text-t3">Scan items to build your listing queue</p>
+                <div className="py-3 px-3 space-y-4">
+                  {totalScans === 0 ? (
+                    <div className="text-center py-14">
+                      <div className="text-4xl mb-3">📷</div>
+                      <h2 className="text-base font-bold text-t1 mb-1">No scans yet</h2>
+                      <p className="text-xs text-t3 mb-4">Scan items at the thrift store to start your pipeline</p>
+                      {onOpenCamera && (
+                        <button
+                          onClick={onOpenCamera}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-b1 text-white text-xs font-bold rounded-full active:scale-95 transition-all"
+                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          <Camera size={14} weight="bold" /> Scan Item
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <>
-                      {buyQueue.length > 0 && (
+                      {/* Pending Review — most urgent, shown first */}
+                      {pendingItems.length > 0 && (
                         <div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">
-                            📥 Needs Listing ({buyQueue.length})
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber inline-block" />
+                            Needs Decision ({pendingItems.length})
                           </div>
                           <div className="space-y-2">
-                            {buyQueue.slice().reverse().map(item => (
-                              <div key={item.id} className="p-3.5 bg-fg/90 border border-s2/60 rounded-2xl shadow-sm">
-                                <div className="flex items-start justify-between gap-2 mb-1">
-                                  <span className="text-sm font-semibold text-t1 truncate flex-1">
-                                    {item.productName || 'Unknown item'}
-                                  </span>
-                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green/15 text-green flex-shrink-0">BUY</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-[10px] text-t3">
-                                  <span>Cost: <span className="text-t1 font-semibold">${item.purchasePrice.toFixed(2)}</span></span>
-                                  {item.estimatedSellPrice ? (
-                                    <span>Est sell: <span className="text-t1 font-semibold">${item.estimatedSellPrice.toFixed(0)}</span></span>
-                                  ) : null}
-                                  {item.profitMargin ? (
-                                    <span className={item.profitMargin >= 30 ? 'text-green font-semibold' : 'text-t2'}>
-                                      {item.profitMargin.toFixed(0)}% margin
-                                    </span>
-                                  ) : null}
-                                </div>
-                                {item.category && (
-                                  <div className="mt-1 text-[9px] text-t3">{item.category}</div>
-                                )}
-                              </div>
-                            ))}
+                            {pendingItems.map(item => <ScanCard key={item.id} item={item} />)}
                           </div>
                         </div>
                       )}
-                      {readyItems.length > 0 && (
+
+                      {/* BUY — needs listing created */}
+                      {buyQueue.length > 0 && (
                         <div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">
-                            📋 In Listings ({readyItems.length})
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green inline-block" />
+                            Needs Listing ({buyQueue.length})
                           </div>
                           <div className="space-y-2">
-                            {readyItems.slice().reverse().map(item => (
-                              <div key={item.id} className="p-2.5 bg-fg/50 border border-s1/50 rounded-xl opacity-70">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs font-medium text-t2 truncate flex-1">
-                                    {item.productName || 'Unknown item'}
-                                  </span>
-                                  <span className="text-[9px] text-t3 capitalize flex-shrink-0">{item.listingStatus}</span>
-                                </div>
-                              </div>
-                            ))}
+                            {buyQueue.map(item => <ScanCard key={item.id} item={item} />)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* BUY — listing in progress or complete */}
+                      {inListings.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-b1 inline-block" />
+                            In Listings ({inListings.length})
+                          </div>
+                          <div className="space-y-2">
+                            {inListings.map(item => <ScanCard key={item.id} item={item} />)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PASS — dimmed at bottom for reference */}
+                      {passItems.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-t3 inline-block" />
+                            Passed ({passItems.length})
+                          </div>
+                          <div className="space-y-2">
+                            {passItems.map(item => <ScanCard key={item.id} item={item} dimmed />)}
                           </div>
                         </div>
                       )}
