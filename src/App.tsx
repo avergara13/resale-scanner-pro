@@ -1664,7 +1664,10 @@ function App() {
         className="flex-1 relative w-full"
         style={{
           minHeight: 'calc(100dvh - 96px)',
-          paddingBottom: 'max(calc(4rem + env(safe-area-inset-bottom, 0px)), 4.5rem)',
+          // Agent screen owns its bottom bar — skip the nav-clearance padding so the
+          // input sits flush against the nav bar. All other screens need it to prevent
+          // content from being hidden behind the fixed nav.
+          paddingBottom: screen === 'agent' ? 0 : 'max(calc(4rem + env(safe-area-inset-bottom, 0px)), 4.5rem)',
         }}
       >
         <AnimatePresence mode="wait">
