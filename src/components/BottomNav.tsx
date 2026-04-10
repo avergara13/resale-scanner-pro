@@ -35,7 +35,9 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
       <div className="relative h-16 sm:h-18 flex items-center justify-around px-2 sm:px-4">
         {items.slice(0, 2).map((item) => {
           const Icon = item.icon
-          const isActive = currentScreen === item.id
+          // scan-result is a child of the agent tab — keep agent highlighted while on it
+          const isActive = currentScreen === item.id ||
+            (item.id === 'agent' && currentScreen === 'scan-result')
 
           return (
             <button

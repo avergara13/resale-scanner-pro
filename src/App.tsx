@@ -1568,10 +1568,48 @@ function App() {
     }
   }, []) // intentionally empty deps — runs once on mount
 
+  // Directional slide transitions —————————————————————————————————————————
+  // Tab screens have a fixed left-to-right order.  Secondary/push screens
+  // (settings, session-detail, scan-result, …) always push in from the right
+  // and pop back to the left.  The direction is computed once per screen
+  // change (synchronously, before JSX evaluates) so framer-motion's
+  // `custom` prop receives the correct value for both the entering and the
+  // exiting motion.div.
+  const SCREEN_TAB_ORDER: Partial<Record<Screen, number>> = {
+    session: 0,
+    agent: 1,
+    'scan-result': 1.5, // lives between agent and queue
+    queue: 2,
+    sold: 3,
+  }
+
+  const prevScreenRef = useRef<Screen>(screen)
+  const slideDir = useRef<'left' | 'right' | 'none'>('none')
+
+  if (prevScreenRef.current !== screen) {
+    const prevIdx = SCREEN_TAB_ORDER[prevScreenRef.current]
+    const nextIdx = SCREEN_TAB_ORDER[screen]
+    if (prevIdx !== undefined && nextIdx !== undefined) {
+      slideDir.current = nextIdx > prevIdx ? 'right' : nextIdx < prevIdx ? 'left' : 'none'
+    } else if (nextIdx === undefined) {
+      slideDir.current = 'right'   // pushing into a secondary screen
+    } else {
+      slideDir.current = 'left'    // returning from a secondary screen to a tab
+    }
+    prevScreenRef.current = screen
+  }
+
+  type SlideDir = 'left' | 'right' | 'none'
   const screenVariants = {
-    initial: { opacity: 0, y: 8 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -8 },
+    initial: (dir: SlideDir) => ({
+      opacity: 0,
+      x: dir === 'right' ? 22 : dir === 'left' ? -22 : 0,
+    }),
+    animate: { opacity: 1, x: 0 },
+    exit: (dir: SlideDir) => ({
+      opacity: 0,
+      x: dir === 'right' ? -22 : dir === 'left' ? 22 : 0,
+    }),
   }
 
   useEffect(() => {
@@ -1619,6 +1657,8 @@ function App() {
             ? () => setScreen('queue')
             : screen === 'cost-tracking'
             ? () => setScreen('settings')
+            : screen === 'scan-result'
+            ? () => setScreen('agent')
             : undefined
         }
       />
@@ -1633,11 +1673,12 @@ function App() {
           {screen === 'session' && (
             <motion.div
               key="session"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1664,11 +1705,12 @@ function App() {
           {screen === 'agent' && (
             <motion.div
               key="agent"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1699,11 +1741,12 @@ function App() {
           {screen === 'scan-result' && (
             <motion.div
               key="scan-result"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1728,11 +1771,12 @@ function App() {
           {screen === 'queue' && (
             <motion.div
               key="queue"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1781,11 +1825,12 @@ function App() {
           {screen === 'sold' && (
             <motion.div
               key="sold"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1803,11 +1848,12 @@ function App() {
           {screen === 'settings' && settings && (
             <motion.div
               key="settings"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1821,11 +1867,12 @@ function App() {
           {screen === 'tag-analytics' && (
             <motion.div
               key="tag-analytics"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1839,11 +1886,12 @@ function App() {
           {screen === 'location-insights' && (
             <motion.div
               key="location-insights"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1856,11 +1904,12 @@ function App() {
           {screen === 'cost-tracking' && (
             <motion.div
               key="cost-tracking"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1872,11 +1921,12 @@ function App() {
           {screen === 'scan-history' && (
             <motion.div
               key="scan-history"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >
@@ -1895,11 +1945,12 @@ function App() {
           {screen === 'session-detail' && selectedSessionId && (
             <motion.div
               key="session-detail"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
               className="w-full h-full"
             >

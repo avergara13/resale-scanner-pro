@@ -5,6 +5,7 @@ import type { Screen } from '@/types'
 const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   session: 'RESALE SCANNER PRO',
   agent: 'AGENT',
+  'scan-result': 'SCAN RESULT',
   queue: 'LISTING QUEUE',
   sold: 'SOLD',
   settings: 'SETTINGS',
@@ -25,7 +26,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, onBack, showTrends }: AppHeaderProps) {
   const title = SCREEN_TITLES[screen] || ''
-  const isSubScreen = !['session', 'agent', 'queue', 'sold'].includes(screen)
+  const isSubScreen = !['session', 'agent', 'queue', 'sold'].includes(screen as string)
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-4 h-11 bg-fg border-b border-s1 flex-shrink-0">
