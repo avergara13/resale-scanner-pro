@@ -332,8 +332,8 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                     }
                   }}
                 >
-                  <motion.div 
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                     animate={{
                       x: ['-100%', '200%']
                     }}
@@ -375,8 +375,8 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   animate={{ width: '100%' }}
                   transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
                 >
-                  <motion.div 
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent"
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent"
                     initial={{ x: '-100%' }}
                     animate={{ x: '200%' }}
                     transition={{ duration: 0.8, ease: 'easeInOut' }}

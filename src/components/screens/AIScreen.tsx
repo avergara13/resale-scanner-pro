@@ -199,13 +199,13 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
         >
           {isProcessing && (
             <div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent"
               style={{ animation: 'shimmer-sweep 1.5s ease-in-out infinite' }}
             />
           )}
           {isComplete && (
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
               initial={{ x: '-100%' }}
               animate={{ x: '200%' }}
               transition={{ duration: 0.8, ease: 'easeInOut' }}

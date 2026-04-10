@@ -1182,12 +1182,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           <div className="flex items-center gap-2">
             <button
               onClick={handleSelectAll}
-              className="flex items-center gap-1 h-6 px-2 rounded-full border border-s2 bg-transparent text-[10px] font-semibold text-t3 hover:text-t1 hover:bg-s1 transition-colors flex-shrink-0"
+              className="flex items-center gap-1 h-5 px-2 rounded-full bg-s1 text-[9px] font-semibold text-t2 hover:bg-s2 hover:text-t1 transition-colors flex-shrink-0"
             >
               {allFilteredSelected ? (
-                <><CheckSquare size={11} weight="fill" />Deselect All</>
+                <><CheckSquare size={10} weight="fill" />Deselect All</>
               ) : (
-                <><Square size={11} weight="bold" />Select All</>
+                <><Square size={10} weight="bold" />Select All</>
               )}
             </button>
             {selectedIds.size > 0 && (
