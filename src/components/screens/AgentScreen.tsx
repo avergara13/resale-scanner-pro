@@ -233,6 +233,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   const [activeSessionId, setActiveSessionId] = useKV<string | null>(activeKey, null)
   const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', EMPTY_TODOS)
   const [viewMode, setViewMode] = useState<'list' | 'chat'>('list')
+  const [agentTab, setAgentTab] = useState<'chat' | 'scan' | 'task'>('chat')
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [showRenameDialog, setShowRenameDialog] = useState(false)
@@ -1077,25 +1078,55 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0"
           >
-            {/* List header */}
-            <div className="flex items-center justify-between px-4 py-4 bg-fg border-b border-s1">
+            {/* Agent header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-fg border-b border-s1">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-b1 to-b2 rounded-xl">
-                  <Robot size={24} weight="bold" className="text-white" />
+                  <Robot size={22} weight="bold" className="text-white" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-bold text-t1">Agent</h1>
-                  <p className="text-xs text-t3">AI Research & Automation</p>
+                  <h1 className="text-base font-bold text-t1">Agent</h1>
+                  <p className="text-[10px] text-t3">AI Research & Automation</p>
                 </div>
               </div>
-              <Button size="sm" onClick={handleCreateSession} className="h-8 px-3 text-xs">
-                <Plus size={14} weight="bold" className="mr-1" /> New Chat
-              </Button>
+              {agentTab === 'chat' && (
+                <Button size="sm" onClick={handleCreateSession} className="h-8 px-3 text-xs">
+                  <Plus size={14} weight="bold" className="mr-1" /> New Chat
+                </Button>
+              )}
             </div>
 
+            {/* Tab bar — Chat / Scan / Task */}
+            <div className="flex border-b border-s1 bg-fg">
+              {([
+                { id: 'chat', emoji: '💬', label: 'Chat' },
+                { id: 'scan', emoji: '📷', label: 'Scan' },
+                { id: 'task', emoji: '✅', label: 'Task' },
+              ] as const).map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setAgentTab(tab.id)}
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-all border-b-2',
+                    agentTab === tab.id
+                      ? 'border-b1 text-b1'
+                      : 'border-transparent text-t3 active:opacity-60'
+                  )}
+                >
+                  <span>{tab.emoji}</span>
+                  <span>{tab.label}</span>
+                  {tab.id === 'task' && pendingTodos.length > 0 && (
+                    <span className="text-[8px] bg-b1/15 text-b1 px-1 py-0.5 rounded font-black leading-none">{pendingTodos.length}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* ── CHAT TAB ── */}
+            {agentTab === 'chat' && (
             <ScrollArea className="flex-1">
               <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5">
-                {/* Quick Actions — always visible */}
+                {/* Quick Actions */}
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">Quick Actions</div>
                   <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
@@ -1111,51 +1142,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
                     ))}
                   </div>
                 </div>
-
-                {/* Tasks */}
-                {(pendingTodos.length > 0 || showTaskInput) && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <ListChecks size={14} className="text-t3" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-t3">Tasks</span>
-                        {pendingTodos.length > 0 && (
-                          <span className="text-[8px] bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md font-bold">{pendingTodos.length}</span>
-                        )}
-                      </div>
-                      <button onClick={() => setShowTaskInput(!showTaskInput)} className="text-[10px] text-b1 font-bold">
-                        {showTaskInput ? 'Done' : '+ Add'}
-                      </button>
-                    </div>
-                    {showTaskInput && (
-                      <form onSubmit={(e) => { e.preventDefault(); if (taskInput.trim()) { setTodos(prev => [...(prev || []), { id: Date.now().toString(), text: taskInput.trim(), completed: false, createdBy: 'user' as const, createdAt: Date.now() }]); setTaskInput('') } }} className="flex gap-2 mb-2">
-                        <Input value={taskInput} onChange={e => setTaskInput(e.target.value)} placeholder="Add a task..." className="flex-1 h-8 text-xs" autoFocus />
-                        <Button type="submit" size="sm" disabled={!taskInput.trim()} className="h-8 px-3 text-xs">Add</Button>
-                      </form>
-                    )}
-                    <div className="space-y-1">
-                      {pendingTodos.map(t => (
-                        <div key={t.id} className="flex items-center gap-2 py-1.5 px-2 bg-fg rounded-lg border border-s1 group">
-                          <button onClick={() => setTodos(prev => (prev || []).map(x => x.id === t.id ? { ...x, completed: true } : x))} className="w-4 h-4 rounded border border-s2 flex items-center justify-center flex-shrink-0 hover:border-b1">
-                          </button>
-                          <span className="text-xs text-t1 flex-1 truncate">{t.text}</span>
-                          <span className="text-[8px] text-t3 uppercase">{t.createdBy}</span>
-                          <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash size={12} />
-                          </button>
-                        </div>
-                      ))}
-                      {completedTodos.length > 0 && (
-                        <div className="text-[10px] text-t3 px-2 pt-1">{completedTodos.length} completed</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {pendingTodos.length === 0 && !showTaskInput && (
-                  <button onClick={() => setShowTaskInput(true)} className="flex items-center gap-1.5 text-[10px] text-t3 font-bold">
-                    <ListChecks size={12} /> Add a task
-                  </button>
-                )}
 
                 {/* Conversation List */}
                 {sortedSessions.length === 0 ? (
@@ -1197,8 +1183,122 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
                 )}
               </div>
             </ScrollArea>
+            )}
 
-            {inputBar}
+            {/* ── SCAN TAB ── */}
+            {agentTab === 'scan' && (
+            <ScrollArea className="flex-1">
+              <div className="py-4 px-4 space-y-3">
+                {queueItems.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-3xl mb-3">📷</div>
+                    <h2 className="text-base font-bold text-t1 mb-1">No items scanned yet</h2>
+                    <p className="text-xs text-t3">Tap the camera to scan your first item</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-1">
+                      {queueItems.length} item{queueItems.length !== 1 ? 's' : ''} scanned
+                    </div>
+                    {queueItems.slice().reverse().map(item => (
+                      <div key={item.id} className="p-3 bg-fg border border-s1 rounded-xl">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <span className="text-sm font-semibold text-t1 truncate flex-1">
+                            {item.productName || 'Unknown item'}
+                          </span>
+                          <span className={cn(
+                            'text-[9px] font-black px-1.5 py-0.5 rounded-md flex-shrink-0',
+                            item.decision === 'BUY' ? 'bg-green/15 text-green' :
+                            item.decision === 'PASS' ? 'bg-red/15 text-red' : 'bg-s1 text-t3'
+                          )}>
+                            {item.decision}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] text-t3">
+                          <span>Cost: <span className="text-t1 font-semibold">${item.purchasePrice.toFixed(2)}</span></span>
+                          {item.estimatedSellPrice && (
+                            <span>Sell: <span className="text-t1 font-semibold">${item.estimatedSellPrice.toFixed(0)}</span></span>
+                          )}
+                          {item.profitMargin && (
+                            <span className={item.profitMargin >= 30 ? 'text-green font-semibold' : 'text-t2'}>
+                              {item.profitMargin.toFixed(0)}% margin
+                            </span>
+                          )}
+                        </div>
+                        {item.listingStatus && item.listingStatus !== 'not-started' && (
+                          <div className="mt-1 text-[9px] text-t3 capitalize">{item.listingStatus}</div>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </ScrollArea>
+            )}
+
+            {/* ── TASK TAB ── */}
+            {agentTab === 'task' && (
+            <ScrollArea className="flex-1">
+              <div className="py-4 px-4 space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 flex items-center gap-1.5">
+                    <ListChecks size={12} /> Tasks
+                    {pendingTodos.length > 0 && (
+                      <span className="text-[8px] bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md font-black">{pendingTodos.length}</span>
+                    )}
+                  </div>
+                  <button onClick={() => setShowTaskInput(!showTaskInput)} className="text-[10px] text-b1 font-bold">
+                    {showTaskInput ? 'Done' : '+ Add'}
+                  </button>
+                </div>
+                {showTaskInput && (
+                  <form onSubmit={(e) => { e.preventDefault(); if (taskInput.trim()) { setTodos(prev => [...(prev || []), { id: Date.now().toString(), text: taskInput.trim(), completed: false, createdBy: 'user' as const, createdAt: Date.now() }]); setTaskInput('') } }} className="flex gap-2">
+                    <Input value={taskInput} onChange={e => setTaskInput(e.target.value)} placeholder="Add a task..." className="flex-1 h-8 text-xs" autoFocus />
+                    <Button type="submit" size="sm" disabled={!taskInput.trim()} className="h-8 px-3 text-xs">Add</Button>
+                  </form>
+                )}
+                {pendingTodos.length === 0 && !showTaskInput ? (
+                  <div className="text-center py-12">
+                    <div className="text-3xl mb-3">✅</div>
+                    <h2 className="text-base font-bold text-t1 mb-1">No tasks yet</h2>
+                    <p className="text-xs text-t3">Tap "+ Add" to create a task, or ask the agent to add one</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {pendingTodos.map(t => (
+                      <div key={t.id} className="flex items-center gap-2 py-2 px-3 bg-fg rounded-xl border border-s1 group">
+                        <button onClick={() => setTodos(prev => (prev || []).map(x => x.id === t.id ? { ...x, completed: true } : x))} className="w-5 h-5 rounded-full border-2 border-s2 flex items-center justify-center flex-shrink-0 hover:border-b1 active:bg-b1/10 transition-colors">
+                        </button>
+                        <span className="text-sm text-t1 flex-1">{t.text}</span>
+                        <span className="text-[8px] text-t3 uppercase flex-shrink-0">{t.createdBy}</span>
+                        <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red transition-colors p-1">
+                          <Trash size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    {completedTodos.length > 0 && (
+                      <div className="pt-2 border-t border-s1">
+                        <div className="text-[10px] text-t3 mb-2 font-semibold">{completedTodos.length} completed</div>
+                        {completedTodos.map(t => (
+                          <div key={t.id} className="flex items-center gap-2 py-1.5 px-3 rounded-lg opacity-50">
+                            <div className="w-5 h-5 rounded-full bg-b1/20 flex items-center justify-center flex-shrink-0">
+                              <span className="text-[8px] text-b1">✓</span>
+                            </div>
+                            <span className="text-xs text-t3 line-through flex-1">{t.text}</span>
+                            <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red transition-colors p-1">
+                              <Trash size={11} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+            )}
+
+            {agentTab === 'chat' && inputBar}
           </motion.div>
         ) : (
           <motion.div
