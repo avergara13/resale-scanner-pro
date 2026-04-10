@@ -198,7 +198,7 @@ export function useImageOptimization(qualityPreset: ImageQualityPreset = 'balanc
 
   const estimateCacheSizeBytes = useCallback((): number => {
     if (!cache) return 0
-    return Object.values(cache).reduce((total, img) => {
+    return Object.values(cache).reduce((total, img: OptimizedImage & { lastAccessed: number }) => {
       return total + img.size + img.thumbnailSize
     }, 0)
   }, [cache])

@@ -222,7 +222,7 @@ export function CostTrackingScreen({ onBack }: CostTrackingScreenProps) {
                             </h4>
                             <div className="space-y-2">
                               {Object.entries(service.costByOperation)
-                                .sort(([, a], [, b]) => b - a)
+                                .sort(([, a], [, b]) => (b as number) - (a as number))
                                 .map(([operation, cost]) => (
                                   <div key={operation} className="flex items-center justify-between text-sm">
                                     <span className="text-t2">{operation}</span>

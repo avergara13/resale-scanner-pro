@@ -28,11 +28,8 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
         paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
         paddingLeft: 'env(safe-area-inset-left, 0px)',
         paddingRight: 'env(safe-area-inset-right, 0px)',
-        background: 'color-mix(in oklch, var(--fg) 88%, transparent)',
-        backdropFilter: 'saturate(180%) blur(28px)',
-        WebkitBackdropFilter: 'saturate(180%) blur(28px)',
-        borderTop: '0.5px solid color-mix(in oklch, var(--s2) 60%, transparent)',
-        boxShadow: '0 -0.5px 0 rgba(0,0,0,0.06)',
+        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
+        WebkitBackdropFilter: 'blur(12px)'
       }}
     >
       {/* 5-column grid — each slot is exactly 1/5 of the nav width, pixel-perfect on every iPhone */}
@@ -46,7 +43,9 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
       >
         {leftItems.map((item) => {
           const Icon = item.icon
-          const isActive = currentScreen === item.id
+          // scan-result is a child of the agent tab — keep agent highlighted while on it
+          const isActive = currentScreen === item.id ||
+            (item.id === 'agent' && currentScreen === 'scan-result')
 
           return (
             <button
@@ -59,7 +58,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               style={{
                 height: '54px',
                 touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
+                WebkitTapHighlightColor: 'transparent'
               }}
             >
               <Icon
@@ -94,7 +93,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
             height: '44px',
             margin: '0 auto',
             touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
+            WebkitTapHighlightColor: 'transparent'
           }}
         >
           <Camera size={20} weight="bold" className="text-white relative z-10" />
@@ -115,7 +114,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               style={{
                 height: '54px',
                 touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
+                WebkitTapHighlightColor: 'transparent'
               }}
             >
               <Icon
