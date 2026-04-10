@@ -127,7 +127,7 @@ function SortableItem({
         isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
       )}
     >
-      <div className="flex gap-2 sm:gap-2.5 md:gap-3">
+      <div className="flex gap-1.5 sm:gap-2.5 md:gap-3">
         {/* Narrow control column: drag handle + checkbox */}
         <div className="flex flex-col gap-1 items-center justify-start pt-0.5 flex-shrink-0">
           <div
@@ -136,17 +136,17 @@ function SortableItem({
             className="cursor-grab active:cursor-grabbing touch-none p-0.5 hover:bg-s1 rounded transition-colors"
             aria-label="Drag to reorder"
           >
-            <DotsSixVertical size={14} weight="bold" className="text-s3" />
+            <DotsSixVertical size={12} weight="bold" className="text-s3" />
           </div>
           <label
             htmlFor={`select-${item.id}`}
-            className="flex items-center justify-center w-10 h-10 -m-2 cursor-pointer"
+            className="flex items-center justify-center w-8 h-8 -m-1.5 cursor-pointer"
           >
             <Checkbox
               id={`select-${item.id}`}
               checked={isSelected}
               onCheckedChange={() => onToggleSelect(item.id)}
-              className="w-4 h-4 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+              className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
             />
           </label>
         </div>
@@ -155,17 +155,17 @@ function SortableItem({
           <img
             src={item.imageThumbnail || item.imageData}
             alt={item.productName || 'Item'}
-            className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+            className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
           />
         ) : (
-          <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 rounded-md border border-s2 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
-            <Package size={24} weight="duotone" className="text-s3" />
+          <div className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 rounded-md border border-s2 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
+            <Package size={20} weight="duotone" className="text-s3" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-1 sm:gap-1.5 md:gap-2 mb-1 sm:mb-1.5 md:mb-2">
+          <div className="flex items-start justify-between gap-1 sm:gap-1.5 md:gap-2 mb-0.5 sm:mb-1.5 md:mb-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              <h3 className="font-semibold text-t1 text-xs sm:text-sm md:text-base line-clamp-2 leading-tight">
+              <h3 className="font-bold text-t1 text-[11px] sm:text-sm md:text-base line-clamp-2 leading-snug tracking-tight">
                 {item.productName || 'Unknown Item'}
               </h3>
               {isPersonal && (
@@ -188,7 +188,7 @@ function SortableItem({
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 text-[10px] sm:text-[11px] md:text-xs font-mono text-t3 mb-1.5 sm:mb-2 md:mb-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-3 md:gap-4 text-[10px] sm:text-[11px] md:text-xs font-mono text-t3 mb-1 sm:mb-2 md:mb-2.5">
             <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
             {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
               ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
@@ -1326,21 +1326,21 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                   <Card
                     key={item.id}
                     className={cn(
-                      "p-3 sm:p-3.5 md:p-4 border transition-colors",
+                      "p-2 sm:p-3 md:p-4 border transition-colors",
                       isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
                     )}
                   >
-                    <div className="flex gap-2.5 sm:gap-3 md:gap-3.5">
+                    <div className="flex gap-1.5 sm:gap-3 md:gap-3.5">
                       <div className="flex flex-col gap-2 items-center justify-start pt-0.5 flex-shrink-0">
                         <label
                           htmlFor={`select-bulk-${item.id}`}
-                          className="flex items-center justify-center w-10 h-10 -m-2 cursor-pointer"
+                          className="flex items-center justify-center w-8 h-8 -m-1.5 cursor-pointer"
                         >
                           <Checkbox
                             id={`select-bulk-${item.id}`}
                             checked={isSelected}
                             onCheckedChange={() => handleToggleSelect(item.id)}
-                            className="w-4 h-4 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+                            className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
                           />
                         </label>
                       </div>
@@ -1348,12 +1348,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                         <img
                           src={item.imageThumbnail || item.imageData}
                           alt={item.productName || 'Item'}
-                          className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+                          className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-2 md:mb-2.5">
-                          <h3 className="font-semibold text-t1 text-sm md:text-base line-clamp-2">
+                        <div className="flex items-start justify-between gap-2 mb-0.5 md:mb-2.5">
+                          <h3 className="font-bold text-t1 text-[11px] sm:text-sm md:text-base line-clamp-2 leading-snug tracking-tight">
                             {item.productName || 'Unknown Item'}
                           </h3>
                           {item.profitMargin != null && isFinite(item.profitMargin) && (
@@ -1371,7 +1371,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-2">
+                        <div className="flex items-center gap-1.5 sm:gap-4 text-[10px] sm:text-xs font-mono text-s4 mb-1 sm:mb-2">
                           <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
                           {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
                             ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
