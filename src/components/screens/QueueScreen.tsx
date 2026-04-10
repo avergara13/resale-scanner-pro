@@ -1180,24 +1180,16 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         
         {filteredItems.length > 0 && (
           <div className="flex items-center gap-2">
-            <Button
+            <button
               onClick={handleSelectAll}
-              size="sm"
-              variant="outline"
-              className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+              className="flex items-center gap-1 h-6 px-2 rounded-full border border-s2 bg-transparent text-[10px] font-semibold text-t3 hover:text-t1 hover:bg-s1 transition-colors flex-shrink-0"
             >
               {allFilteredSelected ? (
-                <>
-                  <CheckSquare size={14} weight="fill" className="mr-1" />
-                  Deselect All
-                </>
+                <><CheckSquare size={11} weight="fill" />Deselect All</>
               ) : (
-                <>
-                  <Square size={14} weight="bold" className="mr-1" />
-                  Select All
-                </>
+                <><Square size={11} weight="bold" />Select All</>
               )}
-            </Button>
+            </button>
             {selectedIds.size > 0 && (
               <div className="flex items-center gap-2 flex-1">
                 <span className="text-xs font-medium text-b1">
