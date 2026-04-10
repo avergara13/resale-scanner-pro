@@ -1027,7 +1027,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
 
   // Shared input bar used in both views
   const inputBar = (
-    <div className="p-4 bg-fg border-t border-s1 safe-bottom">
+    <div className="px-4 pt-2 pb-2 bg-fg border-t border-s1 safe-bottom">
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -1078,58 +1078,37 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0"
           >
-            {/* Agent header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-fg border-b border-s1">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-b1 to-b2 rounded-xl">
-                  <Robot size={22} weight="bold" className="text-white" />
-                </div>
-                <div>
-                  <h1 className="text-base font-bold text-t1">Agent</h1>
-                  <p className="text-[10px] text-t3">AI Research & Automation</p>
-                </div>
-              </div>
-              {agentTab === 'chat' && (
-                <Button size="sm" onClick={handleCreateSession} className="h-8 px-3 text-xs">
-                  <Plus size={14} weight="bold" className="mr-1" /> New Chat
-                </Button>
-              )}
-            </div>
-
-            {/* Tab bar — Chat / Scan / Task */}
-            <div className="flex border-b border-s1 bg-fg">
-              {([
-                { id: 'chat', emoji: '💬', label: 'Chat' },
-                { id: 'scan', emoji: '📷', label: 'Scan' },
-                { id: 'task', emoji: '✅', label: 'Task' },
-              ] as const).map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setAgentTab(tab.id)}
-                  className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-all border-b-2',
-                    agentTab === tab.id
-                      ? 'border-b1 text-b1'
-                      : 'border-transparent text-t3 active:opacity-60'
-                  )}
-                >
-                  <span>{tab.emoji}</span>
-                  <span>{tab.label}</span>
-                  {tab.id === 'task' && pendingTodos.length > 0 && (
-                    <span className="text-[8px] bg-b1/15 text-b1 px-1 py-0.5 rounded font-black leading-none">{pendingTodos.length}</span>
-                  )}
+            {/* Tab bar — matches Listings page tab-bar / tab-btn style */}
+            <div className="px-3 pt-3 pb-2 bg-fg border-b border-s1">
+              <div className="tab-bar">
+                <button onClick={() => setAgentTab('chat')} className={cn('tab-btn', agentTab === 'chat' && 'active')}>
+                  <span>💬 Chat</span>
                 </button>
-              ))}
+                <button onClick={() => setAgentTab('scan')} className={cn('tab-btn', agentTab === 'scan' && 'active')}>
+                  <span>📷 Scan {queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started')).length > 0 ? `(${queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started')).length})` : ''}</span>
+                </button>
+                <button onClick={() => setAgentTab('task')} className={cn('tab-btn', agentTab === 'task' && 'active')}>
+                  <span>✅ Task {pendingTodos.length > 0 ? `(${pendingTodos.length})` : ''}</span>
+                </button>
+              </div>
             </div>
 
             {/* ── CHAT TAB ── */}
             {agentTab === 'chat' && (
             <ScrollArea className="flex-1">
               <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5">
-                {/* Quick Actions */}
+                {/* Quick Actions + New Chat */}
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">Quick Actions</div>
                   <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                    {/* New Chat — first in the row */}
+                    <button
+                      onClick={handleCreateSession}
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-gradient-to-br from-b1 to-b2 rounded-xl text-xs font-bold text-white active:scale-95 transition-all"
+                    >
+                      <Plus size={12} weight="bold" />
+                      <span>New Chat</span>
+                    </button>
                     {QUICK_ACTIONS.map(action => (
                       <button
                         key={action.label}
@@ -1185,56 +1164,79 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
             </ScrollArea>
             )}
 
-            {/* ── SCAN TAB ── */}
-            {agentTab === 'scan' && (
-            <ScrollArea className="flex-1">
-              <div className="py-4 px-4 space-y-3">
-                {queueItems.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-3xl mb-3">📷</div>
-                    <h2 className="text-base font-bold text-t1 mb-1">No items scanned yet</h2>
-                    <p className="text-xs text-t3">Tap the camera to scan your first item</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-1">
-                      {queueItems.length} item{queueItems.length !== 1 ? 's' : ''} scanned
+            {/* ── SCAN TAB — BUY queue awaiting listing ── */}
+            {agentTab === 'scan' && (() => {
+              const buyQueue = queueItems.filter(i => i.decision === 'BUY' && (!i.listingStatus || i.listingStatus === 'not-started'))
+              const readyItems = queueItems.filter(i => i.decision === 'BUY' && i.listingStatus && i.listingStatus !== 'not-started' && i.listingStatus !== 'sold')
+              return (
+              <ScrollArea className="flex-1">
+                <div className="py-3 px-3 space-y-3">
+                  {buyQueue.length === 0 && readyItems.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="text-3xl mb-3">📷</div>
+                      <h2 className="text-base font-bold text-t1 mb-1">Queue is clear</h2>
+                      <p className="text-xs text-t3">Scan items to build your listing queue</p>
                     </div>
-                    {queueItems.slice().reverse().map(item => (
-                      <div key={item.id} className="p-3 bg-fg border border-s1 rounded-xl">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <span className="text-sm font-semibold text-t1 truncate flex-1">
-                            {item.productName || 'Unknown item'}
-                          </span>
-                          <span className={cn(
-                            'text-[9px] font-black px-1.5 py-0.5 rounded-md flex-shrink-0',
-                            item.decision === 'BUY' ? 'bg-green/15 text-green' :
-                            item.decision === 'PASS' ? 'bg-red/15 text-red' : 'bg-s1 text-t3'
-                          )}>
-                            {item.decision}
-                          </span>
+                  ) : (
+                    <>
+                      {buyQueue.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">
+                            📥 Needs Listing ({buyQueue.length})
+                          </div>
+                          <div className="space-y-2">
+                            {buyQueue.slice().reverse().map(item => (
+                              <div key={item.id} className="p-3 bg-fg border border-s1 rounded-xl">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <span className="text-sm font-semibold text-t1 truncate flex-1">
+                                    {item.productName || 'Unknown item'}
+                                  </span>
+                                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green/15 text-green flex-shrink-0">BUY</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-[10px] text-t3">
+                                  <span>Cost: <span className="text-t1 font-semibold">${item.purchasePrice.toFixed(2)}</span></span>
+                                  {item.estimatedSellPrice ? (
+                                    <span>Est sell: <span className="text-t1 font-semibold">${item.estimatedSellPrice.toFixed(0)}</span></span>
+                                  ) : null}
+                                  {item.profitMargin ? (
+                                    <span className={item.profitMargin >= 30 ? 'text-green font-semibold' : 'text-t2'}>
+                                      {item.profitMargin.toFixed(0)}% margin
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {item.category && (
+                                  <div className="mt-1 text-[9px] text-t3">{item.category}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3 text-[10px] text-t3">
-                          <span>Cost: <span className="text-t1 font-semibold">${item.purchasePrice.toFixed(2)}</span></span>
-                          {item.estimatedSellPrice && (
-                            <span>Sell: <span className="text-t1 font-semibold">${item.estimatedSellPrice.toFixed(0)}</span></span>
-                          )}
-                          {item.profitMargin && (
-                            <span className={item.profitMargin >= 30 ? 'text-green font-semibold' : 'text-t2'}>
-                              {item.profitMargin.toFixed(0)}% margin
-                            </span>
-                          )}
+                      )}
+                      {readyItems.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">
+                            📋 In Listings ({readyItems.length})
+                          </div>
+                          <div className="space-y-2">
+                            {readyItems.slice().reverse().map(item => (
+                              <div key={item.id} className="p-2.5 bg-fg/50 border border-s1/50 rounded-xl opacity-70">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-medium text-t2 truncate flex-1">
+                                    {item.productName || 'Unknown item'}
+                                  </span>
+                                  <span className="text-[9px] text-t3 capitalize flex-shrink-0">{item.listingStatus}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        {item.listingStatus && item.listingStatus !== 'not-started' && (
-                          <div className="mt-1 text-[9px] text-t3 capitalize">{item.listingStatus}</div>
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            </ScrollArea>
-            )}
+                      )}
+                    </>
+                  )}
+                </div>
+              </ScrollArea>
+              )
+            })()}
 
             {/* ── TASK TAB ── */}
             {agentTab === 'task' && (

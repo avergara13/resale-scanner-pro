@@ -868,8 +868,38 @@ function App() {
     const expenseType: '💼 Business' | '🏡 Personal' =
       itemSession?.sessionType === 'personal' ? '🏡 Personal' : '💼 Business'
 
+    // Extract item specifics from optimized listing for Notion fields
+    const specs = listing?.itemSpecifics || {}
+    const brand    = specs['Brand'] || specs['brand'] || undefined
+    const modelSku = specs['Model'] || specs['Model Number'] || specs['MPN'] || undefined
+    const mpn      = specs['MPN'] || specs['Manufacturer Part Number'] || undefined
+    const color    = specs['Color'] || specs['Colour'] || undefined
+    const material = specs['Material'] || undefined
+    const country  = specs['Country of Manufacture'] || specs['Country'] || undefined
+    const barcode  = item.marketData?.barcodeProduct?.barcode || undefined
+
+    // Build pipe-separated item specifics string for Notion "Item Specifics" field
+    const itemSpecificsRaw = Object.entries(specs)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}:${v}`)
+      .join('|') || undefined
+
+    // Market data for comp pricing fields
+    const md = item.marketData
+    const ebayAvgSold = md?.ebayAvgSold ?? md?.ebayMedianSold
+    const ebayHigh    = md?.ebayPriceRange?.max
+    const ebayLow     = md?.ebayPriceRange?.min
+
+    // AI confidence from lens analysis match quality
+    const aiConfidence: 'High' | 'Medium' | 'Low' | 'Needs Review' =
+      (item.lensAnalysis?.bestMatch || (md?.ebayAvgSold && md.ebayAvgSold > 0))
+        ? 'High'
+        : item.decision === 'BUY' ? 'Medium' : 'Needs Review'
+
     const result = await notionService.pushListing({
-      title: listing?.title || item.productName || 'Unknown Item',
+      // Core
+      title: item.productName || listing?.title || 'Unknown Item',
+      seoTitle: listing?.title || undefined,
       description: listing?.description || item.description || '',
       price: listing?.price || item.estimatedSellPrice || 0,
       purchasePrice: item.purchasePrice,
@@ -882,8 +912,36 @@ function App() {
       status: 'ready',
       itemId: item.id,
       timestamp: item.timestamp,
-      location: item.location?.name,
       notes: item.notes,
+      hasImage: !!(item.imageData || item.imageUrl),
+      photoCount: (item.imageData || item.imageUrl) ? 1 : 0,
+
+      // Item specifics
+      brand,
+      modelSku,
+      mpn,
+      upcEanGtin: barcode,
+      color,
+      material,
+      countryOfManufacture: country,
+      itemSpecificsRaw,
+
+      // Market / pricing
+      ebayAvgSold,
+      ebayHigh,
+      ebayLow,
+      minAcceptablePrice: +(item.purchasePrice * 1.35).toFixed(2),
+      bestOfferMin: ebayLow ? String(Math.max(item.purchasePrice * 1.1, ebayLow * 0.8).toFixed(2)) : undefined,
+
+      // Shipping
+      shipFromZip: settings?.defaultShippingCost !== undefined ? '32806' : '32806',
+
+      // Research
+      aiConfidence,
+      marketNotes: md?.researchSummary || undefined,
+
+      // Source / session
+      sourceVendor: item.location?.name,
       sessionId: itemSession?.id,
       sessionNumber: itemSession?.sessionNumber,
       expenseType,
