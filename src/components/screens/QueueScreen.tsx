@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Trash, Eye, Lightning, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -1356,7 +1355,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           )}
         </div>
       ) : (
-        <ScrollArea className="flex-1 px-3 sm:px-4 md:px-5 py-3 sm:py-4">
+        <div className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 pb-24">
           {onReorder ? (
             <DndContext
               sensors={sensors}
@@ -1598,7 +1597,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               </Collapsible>
             )
           })()}
-        </ScrollArea>
+        </div>
       )}
     </div>
   )
