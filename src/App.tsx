@@ -90,7 +90,7 @@ function App() {
     ebayFeePercent: 12.9,
     ebayAdFeePercent: 0,
     shippingMaterialsCost: 0,
-    paypalFeePercent: 3.49,
+    paypalFeePercent: 0,
     preferredAiModel: 'gemini-2.5-flash',
     notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
     imageQuality: { preset: 'balanced' },
@@ -525,7 +525,7 @@ function App() {
         sellPrice,
         settings?.defaultShippingCost || 5.0,
         settings?.ebayFeePercent || 12.9,
-        settings?.paypalFeePercent || 3.49
+        settings?.paypalFeePercent || 0
       ) || calculateProfitFallback(
         price,
         sellPrice,
@@ -626,9 +626,8 @@ function App() {
         })
       }
 
-      toast.success(decision === 'BUY' ? '✅ BUY Decision! Sending to Listings…' : '❌ PASS — scan saved')
-      // Navigate to Listings (Queue) screen so the card is immediately visible
-      setScreen('queue')
+      toast.success(decision === 'BUY' ? '✅ Analysis complete — it\'s a BUY!' : '❌ Analysis done — PASS')
+      setScreen('scan-result')
     } catch (error) {
       console.error('Pipeline error:', error)
       setPipeline(prev => prev.map(s => ({ 
@@ -657,11 +656,13 @@ function App() {
     const timeOfDay = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
     const dayName = now.toLocaleDateString('en-US', { weekday: 'short' })
     const monthDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const name = `${dayName} ${timeOfDay} — ${monthDay}`
+    const sessionNumber = ((allSessions || []).filter(s => !s.deletedAt).length + 1)
+    const name = `#${String(sessionNumber).padStart(3, '0')} — ${dayName} ${timeOfDay} — ${monthDay}`
     const id = Date.now().toString()
     const newSession: Session = {
       id,
       name,
+      sessionNumber,
       startTime: Date.now(),
       itemsScanned: 0,
       buyCount: 0,
@@ -675,7 +676,7 @@ function App() {
     setSelectedSessionId(id)
     setScreen('session-detail')
     toast.success('Session started')
-  }, [setSession, setAllSessions, setSelectedSessionId, setScreen])
+  }, [allSessions, setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -782,7 +783,7 @@ function App() {
         ebayFeePercent: 12.9,
         ebayAdFeePercent: 0,
         shippingMaterialsCost: 0,
-        paypalFeePercent: 3.49,
+        paypalFeePercent: 0,
         preferredAiModel: 'gemini-2.5-flash',
       }
       const newSettings = { ...(prev || defaults), ...updates }
@@ -1192,6 +1193,32 @@ function App() {
     toast.success('Passed — heavy image data will be removed at session end')
   }, [currentItem, setQueue])
 
+  const handleMaybeFromScan = useCallback((price: number, notes: string) => {
+    if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
+      toast.error('No image to save')
+      return
+    }
+    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
+    const maybeItem: ScannedItem = {
+      ...lightweight,
+      purchasePrice: effectivePrice,
+      notes: notes || currentItem!.notes,
+      inQueue: true,
+      decision: 'PENDING',
+    }
+    setQueue(prev => {
+      const current = prev || []
+      if (current.some(i => i.id === maybeItem.id)) {
+        return current.map(i => i.id === maybeItem.id ? maybeItem : i)
+      }
+      return [...current, maybeItem]
+    })
+    setCurrentItem(undefined)
+    setPipeline([])
+    toast.success('Saved as Maybe — tap in Queue to re-evaluate')
+  }, [currentItem, setQueue])
+
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
 
@@ -1341,7 +1368,7 @@ function App() {
           sellPrice,
           settings?.defaultShippingCost || 5.0,
           settings?.ebayFeePercent || 12.9,
-          settings?.paypalFeePercent || 3.49
+          settings?.paypalFeePercent || 0
         ) || calculateProfitFallback(
           item.purchasePrice,
           sellPrice,
@@ -1769,6 +1796,7 @@ function App() {
                 onSaveDraft={handleSaveDraft}
                 onCreateListing={handleCreateListingFromScan}
                 onPassItem={handlePassFromScan}
+                onMaybeItem={handleMaybeFromScan}
                 onRecalculate={handleRecalculate}
                 onRescan={handleRescan}
                 onOpenCamera={() => setCameraOpen(true)}
@@ -1836,6 +1864,7 @@ function App() {
                 onSaveDraft={handleSaveDraft}
                 onCreateListing={handleCreateListingFromScan}
                 onPassItem={handlePassFromScan}
+                onMaybeItem={handleMaybeFromScan}
                 onRecalculate={handleRecalculate}
                 onRescan={handleRescan}
                 onOpenCamera={() => setCameraOpen(true)}

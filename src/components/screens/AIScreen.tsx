@@ -7,6 +7,7 @@ import {
   ArrowClockwise,
   ArrowCounterClockwise,
   XCircle,
+  BookmarkSimple,
   ShoppingCart,
   Scan,
   FloppyDisk,
@@ -62,6 +63,7 @@ interface AIScreenProps {
   onSaveDraft: (price: number, notes: string) => void
   onCreateListing: (price: number, notes: string, draft: ListingDraftOverrides) => void
   onPassItem: (price: number, notes: string) => void
+  onMaybeItem?: (price: number, notes: string) => void
   onRecalculate?: (price: number) => void
   onRescan?: () => void
   onOpenCamera?: () => void
@@ -230,6 +232,7 @@ export function AIScreen({
   onSaveDraft,
   onCreateListing,
   onPassItem,
+  onMaybeItem,
   onRecalculate,
   onRescan,
   onOpenCamera,
@@ -739,6 +742,17 @@ export function AIScreen({
                   <XCircle size={15} weight="bold" className="mr-1" />
                   Pass
                 </Button>
+                {onMaybeItem && (
+                  <Button
+                    onClick={() => onMaybeItem(parseFloat(buyPrice) || 0, description)}
+                    disabled={!canSaveDraft}
+                    variant="outline"
+                    className="flex-1 h-9 sm:h-10 border-amber-400/50 text-amber-500 hover:bg-amber-400/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                  >
+                    <BookmarkSimple size={15} weight="bold" className="mr-1" />
+                    Maybe
+                  </Button>
+                )}
                 <Button
                   onClick={handleAddToQueue}
                   disabled={!canSaveDraft}
