@@ -62,7 +62,11 @@ export function useConnectionHistory(
       return updated.slice(-maxEvents)
     })
 
-    if (newStatus === 'offline' && previousStatus !== 'offline') {
+    // Only open a new incident on a genuine offline transition from a known-good state.
+    // Ignore checking→offline because the health checker sets status to 'checking' on
+    // every poll cycle, so a persistent offline service would otherwise create a new
+    // incident every 30 s.
+    if (newStatus === 'offline' && previousStatus !== 'offline' && previousStatus !== 'checking') {
       const incident: DowntimeIncident = {
         id: `incident-${Date.now()}-${service}`,
         service,

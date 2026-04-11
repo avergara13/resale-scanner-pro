@@ -139,7 +139,7 @@ function PlatformTab({ platform, item, onGenerate, isGenerating }: PlatformTabPr
         </Badge>
         {price != null && netPrice != null && (
           <span className="text-[10px] text-t3 font-mono">
-            List ${price.toFixed(2)} → net ~${netPrice.toFixed(2)}
+            List ${price.toFixed(2)} → after fee ~${netPrice.toFixed(2)}
           </span>
         )}
       </div>

@@ -1796,7 +1796,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <AIScreen
                 currentItem={currentItem}
@@ -1864,7 +1864,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <AIScreen
                 currentItem={currentItem}
