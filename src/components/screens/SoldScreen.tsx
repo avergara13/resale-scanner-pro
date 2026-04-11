@@ -589,42 +589,42 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
               WebkitBackdropFilter: 'saturate(180%) blur(24px)',
               border: '0.5px solid var(--glass-border)',
               boxShadow: 'var(--glass-shadow)',
-              borderRadius: '20px',
-              padding: '5px 5px 5px 14px',
-              gap: '8px',
+              borderRadius: '14px',
+              padding: '3px 3px 3px 10px',
+              gap: '6px',
             }}
           >
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '5px' }}>
               {batchStats.overdueCount > 0 ? (
                 <>
-                  <Warning size={13} weight="fill" className="text-amber flex-shrink-0" />
-                  <span style={{ fontSize: '12px', color: 'var(--amber)', fontWeight: 600 }}>
+                  <Warning size={11} weight="fill" className="text-amber flex-shrink-0" />
+                  <span style={{ fontSize: '11px', color: 'var(--amber)', fontWeight: 600 }}>
                     {batchStats.overdueCount} {batchStats.overdueCount === 1 ? 'item' : 'items'} overdue
                   </span>
                 </>
               ) : batchStats.needsLabelCount > 0 ? (
                 <>
-                  <Warning size={13} weight="fill" className="text-t3 flex-shrink-0" />
-                  <span style={{ fontSize: '12px', color: 'var(--t2)', fontWeight: 500 }}>
+                  <Warning size={11} weight="fill" className="text-t3 flex-shrink-0" />
+                  <span style={{ fontSize: '11px', color: 'var(--t2)', fontWeight: 500 }}>
                     {batchStats.needsLabelCount} {batchStats.needsLabelCount === 1 ? 'item' : 'items'} need a label
                   </span>
                 </>
               ) : lastSyncedLabel ? (
-                <span style={{ fontSize: '11px', color: 'var(--t3)' }}>Synced {lastSyncedLabel}</span>
+                <span style={{ fontSize: '10px', color: 'var(--t3)' }}>Synced {lastSyncedLabel}</span>
               ) : (
-                <span style={{ fontSize: '11px', color: 'var(--t3)' }}>All items on track</span>
+                <span style={{ fontSize: '10px', color: 'var(--t3)' }}>All items on track</span>
               )}
             </div>
             <button
               onClick={() => setShowManualDialog(true)}
               style={{
-                width: '32px',
-                height: '32px',
+                width: '26px',
+                height: '26px',
                 flexShrink: 0,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                borderRadius: '16px',
+                borderRadius: '13px',
                 background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
                 boxShadow: 'var(--send-glow)',
                 border: 'none',
@@ -634,7 +634,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
               }}
               aria-label="Log Sale"
             >
-              <Plus size={15} weight="bold" className="text-white" />
+              <Plus size={12} weight="bold" className="text-white" />
             </button>
           </div>
         </div>,
