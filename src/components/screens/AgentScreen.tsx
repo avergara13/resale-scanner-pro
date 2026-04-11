@@ -1139,9 +1139,20 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
       className="px-3 py-1.5 border-b border-s1/60"
       style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)' }}
     >
-      {currentSession?.active && (
-        <div className="text-[9px] font-bold text-b1 uppercase tracking-wide mb-1">
-          {currentSession.name || 'Active Session'}
+      {(currentSession?.active || (activeTab === 'chat' && viewMode === 'chat')) && (
+        <div className="flex items-center justify-between mb-1">
+          <div className="text-[9px] font-bold text-b1 uppercase tracking-wide">
+            {currentSession?.active ? (currentSession.name || 'Active Session') : ''}
+          </div>
+          {activeTab === 'chat' && viewMode === 'chat' && (
+            <button
+              onClick={handleNewChat}
+              className="text-[9px] font-bold text-t3 hover:text-b1 uppercase tracking-wide transition-colors active:opacity-60"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              ↺ New Chat
+            </button>
+          )}
         </div>
       )}
       <div className="grid grid-cols-4 gap-1.5">
@@ -1162,18 +1173,6 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Profit</div>
         </div>
       </div>
-      {/* ↺ New Chat — below the stats grid, only visible on Chat tab */}
-      {activeTab === 'chat' && viewMode === 'chat' && (
-        <div className="flex justify-end pt-1.5">
-          <button
-            onClick={handleNewChat}
-            className="text-[9px] font-bold text-b1 uppercase tracking-wide transition-colors active:opacity-60 flex items-center gap-0.5"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          >
-            ↺ New Chat
-          </button>
-        </div>
-      )}
     </div>
   )
 
