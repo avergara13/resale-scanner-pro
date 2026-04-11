@@ -1137,7 +1137,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
   const statsBar = (
     <div
       className="px-3 border-b border-s1/60"
-      style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)', height: '30px', display: 'flex', alignItems: 'center' }}
+      style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)', height: '38px', display: 'flex', alignItems: 'center', overflow: 'hidden' }}
     >
       <div className="flex items-center gap-3 flex-1 text-[10px]">
         <span className="text-t1 font-black">{queueStats.total} <span className="font-normal text-t3">Queue</span></span>
@@ -1148,7 +1148,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
       {activeTab === 'chat' && viewMode === 'chat' && (
         <button
           onClick={handleNewChat}
-          className="text-[9px] font-bold text-t3 hover:text-b1 uppercase tracking-wide transition-colors active:opacity-60 flex-shrink-0"
+          className="text-[9px] font-bold text-t1 uppercase tracking-wide transition-opacity active:opacity-50 flex-shrink-0"
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         >
           ↺ New Chat

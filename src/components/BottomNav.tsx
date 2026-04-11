@@ -25,16 +25,20 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
       id="bottom-nav"
       className="fixed bottom-0 left-0 right-0 z-40"
       style={{
-        paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
+        paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 4px)',
         paddingLeft: 'env(safe-area-inset-left, 0px)',
         paddingRight: 'env(safe-area-inset-right, 0px)',
-        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
-        WebkitBackdropFilter: 'blur(12px)'
+        background: 'color-mix(in oklch, var(--bg) 88%, transparent)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderTop: '1px solid color-mix(in oklch, var(--fg) 12%, transparent)',
+        borderRadius: '20px 20px 0 0',
+        boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.12)',
       }}
     >
       {/* 5-column grid — each slot is exactly 1/5 of the nav width, pixel-perfect on every iPhone */}
       <div
-        className="h-[54px]"
+        className="h-[52px]"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(5, 1fr)',
@@ -56,7 +60,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
                 isActive ? 'text-b1' : 'text-t3'
               )}
               style={{
-                height: '54px',
+                height: '52px',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent'
               }}
@@ -112,7 +116,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
                 isActive ? 'text-b1' : 'text-t3'
               )}
               style={{
-                height: '54px',
+                height: '52px',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent'
               }}

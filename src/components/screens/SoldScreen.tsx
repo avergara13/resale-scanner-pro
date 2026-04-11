@@ -274,18 +274,17 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
       {/* ── Slim stats strip — matches Agent inline style ─────────────── */}
       <div
         className="px-3 border-b border-s1/60 flex-shrink-0"
-        style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', height: '30px', display: 'flex', alignItems: 'center' }}
+        style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', height: '38px', display: 'flex', alignItems: 'center', overflow: 'hidden' }}
       >
-        <div className="flex items-center gap-3 flex-1 text-[10px]">
+        <div className="flex items-center gap-2 flex-1 text-[10px]">
           <span className="text-t1 font-black">{mergedItems.length} <span className="font-normal text-t3">Sold</span></span>
-          <span className="text-t1 font-black">{formatMoney(batchStats.totalNetIncome)} <span className="font-normal text-t3">Net</span></span>
-          {batchStats.needsLabelCount > 0 && <span className="text-red font-black">{batchStats.needsLabelCount} <span className="font-normal text-t3">Need Label</span></span>}
-          {batchStats.overdueCount > 0 && <span className="text-amber font-black">{batchStats.overdueCount} <span className="font-normal text-t3">Overdue</span></span>}
+          <span className="text-red font-black">{batchStats.needsLabelCount} <span className="font-normal text-t3">Need Label</span></span>
+          <span className="text-amber font-black">{batchStats.overdueCount} <span className="font-normal text-t3">Overdue</span></span>
           <span className="text-green font-black">{batchStats.shippedCount} <span className="font-normal text-t3">Shipped</span></span>
         </div>
         <button
           onClick={() => setShowManualDialog(true)}
-          className="text-[9px] font-bold text-t3 hover:text-b1 uppercase tracking-wide transition-colors active:opacity-60 flex-shrink-0"
+          className="text-[9px] font-bold text-t1 uppercase tracking-wide transition-opacity active:opacity-50 flex-shrink-0"
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         >
           + Log Sale
@@ -295,7 +294,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
       {/* ── Scrollable list ───────────────────────────────────────────── */}
       <div
         className="flex-1 overflow-y-auto px-3 pt-2 space-y-2"
-        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 16px) + 62px)' }}
+        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 80px)' }}
       >
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8 py-16">
