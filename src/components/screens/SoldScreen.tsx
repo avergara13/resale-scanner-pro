@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { ArrowClockwise, ArrowSquareOut, CheckCircle, Package, SpinnerGap, Truck, Plus, Warning, Sparkle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowSquareOut, CheckCircle, Package, SpinnerGap, Truck, Plus, Sparkle, X } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -253,7 +252,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           borderBottom: '0.5px solid color-mix(in oklch, var(--s2) 50%, transparent)',
         }}
       >
-        <div className="tab-bar mb-2">
+        <div className="tab-bar">
           {([
             ['all', 'All'],
             ['need-label', 'Sold'],
@@ -270,36 +269,33 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           ))}
         </div>
 
-        {/* Stats row — 4 cards, tight iPhone spacing */}
-        <div className="grid grid-cols-4 gap-1.5">
-          <div className="rounded-xl border border-s2/60 py-1.5 px-1 text-center"
-            style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
-            <div className="text-sm font-black text-t1 leading-tight">{mergedItems.length}</div>
-            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Sold</div>
-          </div>
-          <div className="rounded-xl border border-s2/60 py-1.5 px-1 text-center"
-            style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
-            <div className="text-sm font-black text-t1 leading-tight">{formatMoney(batchStats.totalNetIncome)}</div>
-            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Net</div>
-          </div>
-          <div className="rounded-xl border border-red/30 py-1.5 px-1 text-center"
-            style={{ background: 'color-mix(in oklch, var(--red-bg) 50%, transparent)' }}>
-            <div className="text-sm font-black text-red leading-tight">{batchStats.needsLabelCount}</div>
-            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Sold</div>
-          </div>
-          <div className="rounded-xl border border-green/30 py-1.5 px-1 text-center"
-            style={{ background: 'color-mix(in oklch, var(--green-bg) 50%, transparent)' }}>
-            <div className="text-sm font-black text-green leading-tight">{batchStats.shippedCount}</div>
-            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Shipped</div>
-          </div>
-        </div>
+      </div>
 
+      {/* ── Slim stats strip — matches Agent inline style ─────────────── */}
+      <div
+        className="px-3 border-b border-s1/60 flex-shrink-0"
+        style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', height: '30px', display: 'flex', alignItems: 'center' }}
+      >
+        <div className="flex items-center gap-3 flex-1 text-[10px]">
+          <span className="text-t1 font-black">{mergedItems.length} <span className="font-normal text-t3">Sold</span></span>
+          <span className="text-t1 font-black">{formatMoney(batchStats.totalNetIncome)} <span className="font-normal text-t3">Net</span></span>
+          {batchStats.needsLabelCount > 0 && <span className="text-red font-black">{batchStats.needsLabelCount} <span className="font-normal text-t3">Need Label</span></span>}
+          {batchStats.overdueCount > 0 && <span className="text-amber font-black">{batchStats.overdueCount} <span className="font-normal text-t3">Overdue</span></span>}
+          <span className="text-green font-black">{batchStats.shippedCount} <span className="font-normal text-t3">Shipped</span></span>
+        </div>
+        <button
+          onClick={() => setShowManualDialog(true)}
+          className="text-[9px] font-bold text-t3 hover:text-b1 uppercase tracking-wide transition-colors active:opacity-60 flex-shrink-0"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        >
+          + Log Sale
+        </button>
       </div>
 
       {/* ── Scrollable list ───────────────────────────────────────────── */}
       <div
         className="flex-1 overflow-y-auto px-3 pt-2 space-y-2"
-        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 108px)' }}
+        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 16px) + 62px)' }}
       >
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8 py-16">
@@ -566,80 +562,6 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           })
         )}
       </div>
-
-      {/* ── Glass bottom pill — overdue indicator + Log Sale button ─── */}
-      {createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            left: 0,
-            right: 0,
-            bottom: 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
-            zIndex: 50,
-            padding: '0 12px',
-            pointerEvents: 'none',
-          }}
-        >
-          <div
-            className="flex items-center"
-            style={{
-              pointerEvents: 'auto',
-              background: 'var(--glass-bg)',
-              backdropFilter: 'saturate(180%) blur(24px)',
-              WebkitBackdropFilter: 'saturate(180%) blur(24px)',
-              border: '0.5px solid var(--glass-border)',
-              boxShadow: 'var(--glass-shadow)',
-              borderRadius: '14px',
-              padding: '3px 3px 3px 10px',
-              gap: '6px',
-            }}
-          >
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              {batchStats.overdueCount > 0 ? (
-                <>
-                  <Warning size={11} weight="fill" className="text-amber flex-shrink-0" />
-                  <span style={{ fontSize: '11px', color: 'var(--amber)', fontWeight: 600 }}>
-                    {batchStats.overdueCount} {batchStats.overdueCount === 1 ? 'item' : 'items'} overdue
-                  </span>
-                </>
-              ) : batchStats.needsLabelCount > 0 ? (
-                <>
-                  <Warning size={11} weight="fill" className="text-t3 flex-shrink-0" />
-                  <span style={{ fontSize: '11px', color: 'var(--t2)', fontWeight: 500 }}>
-                    {batchStats.needsLabelCount} {batchStats.needsLabelCount === 1 ? 'item' : 'items'} need a label
-                  </span>
-                </>
-              ) : lastSyncedLabel ? (
-                <span style={{ fontSize: '10px', color: 'var(--t3)' }}>Synced {lastSyncedLabel}</span>
-              ) : (
-                <span style={{ fontSize: '10px', color: 'var(--t3)' }}>All items on track</span>
-              )}
-            </div>
-            <button
-              onClick={() => setShowManualDialog(true)}
-              style={{
-                width: '26px',
-                height: '26px',
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '13px',
-                background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
-                boxShadow: 'var(--send-glow)',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'opacity 0.15s, transform 0.1s',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-              aria-label="Log Sale"
-            >
-              <Plus size={12} weight="bold" className="text-white" />
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* ── Manual Sale Dialog ──────────────────────────────────────── */}
       <ManualSaleDialog
