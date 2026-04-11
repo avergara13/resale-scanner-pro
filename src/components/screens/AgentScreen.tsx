@@ -1414,20 +1414,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.15 }}
-            className="flex flex-col flex-1 min-h-0"
-            style={{ overflow: 'visible', position: 'relative' }}
+            className="flex flex-col flex-1 min-h-0 overflow-hidden"
           >
-            {/* Persistent ↺ new chat — top-right corner of chat window when messages exist */}
-            {chatMessages.length > 0 && (
-              <button
-                onClick={handleNewChat}
-                className="absolute top-2 right-3 z-10 text-[9px] font-bold text-t3 hover:text-b1 uppercase tracking-wide transition-colors active:opacity-60"
-                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-              >
-                ↺ New Chat
-              </button>
-            )}
-
             {/* Empty state when chat has no messages */}
             {chatMessages.length === 0 && (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
