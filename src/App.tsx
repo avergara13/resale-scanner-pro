@@ -71,6 +71,11 @@ function App() {
 
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
+  // Ref mirror of `queue` — used by pipeline handlers to escape stale closures
+  // when the Agent runs multi-step flows (batch-analyze → optimize → push) and
+  // subsequent handlers need the latest queue state, not the pre-pipeline snapshot.
+  const queueRef = useRef(queue)
+  useEffect(() => { queueRef.current = queue }, [queue])
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
@@ -808,7 +813,9 @@ function App() {
   }, [setSettings, setTheme, toggleAmbientLight])
 
   const handleOptimizeItem = useCallback(async (itemId: string) => {
-    const item = (queue || []).find(i => i.id === itemId)
+    // Read fresh queue via ref to avoid stale closure when agent pipeline
+    // chains batch-analyze → optimize (items that just flipped PENDING→BUY)
+    const item = (queueRef.current || []).find(i => i.id === itemId)
     if (!item || item.decision !== 'BUY' || item.optimizedListing) return
     const optimized = await listingOptimizationService.generateOptimizedListing({
       item,
@@ -824,14 +831,16 @@ function App() {
         ? { ...i, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
         : i
     ))
-  }, [queue, setQueue, listingOptimizationService])
+  }, [setQueue, listingOptimizationService])
 
   const handlePushToNotion = useCallback(async (itemId: string) => {
     if (!notionService) {
       toast.error('Configure Notion API key and Database ID in Settings')
       return
     }
-    const item = (queue || []).find(i => i.id === itemId)
+    // Read fresh queue via ref — pipeline just optimized this item, stale
+    // closure would still show optimizedListing as undefined.
+    const item = (queueRef.current || []).find(i => i.id === itemId)
     if (!item || item.notionPageId || !item.optimizedListing) return
 
     const listing = item.optimizedListing
@@ -871,7 +880,7 @@ function App() {
     } else {
       toast.error(`Notion error: ${result.error}`)
     }
-  }, [queue, setQueue, notionService])
+  }, [setQueue, notionService])
 
   const handleMarkAsSold = useCallback((
     itemId: string,
