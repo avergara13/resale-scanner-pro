@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowClockwise, ArrowSquareOut, Package, SpinnerGap, Truck, Plus, Warning, Sparkle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowSquareOut, CheckCircle, Package, SpinnerGap, Truck, Plus, Sparkle, X } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -252,10 +252,10 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           borderBottom: '0.5px solid color-mix(in oklch, var(--s2) 50%, transparent)',
         }}
       >
-        <div className="tab-bar mb-2">
+        <div className="tab-bar">
           {([
             ['all', 'All'],
-            ['need-label', 'Need'],
+            ['need-label', 'Sold'],
             ['label-ready', 'Ready'],
             ['shipped', 'Shipped'],
           ] as Array<[FulfillmentFilter, string]>).map(([filter, label]) => (
@@ -269,65 +269,32 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           ))}
         </div>
 
-        {/* Stats row — 4 cards, tight iPhone spacing */}
-        <div className="grid grid-cols-4 gap-1.5">
-          <div className="rounded-xl border border-s2/60 py-1.5 px-1 text-center"
-            style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
-            <div className="text-sm font-black text-t1 leading-tight">{mergedItems.length}</div>
-            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Sold</div>
-          </div>
-          <div className="rounded-xl border border-s2/60 py-1.5 px-1 text-center"
-            style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
-            <div className="text-sm font-black text-t1 leading-tight">{formatMoney(batchStats.totalNetIncome)}</div>
-            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Net</div>
-          </div>
-          <div className="rounded-xl border border-red/30 py-1.5 px-1 text-center"
-            style={{ background: 'color-mix(in oklch, var(--red-bg) 50%, transparent)' }}>
-            <div className="text-sm font-black text-red leading-tight">{batchStats.needsLabelCount}</div>
-            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Need</div>
-          </div>
-          <div className="rounded-xl border border-green/30 py-1.5 px-1 text-center"
-            style={{ background: 'color-mix(in oklch, var(--green-bg) 50%, transparent)' }}>
-            <div className="text-sm font-black text-green leading-tight">{batchStats.shippedCount}</div>
-            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Shipped</div>
-          </div>
+      </div>
+
+      {/* ── Slim stats strip — matches Agent inline style ─────────────── */}
+      <div
+        className="px-3 border-b border-s1/60 flex-shrink-0"
+        style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', height: '38px', display: 'flex', alignItems: 'center', overflow: 'hidden' }}
+      >
+        <div className="flex items-center gap-2 flex-1 text-[10px]">
+          <span className="text-t1 font-black">{mergedItems.length} <span className="font-normal text-t3">Sold</span></span>
+          <span className="text-red font-black">{batchStats.needsLabelCount} <span className="font-normal text-t3">Need Label</span></span>
+          <span className="text-amber font-black">{batchStats.overdueCount} <span className="font-normal text-t3">Overdue</span></span>
+          <span className="text-green font-black">{batchStats.shippedCount} <span className="font-normal text-t3">Shipped</span></span>
         </div>
-
-        {/* Action row: Log Manual Sale button + sync time */}
-        <div className="flex items-center justify-between mt-2">
-          <button
-            onClick={() => setShowManualDialog(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gradient-to-br from-b1 to-b2 text-white text-[10px] font-bold active:scale-95 transition-transform"
-          >
-            <Plus size={12} weight="bold" />
-            <span>Log Sale</span>
-          </button>
-          {lastSyncedLabel && (
-            <span className="text-[9px] text-t3">Synced {lastSyncedLabel}</span>
-          )}
-        </div>
-
-        {/* Overdue banner — show when anything is overdue */}
-        {batchStats.overdueCount > 0 && (
-          <div className="mt-2 rounded-xl border border-amber/40 px-3 py-1.5 flex items-center gap-2"
-            style={{ background: 'color-mix(in oklch, var(--amber) 12%, transparent)' }}>
-            <Warning size={14} weight="fill" className="text-amber flex-shrink-0" />
-            <span className="text-[11px] text-t1 font-semibold">
-              {batchStats.overdueCount} {batchStats.overdueCount === 1 ? 'item is' : 'items are'} overdue (&gt;48h)
-            </span>
-          </div>
-        )}
-
-        {/* Warnings from server (e.g., Supabase sales table missing) */}
-        {warnings.length > 0 && (
-          <div className="mt-2 text-[9px] text-t3 italic">{warnings[0]}</div>
-        )}
+        <button
+          onClick={() => setShowManualDialog(true)}
+          className="text-[9px] font-bold text-t1 uppercase tracking-wide transition-opacity active:opacity-50 flex-shrink-0"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        >
+          + Log Sale
+        </button>
       </div>
 
       {/* ── Scrollable list ───────────────────────────────────────────── */}
       <div
         className="flex-1 overflow-y-auto px-3 pt-2 space-y-2"
-        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 88px)' }}
+        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 80px)' }}
       >
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8 py-16">
@@ -438,15 +405,42 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                   </div>
                 )}
 
-                {/* ── Row 3: Quick status buttons (tap to cycle) ────── */}
-                {draft.shippingStatus !== '✅ Shipped' && (
+                {/* ── Row 3: Shipped CTA (Ready items only) or status cycle ── */}
+                {(draft.shippingStatus === '🟡 Label Ready' || draft.shippingStatus === '📦 Packed') ? (
+                  <button
+                    disabled={savingItemId === item.salePageId}
+                    onClick={async () => {
+                      const shippedDraft = { ...draft, shippingStatus: '✅ Shipped' as SoldShippingStatus }
+                      setDrafts(prev => ({ ...prev, [item.salePageId]: shippedDraft }))
+                      if (item.isManualEntry) {
+                        const manualId = item.salePageId.replace(/^manual-/, '')
+                        setManualSales(prev => (prev || []).map(m => m.id === manualId ? { ...m, shippingStatus: '✅ Shipped' as SoldShippingStatus } : m))
+                        toast.success('Shipped!')
+                      } else {
+                        setSavingItemId(item.salePageId)
+                        try {
+                          await onUpdateShipping(item.salePageId, { shippingStatus: '✅ Shipped' })
+                          toast.success('Marked as shipped!')
+                        } finally {
+                          setSavingItemId(null)
+                        }
+                      }
+                    }}
+                    className="w-full mt-2 flex items-center justify-center gap-1.5 h-9 rounded-xl font-bold text-xs text-white transition-all active:scale-[0.98] disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                  >
+                    {savingItemId === item.salePageId
+                      ? <SpinnerGap size={13} className="animate-spin" />
+                      : <CheckCircle size={13} weight="bold" />}
+                    Shipped — Done
+                  </button>
+                ) : draft.shippingStatus !== '✅ Shipped' ? (
                   <div className="flex gap-1.5 mt-2">
-                    {SHIPPING_STATUS_OPTIONS.map((status) => (
+                    {SHIPPING_STATUS_OPTIONS.filter(s => s !== '✅ Shipped').map((status) => (
                       <button
                         key={status}
                         onClick={() => {
                           handleDraftChange(item.salePageId, 'shippingStatus', status)
-                          // Auto-save status change for speed
                           const updatedDraft = { ...draft, shippingStatus: status }
                           setDrafts(prev => ({ ...prev, [item.salePageId]: updatedDraft }))
                         }}
@@ -461,7 +455,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                       </button>
                     ))}
                   </div>
-                )}
+                ) : null}
 
                 {/* ── Row 4: Expand/Collapse details ───────────────── */}
                 <button

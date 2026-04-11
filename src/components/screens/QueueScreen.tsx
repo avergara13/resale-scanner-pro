@@ -1,18 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, Eye, Lightning, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
+import { Trash, Eye, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { toast } from 'sonner'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
@@ -359,7 +352,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [soldMarketplace, setSoldMarketplace] = useState<'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'>('ebay')
   const [showTrendIndicator, setShowTrendIndicator] = useState(false)
   const [locationInsightsOpen, setLocationInsightsOpen] = useState(false)
-  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1003,168 +995,70 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               onClick={() => setFilter('ALL')}
               className={cn('tab-btn', filter === 'ALL' && 'active')}
             >
-              <span>📦 ALL</span>
+              <span>All</span>
             </button>
             <button
               onClick={() => setFilter('BUY')}
               className={cn('tab-btn', filter === 'BUY' && 'active')}
             >
-              <span>📋 Listed{buyCount > 0 && ` (${buyCount})`}</span>
+              <span>Listed{buyCount > 0 && ` (${buyCount})`}</span>
             </button>
             <button
               onClick={() => setFilter('PASS')}
               className={cn('tab-btn', filter === 'PASS' && 'active')}
             >
-              <span>❌ Passed{passCount > 0 && ` (${passCount})`}</span>
+              <span>Passed{passCount > 0 && ` (${passCount})`}</span>
             </button>
             <button
               onClick={() => setFilter('PENDING')}
               className={cn('tab-btn', filter === 'PENDING' && 'active')}
             >
-              <span>⏳ Pending{pendingCount > 0 && ` (${pendingCount})`}</span>
+              <span>Pending{pendingCount > 0 && ` (${pendingCount})`}</span>
             </button>
           </div>
         </div>
         
-        {/* Collapsible search / sort / filter panel */}
-        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <CollapsibleTrigger asChild>
-            <button className="flex items-center justify-between w-full h-9 px-3 mb-2 rounded-lg bg-s1 hover:bg-s2 transition-colors text-left">
-              <div className="flex items-center gap-2">
-                <MagnifyingGlass size={14} weight="bold" className="text-t3" />
-                <span className="text-xs font-semibold text-t2">Search &amp; Filters</span>
-                {hasActiveFilters && (
-                  <span className="w-2 h-2 rounded-full bg-b1 flex-shrink-0" />
-                )}
-              </div>
-              <CaretDown
-                size={14}
-                weight="bold"
-                className={cn('text-t3 transition-transform duration-200', filtersOpen && 'rotate-180')}
-              />
+        {/* Single action strip — Filters + Presets (left), Select All (right) */}
+        <div
+          className="border-b border-s1/60"
+          style={{
+            background: 'color-mix(in oklch, var(--fg) 85%, transparent)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            height: '38px',
+            display: 'flex',
+            alignItems: 'center',
+            overflow: 'hidden',
+            paddingLeft: '12px',
+            paddingRight: '12px',
+          }}
+        >
+          <div className="flex items-center gap-2 flex-1">
+            <AdvancedFilters
+              filters={advancedFilters}
+              onFiltersChange={setAdvancedFilters}
+              availableCategories={availableCategories}
+              priceMin={priceRange.min}
+              priceMax={priceRange.max}
+              showPresets={false}
+              className="h-auto px-0 text-[9px] font-bold text-t1 uppercase tracking-wide border-0 bg-transparent shadow-none rounded-md hover:bg-transparent hover:text-t1 hover:opacity-70"
+            />
+            <button
+              onClick={() => setPresetsOpen(true)}
+              className="text-[9px] font-bold text-t1 uppercase tracking-wide transition-opacity active:opacity-50 flex-shrink-0 hover:opacity-70"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              Presets
             </button>
-          </CollapsibleTrigger>
-
-          <CollapsibleContent className="space-y-2.5 pb-3">
-            {/* Search */}
-            <div className="relative">
-              <MagnifyingGlass size={16} weight="bold" className="absolute left-3 top-1/2 -translate-y-1/2 text-s3 pointer-events-none" />
-              <Input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, description, category..."
-                className="h-11 pl-9 pr-9 bg-bg border-s2 text-t1 placeholder:text-t3 text-base"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-t3 hover:text-t1 transition-colors"
-                >
-                  <X size={14} weight="bold" />
-                </button>
-              )}
-            </div>
-
-            {/* Location filter */}
-            {availableLocations.length > 0 && (
-              <div className="flex items-center gap-2">
-                <MapPin size={14} weight="bold" className="text-s4 flex-shrink-0" />
-                <Select
-                  value={advancedFilters.locations?.[0] || 'all'}
-                  onValueChange={(value) => setAdvancedFilters({ ...advancedFilters, locations: value === 'all' ? undefined : [value] })}
-                >
-                  <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                    <SelectValue placeholder="All Locations" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-xs">All Locations</SelectItem>
-                    {availableLocations.map(loc => (
-                      <SelectItem key={loc.id} value={loc.id} className="text-xs">{loc.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Tag filter */}
-            {(allTags || []).length > 0 && (
-              <div className="flex items-center gap-2">
-                <Tag size={14} weight="bold" className="text-s4 flex-shrink-0" />
-                <Select
-                  value={advancedFilters.tags?.[0] || 'all'}
-                  onValueChange={(value) => setAdvancedFilters({ ...advancedFilters, tags: value === 'all' ? undefined : [value] })}
-                >
-                  <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                    <SelectValue placeholder="All Tags" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-xs">All Tags</SelectItem>
-                    {(allTags || []).map(tag => (
-                      <SelectItem key={tag.id} value={tag.id} className="text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
-                          <span>{tag.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Sort */}
-            <div className="flex items-center gap-2">
-              <ArrowsDownUp size={14} weight="bold" className="text-s4 flex-shrink-0" />
-              <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-                <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual" className="text-xs">Manual Order</SelectItem>
-                  <SelectItem value="profit-desc" className="text-xs">Profit ↓</SelectItem>
-                  <SelectItem value="profit-asc" className="text-xs">Profit ↑</SelectItem>
-                  <SelectItem value="date-desc" className="text-xs">Newest First</SelectItem>
-                  <SelectItem value="date-asc" className="text-xs">Oldest First</SelectItem>
-                  <SelectItem value="category-asc" className="text-xs">Category A→Z</SelectItem>
-                  <SelectItem value="category-desc" className="text-xs">Category Z→A</SelectItem>
-                  <SelectItem value="tag-count-desc" className="text-xs">Most Tags First</SelectItem>
-                  <SelectItem value="tag-count-asc" className="text-xs">Fewest Tags First</SelectItem>
-                  <SelectItem value="tag-name-asc" className="text-xs">Tag Name A→Z</SelectItem>
-                  <SelectItem value="tag-name-desc" className="text-xs">Tag Name Z→A</SelectItem>
-                </SelectContent>
-              </Select>
-              {sortBy !== 'manual' && (
-                <Button
-                  onClick={() => setSortBy('manual')}
-                  size="sm" variant="ghost"
-                  className="h-9 px-2 text-xs text-t3 hover:text-t1 flex-shrink-0"
-                >
-                  <X size={13} weight="bold" />
-                </Button>
-              )}
-            </div>
-
-            {/* Advanced filters + presets */}
-            <div className="flex items-center gap-2">
-              <AdvancedFilters
-                filters={advancedFilters}
-                onFiltersChange={setAdvancedFilters}
-                availableCategories={availableCategories}
-                priceMin={priceRange.min}
-                priceMax={priceRange.max}
-              />
-              <Button
-                onClick={() => setPresetsOpen(true)}
-                size="sm" variant="outline"
-                className="h-9 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1 flex-1"
-              >
-                <BookmarkSimple size={14} weight="bold" className="mr-1.5" />
-                Presets
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
+          <button
+            onClick={handleSelectAll}
+            className="text-[9px] font-bold text-t1 uppercase tracking-wide transition-opacity active:opacity-50 flex-shrink-0"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {allFilteredSelected ? 'Deselect All' : 'Select All'}
+          </button>
+        </div>
 
         <FilterPresetsManager
           isOpen={presetsOpen}
@@ -1177,53 +1071,39 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           onRemoveFilter={handleRemoveFilter}
           className="mb-3"
         />
-        
-        {filteredItems.length > 0 && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleSelectAll}
-              className="flex items-center gap-1 h-6 px-2 rounded-full border border-s2 bg-transparent text-[10px] font-semibold text-t3 hover:text-t1 hover:bg-s1 transition-colors flex-shrink-0"
+
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-s1/60">
+            <span className="text-xs font-medium text-b1 flex-shrink-0">
+              {selectedIds.size} selected
+            </span>
+            <Button
+              onClick={() => setBulkTagDialogOpen(true)}
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
             >
-              {allFilteredSelected ? (
-                <><CheckSquare size={11} weight="fill" />Deselect All</>
-              ) : (
-                <><Square size={11} weight="bold" />Select All</>
-              )}
-            </button>
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-2 flex-1">
-                <span className="text-xs font-medium text-b1">
-                  {selectedIds.size} selected
-                </span>
-                <Button
-                  onClick={() => setBulkTagDialogOpen(true)}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
-                >
-                  <Tag size={14} weight="bold" className="mr-1" />
-                  Tags
-                </Button>
-                <Button
-                  onClick={handleExportCSV}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
-                >
-                  <DownloadSimple size={14} weight="bold" className="mr-1" />
-                  Export
-                </Button>
-                <Button
-                  onClick={handleBulkRemove}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs font-medium border border-red/30 bg-transparent text-red hover:bg-red/10 hover:text-red"
-                >
-                  <Trash size={14} weight="bold" className="mr-1" />
-                  Remove
-                </Button>
-              </div>
-            )}
+              <Tag size={12} weight="bold" className="mr-1" />
+              Tags
+            </Button>
+            <Button
+              onClick={handleExportCSV}
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+            >
+              <DownloadSimple size={12} weight="bold" className="mr-1" />
+              Export
+            </Button>
+            <Button
+              onClick={handleBulkRemove}
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 text-xs font-medium border border-red/30 bg-transparent text-red hover:bg-red/10 hover:text-red"
+            >
+              <Trash size={12} weight="bold" className="mr-1" />
+              Remove
+            </Button>
           </div>
         )}
         

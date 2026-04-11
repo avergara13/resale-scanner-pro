@@ -71,10 +71,15 @@ function App() {
 
   
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
+  // Ref mirror of `queue` — used by pipeline handlers to escape stale closures
+  // when the Agent runs multi-step flows (batch-analyze → optimize → push) and
+  // subsequent handlers need the latest queue state, not the pre-pipeline snapshot.
+  const queueRef = useRef(queue)
+  useEffect(() => { queueRef.current = queue }, [queue])
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
-  const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
+  const [allTags] = useKV<ItemTag[]>('all-tags', [])
   const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [settings, setSettings] = useKV<AppSettings>('settings', {
     voiceEnabled: true,
@@ -90,7 +95,7 @@ function App() {
     ebayFeePercent: 12.9,
     ebayAdFeePercent: 0,
     shippingMaterialsCost: 0,
-    paypalFeePercent: 3.49,
+    paypalFeePercent: 0,
     preferredAiModel: 'gemini-2.5-flash',
     notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
     imageQuality: { preset: 'balanced' },
@@ -106,10 +111,10 @@ function App() {
   })
   
   const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
-  const { theme, themeMode, setTheme, useAmbientLight, toggleAmbientLight } = useTheme()
+  const { themeMode, setTheme, toggleAmbientLight } = useTheme()
   const imageQualityPreset = settings?.imageQuality?.preset || 'balanced'
-  const { optimizeAndCache, isOptimizing: isOptimizingImage } = useImageOptimization(imageQualityPreset)
-  const { state: retryState, startRetry, updateRetry, completeRetry } = useRetryTracker()
+  const { optimizeAndCache } = useImageOptimization(imageQualityPreset)
+  const { state: retryState } = useRetryTracker()
 
   const ebayService = useMemo(() => {
     return createEbayService(
@@ -298,11 +303,6 @@ function App() {
       if (googleLensService && !skipLens) {
         try {
           lensAnalysis = await googleLensService.searchByImage(imageData, visionResult?.productName || mockProductName)
-          
-          const resultCount = lensAnalysis.results.length
-          const priceInfo = lensAnalysis.priceRange 
-            ? `$${lensAnalysis.priceRange.min.toFixed(2)}-$${lensAnalysis.priceRange.max.toFixed(2)}` 
-            : 'No prices'
           
           completeStep(1)
           await new Promise(resolve => setTimeout(resolve, 100))
@@ -530,7 +530,7 @@ function App() {
         sellPrice,
         settings?.defaultShippingCost || 5.0,
         settings?.ebayFeePercent || 12.9,
-        settings?.paypalFeePercent || 3.49
+        settings?.paypalFeePercent || 0
       ) || calculateProfitFallback(
         price,
         sellPrice,
@@ -598,7 +598,11 @@ function App() {
           setQueue(prev => (prev || []).map(i =>
             i.id === itemId ? { ...i, marketData: { ...i.marketData, researchSummary: researchText } } : i
           ))
-        }).catch(() => {/* silent — non-blocking enrichment */})
+        }).catch((err: unknown) => {
+          // Non-blocking enrichment — log for ops visibility but never surface to UI
+          const msg = err instanceof Error ? err.message : String(err)
+          console.warn('[research] Non-blocking enrichment failed for', newItem.id, '—', msg)
+        })
       }
 
       const tagSuggestions = tagSuggestionService.suggestTags(updatedItem)
@@ -626,8 +630,9 @@ function App() {
           }
         })
       }
-      
-      toast.success(decision === 'BUY' ? '✅ BUY Decision!' : '❌ PASS Decision')
+
+      toast.success(decision === 'BUY' ? '✅ Analysis complete — it\'s a BUY!' : '❌ Analysis done — PASS')
+      setScreen('scan-result')
     } catch (error) {
       console.error('Pipeline error:', error)
       setPipeline(prev => prev.map(s => ({ 
@@ -656,11 +661,13 @@ function App() {
     const timeOfDay = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
     const dayName = now.toLocaleDateString('en-US', { weekday: 'short' })
     const monthDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const name = `${dayName} ${timeOfDay} — ${monthDay}`
+    const sessionNumber = ((allSessions || []).filter(s => !s.deletedAt).length + 1)
+    const name = `#${String(sessionNumber).padStart(3, '0')} — ${dayName} ${timeOfDay} — ${monthDay}`
     const id = Date.now().toString()
     const newSession: Session = {
       id,
       name,
+      sessionNumber,
       startTime: Date.now(),
       itemsScanned: 0,
       buyCount: 0,
@@ -674,7 +681,7 @@ function App() {
     setSelectedSessionId(id)
     setScreen('session-detail')
     toast.success('Session started')
-  }, [setSession, setAllSessions, setSelectedSessionId, setScreen])
+  }, [allSessions, setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -781,7 +788,7 @@ function App() {
         ebayFeePercent: 12.9,
         ebayAdFeePercent: 0,
         shippingMaterialsCost: 0,
-        paypalFeePercent: 3.49,
+        paypalFeePercent: 0,
         preferredAiModel: 'gemini-2.5-flash',
       }
       const newSettings = { ...(prev || defaults), ...updates }
@@ -806,7 +813,9 @@ function App() {
   }, [setSettings, setTheme, toggleAmbientLight])
 
   const handleOptimizeItem = useCallback(async (itemId: string) => {
-    const item = (queue || []).find(i => i.id === itemId)
+    // Read fresh queue via ref to avoid stale closure when agent pipeline
+    // chains batch-analyze → optimize (items that just flipped PENDING→BUY)
+    const item = (queueRef.current || []).find(i => i.id === itemId)
     if (!item || item.decision !== 'BUY' || item.optimizedListing) return
     const optimized = await listingOptimizationService.generateOptimizedListing({
       item,
@@ -822,14 +831,16 @@ function App() {
         ? { ...i, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
         : i
     ))
-  }, [queue, setQueue, listingOptimizationService])
+  }, [setQueue, listingOptimizationService])
 
   const handlePushToNotion = useCallback(async (itemId: string) => {
     if (!notionService) {
       toast.error('Configure Notion API key and Database ID in Settings')
       return
     }
-    const item = (queue || []).find(i => i.id === itemId)
+    // Read fresh queue via ref — pipeline just optimized this item, stale
+    // closure would still show optimizedListing as undefined.
+    const item = (queueRef.current || []).find(i => i.id === itemId)
     if (!item || item.notionPageId || !item.optimizedListing) return
 
     const listing = item.optimizedListing
@@ -869,7 +880,7 @@ function App() {
     } else {
       toast.error(`Notion error: ${result.error}`)
     }
-  }, [queue, setQueue, notionService])
+  }, [setQueue, notionService])
 
   const handleMarkAsSold = useCallback((
     itemId: string,
@@ -1191,6 +1202,32 @@ function App() {
     toast.success('Passed — heavy image data will be removed at session end')
   }, [currentItem, setQueue])
 
+  const handleMaybeFromScan = useCallback((price: number, notes: string) => {
+    if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
+      toast.error('No image to save')
+      return
+    }
+    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
+    const maybeItem: ScannedItem = {
+      ...lightweight,
+      purchasePrice: effectivePrice,
+      notes: notes || currentItem!.notes,
+      inQueue: true,
+      decision: 'PENDING',
+    }
+    setQueue(prev => {
+      const current = prev || []
+      if (current.some(i => i.id === maybeItem.id)) {
+        return current.map(i => i.id === maybeItem.id ? maybeItem : i)
+      }
+      return [...current, maybeItem]
+    })
+    setCurrentItem(undefined)
+    setPipeline([])
+    toast.success('Saved as Maybe — tap in Queue to re-evaluate')
+  }, [currentItem, setQueue])
+
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
 
@@ -1255,7 +1292,9 @@ function App() {
     let buyCount = 0
     let passCount = 0
     let totalNewProfit = 0
-    const failedItems: string[] = []
+    // Capture root cause for each failure so we can give the user a specific
+    // diagnosis instead of a blind "X items failed" count.
+    const failedItems: Array<{ id: string; reason: string }> = []
     const skippedItems: string[] = []
     const updatedItemsMap = new Map<string, ScannedItem>()
 
@@ -1338,7 +1377,7 @@ function App() {
           sellPrice,
           settings?.defaultShippingCost || 5.0,
           settings?.ebayFeePercent || 12.9,
-          settings?.paypalFeePercent || 3.49
+          settings?.paypalFeePercent || 0
         ) || calculateProfitFallback(
           item.purchasePrice,
           sellPrice,
@@ -1373,8 +1412,9 @@ function App() {
 
         await new Promise(resolve => setTimeout(resolve, 500))
       } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
         console.error('Failed to analyze item:', item.id, error)
-        failedItems.push(item.id)
+        failedItems.push({ id: item.id, reason: reason.slice(0, 200) })
       }
     }
 
@@ -1402,7 +1442,17 @@ function App() {
     setBatchProgress({ current: 0, total: 0, currentItemName: '' })
 
     if (failedItems.length > 0) {
-      toast.warning(`${failedItems.length} item(s) failed analysis`)
+      // Surface the dominant failure reason so the user knows *why* batch failed
+      // (API key missing, rate limit, timeout, etc.) rather than just a count.
+      const reasonCounts = new Map<string, number>()
+      for (const f of failedItems) {
+        reasonCounts.set(f.reason, (reasonCounts.get(f.reason) || 0) + 1)
+      }
+      const [topReason] = [...reasonCounts.entries()].sort((a, b) => b[1] - a[1])
+      toast.warning(
+        `${failedItems.length} item(s) failed analysis`,
+        topReason ? { description: topReason[0] } : undefined,
+      )
     }
     if (skippedItems.length > 0) {
       toast.info(`${skippedItems.length} item(s) skipped (no image)`)
@@ -1541,6 +1591,10 @@ function App() {
   useEffect(() => {
     if (screen === 'sold') {
       loadLiveSoldItems()
+    } else if (screen === 'agent') {
+      // Agent needs live sold data for intelligence/reporting, but should never
+      // surface a toast — errors here would leak onto unrelated tabs.
+      loadLiveSoldItems({ silent: true })
     }
   }, [screen, loadLiveSoldItems])
 
@@ -1680,7 +1734,9 @@ function App() {
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
         onBack={
-          screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
+          screen === 'scan'
+            ? () => setScreen('session')
+            : screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
             ? () => setScreen('session')
             : screen === 'tag-analytics' || screen === 'location-insights'
             ? () => setScreen('queue')
@@ -1731,6 +1787,31 @@ function App() {
               />
             </motion.div>
           )}
+          {screen === 'scan' && (
+            <motion.div
+              key="scan"
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
+              className="w-full h-full"
+            >
+              <AIScreen
+                currentItem={currentItem}
+                pipeline={pipeline}
+                settings={settings}
+                onSaveDraft={handleSaveDraft}
+                onCreateListing={handleCreateListingFromScan}
+                onPassItem={handlePassFromScan}
+                onMaybeItem={handleMaybeFromScan}
+                onRecalculate={handleRecalculate}
+                onRescan={handleRescan}
+                onOpenCamera={() => setCameraOpen(true)}
+              />
+            </motion.div>
+          )}
           {screen === 'agent' && (
             <motion.div
               key="agent"
@@ -1744,6 +1825,7 @@ function App() {
               className="w-full h-full"
             >
               <AgentScreen
+                isCurrentScreen={screen === 'agent'}
                 queueItems={queue || []}
                 soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
                 settings={settings}
@@ -1764,6 +1846,11 @@ function App() {
                 allSessions={allSessions || []}
                 scanHistory={scanHistory || []}
                 profitGoals={profitGoals || []}
+                onOpenScanItem={(item) => {
+                  setCurrentItem(item)
+                  setPipeline([])
+                  setScreen('scan')
+                }}
               />
             </motion.div>
           )}
@@ -1786,6 +1873,7 @@ function App() {
                 onSaveDraft={handleSaveDraft}
                 onCreateListing={handleCreateListingFromScan}
                 onPassItem={handlePassFromScan}
+                onMaybeItem={handleMaybeFromScan}
                 onRecalculate={handleRecalculate}
                 onRescan={handleRescan}
                 onOpenCamera={() => setCameraOpen(true)}
@@ -1802,7 +1890,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <QueueScreen
                 queueItems={queue || []}
@@ -1856,7 +1944,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <SoldScreen
                 soldItems={liveSoldItems}

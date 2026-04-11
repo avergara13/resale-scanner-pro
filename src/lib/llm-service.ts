@@ -15,6 +15,33 @@ import { retryFetch } from './retry-service'
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages'
 
+// Hard upper bound on any single LLM HTTP call — prevents the UI from hanging
+// forever if the provider hangs the socket without responding.
+const LLM_FETCH_TIMEOUT_MS = 45_000
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number = LLM_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController()
+  // Chain onto any caller-supplied signal so external aborts still propagate
+  const callerSignal = init.signal
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort(callerSignal.reason)
+    else callerSignal.addEventListener('abort', () => controller.abort(callerSignal.reason), { once: true })
+  }
+  const timeoutId = setTimeout(
+    () => controller.abort(new DOMException(`Request timed out after ${timeoutMs}ms`, 'TimeoutError')),
+    timeoutMs,
+  )
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 // ------- In-memory research cache -------
 // Prevents duplicate API calls when the same product is scanned multiple times
 // in a session (common at thrift stores). TTLs mirror retry-config.ts definitions.
@@ -28,7 +55,9 @@ const CACHE_TTL_MS = {
 } as const
 
 function cacheKey(...parts: (string | undefined)[]): string {
-  return parts.map(p => (p ?? '').toLowerCase().trim()).join('|')
+  // Sentinel-separated so "nike|air max" and "nike air|max" don't collide.
+  // `\x1f` (ASCII unit separator) never appears in product names.
+  return parts.map(p => (p ?? '').toLowerCase().trim()).join('\x1f')
 }
 
 function cacheGet(key: string): string | null {
@@ -73,11 +102,19 @@ async function callGemini(
     body.systemInstruction = { parts: [{ text: systemInstruction }] }
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  let response: Response
+  try {
+    response = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new Error(`Gemini request timed out after ${LLM_FETCH_TIMEOUT_MS / 1000}s — network or provider issue`)
+    }
+    throw err
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '')
@@ -363,21 +400,33 @@ async function callClaude(
 ): Promise<string> {
   const { model = 'claude-haiku-4-5-20251001', maxTokens = 1024, systemPrompt } = options
 
-  const response = await fetch(ANTHROPIC_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      ...(systemPrompt && systemPrompt.trim().length > 10 ? { system: systemPrompt } : {}),
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  })
+  let response: Response
+  try {
+    response = await fetchWithTimeout(ANTHROPIC_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        // SECURITY: This header enables direct browser→Anthropic calls which exposes
+        // the API key to the client. Acceptable here because the key is a user-supplied
+        // BYO-key stored only in local device settings (not a server secret).
+        // Never ship this with a shared/tenant key.
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        ...(systemPrompt && systemPrompt.trim().length > 10 ? { system: systemPrompt } : {}),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    })
+  } catch (err) {
+    if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new Error(`Claude request timed out after ${LLM_FETCH_TIMEOUT_MS / 1000}s — network or provider issue`)
+    }
+    throw err
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '')

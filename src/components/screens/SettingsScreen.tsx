@@ -36,11 +36,9 @@ import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
 import { IncidentLogViewer } from '../IncidentLogViewer'
 import { DetectionHistoryViewer } from '../DetectionHistoryViewer'
 import { FalsePositiveAnalyzerPanel } from '../FalsePositiveAnalyzer'
-import { ThemeToggle } from '../ThemeToggle'
 import { TagPresetsManager } from '../TagPresetsManager'
 import { CompressionAnalytics } from '../CompressionAnalytics'
 import { RetryConfigPanel } from '../RetryConfigPanel'
-import { ArrowLeft } from '@phosphor-icons/react'
 import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
@@ -49,7 +47,7 @@ interface SettingsScreenProps {
   onBack?: () => void
 }
 
-export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenProps) {
+export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
 
   const toggleKeyVisibility = (key: string) => {
@@ -115,43 +113,20 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
       id="scr-settings"
       className="flex flex-col h-full overflow-y-auto overflow-x-hidden"
     >
-      <div className="px-4 pt-2 pb-4 border-b border-s2 bg-fg">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            {onBack && (
-              <button onClick={onBack} className="p-1.5 -ml-1 rounded-lg hover:bg-s1 transition-colors active:opacity-60">
-                <ArrowLeft size={20} weight="bold" className="text-t1" />
-              </button>
-            )}
-            <div>
-              <h1 className="text-2xl font-semibold text-t1 mb-1">Settings</h1>
-              <p className="text-sm text-t2">Configure AI models, APIs, and business rules</p>
+      <div className="px-4 py-2 border-b border-s2 bg-fg">
+        <div className="flex items-center gap-4 overflow-x-auto scrollbar-none">
+          {([
+            ['AI', aiConfigured],
+            ['Google', googleConfigured],
+            ['eBay', ebayConfigured],
+            ['Database', supabaseConfigured],
+            ['Notion', notionConfigured],
+          ] as [string, boolean][]).map(([label, ok]) => (
+            <div key={label} className="flex items-center gap-1.5 flex-shrink-0">
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ok ? 'bg-green' : 'bg-s3'}`} />
+              <span className={`text-[11px] font-semibold ${ok ? 'text-t1' : 'text-t3'}`}>{label}</span>
             </div>
-          </div>
-          <ThemeToggle />
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={aiConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(aiConfigured)}
-            <span className="text-xs">AI</span>
-          </Badge>
-          <Badge variant={googleConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(googleConfigured)}
-            <span className="text-xs">Google</span>
-          </Badge>
-          <Badge variant={ebayConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(ebayConfigured)}
-            <span className="text-xs">eBay</span>
-          </Badge>
-          <Badge variant={supabaseConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(supabaseConfigured)}
-            <span className="text-xs">Database</span>
-          </Badge>
-          <Badge variant={notionConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(notionConfigured)}
-            <span className="text-xs">Notion</span>
-          </Badge>
+          ))}
         </div>
       </div>
 

@@ -17,9 +17,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   }
 
   const getLabel = () => {
-    if (themeMode === 'auto') {
-      return `Auto (${theme === 'dark' ? 'Dark' : 'Light'})`
-    }
+    if (themeMode === 'auto') return `System (${theme === 'dark' ? 'Dark' : 'Light'})`
     return theme === 'dark' ? 'Dark' : 'Light'
   }
 

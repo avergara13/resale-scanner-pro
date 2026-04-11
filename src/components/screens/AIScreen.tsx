@@ -7,6 +7,7 @@ import {
   ArrowClockwise,
   ArrowCounterClockwise,
   XCircle,
+  BookmarkSimple,
   ShoppingCart,
   Scan,
   FloppyDisk,
@@ -62,6 +63,7 @@ interface AIScreenProps {
   onSaveDraft: (price: number, notes: string) => void
   onCreateListing: (price: number, notes: string, draft: ListingDraftOverrides) => void
   onPassItem: (price: number, notes: string) => void
+  onMaybeItem?: (price: number, notes: string) => void
   onRecalculate?: (price: number) => void
   onRescan?: () => void
   onOpenCamera?: () => void
@@ -199,13 +201,13 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
         >
           {isProcessing && (
             <div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent"
               style={{ animation: 'shimmer-sweep 1.5s ease-in-out infinite' }}
             />
           )}
           {isComplete && (
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
               initial={{ x: '-100%' }}
               animate={{ x: '200%' }}
               transition={{ duration: 0.8, ease: 'easeInOut' }}
@@ -230,6 +232,7 @@ export function AIScreen({
   onSaveDraft,
   onCreateListing,
   onPassItem,
+  onMaybeItem,
   onRecalculate,
   onRescan,
   onOpenCamera,
@@ -305,6 +308,12 @@ export function AIScreen({
     prevHasDecision.current = hasDecision
   }, [hasDecision])
 
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    enabled: true,
+  })
+
   const handleAddToQueue = useCallback(() => {
     onCreateListing(parseFloat(buyPrice) || 0, description, {
       productName: itemName || undefined,
@@ -317,8 +326,6 @@ export function AIScreen({
     })
     setListingAdded(true)
   }, [buyPrice, description, itemName, category, condition, estSellPrice, shippingCost, platform, onCreateListing])
-
-  const pullToRefresh = usePullToRefresh({ onRefresh: handleRefresh, threshold: 80, enabled: true })
 
   return (
     <div className="flex flex-col w-full h-full bg-bg">
@@ -735,6 +742,17 @@ export function AIScreen({
                   <XCircle size={15} weight="bold" className="mr-1" />
                   Pass
                 </Button>
+                {onMaybeItem && (
+                  <Button
+                    onClick={() => onMaybeItem(parseFloat(buyPrice) || 0, description)}
+                    disabled={!canSaveDraft}
+                    variant="outline"
+                    className="flex-1 h-9 sm:h-10 border-amber-400/50 text-amber-500 hover:bg-amber-400/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                  >
+                    <BookmarkSimple size={15} weight="bold" className="mr-1" />
+                    Maybe
+                  </Button>
+                )}
                 <Button
                   onClick={handleAddToQueue}
                   disabled={!canSaveDraft}

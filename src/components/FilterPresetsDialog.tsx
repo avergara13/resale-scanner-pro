@@ -12,6 +12,19 @@ import type { AdvancedFilterOptions } from './AdvancedFilters'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 
+// Guards against `RangeError: Invalid time value` from date-fns when a
+// preset's persisted dateRange is missing start/end or contains NaN.
+function safeFormat(ts: unknown, fmt: string): string | null {
+  if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return null
+  try {
+    return format(d, fmt)
+  } catch {
+    return null
+  }
+}
+
 interface FilterPresetsDialogProps {
   currentFilters: AdvancedFilterOptions
   onApplyPreset: (filters: AdvancedFilterOptions) => void
@@ -101,7 +114,10 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
       summary.push(`Margin: ${filters.profitMarginRange.min}%-${filters.profitMarginRange.max}%`)
     }
     if (filters.dateRange) {
-      summary.push(`Date: ${format(filters.dateRange.start, 'MMM d')} - ${format(filters.dateRange.end, 'MMM d')}`)
+      const s = safeFormat(filters.dateRange.start, 'MMM d')
+      const e = safeFormat(filters.dateRange.end, 'MMM d')
+      if (s && e) summary.push(`Date: ${s} - ${e}`)
+      else if (s || e) summary.push(`Date: ${s || e}`)
     }
     if (filters.categories && filters.categories.length > 0) {
       summary.push(`${filters.categories.length} categories`)
@@ -225,11 +241,14 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
                                   </Badge>
                                 )}
                               </div>
-                              {preset.lastUsed && (
-                                <p className="text-[10px] text-t3 font-medium">
-                                  Last used {format(preset.lastUsed, 'MMM d, h:mm a')}
-                                </p>
-                              )}
+                              {(() => {
+                                const lastUsedLabel = safeFormat(preset.lastUsed, 'MMM d, h:mm a')
+                                return lastUsedLabel ? (
+                                  <p className="text-[10px] text-t3 font-medium">
+                                    Last used {lastUsedLabel}
+                                  </p>
+                                ) : null
+                              })()}
                             </div>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>

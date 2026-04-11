@@ -119,8 +119,14 @@ export function AdvancedFilters({
   }
 
   const formatDateForInput = (timestamp?: number) => {
-    if (!timestamp) return ''
-    return format(timestamp, 'yyyy-MM-dd')
+    // Reject non-finite numbers (NaN, Infinity) to avoid
+    // date-fns `RangeError: Invalid time value`.
+    if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return ''
+    try {
+      return format(timestamp, 'yyyy-MM-dd')
+    } catch {
+      return ''
+    }
   }
 
   return (
