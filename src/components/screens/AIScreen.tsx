@@ -337,6 +337,13 @@ export function AIScreen({
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
 
+      {/* ── Overall Progress — persistent strip between header and scroll ── */}
+      {pipeline.length > 0 && (
+        <div className="flex-shrink-0 px-3 pt-2.5 pb-0 border-b border-s2 bg-fg">
+          <OverallProgress steps={pipeline} />
+        </div>
+      )}
+
       {/* ── Scrollable content ── */}
       <div className="flex-1 overflow-y-auto" ref={pullToRefresh.containerRef}>
         <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-4">
@@ -368,7 +375,6 @@ export function AIScreen({
           ) : (
             /* Pipeline in progress or complete */
             <div className="space-y-3 sm:space-y-4">
-              <OverallProgress steps={pipeline} />
               <PipelinePanel steps={pipeline} />
 
               {/* Market velocity "still searching" banner */}
@@ -725,7 +731,7 @@ export function AIScreen({
                   </Button>
                 )}
 
-              {/* Rescan / Pass / Add to Queue */}
+              {/* Row 1: secondary actions */}
               <div className="flex gap-2">
                 <Button
                   onClick={() => onRescan?.()}
@@ -755,15 +761,16 @@ export function AIScreen({
                     Maybe
                   </Button>
                 )}
-                <Button
-                  onClick={handleAddToQueue}
-                  disabled={!canSaveDraft}
-                  className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold whitespace-nowrap"
-                >
-                  <ShoppingCart size={15} weight="bold" className="mr-1" />
-                  Add to Queue
-                </Button>
               </div>
+              {/* Row 2: primary CTA — full width, tall, prominent */}
+              <Button
+                onClick={handleAddToQueue}
+                disabled={!canSaveDraft}
+                className="w-full h-11 sm:h-12 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-sm font-bold shadow-md shadow-green/20"
+              >
+                <ShoppingCart size={16} weight="bold" className="mr-2" />
+                Add to Queue
+              </Button>
             </div>
           )
         ) : isPipelineRunning ? (
