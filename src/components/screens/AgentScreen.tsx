@@ -1136,42 +1136,23 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
   // Shared stats bar used in both views
   const statsBar = (
     <div
-      className="px-3 py-1 border-b border-s1/60"
-      style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)' }}
+      className="px-3 border-b border-s1/60"
+      style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)', height: '30px', display: 'flex', alignItems: 'center' }}
     >
-      {currentSession?.active && (
-        <div className="text-[9px] font-bold text-b1 uppercase tracking-wide mb-0.5">
-          {currentSession.name || 'Active Session'}
-        </div>
-      )}
-      <div className="grid grid-cols-4 gap-1">
-        <div className="rounded-lg border border-s2/60 py-1 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
-          <div className="text-sm font-black text-t1 leading-tight">{queueStats.total}</div>
-          <div className="text-[8px] uppercase tracking-wide text-t3 leading-none mt-0.5">Queue</div>
-        </div>
-        <div className="rounded-lg border border-green/30 py-1 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--green-bg) 50%, transparent)' }}>
-          <div className="text-sm font-black text-green leading-tight">{queueStats.buy}</div>
-          <div className="text-[8px] uppercase tracking-wide text-t3 leading-none mt-0.5">Buy</div>
-        </div>
-        <div className="rounded-lg border border-red/30 py-1 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--red-bg) 50%, transparent)' }}>
-          <div className="text-sm font-black text-red leading-tight">{queueStats.pass}</div>
-          <div className="text-[8px] uppercase tracking-wide text-t3 leading-none mt-0.5">Pass</div>
-        </div>
-        <div className="rounded-lg border border-s2/60 py-1 px-1 text-center" style={{ background: 'color-mix(in oklch, var(--bg) 60%, transparent)' }}>
-          <div className="text-sm font-black text-green leading-tight">${queueStats.totalProfit.toFixed(0)}</div>
-          <div className="text-[8px] uppercase tracking-wide text-t3 leading-none mt-0.5">Profit</div>
-        </div>
+      <div className="flex items-center gap-3 flex-1 text-[10px]">
+        <span className="text-t1 font-black">{queueStats.total} <span className="font-normal text-t3">Queue</span></span>
+        <span className="text-green font-black">{queueStats.buy} <span className="font-normal text-t3">Buy</span></span>
+        <span className="text-red font-black">{queueStats.pass} <span className="font-normal text-t3">Pass</span></span>
+        <span className="text-green font-black">${queueStats.totalProfit.toFixed(0)} <span className="font-normal text-t3">Profit</span></span>
       </div>
       {activeTab === 'chat' && viewMode === 'chat' && (
-        <div className="flex justify-end pt-1">
-          <button
-            onClick={handleNewChat}
-            className="text-[9px] font-bold text-b1 uppercase tracking-wide transition-colors active:opacity-60 flex items-center gap-0.5"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          >
-            ↺ New Chat
-          </button>
-        </div>
+        <button
+          onClick={handleNewChat}
+          className="text-[9px] font-bold text-t3 hover:text-b1 uppercase tracking-wide transition-colors active:opacity-60 flex-shrink-0"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        >
+          ↺ New Chat
+        </button>
       )}
     </div>
   )
