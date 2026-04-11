@@ -638,7 +638,9 @@ export function AIScreen({
                         <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
                           <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
                           <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                            ${((currentItem.estimatedSellPrice || 0) - currentItem.purchasePrice).toFixed(2)}
+                            {currentItem.profitMargin != null && currentItem.estimatedSellPrice
+                              ? `$${((currentItem.estimatedSellPrice * currentItem.profitMargin) / 100).toFixed(2)}`
+                              : '--'}
                           </p>
                         </div>
                       </div>
@@ -756,7 +758,7 @@ export function AIScreen({
                 <Button
                   onClick={handleAddToQueue}
                   disabled={!canSaveDraft}
-                  className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                  className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold whitespace-nowrap"
                 >
                   <ShoppingCart size={15} weight="bold" className="mr-1" />
                   Add to Queue

@@ -62,7 +62,13 @@ export function useConnectionHistory(
       return updated.slice(-maxEvents)
     })
 
-    if (newStatus === 'offline' && previousStatus !== 'offline') {
+    // Open a new incident only when there is no active incident already open for
+    // this service. The health checker temporarily sets status to 'checking' before
+    // every 30 s poll, so a persistent outage produces repeated checking→offline
+    // transitions. Checking the ref (rather than previousStatus) correctly opens one
+    // incident on the first offline transition and suppresses duplicates thereafter,
+    // while still opening a new incident if the service recovers and goes down again.
+    if (newStatus === 'offline' && !activeIncidentsRef.current.has(service)) {
       const incident: DowntimeIncident = {
         id: `incident-${Date.now()}-${service}`,
         service,
