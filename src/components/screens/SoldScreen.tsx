@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowClockwise, ArrowSquareOut, Package, SpinnerGap, Truck, Plus, Warning, Sparkle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowSquareOut, CheckCircle, Package, SpinnerGap, Truck, Plus, Warning, Sparkle, X } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -256,7 +256,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
         <div className="tab-bar mb-2">
           {([
             ['all', 'All'],
-            ['need-label', 'Need'],
+            ['need-label', 'Sold'],
             ['label-ready', 'Ready'],
             ['shipped', 'Shipped'],
           ] as Array<[FulfillmentFilter, string]>).map(([filter, label]) => (
@@ -285,7 +285,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           <div className="rounded-xl border border-red/30 py-1.5 px-1 text-center"
             style={{ background: 'color-mix(in oklch, var(--red-bg) 50%, transparent)' }}>
             <div className="text-sm font-black text-red leading-tight">{batchStats.needsLabelCount}</div>
-            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Need</div>
+            <div className="text-[8px] uppercase tracking-wide text-t3 leading-tight mt-0.5">Sold</div>
           </div>
           <div className="rounded-xl border border-green/30 py-1.5 px-1 text-center"
             style={{ background: 'color-mix(in oklch, var(--green-bg) 50%, transparent)' }}>
@@ -410,15 +410,42 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                   </div>
                 )}
 
-                {/* ── Row 3: Quick status buttons (tap to cycle) ────── */}
-                {draft.shippingStatus !== '✅ Shipped' && (
+                {/* ── Row 3: Shipped CTA (Ready items only) or status cycle ── */}
+                {(draft.shippingStatus === '🟡 Label Ready' || draft.shippingStatus === '📦 Packed') ? (
+                  <button
+                    disabled={savingItemId === item.salePageId}
+                    onClick={async () => {
+                      const shippedDraft = { ...draft, shippingStatus: '✅ Shipped' as SoldShippingStatus }
+                      setDrafts(prev => ({ ...prev, [item.salePageId]: shippedDraft }))
+                      if (item.isManualEntry) {
+                        const manualId = item.salePageId.replace(/^manual-/, '')
+                        setManualSales(prev => (prev || []).map(m => m.id === manualId ? { ...m, shippingStatus: '✅ Shipped' as SoldShippingStatus } : m))
+                        toast.success('Shipped!')
+                      } else {
+                        setSavingItemId(item.salePageId)
+                        try {
+                          await onUpdateShipping(item.salePageId, { shippingStatus: '✅ Shipped' })
+                          toast.success('Marked as shipped!')
+                        } finally {
+                          setSavingItemId(null)
+                        }
+                      }
+                    }}
+                    className="w-full mt-2 flex items-center justify-center gap-1.5 h-9 rounded-xl font-bold text-xs text-white transition-all active:scale-[0.98] disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                  >
+                    {savingItemId === item.salePageId
+                      ? <SpinnerGap size={13} className="animate-spin" />
+                      : <CheckCircle size={13} weight="bold" />}
+                    Shipped — Done
+                  </button>
+                ) : draft.shippingStatus !== '✅ Shipped' ? (
                   <div className="flex gap-1.5 mt-2">
-                    {SHIPPING_STATUS_OPTIONS.map((status) => (
+                    {SHIPPING_STATUS_OPTIONS.filter(s => s !== '✅ Shipped').map((status) => (
                       <button
                         key={status}
                         onClick={() => {
                           handleDraftChange(item.salePageId, 'shippingStatus', status)
-                          // Auto-save status change for speed
                           const updatedDraft = { ...draft, shippingStatus: status }
                           setDrafts(prev => ({ ...prev, [item.salePageId]: updatedDraft }))
                         }}
@@ -433,7 +460,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                       </button>
                     ))}
                   </div>
-                )}
+                ) : null}
 
                 {/* ── Row 4: Expand/Collapse details ───────────────── */}
                 <button
@@ -575,9 +602,18 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                     {batchStats.overdueCount} {batchStats.overdueCount === 1 ? 'item' : 'items'} overdue
                   </span>
                 </>
+              ) : batchStats.needsLabelCount > 0 ? (
+                <>
+                  <Warning size={13} weight="fill" className="text-t3 flex-shrink-0" />
+                  <span style={{ fontSize: '12px', color: 'var(--t2)', fontWeight: 500 }}>
+                    {batchStats.needsLabelCount} {batchStats.needsLabelCount === 1 ? 'item' : 'items'} need a label
+                  </span>
+                </>
               ) : lastSyncedLabel ? (
                 <span style={{ fontSize: '11px', color: 'var(--t3)' }}>Synced {lastSyncedLabel}</span>
-              ) : null}
+              ) : (
+                <span style={{ fontSize: '11px', color: 'var(--t3)' }}>All items on track</span>
+              )}
             </div>
             <button
               onClick={() => setShowManualDialog(true)}

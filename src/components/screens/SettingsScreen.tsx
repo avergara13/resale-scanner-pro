@@ -40,7 +40,6 @@ import { ThemeToggle } from '../ThemeToggle'
 import { TagPresetsManager } from '../TagPresetsManager'
 import { CompressionAnalytics } from '../CompressionAnalytics'
 import { RetryConfigPanel } from '../RetryConfigPanel'
-import { ArrowLeft } from '@phosphor-icons/react'
 import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
@@ -49,7 +48,7 @@ interface SettingsScreenProps {
   onBack?: () => void
 }
 
-export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenProps) {
+export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
 
   const toggleKeyVisibility = (key: string) => {
@@ -115,23 +114,8 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
       id="scr-settings"
       className="flex flex-col h-full overflow-y-auto overflow-x-hidden"
     >
-      <div className="px-4 pt-2 pb-4 border-b border-s2 bg-fg">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            {onBack && (
-              <button onClick={onBack} className="p-1.5 -ml-1 rounded-lg hover:bg-s1 transition-colors active:opacity-60">
-                <ArrowLeft size={20} weight="bold" className="text-t1" />
-              </button>
-            )}
-            <div>
-              <h1 className="text-2xl font-semibold text-t1 mb-1">Settings</h1>
-              <p className="text-sm text-t2">Configure AI models, APIs, and business rules</p>
-            </div>
-          </div>
-          <ThemeToggle />
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
+      <div className="px-4 pt-3 pb-3 border-b border-s2 bg-fg flex items-center gap-2">
+        <div className="flex flex-wrap gap-2 flex-1">
           <Badge variant={aiConfigured ? "default" : "secondary"} className="gap-1.5">
             {getStatusIcon(aiConfigured)}
             <span className="text-xs">AI</span>
@@ -153,6 +137,7 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
             <span className="text-xs">Notion</span>
           </Badge>
         </div>
+        <ThemeToggle />
       </div>
 
       <div className="flex-1 px-3 py-4">
