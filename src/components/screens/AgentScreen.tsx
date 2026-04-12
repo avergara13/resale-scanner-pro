@@ -25,12 +25,12 @@ import {
   ListChecks,
   ChatCircle,
   Camera,
-  ArrowSquareRight,
+  ShoppingCart,
+  ArrowSquareOut,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
@@ -301,7 +301,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   }, [setScanHistoryKV])
 
   const handlePromoteToQueue = useCallback((item: ScannedItem) => {
-    const queueItem: ScannedItem = { ...item, inQueue: true }
+    const queueItem: ScannedItem = { ...item, inQueue: true, decision: 'BUY' as const }
     setQueueKV(prev => {
       const current = prev || []
       if (current.some(i => i.id === queueItem.id)) return current
@@ -1163,7 +1163,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
       key="chat-pill"
       initial={{ y: 80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 80, opacity: 0 }}
+      exit={{ y: 80, opacity: 0, transition: { duration: 0.15, ease: [0.32, 0, 0.67, 0] } }}
       transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.8 }}
       style={{
         position: 'fixed',
@@ -1242,7 +1242,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
       key="task-pill"
       initial={{ y: 80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 80, opacity: 0 }}
+      exit={{ y: 80, opacity: 0, transition: { duration: 0.15, ease: [0.32, 0, 0.67, 0] } }}
       transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.8 }}
       style={{
         position: 'fixed',
@@ -1322,7 +1322,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
   [chatSessions])
 
   return (
-    <div className="flex flex-col h-full bg-bg">
+    <div className="flex flex-col h-full bg-bg overflow-hidden">
       <PullToRefreshIndicator
         isPulling={pullToRefresh.isPulling}
         isRefreshing={pullToRefresh.isRefreshing}
@@ -1409,8 +1409,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
             {/* Messages — pb clears the floating input bar */}
             {chatMessages.length > 0 && (
-            <ScrollArea className="flex-1 px-4">
-              <div ref={pullToRefresh.containerRef} className="py-4 space-y-4" style={{ paddingBottom: '80px' }}>
+            <div ref={pullToRefresh.containerRef} className="flex-1 overflow-y-auto px-4">
+              <div className="py-4 space-y-4" style={{ paddingBottom: '80px' }}>
                 {chatMessages.map((msg, index) => (
                   <motion.div
                     key={msg.id}
@@ -1465,7 +1465,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
                 <div ref={messagesEndRef} />
               </div>
-            </ScrollArea>
+            </div>
             )}
 
           </motion.div>
@@ -1510,70 +1510,88 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                 return (
                   <Card
                     key={item.id}
-                    className="p-3 bg-fg border-s2 flex gap-3 items-start"
+                    className="bg-fg border-s2 flex flex-col gap-0 overflow-hidden"
                   >
-                    {(item.imageThumbnail || item.imageData) && (
-                      <img
-                        src={item.imageThumbnail || item.imageData}
-                        alt={item.productName || 'Item'}
-                        className="w-14 h-14 rounded-lg object-cover border border-s2 flex-shrink-0"
-                      />
-                    )}
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <p className="text-xs font-bold text-t1 truncate">
-                        {item.productName || 'Unknown Item'}
-                      </p>
-                      <div className="flex gap-2 text-[10px] font-mono text-t2 flex-wrap">
-                        <span>Buy ${item.purchasePrice.toFixed(2)}</span>
-                        {item.estimatedSellPrice != null && (
-                          <>
-                            <span>→</span>
-                            <span>Sell ${item.estimatedSellPrice.toFixed(2)}</span>
-                          </>
-                        )}
-                        {profit != null && (
-                          <span className={profit >= 0 ? 'text-green' : 'text-red'}>
-                            ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={cn(
-                            'inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border',
-                            decisionColor,
+                    {/* ── Info row ── */}
+                    <div className="p-3 flex gap-3 items-start">
+                      {(item.imageThumbnail || item.imageData) && (
+                        <img
+                          src={item.imageThumbnail || item.imageData}
+                          alt={item.productName || 'Item'}
+                          className="w-14 h-14 rounded-lg object-cover border border-s2 flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <p className="text-xs font-bold text-t1 truncate">
+                          {item.productName || 'Unknown Item'}
+                        </p>
+                        <div className="flex gap-2 text-[10px] font-mono text-t2 flex-wrap">
+                          <span>Buy ${item.purchasePrice.toFixed(2)}</span>
+                          {item.estimatedSellPrice != null && (
+                            <>
+                              <span>→</span>
+                              <span>Sell ${item.estimatedSellPrice.toFixed(2)}</span>
+                            </>
                           )}
-                        >
-                          {item.decision}
-                        </span>
-                        {alreadyQueued && (
-                          <span className="inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border text-b1 bg-b1/10 border-b1/30">
-                            In Queue
+                          {profit != null && (
+                            <span className={profit >= 0 ? 'text-green' : 'text-red'}>
+                              ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={cn(
+                              'inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border',
+                              decisionColor,
+                            )}
+                          >
+                            {item.decision}
                           </span>
-                        )}
-                        {item.category && (
-                          <span className="text-[9px] text-t3 truncate">{item.category}</span>
-                        )}
+                          {item.category && (
+                            <span className="text-[9px] text-t3 truncate">{item.category}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1.5 flex-shrink-0">
-                      {!alreadyQueued && (
+
+                    {/* ── Action row ── */}
+                    <div className="border-t border-s2 flex items-center">
+                      {/* Reopen — go back to scan analysis */}
+                      <button
+                        onClick={() => onOpenScanItem?.(item)}
+                        className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-t2 hover:text-t1 hover:bg-s1 active:opacity-60 transition-colors"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <ArrowSquareOut size={13} weight="bold" />
+                        Reopen
+                      </button>
+                      <div className="w-px h-5 bg-s2 flex-shrink-0" />
+                      {/* Add to Queue / already-queued indicator */}
+                      {alreadyQueued ? (
+                        <div className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-green">
+                          <Check size={13} weight="bold" />
+                          In Queue
+                        </div>
+                      ) : (
                         <button
                           onClick={() => handlePromoteToQueue(item)}
-                          className="flex items-center gap-1 px-2 py-1.5 bg-b1/10 hover:bg-b1/20 text-b1 rounded-lg text-[10px] font-bold transition-colors active:scale-95"
-                          title="Add to listing queue"
+                          className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-green hover:bg-green/90 active:opacity-80 transition-colors"
+                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                         >
-                          <ArrowSquareRight size={12} weight="bold" />
-                          Queue
+                          <ShoppingCart size={13} weight="bold" />
+                          Add to Queue
                         </button>
                       )}
+                      <div className="w-px h-5 bg-s2 flex-shrink-0" />
+                      {/* Delete */}
                       <button
                         onClick={() => handleDeleteScan(item.id)}
-                        className="flex items-center gap-1 px-2 py-1.5 bg-s1 hover:bg-red/10 text-t3 hover:text-red rounded-lg text-[10px] font-bold transition-colors active:scale-95"
+                        className="w-12 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
                         title="Remove from scan history"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        <Trash size={12} weight="bold" />
-                        Delete
+                        <Trash size={14} weight="bold" />
                       </button>
                     </div>
                   </Card>
