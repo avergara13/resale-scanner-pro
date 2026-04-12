@@ -35,6 +35,7 @@ import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
 import { logActivity } from '@/lib/activity-log'
+import { useDeviceId } from '@/hooks/use-device-id'
 import { cn } from '@/lib/utils'
 import { getNetProfit } from '@/lib/profit-utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
@@ -220,7 +221,8 @@ interface AgentScreenProps {
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
 export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true }: AgentScreenProps) {
-  const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
+  const deviceId = useDeviceId()
+  const [currentSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const sessionId = currentSession?.id
   const [bannerCollapsed, setBannerCollapsed] = useKV<boolean>('agent-banner-collapsed', false)
   const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])

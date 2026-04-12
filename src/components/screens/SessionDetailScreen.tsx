@@ -35,9 +35,11 @@ interface SessionDetailScreenProps {
   onOpenItem?: (item: ScannedItem) => void
   onOpenChat?: () => void
   onNavigateTo?: (screen: Screen) => void
+  /** Current device operator — used for ownership guards on End/Delete/Reopen */
+  currentOperatorId?: string
 }
 
-export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo }: SessionDetailScreenProps) {
+export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo, currentOperatorId }: SessionDetailScreenProps) {
   const [allSessionsFallback, setAllSessionsFallback] = useKV<Session[]>('all-sessions', [])
   const allSessions = allSessionsProp ?? allSessionsFallback
   const setAllSessions = onUpdateSessions ?? setAllSessionsFallback
@@ -175,6 +177,10 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     )
   }
 
+  // Ownership: only the operator who started the session can end/delete/reopen it
+  // Sessions without operatorId (pre-feature) are unguarded — all actions available
+  const isSessionOwner = !session.operatorId || session.operatorId === currentOperatorId
+
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
     const hours = Math.floor(minutes / 60)
@@ -248,6 +254,12 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               <span>{startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
               <span>·</span>
               <span>{startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+              {session.operatorName && (
+                <>
+                  <span>·</span>
+                  <span className="truncate">{session.operatorName}</span>
+                </>
+              )}
               {session.location && (
                 <>
                   <span>·</span>
@@ -401,9 +413,16 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
           {/* BUY / PASS card — matches active session */}
           <Card className="p-6 mb-4">
             <div className="flex items-center justify-between mb-4">
-              <Badge variant="secondary" className="bg-t3 text-white px-3 py-1 uppercase text-xs font-bold">
-                Completed
-              </Badge>
+              {session.active ? (
+                <Badge variant="secondary" className="bg-green/15 text-green border border-green/30 px-3 py-1 uppercase text-xs font-bold flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
+                  In Session
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-s2/60 text-t3 border border-s2 px-3 py-1 uppercase text-xs font-bold">
+                  Ended
+                </Badge>
+              )}
               <span className="text-sm mono text-t3">{formatDuration(duration)}</span>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -512,8 +531,8 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </div>
           )}
 
-          {/* End Session — only when active */}
-          {session.active && onEndSession && (
+          {/* End Session — only when active, owner only */}
+          {session.active && onEndSession && isSessionOwner && (
             <Button
               onClick={() => { onEndSession(); onBack() }}
               variant="outline"
@@ -523,8 +542,8 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </Button>
           )}
 
-          {/* Reopen Session — only for past (ended) sessions */}
-          {!session.active && onReopenSession && (
+          {/* Reopen Session — only for past (ended) sessions, owner only */}
+          {!session.active && onReopenSession && isSessionOwner && (
             <Button
               onClick={() => { onReopenSession(sessionId); onBack() }}
               variant="outline"
@@ -535,8 +554,8 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </Button>
           )}
 
-          {/* Delete Session — 2-step confirmation, available for all sessions */}
-          {onDeleteSession && (
+          {/* Delete Session — 2-step confirmation, owner only */}
+          {onDeleteSession && isSessionOwner && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button

@@ -20,10 +20,14 @@ export interface NotionListingData {
   ebayListingId?: string
 
   // Session traceability — critical for tax/financial records
-  sessionId?: string
+  sessionId?: string       // human-readable session ID: 'AV-001'
   sessionNumber?: number
   /** Exact Notion Select option name — emoji prefix required for field match */
   expenseType?: '💼 Business' | '🏡 Personal'
+  /** Operator who scanned this item (operatorId slug: 'angel', 'wife') */
+  scannedBy?: string
+  /** Operator display name: 'Angel', 'Wife' */
+  operatorName?: string
 
   // GROUP 1 — Core Identity (pulled from AI/itemSpecifics)
   seoTitle?: string          // 80-char eBay optimized title
@@ -196,9 +200,11 @@ export class NotionService {
 
     // ── Session traceability ─────────────────────────────────────────────────
     const sessionProperties: Record<string, unknown> = {}
-    if (listing.expenseType)          sessionProperties['Expense Type'] = { select: { name: listing.expenseType } }
+    if (listing.expenseType)          sessionProperties['Expense Type']   = { select: { name: listing.expenseType } }
     if (typeof listing.sessionNumber === 'number') sessionProperties['Session #'] = { number: listing.sessionNumber }
-    if (listing.sessionId)            sessionProperties['Session ID']   = rt(listing.sessionId)
+    if (listing.sessionId)            sessionProperties['Session ID']     = rt(listing.sessionId)
+    if (listing.scannedBy)            sessionProperties['Scanned By']     = rt(listing.scannedBy)
+    if (listing.operatorName)         sessionProperties['Operator']       = rt(listing.operatorName)
 
     // Description block in page body
     const children = [

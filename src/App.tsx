@@ -38,8 +38,9 @@ import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { BarcodeProduct } from './lib/barcode-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform, SoldItem, SoldShippingUpdateInput } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform, SoldItem, SoldShippingUpdateInput, UserProfile } from './types'
 import { cn } from './lib/utils'
+import { useDeviceId } from './hooks/use-device-id'
 
 /** Pure helper — determines BUY/PASS/PENDING from profit metrics */
 function makeDecision(
@@ -76,6 +77,8 @@ function App() {
   const [soldSyncedAt, setSoldSyncedAt] = useState<number | null>(null)
 
   
+  const deviceId = useDeviceId()
+
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
   // Ref mirror of `queue` — used by pipeline handlers to escape stale closures
   // when the Agent runs multi-step flows (batch-analyze → optimize → push) and
@@ -83,13 +86,15 @@ function App() {
   const queueRef = useRef(queue)
   useEffect(() => { queueRef.current = queue }, [queue])
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
-  const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
+  // Device-scoped: each device has its own active session — prevents cross-device collisions
+  const [session, setSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
   const [allTags] = useKV<ItemTag[]>('all-tags', [])
   const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [, setActivityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
   const [, setDebugLog] = useKV<DebugEntry[]>(DEBUG_LOG_KEY, [])
-  const [settings, setSettings] = useKV<AppSettings>('settings', {
+  // Device-scoped: each device has its own settings (thresholds, API keys, profile)
+  const [settings, setSettings] = useKV<AppSettings>(`device-settings-${deviceId}`, {
     voiceEnabled: true,
     autoCapture: true,
     agenticMode: true,
@@ -256,6 +261,7 @@ function App() {
           inQueue: false,
           location,
           sessionId: session?.id,
+          scannedBy: settings?.userProfile?.operatorId,
           // Pre-seed from barcode lookup; Gemini vision will overwrite with better data if available
           productName: barcodeProduct?.title || undefined,
         }
@@ -714,13 +720,19 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
-    const now = new Date()
-    const hour = now.getHours()
-    const timeOfDay = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
-    const dayName = now.toLocaleDateString('en-US', { weekday: 'short' })
-    const monthDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const sessionNumber = ((allSessions || []).filter(s => !s.deletedAt).length + 1)
-    const name = `#${String(sessionNumber).padStart(3, '0')} — ${dayName} ${timeOfDay} — ${monthDay}`
+    // Per-operator session counter — derived from allSessions, never conflicts between devices.
+    // Uses max(sessionNumber) across ALL sessions (including soft-deleted) to guarantee
+    // unique IDs even after deletions. Matching by operatorId handles multi-operator teams;
+    // sessions without operatorId (pre-profile or no-profile) are grouped together.
+    const profile = settings?.userProfile
+    const operatorId = profile?.operatorId
+    const operatorAllSessions = (allSessions || []).filter(s =>
+      operatorId ? s.operatorId === operatorId : !s.operatorId
+    )
+    const sessionNumber = operatorAllSessions.reduce((max, s) => Math.max(max, s.sessionNumber || 0), 0) + 1
+    const initial = profile?.operatorInitial || ''
+    const prefix = initial ? `${initial}-` : '#'
+    const name = `${prefix}${String(sessionNumber).padStart(3, '0')}`
     const id = Date.now().toString()
     const newSession: Session = {
       id,
@@ -733,13 +745,17 @@ function App() {
       totalPotentialProfit: 0,
       active: true,
       sessionType: 'business',
+      operatorId: profile?.operatorId,
+      operatorName: profile?.operatorName,
+      operatorInitial: profile?.operatorInitial,
     }
     setAllSessions((prev) => [...(prev || []), newSession])
     setSession(newSession)
     setSelectedSessionId(id)
     setScreen('session-detail')
-    logActivity('Session started')
-  }, [allSessions, setSession, setAllSessions, setSelectedSessionId, setScreen])
+    logActivity(`Session started${profile?.operatorName ? ` by ${profile.operatorName}` : ''}`)
+    logDebug('Session started', 'info', 'session', { id, operatorId, sessionNumber })
+  }, [allSessions, settings?.userProfile, setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -915,6 +931,15 @@ function App() {
       ? listing.price - item.purchasePrice
       : (item.estimatedSellPrice || 0) - item.purchasePrice
 
+    // Resolve session context for traceability — item carries the session UUID,
+    // look it up in allSessions to get the human-readable name ('AV-001') and number.
+    const linkedSession = (allSessions || []).find(s => s.id === item.sessionId)
+    const expenseType = linkedSession?.sessionType === 'business'
+      ? '💼 Business' as const
+      : linkedSession?.sessionType === 'personal'
+      ? '🏡 Personal' as const
+      : undefined
+
     const result = await notionService.pushListing({
       title: listing?.title || item.productName || 'Unknown Item',
       description: listing?.description || item.description || '',
@@ -931,6 +956,12 @@ function App() {
       timestamp: item.timestamp,
       location: item.location?.name,
       notes: item.notes,
+      // Session + operator traceability
+      sessionId: linkedSession?.name,
+      sessionNumber: linkedSession?.sessionNumber,
+      scannedBy: item.scannedBy,
+      operatorName: linkedSession?.operatorName || settings?.userProfile?.operatorName,
+      expenseType,
     })
 
     if (result.success) {
@@ -947,7 +978,7 @@ function App() {
     } else {
       toast.error(`Notion error: ${result.error}`)
     }
-  }, [setQueue, notionService])
+  }, [setQueue, notionService, allSessions, settings])
 
   const handleMarkAsSold = useCallback((
     itemId: string,
@@ -1824,10 +1855,33 @@ function App() {
     }
   }, [])
 
-  // Always start on the session list — clear currentSession view on app load
+  // Auto-redirect: if there's an active session on launch, jump to its dashboard
+  const hasAutoNavigated = useRef(false)
   useEffect(() => {
-    setSession(undefined)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (hasAutoNavigated.current) return
+    if (session?.active && screen === 'session') {
+      hasAutoNavigated.current = true
+      setSelectedSessionId(session.id)
+      setScreen('session-detail')
+    }
+  }, [session?.active, screen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // One-time settings migration: copy global → device-scoped on first load
+  const [legacySettings] = useKV<AppSettings | undefined>('settings', undefined)
+  const hasMigratedRef = useRef(false)
+  useEffect(() => {
+    if (hasMigratedRef.current) return
+    // Migrate if any meaningful legacy setting exists and the device slot is still empty.
+    // Checking only geminiApiKey misses users whose legacy settings had Notion keys,
+    // thresholds, or a user profile but no Gemini key.
+    const hasLegacy = !!(legacySettings?.geminiApiKey || legacySettings?.notionApiKey || legacySettings?.userProfile)
+    const hasDevice = !!(settings?.geminiApiKey || settings?.notionApiKey || settings?.userProfile)
+    if (hasLegacy && !hasDevice) {
+      hasMigratedRef.current = true
+      setSettings((prev: AppSettings) => ({ ...prev, ...legacySettings }))
+      logDebug('Settings auto-migrated from global to device scope', 'info', 'migration')
+    }
+  }, [legacySettings, settings]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Activity log listener — persists silent activity events to KV
   useEffect(() => {
@@ -2352,6 +2406,7 @@ function App() {
                 onOpenItem={handleOpenItemFromSession}
                 onOpenChat={() => setScreen('agent')}
                 onNavigateTo={(s) => { secondaryReturnScreen.current = screen; setScreen(s) }}
+                currentOperatorId={settings?.userProfile?.operatorId}
               />
             </motion.div>
           )}
@@ -2363,9 +2418,18 @@ function App() {
 
       <BottomNav
         currentScreen={screen}
-        onNavigate={setScreen}
+        onNavigate={(s) => {
+          // Session tab while a session is active → go straight to the session dashboard
+          if (s === 'session' && session?.active) {
+            setSelectedSessionId(session.id)
+            setScreen('session-detail')
+          } else {
+            setScreen(s)
+          }
+        }}
         onCameraOpen={() => setCameraOpen(true)}
         captureState={captureState}
+        sessionMode={screen === 'session'}
       />
 
       <CameraOverlay

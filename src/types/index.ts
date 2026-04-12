@@ -193,6 +193,7 @@ export interface ScannedItem {
   notionPageId?: string
   notionUrl?: string
   sessionId?: string
+  scannedBy?: string  // operatorId of who performed this scan
   publishedDate?: number
   soldPrice?: number
   soldDate?: number
@@ -311,6 +312,15 @@ export interface MarketData {
   barcodeProduct?: import('../lib/barcode-service').BarcodeProduct
 }
 
+export interface UserProfile {
+  operatorId: string       // slug: 'angel', 'wife', or custom
+  operatorName: string     // display: 'Angel', 'Wife'
+  operatorInitial: string  // badge: 'A', 'W'
+  color?: string           // badge accent: 'blue' | 'purple' | 'green' | 'amber'
+  focus?: string           // 'Electronics, Sneakers' — shown on session cards
+  aiContext?: string       // freeform notes injected into every AI prompt
+}
+
 export interface Session {
   id: string
   /** Stable sequential number (1, 2, 3...) — used as default name (#001) and Notion session key */
@@ -327,6 +337,10 @@ export interface Session {
   location?: ThriftStoreLocation
   sessionType?: 'business' | 'personal'
   deletedAt?: number
+  /** Operator who started this session — used for ownership guards + audit */
+  operatorId?: string
+  operatorName?: string
+  operatorInitial?: string
 }
 
 export interface ProfitGoal {
@@ -395,6 +409,7 @@ export interface AppSettings {
   imageQuality?: ImageQualitySettings
   enableLensInBatch?: boolean
   lensSkipConfidence?: number
+  userProfile?: UserProfile
 }
 
 export interface SharedTodo {

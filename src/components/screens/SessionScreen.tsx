@@ -1,4 +1,4 @@
-import { Play, CheckCircle, XCircle, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, ArrowLeft } from '@phosphor-icons/react'
+import { Play, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, ArrowLeft } from '@phosphor-icons/react'
 import { useState, useCallback, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,6 @@ import { LocationInsights } from '../LocationInsights'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
-import { toast } from 'sonner'
 import type { Session, ScannedItem, ProfitGoal, Screen } from '@/types'
 
 function PastSessionCard({
@@ -52,6 +51,9 @@ function PastSessionCard({
             )}
             {session.sessionType === 'personal' && (
               <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase">Personal</span>
+            )}
+            {session.operatorInitial && (
+              <span className="text-[8px] font-bold bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md uppercase flex-shrink-0">{session.operatorInitial}</span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

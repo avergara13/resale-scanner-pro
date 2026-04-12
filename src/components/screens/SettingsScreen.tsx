@@ -188,6 +188,71 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
       <div className="flex-1 px-3 py-4">
         <div className="space-y-3 pb-24 w-full max-w-full">
+
+          {/* ═══════════ MY PROFILE — Device operator identity ═══════════ */}
+          <div className="border border-b1/20 rounded-lg px-3 py-3 bg-fg space-y-3">
+            <p className="text-sm font-semibold text-t1 uppercase tracking-wide flex items-center gap-2">
+              <span className="text-base">👤</span> My Profile
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-[10px] text-t3 uppercase tracking-wider">Name</Label>
+                <Input
+                  value={settings.userProfile?.operatorName || ''}
+                  onChange={(e) => {
+                    // Lock operatorId only if the user previously saved a name (stable slug on edits).
+                    // For a new profile (no prior operatorName), regenerate from the full current value
+                    // on every keystroke so the final saved ID matches the complete name, not just
+                    // the first character typed.
+                    const existingId = settings.userProfile?.operatorName
+                      ? settings.userProfile.operatorId
+                      : undefined
+                    onUpdate({ userProfile: { ...settings.userProfile, operatorId: existingId || e.target.value.toLowerCase().replace(/\s+/g, '-').slice(0, 20), operatorName: e.target.value, operatorInitial: e.target.value.slice(0, 1).toUpperCase() || settings.userProfile?.operatorInitial || '' } as any })
+                  }}
+                  placeholder="Angel"
+                  className="h-8 text-sm mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-t3 uppercase tracking-wider">Initials</Label>
+                <Input
+                  value={settings.userProfile?.operatorInitial || ''}
+                  onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, operatorInitial: e.target.value.toUpperCase().slice(0, 3) } as any })}
+                  placeholder="AV"
+                  maxLength={3}
+                  className="h-8 text-sm mt-1 uppercase"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-[10px] text-t3 uppercase tracking-wider">Focus Areas</Label>
+              <Input
+                value={settings.userProfile?.focus || ''}
+                onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, focus: e.target.value } as any })}
+                placeholder="Electronics, Sneakers, Housewares"
+                className="h-8 text-sm mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-[10px] text-t3 uppercase tracking-wider">AI Context Notes</Label>
+              <textarea
+                value={settings.userProfile?.aiContext || ''}
+                onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, aiContext: e.target.value } as any })}
+                placeholder="I focus on electronics and sneakers. Min 35% margin. Ship within 2 days."
+                rows={2}
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1 resize-none"
+              />
+              <p className="text-[9px] text-t3 mt-1">Injected into every AI prompt — helps the agent give personalized advice</p>
+            </div>
+            {settings.userProfile?.operatorName && (
+              <p className="text-[10px] text-t3 flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-b1" />
+                Active as <strong className="text-t1">{settings.userProfile.operatorName}</strong>
+                {settings.userProfile.operatorInitial && <span className="text-[9px] text-b1 font-bold bg-b1/10 px-1.5 py-0.5 rounded">{settings.userProfile.operatorInitial}</span>}
+              </p>
+            )}
+          </div>
+
           <Accordion type="multiple" defaultValue={[]} className="space-y-3">
 
             {/* ════════════════════════════════════════════════════════
