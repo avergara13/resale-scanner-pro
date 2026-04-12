@@ -116,12 +116,17 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-2 sm:p-3 md:p-3.5 border transition-colors",
-        isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
+        // Reset Card defaults (gap-6, py-6, bg-card) and apply scan-card DNA
+        "border overflow-hidden flex flex-col gap-0 p-0 py-0 bg-fg transition-colors",
+        isSelected ? 'border-b1' : 'border-s2'
       )}
     >
-      <div className="flex gap-1.5 sm:gap-2.5 md:gap-3">
-        {/* Narrow control column: drag handle + checkbox */}
+      {/* ── Info row ── */}
+      <div className={cn(
+        "p-3 flex gap-2.5 items-start",
+        isSelected && "bg-accent-3/15"
+      )}>
+        {/* Control column: drag handle + checkbox */}
         <div className="flex flex-col gap-1 items-center justify-start pt-0.5 flex-shrink-0">
           <div
             {...attributes}
@@ -143,22 +148,26 @@ function SortableItem({
             />
           </label>
         </div>
-        {/* Thumbnail column — always rendered for consistent card layout */}
+
+        {/* Thumbnail — rounded-lg to match scan cards */}
         {(item.imageThumbnail || item.imageData) ? (
           <img
             src={item.imageThumbnail || item.imageData}
             alt={item.productName || 'Item'}
-            className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+            className="w-14 h-14 object-cover object-center rounded-lg border border-s2 flex-shrink-0 self-start"
           />
         ) : (
-          <div className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 rounded-md border border-s2 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-lg border border-s2 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
             <Package size={20} weight="duotone" className="text-s3" />
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-1 sm:gap-1.5 md:gap-2 mb-0.5 sm:mb-1.5 md:mb-2">
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 space-y-1">
+          {/* Title + margin badge */}
+          <div className="flex items-start justify-between gap-1.5">
             <div className="flex items-center gap-1.5 min-w-0">
-              <h3 className="font-bold text-t1 text-[11px] sm:text-sm md:text-base line-clamp-2 leading-snug tracking-tight">
+              <h3 className="font-bold text-t1 text-[11px] line-clamp-2 leading-snug tracking-tight">
                 {item.productName || 'Unknown Item'}
               </h3>
               {isPersonal && (
@@ -166,31 +175,52 @@ function SortableItem({
               )}
             </div>
             {item.profitMargin != null && isFinite(item.profitMargin) && (
-              <Badge
-                variant="secondary"
-                className={cn(
-                  "flex-shrink-0 font-mono font-bold text-[9px] sm:text-[10px] h-4 sm:h-5 px-1 sm:px-1.5",
-                  item.profitMargin > 40
-                    ? 'bg-green/20 text-green'
-                    : item.profitMargin > 25
-                    ? 'bg-amber/20 text-amber'
-                    : 'bg-red/20 text-red'
-                )}
-              >
+              <span className={cn(
+                "flex-shrink-0 font-mono font-bold text-[9px] px-1.5 py-0.5 rounded border",
+                item.profitMargin > 40
+                  ? 'bg-green/10 text-green border-green/30'
+                  : item.profitMargin > 25
+                  ? 'bg-amber/10 text-amber border-amber/30'
+                  : 'bg-red/10 text-red border-red/30'
+              )}>
                 {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
-              </Badge>
+              </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-3 md:gap-4 text-[10px] sm:text-[11px] md:text-xs font-mono text-t3 mb-1 sm:mb-2 md:mb-2.5">
-            <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
-            {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
-              ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
-              : <span className="text-s3">Sell: —</span>
-            }
+
+          {/* Prices */}
+          <div className="flex items-center gap-2 text-[10px] font-mono text-t2">
+            <span>Cost ${item.purchasePrice.toFixed(2)}</span>
+            {item.estimatedSellPrice != null && item.estimatedSellPrice > 0 ? (
+              <>
+                <span className="text-s3">→</span>
+                <span>Sell ${item.estimatedSellPrice.toFixed(2)}</span>
+              </>
+            ) : (
+              <span className="text-s3">Sell —</span>
+            )}
           </div>
+
+          {/* Listing status pill — unique to queue cards (scan cards show decision pill) */}
+          {(item.listingStatus === 'published' || item.optimizedListing) && (
+            <div className="flex items-center gap-1.5">
+              {item.listingStatus === 'published' && (
+                <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border bg-green/10 text-green border-green/30">
+                  LIVE
+                </span>
+              )}
+              {item.optimizedListing && item.listingStatus !== 'published' && (
+                <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border bg-b1/10 text-b1 border-b1/20">
+                  OPTIMIZED
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Tags */}
           {item.tags && item.tags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 mb-2 sm:mb-2.5">
-              <Tag size={10} weight="bold" className="text-s4 flex-shrink-0 sm:w-[11px] sm:h-[11px]" />
+            <div className="flex flex-wrap items-center gap-0.5">
+              <Tag size={10} weight="bold" className="text-s4 flex-shrink-0" />
               {item.tags.map((tagId) => {
                 const tag = (allTags || []).find(t => t.id === tagId)
                 if (!tag) return null
@@ -198,7 +228,7 @@ function SortableItem({
                   <Badge
                     key={tagId}
                     variant="outline"
-                    className="text-[8px] sm:text-[9px] h-[16px] sm:h-[18px] pl-1 sm:pl-1.5 pr-0.5 font-medium border flex items-center gap-0.5 group hover:opacity-80 transition-opacity"
+                    className="text-[8px] h-[16px] pl-1 pr-0.5 font-medium border flex items-center gap-0.5 hover:opacity-80 transition-opacity"
                     style={{
                       borderColor: tag.color,
                       backgroundColor: `${tag.color}15`,
@@ -216,112 +246,134 @@ function SortableItem({
                       className="flex items-center justify-center hover:opacity-70 transition-opacity p-0.5"
                       aria-label={`Remove ${tag.name} tag`}
                     >
-                      <X size={8} weight="bold" className="sm:w-[9px] sm:h-[9px]" />
+                      <X size={8} weight="bold" />
                     </button>
                   </Badge>
                 )
               })}
             </div>
           )}
-          <div className="flex gap-1 flex-wrap items-center mt-1 md:mt-1.5">
-            {/* Edit — icon only */}
-            <Button
-              size="sm"
-              onClick={() => onEdit(item)}
-              variant="outline"
-              title="Edit"
-              aria-label="Edit item"
-              className="h-6 w-6 md:h-7 md:w-7 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
-            >
-              <PencilSimple size={11} weight="bold" aria-hidden />
-            </Button>
-            {/* Detail — icon only */}
-            {onOpenDetail && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onOpenDetail(item)}
-                title="View detail"
-                aria-label="View detail"
-                className="h-6 w-6 md:h-7 md:w-7 p-0 text-b1 hover:bg-b1/10"
-              >
-                <Eye size={11} weight="bold" aria-hidden />
-              </Button>
-            )}
-            {/* Re-analyze — icon only (PENDING, failed analysis, or missing sell price) */}
-            {(item.decision === 'PENDING' || item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onReanalyze(item.id)}
-                title="Re-analyze"
-                aria-label="Re-analyze item"
-                className="h-6 w-6 md:h-7 md:w-7 p-0 border-amber/40 text-amber hover:bg-amber/10"
-              >
-                <ArrowCounterClockwise size={11} weight="bold" aria-hidden />
-              </Button>
-            )}
-            {item.listingStatus === 'published' && onOpenSoldDialog ? (
-              <>
-                {/* Mark Sold — text, important action */}
-                <Button
-                  size="sm"
-                  onClick={() => onOpenSoldDialog(item)}
-                  aria-label="Mark as sold"
-                  className="flex-1 bg-green hover:bg-green/90 text-white h-6 md:h-7 text-[10px] md:text-xs font-medium px-2"
-                >
-                  Sold
-                </Button>
-                {/* Delist — icon only */}
-                {onDelist && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onDelist(item.id)}
-                    title="Delist"
-                    aria-label="Delist item"
-                    className="h-6 w-6 md:h-7 md:w-7 p-0 text-t3 hover:text-red hover:bg-red/10"
-                  >
-                    <X size={11} weight="bold" aria-hidden />
-                  </Button>
-                )}
-              </>
-            ) : item.decision === 'BUY' ? (
-              /* Already committed — optimize if no listing yet */
-              !item.optimizedListing && (
-                <Button
-                  size="sm"
-                  onClick={() => onCreateListing(item.id)}
-                  aria-label="Optimize listing"
-                  className="flex-1 bg-b1 hover:bg-b2 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
-                >
-                  Optimize
-                </Button>
-              )
-            ) : onBuyItem ? (
-              /* PENDING or PASS — show Buy button */
-              <Button
-                size="sm"
-                onClick={() => onBuyItem(item.id)}
-                aria-label="Buy this item"
-                className="flex-1 bg-green hover:opacity-90 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
-              >
-                Buy ✅
-              </Button>
-            ) : null}
-            {/* Delete — icon only */}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onRemove(item.id)}
-              title="Remove"
-              aria-label="Remove item"
-              className="h-6 w-6 md:h-7 md:w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
-            >
-              <Trash size={11} weight="bold" aria-hidden />
-            </Button>
-          </div>
         </div>
+      </div>
+
+      {/* ── Action bar — same pattern as scan cards, queue-specific CTAs ── */}
+      <div className={cn(
+        "border-t border-s2 flex items-center",
+        isSelected && "bg-accent-3/10"
+      )}>
+        {/* Edit */}
+        <button
+          onClick={() => onEdit(item)}
+          title="Edit"
+          aria-label="Edit item"
+          className="w-11 h-10 flex items-center justify-center text-t2 hover:bg-s1 hover:text-t1 active:opacity-60 transition-colors"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <PencilSimple size={13} weight="bold" />
+        </button>
+
+        {/* View detail */}
+        {onOpenDetail && (
+          <>
+            <div className="w-px h-5 bg-s2 flex-shrink-0" />
+            <button
+              onClick={() => onOpenDetail(item)}
+              title="View detail"
+              aria-label="View detail"
+              className="w-11 h-10 flex items-center justify-center text-b1 hover:bg-b1/10 active:opacity-60 transition-colors"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <Eye size={13} weight="bold" />
+            </button>
+          </>
+        )}
+
+        {/* Re-analyze (conditional) */}
+        {(item.decision === 'PENDING' || item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
+          <>
+            <div className="w-px h-5 bg-s2 flex-shrink-0" />
+            <button
+              onClick={() => onReanalyze(item.id)}
+              title="Re-analyze"
+              aria-label="Re-analyze item"
+              className="w-11 h-10 flex items-center justify-center text-amber hover:bg-amber/10 active:opacity-60 transition-colors"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <ArrowCounterClockwise size={13} weight="bold" />
+            </button>
+          </>
+        )}
+
+        {/* Primary CTA — fills remaining width */}
+        <div className="w-px h-5 bg-s2 flex-shrink-0" />
+        {item.listingStatus === 'published' && onOpenSoldDialog ? (
+          <>
+            <button
+              onClick={() => onOpenSoldDialog(item)}
+              aria-label="Mark as sold"
+              className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-green hover:bg-green/90 active:opacity-80 transition-colors"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              Sold
+            </button>
+            {onDelist && (
+              <>
+                <div className="w-px h-5 bg-white/20 flex-shrink-0" />
+                <button
+                  onClick={() => onDelist(item.id)}
+                  title="Delist"
+                  aria-label="Delist item"
+                  className="w-11 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <X size={13} weight="bold" />
+                </button>
+              </>
+            )}
+          </>
+        ) : item.decision === 'BUY' ? (
+          !item.optimizedListing ? (
+            <button
+              onClick={() => onCreateListing(item.id)}
+              aria-label="Optimize listing"
+              className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-b1 hover:bg-b2 active:opacity-80 transition-colors"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <Lightning size={13} weight="bold" />
+              Optimize
+            </button>
+          ) : (
+            // Optimized but not yet live — show a quiet "ready" state
+            <div className="flex-1 h-10 flex items-center justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-b1/10 text-b1 border border-b1/20">
+                Ready to List
+              </span>
+            </div>
+          )
+        ) : onBuyItem ? (
+          <button
+            onClick={() => onBuyItem(item.id)}
+            aria-label="Buy this item"
+            className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-green hover:bg-green/90 active:opacity-80 transition-colors"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            Buy ✅
+          </button>
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        {/* Delete */}
+        <div className="w-px h-5 bg-s2 flex-shrink-0" />
+        <button
+          onClick={() => onRemove(item.id)}
+          title="Remove"
+          aria-label="Remove item"
+          className="w-11 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <Trash size={13} weight="bold" />
+        </button>
       </div>
     </Card>
   )
