@@ -117,6 +117,8 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       paypalFeePercent: 0,
       preferredAiModel: 'gemini-2.5-flash',
       imageQuality: { preset: 'balanced' },
+      enableLensInBatch: true,
+      lensSkipConfidence: 0.85,
       geminiApiKey: '',
       anthropicApiKey: '',
       notionApiKey: '',
