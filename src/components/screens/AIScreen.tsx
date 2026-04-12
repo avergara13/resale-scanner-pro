@@ -149,7 +149,7 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
   if (steps.length === 0) return null
 
   return (
-    <div className="mb-4 space-y-2 relative">
+    <div className="space-y-1.5 relative">
       <div className="flex items-center justify-between">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-t2">OVERALL PROGRESS</h3>
         <motion.div className="text-lg font-mono font-black tabular-nums relative">
@@ -337,9 +337,16 @@ export function AIScreen({
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
 
+      {/* ── Overall Progress — persistent strip between header and scroll ── */}
+      {pipeline.length > 0 && (
+        <div className="flex-shrink-0 px-3 pt-2.5 pb-2 border-b border-s2 bg-fg">
+          <OverallProgress steps={pipeline} />
+        </div>
+      )}
+
       {/* ── Scrollable content ── */}
       <div className="flex-1 overflow-y-auto" ref={pullToRefresh.containerRef}>
-        <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-4">
+        <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-6">
           {pipeline.length === 0 ? (
             /* Empty / waiting state */
             <div className="space-y-4 sm:space-y-6">
@@ -354,7 +361,7 @@ export function AIScreen({
                 {onOpenCamera && (
                   <button
                     onClick={onOpenCamera}
-                    className="flex items-center gap-2 px-4 py-2 bg-b1 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform"
+                    className="flex items-center gap-2 px-5 py-3 bg-b1 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform"
                   >
                     <Scan size={16} weight="bold" />
                     Scan an Item
@@ -368,7 +375,6 @@ export function AIScreen({
           ) : (
             /* Pipeline in progress or complete */
             <div className="space-y-3 sm:space-y-4">
-              <OverallProgress steps={pipeline} />
               <PipelinePanel steps={pipeline} />
 
               {/* Market velocity "still searching" banner */}
@@ -520,13 +526,13 @@ export function AIScreen({
                                   )
                                 }
                                 className={cn(
-                                  'p-1 rounded-md transition-colors',
+                                  'w-6 h-6 flex items-center justify-center rounded-md transition-colors',
                                   isListening
                                     ? 'text-red animate-pulse'
                                     : 'text-t3 hover:text-t1',
                                 )}
                               >
-                                <Microphone size={12} weight="bold" />
+                                <Microphone size={13} weight="bold" />
                               </button>
                             )}
                           </label>
@@ -704,7 +710,7 @@ export function AIScreen({
             <div className="p-2.5 sm:p-3">
               <Button
                 onClick={() => onRescan?.()}
-                className="w-full h-9 sm:h-10 bg-b1 hover:bg-b2 text-white font-semibold text-xs sm:text-sm"
+                className="w-full h-11 bg-b1 hover:bg-b2 text-white font-semibold text-sm"
               >
                 <Scan size={15} weight="bold" className="mr-1.5" />
                 Scan Another Item
@@ -718,19 +724,19 @@ export function AIScreen({
                 parseFloat(buyPrice) !== currentItem?.purchasePrice && (
                   <Button
                     onClick={() => onRecalculate?.(parseFloat(buyPrice))}
-                    className="w-full bg-amber hover:opacity-90 text-white h-9 sm:h-10 font-semibold text-xs sm:text-sm"
+                    className="w-full bg-amber hover:opacity-90 text-white h-10 font-semibold text-xs sm:text-sm"
                   >
                     <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
                     ♻️ Recalculate with new price
                   </Button>
                 )}
 
-              {/* Rescan / Pass / Add to Queue */}
+              {/* Row 1: secondary actions */}
               <div className="flex gap-2">
                 <Button
                   onClick={() => onRescan?.()}
                   variant="outline"
-                  className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
+                  className="flex-shrink-0 h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
                 >
                   <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
                   Rescan
@@ -739,7 +745,7 @@ export function AIScreen({
                   onClick={() => onPassItem(parseFloat(buyPrice) || 0, description)}
                   disabled={!canSaveDraft}
                   variant="outline"
-                  className="flex-1 h-9 sm:h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                  className="flex-1 h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
                 >
                   <XCircle size={15} weight="bold" className="mr-1" />
                   Pass
@@ -749,21 +755,22 @@ export function AIScreen({
                     onClick={() => onMaybeItem(parseFloat(buyPrice) || 0, description)}
                     disabled={!canSaveDraft}
                     variant="outline"
-                    className="flex-1 h-9 sm:h-10 border-amber-400/50 text-amber-500 hover:bg-amber-400/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                    className="flex-1 h-10 border-amber-400/50 text-amber-500 hover:bg-amber-400/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
                   >
                     <BookmarkSimple size={15} weight="bold" className="mr-1" />
                     Maybe
                   </Button>
                 )}
-                <Button
-                  onClick={handleAddToQueue}
-                  disabled={!canSaveDraft}
-                  className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold whitespace-nowrap"
-                >
-                  <ShoppingCart size={15} weight="bold" className="mr-1" />
-                  Add to Queue
-                </Button>
               </div>
+              {/* Row 2: primary CTA — full width, tall, prominent */}
+              <Button
+                onClick={handleAddToQueue}
+                disabled={!canSaveDraft}
+                className="w-full h-11 sm:h-12 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-sm font-bold shadow-md shadow-green/20"
+              >
+                <ShoppingCart size={16} weight="bold" className="mr-2" />
+                Add to Queue
+              </Button>
             </div>
           )
         ) : isPipelineRunning ? (
@@ -778,7 +785,7 @@ export function AIScreen({
             <Button
               onClick={() => onRescan?.()}
               variant="outline"
-              className="w-full h-9 sm:h-10 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs sm:text-sm"
+              className="w-full h-10 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-sm"
             >
               <ArrowCounterClockwise size={14} weight="bold" className="mr-1.5" />
               Rescan
@@ -834,7 +841,7 @@ export function AIScreen({
               <Button
                 onClick={() => onSaveDraft(parseFloat(buyPrice), description)}
                 disabled={!canSaveDraft}
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
+                className="flex-1 bg-b1 hover:bg-b2 text-white h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-sm"
               >
                 <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
                 SAVE DRAFT TO QUEUE
