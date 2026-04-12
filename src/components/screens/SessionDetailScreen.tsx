@@ -1,12 +1,23 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CheckCircle, XCircle, TrendUp, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, TrendUp, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
 import type { Session, ScannedItem, ThriftStoreLocation, Screen } from '@/types'
@@ -16,6 +27,7 @@ interface SessionDetailScreenProps {
   onBack: () => void
   onDeleteSession?: (sessionId: string) => void
   onEndSession?: () => void
+  onReopenSession?: (sessionId: string) => void
   allSessions?: Session[]
   onUpdateSessions?: (updater: (prev: Session[]) => Session[]) => void
   queueItems?: ScannedItem[]
@@ -25,7 +37,7 @@ interface SessionDetailScreenProps {
   onNavigateTo?: (screen: Screen) => void
 }
 
-export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo }: SessionDetailScreenProps) {
+export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo }: SessionDetailScreenProps) {
   const [allSessionsFallback, setAllSessionsFallback] = useKV<Session[]>('all-sessions', [])
   const allSessions = allSessionsProp ?? allSessionsFallback
   const setAllSessions = onUpdateSessions ?? setAllSessionsFallback
@@ -509,6 +521,50 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             >
               End Session
             </Button>
+          )}
+
+          {/* Reopen Session — only for past (ended) sessions */}
+          {!session.active && onReopenSession && (
+            <Button
+              onClick={() => { onReopenSession(sessionId); onBack() }}
+              variant="outline"
+              className="w-full h-12 border-b1 text-b1 hover:bg-b1/10 font-medium mt-4 flex items-center gap-2"
+            >
+              <ArrowCounterClockwise size={16} weight="bold" />
+              Reopen Session
+            </Button>
+          )}
+
+          {/* Delete Session — 2-step confirmation, available for all sessions */}
+          {onDeleteSession && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full h-10 text-red/60 hover:text-red hover:bg-red/5 text-xs font-medium mt-2"
+                >
+                  Delete Session
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-sm">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-base font-bold">Delete this session?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-sm text-t2">
+                    <strong>{session.name || `Session #${String(session.sessionNumber ?? 1).padStart(3, '0')}`}</strong> and all its session data will be deleted.
+                    You'll have 60 seconds to undo from the Session tab.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => { onDeleteSession(sessionId); onBack() }}
+                    className="bg-red text-white hover:bg-red/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>

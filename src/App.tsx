@@ -796,6 +796,15 @@ function App() {
     }
   }, [session, setSession, setAllSessions, setQueue])
 
+  const handleReopenSession = useCallback((sessionId: string) => {
+    const sess = (allSessions || []).find(s => s.id === sessionId)
+    if (!sess) return
+    const reopened: Session = { ...sess, active: true, endTime: undefined }
+    setAllSessions((prev) => (prev || []).map(s => s.id === sessionId ? reopened : s))
+    setSession(reopened)
+    logActivity('Session reopened')
+  }, [allSessions, setAllSessions, setSession])
+
   // Keep allSessions in sync with the current active session (scan counts, profit, etc.)
   // Only sync if the session still exists in allSessions (hasn't been deleted)
   const lastSyncedSession = useRef<string>('')
@@ -2256,6 +2265,7 @@ function App() {
                 onBack={() => setScreen('session')}
                 onDeleteSession={handleDeleteSession}
                 onEndSession={handleEndSession}
+                onReopenSession={handleReopenSession}
                 allSessions={visibleSessions}
                 onUpdateSessions={setAllSessions}
                 queueItems={queue || []}
