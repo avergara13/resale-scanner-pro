@@ -57,16 +57,17 @@ function PastSessionCard({
             <span className="text-xs font-bold text-t1 truncate">
               {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </span>
-            {session.active && (
-              <span className={cn(
-                'text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase',
-                sessionStatus === 'live' ? 'bg-green/15 text-green' : 'bg-amber/15 text-amber'
-              )}>
-                {sessionStatus === 'live' ? 'Live' : 'Idle'}
-              </span>
-            )}
+            {/* Status badge — Live / Idle / Ended on every card */}
+            <span className={cn(
+              'text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase flex-shrink-0',
+              sessionStatus === 'live' ? 'bg-green/15 text-green' :
+              sessionStatus === 'idle' ? 'bg-amber/15 text-amber' :
+              'bg-s2/60 text-t3'
+            )}>
+              {sessionStatus === 'live' ? 'Live' : sessionStatus === 'idle' ? 'Idle' : 'Ended'}
+            </span>
             {session.sessionType === 'personal' && (
-              <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase">Personal</span>
+              <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase flex-shrink-0">Personal</span>
             )}
             {session.operatorInitial && (
               <span className="text-[8px] font-bold bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md uppercase flex-shrink-0">{session.operatorInitial}</span>

@@ -249,19 +249,12 @@ function SortableItem({
             )}
           </div>
 
-          {/* Listing status pill — unique to queue cards (scan cards show decision pill) */}
-          {(item.listingStatus === 'published' || item.optimizedListing) && (
+          {/* Listing status pill — only LIVE badge; "OPTIMIZED" is redundant with the completion bar + READY TO LIST CTA */}
+          {item.listingStatus === 'published' && (
             <div className="flex items-center gap-1.5">
-              {item.listingStatus === 'published' && (
-                <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border bg-green/10 text-green border-green/30">
-                  LIVE
-                </span>
-              )}
-              {item.optimizedListing && item.listingStatus !== 'published' && (
-                <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border bg-b1/10 text-b1 border-b1/20">
-                  OPTIMIZED
-                </span>
-              )}
+              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border bg-green/10 text-green border-green/30">
+                LIVE
+              </span>
             </div>
           )}
 
