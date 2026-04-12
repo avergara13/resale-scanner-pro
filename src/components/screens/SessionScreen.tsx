@@ -53,6 +53,9 @@ function PastSessionCard({
             {session.sessionType === 'personal' && (
               <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase">Personal</span>
             )}
+            {session.operatorInitial && (
+              <span className="text-[8px] font-bold bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md uppercase flex-shrink-0">{session.operatorInitial}</span>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-[10px] text-t3 font-mono">{formatDuration(duration)}</span>

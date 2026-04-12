@@ -8,9 +8,11 @@ interface BottomNavProps {
   onNavigate: (screen: Screen) => void
   onCameraOpen: () => void
   captureState?: CaptureState
+  /** When true (session list screen), only Session tab + Camera are interactive */
+  sessionMode?: boolean
 }
 
-export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureState = 'idle' }: BottomNavProps) {
+export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureState = 'idle', sessionMode = false }: BottomNavProps) {
   const leftItems: Array<{ id: Screen; icon: any; label: string }> = [
     { id: 'session', icon: ChartBar, label: 'Session' },
     { id: 'agent', icon: Robot, label: 'Agent' },
@@ -50,14 +52,19 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
           // scan-result is a child of the agent tab — keep agent highlighted while on it
           const isActive = currentScreen === item.id ||
             (item.id === 'agent' && currentScreen === 'scan-result')
+          // In sessionMode, only the Session tab is interactive; Agent is disabled
+          const isDisabled = sessionMode && item.id !== 'session'
 
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => !isDisabled && onNavigate(item.id)}
+              disabled={isDisabled}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200 active:scale-90',
-                isActive ? 'text-b1' : 'text-t3'
+                'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200',
+                !isDisabled && 'active:scale-90',
+                isActive ? 'text-b1' : 'text-t3',
+                isDisabled && 'opacity-20 cursor-default'
               )}
               style={{
                 height: '52px',
@@ -106,14 +113,19 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
         {rightItems.map((item) => {
           const Icon = item.icon
           const isActive = currentScreen === item.id
+          // In sessionMode, all right-side tabs (Listings, Sold) are disabled
+          const isDisabled = sessionMode
 
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => !isDisabled && onNavigate(item.id)}
+              disabled={isDisabled}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200 active:scale-90',
-                isActive ? 'text-b1' : 'text-t3'
+                'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200',
+                !isDisabled && 'active:scale-90',
+                isActive ? 'text-b1' : 'text-t3',
+                isDisabled && 'opacity-20 cursor-default'
               )}
               style={{
                 height: '52px',
