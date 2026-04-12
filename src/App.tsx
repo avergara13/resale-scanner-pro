@@ -99,8 +99,8 @@ function App() {
     minProfitMargin: 30,
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
-    ebayAdFeePercent: 0,
-    shippingMaterialsCost: 0,
+    ebayAdFeePercent: 3.0,
+    shippingMaterialsCost: 0.75,
     paypalFeePercent: 0,
     preferredAiModel: 'gemini-2.5-flash',
     notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
@@ -562,14 +562,20 @@ function App() {
       const profitMetrics = ebayService?.calculateProfitMetrics(
         price,
         sellPrice,
-        settings?.defaultShippingCost || 5.0,
-        settings?.ebayFeePercent || 12.9,
-        settings?.paypalFeePercent || 0
+        settings?.defaultShippingCost ?? 5.0,
+        settings?.ebayFeePercent ?? 12.9,
+        0,                                          // paypalFeePercent (deprecated)
+        0.30,                                       // perOrderFee (eBay fixed)
+        settings?.ebayAdFeePercent ?? 3.0,          // ad/promoted listings fee from Business Rules
+        settings?.shippingMaterialsCost ?? 0.75     // packaging materials cost from Business Rules
       ) || calculateProfitFallback(
         price,
         sellPrice,
-        settings?.defaultShippingCost || 5.0,
-        settings?.ebayFeePercent || 12.9
+        settings?.defaultShippingCost ?? 5.0,
+        settings?.ebayFeePercent ?? 12.9,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       )
 
       const minMargin = settings?.minProfitMargin || 30
@@ -1182,8 +1188,9 @@ function App() {
       effectiveSellPrice,
       effectiveShipping,
       feePercent,
-      0.30,         // per-order fee
+      0.30,                                     // per-order fee
       adFeePercent,
+      settings?.shippingMaterialsCost ?? 0.75,  // packaging materials from Business Rules
     )
 
     const decision = makeDecision(
@@ -1267,7 +1274,11 @@ function App() {
     if ((buyPriceChanged || sellPriceChanged || shippingChanged) && effectiveSellPrice) {
       const freshMetrics = calculateProfitFallback(
         effectivePrice, effectiveSellPrice,
-        effectiveShipping, settings?.ebayFeePercent || 12.9
+        effectiveShipping,
+        settings?.ebayFeePercent ?? 12.9,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
       resolvedDecision = makeDecision(effectiveSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
@@ -1332,7 +1343,11 @@ function App() {
     if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
       const freshMetrics = calculateProfitFallback(
         effectivePrice, currentItem!.estimatedSellPrice,
-        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+        settings?.defaultShippingCost ?? 5.0,
+        settings?.ebayFeePercent ?? 12.9,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
     }
@@ -1536,14 +1551,20 @@ function App() {
         const profitMetrics = ebayService?.calculateProfitMetrics(
           item.purchasePrice,
           sellPrice,
-          settings?.defaultShippingCost || 5.0,
-          settings?.ebayFeePercent || 12.9,
-          settings?.paypalFeePercent || 0
+          settings?.defaultShippingCost ?? 5.0,
+          settings?.ebayFeePercent ?? 12.9,
+          0,
+          0.30,
+          settings?.ebayAdFeePercent ?? 3.0,
+          settings?.shippingMaterialsCost ?? 0.75
         ) || calculateProfitFallback(
           item.purchasePrice,
           sellPrice,
-          settings?.defaultShippingCost || 5.0,
-          settings?.ebayFeePercent || 12.9
+          settings?.defaultShippingCost ?? 5.0,
+          settings?.ebayFeePercent ?? 12.9,
+          0.30,
+          settings?.ebayAdFeePercent ?? 3.0,
+          settings?.shippingMaterialsCost ?? 0.75
         )
 
         const minMargin = settings?.minProfitMargin || 30
