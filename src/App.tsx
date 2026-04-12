@@ -1871,6 +1871,9 @@ function App() {
   const slideDir = useRef<'left' | 'right' | 'none'>('none')
   // Remembers where the user was before opening Settings so back returns there
   const settingsReturnScreen = useRef<Screen>('session')
+  // Remembers where the user came from before opening any secondary screen
+  // (cost-tracking, scan-history) so back returns to the originating screen
+  const secondaryReturnScreen = useRef<Screen>('session')
 
   if (prevScreenRef.current !== screen) {
     const prevIdx = SCREEN_TAB_ORDER[prevScreenRef.current]
@@ -1951,12 +1954,12 @@ function App() {
             ? () => { setOpenedFromScans(false); setScreen('agent') }
             : screen === 'settings'
             ? () => setScreen(settingsReturnScreen.current)
-            : screen === 'session-detail' || screen === 'scan-history'
+            : screen === 'session-detail'
             ? () => setScreen('session')
+            : screen === 'scan-history' || screen === 'cost-tracking'
+            ? () => setScreen(secondaryReturnScreen.current)
             : screen === 'tag-analytics' || screen === 'location-insights'
             ? () => setScreen('queue')
-            : screen === 'cost-tracking'
-            ? () => setScreen('settings')
             : undefined
         }
       />
@@ -1995,7 +1998,7 @@ function App() {
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
                 onOpenItem={handleOpenItemFromSession}
-                onNavigateTo={(s) => setScreen(s)}
+                onNavigateTo={(s) => { secondaryReturnScreen.current = screen; setScreen(s) }}
               />
             </motion.div>
           )}
@@ -2272,7 +2275,7 @@ function App() {
                 scanHistory={scanHistory || []}
                 onOpenItem={handleOpenItemFromSession}
                 onOpenChat={() => setScreen('agent')}
-                onNavigateTo={(s) => setScreen(s)}
+                onNavigateTo={(s) => { secondaryReturnScreen.current = screen; setScreen(s) }}
               />
             </motion.div>
           )}
