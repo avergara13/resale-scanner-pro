@@ -377,7 +377,72 @@ export function AIScreen({
                 </div>
               )}
 
-              {/* ── Listing draft form ── */}
+              {/* ── 1. Quick Summary — financials at a glance ── */}
+              {hasDecision && currentItem && (
+                <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
+                  <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <ChartBar size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
+                          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">
+                            QUICK SUMMARY
+                          </h3>
+                        </div>
+                        <CaretDown
+                          size={18}
+                          weight="bold"
+                          className={cn(
+                            'text-t3 transition-transform duration-200 flex-shrink-0',
+                            summaryOpen && 'rotate-180',
+                          )}
+                        />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
+                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Buy Price</p>
+                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
+                            ${currentItem.purchasePrice.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Sell Price</p>
+                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
+                            ${currentItem.estimatedSellPrice?.toFixed(2) || '--'}
+                          </p>
+                        </div>
+                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
+                          <p
+                            className={cn(
+                              'text-base sm:text-lg font-mono font-bold',
+                              (currentItem.profitMargin || 0) > 50
+                                ? 'text-green'
+                                : (currentItem.profitMargin || 0) > 20
+                                  ? 'text-amber'
+                                  : 'text-red',
+                            )}
+                          >
+                            {currentItem.profitMargin?.toFixed(1) || '--'}%
+                          </p>
+                        </div>
+                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
+                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
+                            {currentItem.profitMargin != null && currentItem.estimatedSellPrice
+                              ? `$${((currentItem.estimatedSellPrice * currentItem.profitMargin) / 100).toFixed(2)}`
+                              : '--'}
+                          </p>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {/* ── 2. Listing draft form ── */}
               {hasDecision && !listingAdded && (
                 <Collapsible open={formOpen} onOpenChange={setFormOpen}>
                   <Card className="mt-3 p-3 sm:p-4 bg-fg border-s2">
@@ -569,83 +634,8 @@ export function AIScreen({
                 </motion.div>
               )}
 
-              {/* Quick Summary */}
-              {hasDecision && currentItem && (
-                <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
-                  <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
-                    <CollapsibleTrigger className="w-full">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2">
-                          <ChartBar size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
-                          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">
-                            QUICK SUMMARY
-                          </h3>
-                        </div>
-                        <CaretDown
-                          size={18}
-                          weight="bold"
-                          className={cn(
-                            'text-t3 transition-transform duration-200 flex-shrink-0',
-                            summaryOpen && 'rotate-180',
-                          )}
-                        />
-                      </div>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
-                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Buy Price</p>
-                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                            ${currentItem.purchasePrice.toFixed(2)}
-                          </p>
-                        </div>
-                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Sell Price</p>
-                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                            ${currentItem.estimatedSellPrice?.toFixed(2) || '--'}
-                          </p>
-                        </div>
-                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
-                          <p
-                            className={cn(
-                              'text-base sm:text-lg font-mono font-bold',
-                              (currentItem.profitMargin || 0) > 50
-                                ? 'text-green'
-                                : (currentItem.profitMargin || 0) > 20
-                                  ? 'text-amber'
-                                  : 'text-red',
-                            )}
-                          >
-                            {currentItem.profitMargin?.toFixed(1) || '--'}%
-                          </p>
-                        </div>
-                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
-                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                            {currentItem.profitMargin != null && currentItem.estimatedSellPrice
-                              ? `$${((currentItem.estimatedSellPrice * currentItem.profitMargin) / 100).toFixed(2)}`
-                              : '--'}
-                          </p>
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )}
-
-              {/* Google Lens results */}
-              {currentItem?.lensAnalysis && (
-                <GoogleLensResults lensAnalysis={currentItem.lensAnalysis} />
-              )}
-
-              {/* Market data */}
-              {currentItem?.marketData && (
-                <MarketDataPanel marketData={currentItem.marketData} />
-              )}
-
-              {/* Scanned image */}
-              {currentItem?.imageData && (
+              {/* ── 3. Photo — collapsible reference image ── */}
+              {(currentItem?.imageData || currentItem?.imageThumbnail) && (
                 <Collapsible open={imageOpen} onOpenChange={setImageOpen}>
                   <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
                     <CollapsibleTrigger className="w-full">
@@ -653,7 +643,7 @@ export function AIScreen({
                         <div className="flex items-center gap-2">
                           <Image size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
                           <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">
-                            SCANNED IMAGE
+                            PHOTO
                           </h3>
                         </div>
                         <CaretDown
@@ -668,13 +658,23 @@ export function AIScreen({
                     </CollapsibleTrigger>
                     <CollapsibleContent className="mt-3">
                       <img
-                        src={currentItem.imageData}
-                        alt="Scanned item"
+                        src={currentItem.imageData || currentItem.imageThumbnail}
+                        alt="Listing photo"
                         className="w-full rounded-lg sm:rounded-xl border-2 border-s2 shadow-md"
                       />
                     </CollapsibleContent>
                   </Card>
                 </Collapsible>
+              )}
+
+              {/* Google Lens results */}
+              {currentItem?.lensAnalysis && (
+                <GoogleLensResults lensAnalysis={currentItem.lensAnalysis} />
+              )}
+
+              {/* Market data */}
+              {currentItem?.marketData && (
+                <MarketDataPanel marketData={currentItem.marketData} />
               )}
             </div>
           )}
