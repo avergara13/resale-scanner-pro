@@ -276,19 +276,26 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   }, [queueItems, currentSession?.id])
 
   const queueStats = useMemo(() => {
-    const total = sessionItems.length
-    const buy = sessionItems.filter(item => item.decision === 'BUY').length
-    const pass = sessionItems.filter(item => item.decision === 'PASS').length
-    const pending = sessionItems.filter(item => item.decision === 'PENDING').length
-    const totalProfit = sessionItems
-      .filter(item => item.decision === 'BUY' && item.profitMargin)
-      .reduce((sum, item) => {
-        const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
-        return sum + profit
-      }, 0)
+    // Combine queue items + scan history for this session, deduplicated by ID
+    // so BUY/PASS/MAYBE counts reflect ALL scans, not just items still in queue
+    const combined = [...sessionItems, ...(scanHistoryKV || []).filter(i =>
+      currentSession?.id ? i.sessionId === currentSession.id : true
+    )]
+    const seen = new Set<string>()
+    const unique = combined.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true })
 
-    return { total, buy, pass, pending, totalProfit }
-  }, [sessionItems])
+    const buy = unique.filter(i => i.decision === 'BUY').length
+    const pass = unique.filter(i => i.decision === 'PASS').length
+    const maybe = unique.filter(i => i.decision === 'PENDING').length
+    // Queue count: items currently sitting in the listing queue (inQueue flag)
+    const queueCount = sessionItems.filter(i => i.inQueue).length
+    const totalProfit = unique
+      .filter(i => i.decision === 'BUY')
+      .reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
+
+    // Keep legacy total/pending for LLM context compatibility
+    return { total: unique.length, buy, pass, pending: maybe, maybe, queueCount, totalProfit }
+  }, [sessionItems, scanHistoryKV, currentSession?.id])
 
   // Session-scoped scan cards (most recent first) for the Scans tab
   const sessionScans = useMemo(() => {
@@ -1142,22 +1149,29 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
       className="px-4 border-b border-s1/50"
       style={{ background: 'color-mix(in oklch, var(--fg) 90%, transparent)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)', height: '36px', display: 'flex', alignItems: 'center' }}
     >
-      <div className="flex items-center gap-4 flex-1">
-        <span className="text-[10px] text-t3 font-medium">
-          <span className="text-t1 font-bold text-[11px]">{queueStats.total}</span> queue
-        </span>
-        <span className="text-[10px] text-t3 font-medium">
+      <div className="flex items-center gap-3 flex-1 overflow-x-auto scrollbar-none">
+        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
           <span className="text-green font-bold text-[11px]">{queueStats.buy}</span> buy
         </span>
+        <span className="text-[9px] text-s2 flex-shrink-0">·</span>
+        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
+          <span className="text-red font-bold text-[11px]">{queueStats.pass}</span> pass
+        </span>
+        <span className="text-[9px] text-s2 flex-shrink-0">·</span>
+        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
+          <span className="text-amber font-bold text-[11px]">{queueStats.maybe}</span> maybe
+        </span>
+        <span className="text-[9px] text-s2 flex-shrink-0">·</span>
+        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
+          <span className="text-t1 font-bold text-[11px]">{queueStats.queueCount}</span> queue
+        </span>
         {queueStats.totalProfit > 0 && (
-          <span className="text-[10px] text-t3 font-medium">
-            <span className="text-green font-bold text-[11px]">${queueStats.totalProfit.toFixed(0)}</span> profit
-          </span>
-        )}
-        {pendingTodos.length > 0 && (
-          <span className="text-[10px] text-t3 font-medium">
-            <span className="text-amber font-bold text-[11px]">{pendingTodos.length}</span> tasks
-          </span>
+          <>
+            <span className="text-[9px] text-s2 flex-shrink-0">·</span>
+            <span className="text-[10px] text-t3 font-medium flex-shrink-0">
+              <span className="text-green font-bold text-[11px]">${queueStats.totalProfit.toFixed(0)}</span> profit
+            </span>
+          </>
         )}
       </div>
       {activeTab === 'chat' && viewMode === 'chat' && chatMessages.length > 0 && (
