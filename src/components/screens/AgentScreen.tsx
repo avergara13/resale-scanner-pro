@@ -226,7 +226,8 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const activeKey = useMemo(() => sessionId ? `active-chat-session-${sessionId}` : 'active-chat-session-global', [sessionId])
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>(chatKey, EMPTY_CHAT_SESSIONS)
   const [activeSessionId, setActiveSessionId] = useKV<string | null>(activeKey, null)
-  const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', EMPTY_TODOS)
+  const todosKey = useMemo(() => sessionId ? `shared-todos-${sessionId}` : 'shared-todos-global', [sessionId])
+  const [todos, setTodos] = useKV<SharedTodo[]>(todosKey, EMPTY_TODOS)
   const [activeTab, setActiveTab] = useKV<'chat' | 'scans' | 'tasks'>('agent-active-tab', 'chat')
   const [viewMode, setViewMode] = useState<'list' | 'chat'>('list')
   const [input, setInput] = useState('')
@@ -1346,6 +1347,16 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
       {/* ── Chrome: tab bar + stats bar — flex-shrink-0 keeps it out of scroll ── */}
       <div className="flex-shrink-0 z-20 bg-fg">
+        {/* Session context indicator — visible only when inside an active scanning session */}
+        {currentSession?.active && (
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-b1/20" style={{ background: 'color-mix(in oklch, var(--b1) 8%, var(--fg))' }}>
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-b1 animate-pulse flex-shrink-0" />
+            <span className="text-[10px] font-bold text-b1 truncate">
+              {currentSession.name || `Session #${String(currentSession.sessionNumber ?? 1).padStart(3, '0')}`}
+            </span>
+            <span className="text-[10px] text-t3 ml-auto flex-shrink-0 font-medium">Active</span>
+          </div>
+        )}
         <div className="border-b border-s1">
           <div className="tab-bar px-3">
             <button
