@@ -68,6 +68,9 @@ interface AIScreenProps {
   onRecalculate?: (buyPrice: number, sellPrice?: number, shippingCost?: number) => void
   onRescan?: () => void
   onOpenCamera?: () => void
+  onAddPhoto?: () => void
+  onDeletePhoto?: (index: number) => void
+  onDeletePrimaryPhoto?: () => void
 }
 
 // ─── Celebration particles ────────────────────────────────────────────────────
@@ -237,6 +240,9 @@ export function AIScreen({
   onRecalculate,
   onRescan,
   onOpenCamera,
+  onAddPhoto,
+  onDeletePhoto,
+  onDeletePrimaryPhoto,
 }: AIScreenProps) {
   // ── Listing form state ──
   const [buyPrice, setBuyPrice] = useState('')
@@ -729,7 +735,7 @@ export function AIScreen({
                 </motion.div>
               )}
 
-              {/* ── 3. Photo — collapsible reference image ── */}
+              {/* ── 3. Photos — collapsible multi-photo strip ── */}
               {(currentItem?.imageData || currentItem?.imageThumbnail) && (
                 <Collapsible open={imageOpen} onOpenChange={setImageOpen}>
                   <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
@@ -738,8 +744,11 @@ export function AIScreen({
                         <div className="flex items-center gap-2">
                           <Image size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
                           <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">
-                            PHOTO
+                            PHOTOS
                           </h3>
+                          <span className="text-[10px] text-t3 font-medium">
+                            {1 + (currentItem?.additionalImages?.length || 0)}/5
+                          </span>
                         </div>
                         <CaretDown
                           size={18}
@@ -752,11 +761,59 @@ export function AIScreen({
                       </div>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="mt-3">
-                      <img
-                        src={currentItem.imageData || currentItem.imageThumbnail}
-                        alt="Listing photo"
-                        className="w-full rounded-lg sm:rounded-xl border-2 border-s2 shadow-md"
-                      />
+                      <div className="flex items-start gap-2 overflow-x-auto pb-1">
+                        {/* Primary photo */}
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={currentItem.imageData || currentItem.imageThumbnail}
+                            alt="Primary photo"
+                            className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover border-2 border-b1/30"
+                          />
+                          <span className="absolute bottom-1 left-1 text-[8px] font-bold text-white bg-b1/80 px-1.5 py-0.5 rounded-full leading-tight">
+                            Main
+                          </span>
+                          <button
+                            onClick={() => onDeletePrimaryPhoto?.()}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                            style={{ touchAction: 'manipulation' }}
+                          >
+                            <XCircle size={12} weight="fill" className="text-white" />
+                          </button>
+                        </div>
+
+                        {/* Additional photos */}
+                        {(currentItem.additionalImages || []).map((thumb, idx) => (
+                          <div key={idx} className="relative flex-shrink-0">
+                            <img
+                              src={thumb}
+                              alt={`Photo ${idx + 2}`}
+                              className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-s2"
+                            />
+                            <button
+                              onClick={() => onDeletePhoto?.(idx)}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                              style={{ touchAction: 'manipulation' }}
+                            >
+                              <XCircle size={12} weight="fill" className="text-white" />
+                            </button>
+                          </div>
+                        ))}
+
+                        {/* Add photo button — hidden when at max 5 */}
+                        {(1 + (currentItem.additionalImages?.length || 0)) < 5 && (
+                          <button
+                            onClick={() => onAddPhoto?.()}
+                            className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl border-2 border-dashed border-s2 flex flex-col items-center justify-center gap-1 hover:bg-s1 transition-colors active:scale-[0.97]"
+                            style={{ touchAction: 'manipulation' }}
+                          >
+                            <Camera size={18} className="text-t3" />
+                            <span className="text-[9px] text-t3 font-medium">Add Photo</span>
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-t3 mt-2 leading-tight opacity-70">
+                        Add photos then tap Re-analyze to scan all {1 + (currentItem?.additionalImages?.length || 0)} together
+                      </p>
                     </CollapsibleContent>
                   </Card>
                 </Collapsible>

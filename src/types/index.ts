@@ -166,6 +166,8 @@ export interface ScannedItem {
   imageData?: string
   imageThumbnail?: string
   imageOptimized?: string
+  additionalImages?: string[]       // thumbnails for photos 2–5; persisted with item
+  additionalImageData?: string[]    // full base64 for photos 2–5; in-memory only (stripped on KV save)
   purchasePrice: number
   productName?: string
   description?: string
