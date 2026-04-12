@@ -971,106 +971,6 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
           </Accordion>
 
-          {/* ── Reset / Clear ── */}
-          <div className="space-y-3">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 border-b1 text-b1 hover:bg-b1/10 hover:border-b1"
-                >
-                  <ArrowCounterClockwise size={18} weight="bold" />
-                  Reset All Settings
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="max-w-md">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="flex items-center gap-2 text-lg">
-                    <ArrowCounterClockwise size={24} className="text-b1" weight="bold" />
-                    Reset All Settings?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="space-y-3 text-sm">
-                    <p>This will restore all settings to their default values.</p>
-                    <div className="p-3 bg-green-bg border border-green/30 rounded-md">
-                      <p className="text-xs text-t1">
-                        <strong className="text-green">✓ API Keys Will Be Preserved</strong>
-                      </p>
-                      <ul className="text-xs text-t2 mt-2 space-y-1 ml-4 list-disc">
-                        <li>Gemini & Anthropic API keys</li>
-                        <li>Google Cloud & eBay credentials</li>
-                        <li>Notion, Supabase & n8n keys</li>
-                      </ul>
-                    </div>
-                    <div className="p-3 bg-amber/10 border border-amber/30 rounded-md">
-                      <p className="text-xs text-t1">
-                        <strong className="text-amber">⚠ Will Reset:</strong>
-                      </p>
-                      <ul className="text-xs text-t2 mt-2 space-y-1 ml-4 list-disc">
-                        <li>Feature toggles, theme, image quality</li>
-                        <li>Business rules (profit margins, fees)</li>
-                        <li>AI model preference</li>
-                      </ul>
-                    </div>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleResetSettings}
-                    className="bg-b1 hover:bg-b2 text-t1"
-                  >
-                    Reset Settings
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            <p className="text-xs text-t2 text-center">
-              Restore default settings while keeping your API keys
-            </p>
-
-            <Separator className="bg-s2" />
-
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full text-red hover:bg-red hover:text-t1 border-s2 hover:border-red"
-                >
-                  Clear All App Data
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="max-w-md">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="flex items-center gap-2 text-lg text-red">
-                    ⚠️ Clear All App Data?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="space-y-3 text-sm">
-                    <p>This will reset <strong>everything</strong> — all settings, API keys, and stored preferences.</p>
-                    <div className="p-3 bg-red/10 border border-red/30 rounded-md">
-                      <p className="text-xs text-t1">
-                        <strong className="text-red">This cannot be undone.</strong> You will need to re-enter all API keys and reconfigure your settings.
-                      </p>
-                    </div>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleClearAllData}
-                    className="bg-red hover:bg-red/80 text-t1"
-                  >
-                    Clear Everything
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            <p className="text-xs text-t2 text-center">
-              This will reset all settings, API keys, and stored data
-            </p>
-          </div>
-
           {/* ── Activity + Debug Console ── */}
           <div className="rounded-2xl border border-s2 bg-fg overflow-hidden">
             {/* Tab bar */}
@@ -1204,6 +1104,106 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 )}
               </div>
             )}
+          </div>
+
+          {/* ── Reset / Clear — at the bottom below Activity/Debug ── */}
+          <div className="space-y-3 pt-2">
+            <Separator className="bg-s2" />
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 border-b1 text-b1 hover:bg-b1/10 hover:border-b1"
+                >
+                  <ArrowCounterClockwise size={18} weight="bold" />
+                  Reset All Settings
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-md">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-lg">
+                    <ArrowCounterClockwise size={24} className="text-b1" weight="bold" />
+                    Reset All Settings?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-3 text-sm">
+                    <p>This will restore all settings to their default values.</p>
+                    <div className="p-3 bg-green-bg border border-green/30 rounded-md">
+                      <p className="text-xs text-t1">
+                        <strong className="text-green">✓ API Keys Will Be Preserved</strong>
+                      </p>
+                      <ul className="text-xs text-t2 mt-2 space-y-1 ml-4 list-disc">
+                        <li>Gemini & Anthropic API keys</li>
+                        <li>Google Cloud & eBay credentials</li>
+                        <li>Notion, Supabase & n8n keys</li>
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-amber/10 border border-amber/30 rounded-md">
+                      <p className="text-xs text-t1">
+                        <strong className="text-amber">⚠ Will Reset:</strong>
+                      </p>
+                      <ul className="text-xs text-t2 mt-2 space-y-1 ml-4 list-disc">
+                        <li>Feature toggles, theme, image quality</li>
+                        <li>Business rules (profit margins, fees)</li>
+                        <li>AI model preference</li>
+                      </ul>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleResetSettings}
+                    className="bg-b1 hover:bg-b2 text-t1"
+                  >
+                    Reset Settings
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <p className="text-xs text-t2 text-center">
+              Restore default settings while keeping your API keys
+            </p>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full text-red hover:bg-red hover:text-t1 border-s2 hover:border-red"
+                >
+                  Clear All App Data
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-md">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-lg text-red">
+                    ⚠️ Clear All App Data?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-3 text-sm">
+                    <p>This will reset <strong>everything</strong> — all settings, API keys, and stored preferences.</p>
+                    <div className="p-3 bg-red/10 border border-red/30 rounded-md">
+                      <p className="text-xs text-t1">
+                        <strong className="text-red">This cannot be undone.</strong> You will need to re-enter all API keys and reconfigure your settings.
+                      </p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleClearAllData}
+                    className="bg-red hover:bg-red/80 text-t1"
+                  >
+                    Clear Everything
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <p className="text-xs text-t2 text-center">
+              This will reset all settings, API keys, and stored data
+            </p>
           </div>
         </div>
       </div>
