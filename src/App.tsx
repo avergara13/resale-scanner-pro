@@ -1019,8 +1019,11 @@ function App() {
       if (current.some(i => i.id === draftItem.id)) return current
       return [...current, draftItem]
     })
+    setCurrentItem(undefined)
+    setPipeline([])
+    setScreen('agent')
     toast.success('Draft saved to queue')
-  }, [currentItem, setQueue])
+  }, [currentItem, setQueue, setScreen])
 
   const handleRescan = useCallback(() => {
     setCurrentItem(undefined)
@@ -1199,8 +1202,9 @@ function App() {
     })
     setCurrentItem(undefined)
     setPipeline([])
-    toast.success('Passed — heavy image data will be removed at session end')
-  }, [currentItem, setQueue])
+    setScreen('agent')
+    toast.success('Passed — saved to scan history')
+  }, [currentItem, setQueue, setScreen])
 
   const handleMaybeFromScan = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
@@ -1225,8 +1229,9 @@ function App() {
     })
     setCurrentItem(undefined)
     setPipeline([])
+    setScreen('agent')
     toast.success('Saved as Maybe — tap in Queue to re-evaluate')
-  }, [currentItem, setQueue])
+  }, [currentItem, setQueue, setScreen])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
@@ -1734,16 +1739,14 @@ function App() {
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
         onBack={
-          screen === 'scan'
-            ? () => setScreen('session')
+          screen === 'scan-result'
+            ? () => setScreen('agent')
             : screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
             ? () => setScreen('session')
             : screen === 'tag-analytics' || screen === 'location-insights'
             ? () => setScreen('queue')
             : screen === 'cost-tracking'
             ? () => setScreen('settings')
-            : screen === 'scan-result'
-            ? () => setScreen('agent')
             : undefined
         }
       />
@@ -1784,31 +1787,7 @@ function App() {
               />
             </motion.div>
           )}
-          {screen === 'scan' && (
-            <motion.div
-              key="scan"
-              variants={screenVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
-              style={{ willChange: 'opacity, transform' }}
-              className="absolute inset-0"
-            >
-              <AIScreen
-                currentItem={currentItem}
-                pipeline={pipeline}
-                settings={settings}
-                onSaveDraft={handleSaveDraft}
-                onCreateListing={handleCreateListingFromScan}
-                onPassItem={handlePassFromScan}
-                onMaybeItem={handleMaybeFromScan}
-                onRecalculate={handleRecalculate}
-                onRescan={handleRescan}
-                onOpenCamera={() => setCameraOpen(true)}
-              />
-            </motion.div>
-          )}
+
           {screen === 'agent' && (
             <motion.div
               key="agent"
@@ -1819,10 +1798,10 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0 overflow-hidden"
             >
               <AgentScreen
-                isCurrentScreen={screen === 'agent'}
+                isCurrentScreen={screen === 'agent' && !cameraOpen}
                 queueItems={queue || []}
                 soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
                 settings={settings}
@@ -1846,7 +1825,7 @@ function App() {
                 onOpenScanItem={(item) => {
                   setCurrentItem(item)
                   setPipeline([])
-                  setScreen('scan')
+                  setScreen('scan-result')
                 }}
               />
             </motion.div>

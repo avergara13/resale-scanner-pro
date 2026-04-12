@@ -25,12 +25,12 @@ import {
   ListChecks,
   ChatCircle,
   Camera,
-  ArrowSquareRight,
+  ShoppingCart,
+  ArrowSquareOut,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
@@ -301,7 +301,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   }, [setScanHistoryKV])
 
   const handlePromoteToQueue = useCallback((item: ScannedItem) => {
-    const queueItem: ScannedItem = { ...item, inQueue: true }
+    const queueItem: ScannedItem = { ...item, inQueue: true, decision: 'BUY' as const }
     setQueueKV(prev => {
       const current = prev || []
       if (current.some(i => i.id === queueItem.id)) return current
@@ -1136,22 +1136,34 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
   // Shared stats bar used in both views
   const statsBar = (
     <div
-      className="px-3 border-b border-s1/60"
-      style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)', height: '38px', display: 'flex', alignItems: 'center', overflow: 'hidden' }}
+      className="px-4 border-b border-s1/50"
+      style={{ background: 'color-mix(in oklch, var(--fg) 90%, transparent)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)', height: '36px', display: 'flex', alignItems: 'center' }}
     >
-      <div className="flex items-center gap-3 flex-1 text-[10px]">
-        <span className="text-t1 font-black">{queueStats.total} <span className="font-normal text-t3">Queue</span></span>
-        <span className="text-green font-black">{queueStats.buy} <span className="font-normal text-t3">Buy</span></span>
-        <span className="text-red font-black">{queueStats.pass} <span className="font-normal text-t3">Pass</span></span>
-        <span className="text-green font-black">${queueStats.totalProfit.toFixed(0)} <span className="font-normal text-t3">Profit</span></span>
+      <div className="flex items-center gap-4 flex-1">
+        <span className="text-[10px] text-t3 font-medium">
+          <span className="text-t1 font-bold text-[11px]">{queueStats.total}</span> queue
+        </span>
+        <span className="text-[10px] text-t3 font-medium">
+          <span className="text-green font-bold text-[11px]">{queueStats.buy}</span> buy
+        </span>
+        {queueStats.totalProfit > 0 && (
+          <span className="text-[10px] text-t3 font-medium">
+            <span className="text-green font-bold text-[11px]">${queueStats.totalProfit.toFixed(0)}</span> profit
+          </span>
+        )}
+        {pendingTodos.length > 0 && (
+          <span className="text-[10px] text-t3 font-medium">
+            <span className="text-amber font-bold text-[11px]">{pendingTodos.length}</span> tasks
+          </span>
+        )}
       </div>
-      {activeTab === 'chat' && viewMode === 'chat' && (
+      {activeTab === 'chat' && viewMode === 'chat' && chatMessages.length > 0 && (
         <button
           onClick={handleNewChat}
-          className="text-[9px] font-bold text-t1 uppercase tracking-wide transition-opacity active:opacity-50 flex-shrink-0"
+          className="flex items-center gap-1 text-[10px] font-semibold text-t3 hover:text-t1 transition-colors active:opacity-50 flex-shrink-0 px-2 py-1 rounded-lg hover:bg-s1"
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         >
-          ↺ New Chat
+          New Chat
         </button>
       )}
     </div>
@@ -1163,7 +1175,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
       key="chat-pill"
       initial={{ y: 80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 80, opacity: 0 }}
+      exit={{ y: 80, opacity: 0, transition: { duration: 0.15, ease: [0.32, 0, 0.67, 0] } }}
       transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.8 }}
       style={{
         position: 'fixed',
@@ -1198,7 +1210,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask anything..."
+          placeholder="Message Agent..."
           disabled={isProcessing}
           style={{
             flex: 1,
@@ -1242,7 +1254,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
       key="task-pill"
       initial={{ y: 80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 80, opacity: 0 }}
+      exit={{ y: 80, opacity: 0, transition: { duration: 0.15, ease: [0.32, 0, 0.67, 0] } }}
       transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.8 }}
       style={{
         position: 'fixed',
@@ -1322,7 +1334,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
   [chatSessions])
 
   return (
-    <div className="flex flex-col h-full bg-bg">
+    <div className="flex flex-col h-full bg-bg overflow-hidden">
       <PullToRefreshIndicator
         isPulling={pullToRefresh.isPulling}
         isRefreshing={pullToRefresh.isRefreshing}
@@ -1368,96 +1380,154 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
         {viewMode === 'list' ? (
           <motion.div
             key="agent-list"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="flex flex-col flex-1 min-h-0"
+            className="flex flex-col flex-1 min-h-0 overflow-y-auto"
           >
-            {/* Splash — vertically centered */}
-            <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-              <button
-                onClick={handleCreateSession}
-                className="inline-flex p-5 bg-gradient-to-br from-b1 to-b2 rounded-3xl mb-5 active:scale-95 transition-transform shadow-xl"
-                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            {/* First-run welcome — identical layout to the empty chat state */}
+            <div className="flex flex-col items-center text-center px-5 pt-10 pb-6">
+              <div
+                className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-xl"
+                style={{ boxShadow: 'var(--send-glow)' }}
               >
-                <Sparkle size={32} weight="fill" className="text-white" />
-              </button>
-              <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
-              <p className="text-sm text-t3 max-w-[200px] leading-relaxed">Tap to start your session assistant</p>
+                <Robot size={38} weight="duotone" className="text-white" />
+              </div>
+              <h2 className="text-[22px] font-black text-t1 mb-2 tracking-tight">Session Assistant</h2>
+              <p className="text-sm text-t3 leading-relaxed max-w-[220px]">
+                I know your queue, scans, sessions, and goals.
+              </p>
+            </div>
+            <div className="px-4 pb-24 grid grid-cols-2 gap-3">
+              {QUICK_ACTIONS.map(action => (
+                <button
+                  key={action.label}
+                  onClick={() => handleQuickAction(action.prompt)}
+                  className="flex flex-col items-start gap-2.5 p-4 bg-s1 border border-s2 rounded-2xl text-left active:scale-95 active:opacity-70 transition-transform"
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <span className="text-2xl leading-none">{action.emoji}</span>
+                  <span className="text-[12px] font-bold text-t1 leading-snug">{action.label}</span>
+                </button>
+              ))}
             </div>
           </motion.div>
         ) : (
           <motion.div
             key="agent-chat"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             className="flex flex-col flex-1 min-h-0 overflow-hidden"
           >
-            {/* Empty state when chat has no messages */}
+            {/* Empty state: no messages yet — show agent identity + quick actions */}
             {chatMessages.length === 0 && (
-              <div className="flex-1 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
-                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg" style={{ boxShadow: 'var(--send-glow)' }}>
-                  <Robot size={48} weight="duotone" className="text-white" />
+              <div className="flex-1 flex flex-col overflow-y-auto">
+                <div className="flex flex-col items-center text-center px-5 pt-10 pb-6">
+                  <div
+                    className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-xl"
+                    style={{ boxShadow: 'var(--send-glow)' }}
+                  >
+                    <Robot size={38} weight="duotone" className="text-white" />
+                  </div>
+                  <h2 className="text-[22px] font-black text-t1 mb-2 tracking-tight">Session Assistant</h2>
+                  <p className="text-sm text-t3 leading-relaxed max-w-[220px]">
+                    I know your queue, scans, sessions, and goals.
+                  </p>
                 </div>
-                <p className="text-base font-semibold text-t1 mb-1">Session Assistant</p>
-                <p className="text-xs text-t3 max-w-[200px] leading-relaxed">Ask about your queue, pricing, listings, or what to do next.</p>
+                <div className="px-4 pb-24 grid grid-cols-2 gap-3">
+                  {QUICK_ACTIONS.map(action => (
+                    <button
+                      key={action.label}
+                      onClick={() => handleQuickAction(action.prompt)}
+                      className="flex flex-col items-start gap-2.5 p-4 bg-s1 border border-s2 rounded-2xl text-left active:scale-95 active:opacity-70 transition-transform"
+                      style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <span className="text-2xl leading-none">{action.emoji}</span>
+                      <span className="text-[12px] font-bold text-t1 leading-snug">{action.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
             {/* Messages — pb clears the floating input bar */}
             {chatMessages.length > 0 && (
-            <ScrollArea className="flex-1 px-4">
-              <div ref={pullToRefresh.containerRef} className="py-4 space-y-4" style={{ paddingBottom: '80px' }}>
-                {chatMessages.map((msg, index) => (
-                  <motion.div
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.02 }}
-                    className={cn(
-                      "flex gap-3",
-                      msg.role === 'user' ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    {msg.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
-                        <Robot size={18} weight="bold" className="text-white" />
-                      </div>
-                    )}
-                    <div
-                      className={cn(
-                        "max-w-[80%] rounded-2xl px-4 py-3",
-                        msg.role === 'user'
-                          ? "bg-gradient-to-br from-b1 to-b2 text-white"
-                          : "bg-s1 border border-s2 text-t1"
-                      )}
+            <div ref={pullToRefresh.containerRef} className="flex-1 min-h-0 overflow-y-auto">
+              <div className="px-4 py-5 space-y-3" style={{ paddingBottom: '88px' }}>
+                {chatMessages.map((msg, index) => {
+                  const ts = new Date(msg.timestamp)
+                  const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                  const showTime = index === 0 || msg.timestamp - chatMessages[index - 1].timestamp > 5 * 60 * 1000
+
+                  return (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                      className="flex flex-col"
                     >
-                      {msg.role === 'user' ? (
-                        <p className="text-sm leading-relaxed">{msg.content}</p>
-                      ) : (
-                        <CollapsibleMessage message={msg.content} />
+                      {showTime && (
+                        <p className={cn(
+                          "text-[10px] text-t3 mb-1.5 font-medium",
+                          msg.role === 'user' ? "text-right" : "text-left pl-11"
+                        )}>
+                          {timeStr}
+                        </p>
                       )}
-                    </div>
-                  </motion.div>
-                ))}
+                      <div className={cn(
+                        "flex gap-2.5 items-end",
+                        msg.role === 'user' ? "justify-end" : "justify-start"
+                      )}>
+                        {msg.role === 'assistant' && (
+                          <div
+                            className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0 mb-0.5"
+                            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                          >
+                            <Robot size={16} weight="bold" className="text-white" />
+                          </div>
+                        )}
+                        <div
+                          className={cn(
+                            "max-w-[78%] rounded-[20px] px-4 py-3",
+                            msg.role === 'user'
+                              ? "rounded-br-md bg-gradient-to-br from-b1 to-b2 text-white"
+                              : "rounded-bl-md bg-s1 border border-s2 text-t1"
+                          )}
+                          style={msg.role === 'user' ? { boxShadow: '0 2px 12px rgba(var(--b1-rgb), 0.3)' } : undefined}
+                        >
+                          {msg.role === 'user' ? (
+                            <p className="text-[14px] leading-relaxed">{msg.content}</p>
+                          ) : (
+                            <CollapsibleMessage message={msg.content} />
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
 
                 {isProcessing && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex gap-3 justify-start"
+                    transition={{ duration: 0.2 }}
+                    className="flex gap-2.5 items-end justify-start"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
-                      <Robot size={18} weight="bold" className="text-white" />
+                    <div
+                      className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0"
+                      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                    >
+                      <Robot size={16} weight="bold" className="text-white" />
                     </div>
-                    <div className="bg-s1 border border-s2 rounded-2xl px-4 py-3">
-                      <div className="flex gap-1">
+                    <div className="bg-s1 border border-s2 rounded-[20px] rounded-bl-md px-4 py-3.5">
+                      <div className="flex gap-1.5 items-center">
                         <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '160ms' }} />
+                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '320ms' }} />
                       </div>
                     </div>
                   </motion.div>
@@ -1465,7 +1535,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
                 <div ref={messagesEndRef} />
               </div>
-            </ScrollArea>
+            </div>
             )}
 
           </motion.div>
@@ -1510,70 +1580,88 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                 return (
                   <Card
                     key={item.id}
-                    className="p-3 bg-fg border-s2 flex gap-3 items-start"
+                    className="bg-fg border-s2 flex flex-col gap-0 overflow-hidden"
                   >
-                    {(item.imageThumbnail || item.imageData) && (
-                      <img
-                        src={item.imageThumbnail || item.imageData}
-                        alt={item.productName || 'Item'}
-                        className="w-14 h-14 rounded-lg object-cover border border-s2 flex-shrink-0"
-                      />
-                    )}
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <p className="text-xs font-bold text-t1 truncate">
-                        {item.productName || 'Unknown Item'}
-                      </p>
-                      <div className="flex gap-2 text-[10px] font-mono text-t2 flex-wrap">
-                        <span>Buy ${item.purchasePrice.toFixed(2)}</span>
-                        {item.estimatedSellPrice != null && (
-                          <>
-                            <span>→</span>
-                            <span>Sell ${item.estimatedSellPrice.toFixed(2)}</span>
-                          </>
-                        )}
-                        {profit != null && (
-                          <span className={profit >= 0 ? 'text-green' : 'text-red'}>
-                            ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span
-                          className={cn(
-                            'inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border',
-                            decisionColor,
+                    {/* ── Info row ── */}
+                    <div className="p-3 flex gap-3 items-start">
+                      {(item.imageThumbnail || item.imageData) && (
+                        <img
+                          src={item.imageThumbnail || item.imageData}
+                          alt={item.productName || 'Item'}
+                          className="w-14 h-14 rounded-lg object-cover border border-s2 flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <p className="text-xs font-bold text-t1 truncate">
+                          {item.productName || 'Unknown Item'}
+                        </p>
+                        <div className="flex gap-2 text-[10px] font-mono text-t2 flex-wrap">
+                          <span>Buy ${item.purchasePrice.toFixed(2)}</span>
+                          {item.estimatedSellPrice != null && (
+                            <>
+                              <span>→</span>
+                              <span>Sell ${item.estimatedSellPrice.toFixed(2)}</span>
+                            </>
                           )}
-                        >
-                          {item.decision}
-                        </span>
-                        {alreadyQueued && (
-                          <span className="inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border text-b1 bg-b1/10 border-b1/30">
-                            In Queue
+                          {profit != null && (
+                            <span className={profit >= 0 ? 'text-green' : 'text-red'}>
+                              ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={cn(
+                              'inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border',
+                              decisionColor,
+                            )}
+                          >
+                            {item.decision}
                           </span>
-                        )}
-                        {item.category && (
-                          <span className="text-[9px] text-t3 truncate">{item.category}</span>
-                        )}
+                          {item.category && (
+                            <span className="text-[9px] text-t3 truncate">{item.category}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1.5 flex-shrink-0">
-                      {!alreadyQueued && (
+
+                    {/* ── Action row ── */}
+                    <div className="border-t border-s2 flex items-center">
+                      {/* Reopen — go back to scan analysis */}
+                      <button
+                        onClick={() => onOpenScanItem?.(item)}
+                        className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-t2 hover:text-t1 hover:bg-s1 active:opacity-60 transition-colors"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <ArrowSquareOut size={13} weight="bold" />
+                        Reopen
+                      </button>
+                      <div className="w-px h-5 bg-s2 flex-shrink-0" />
+                      {/* Add to Queue / already-queued indicator */}
+                      {alreadyQueued ? (
+                        <div className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-green">
+                          <Check size={13} weight="bold" />
+                          In Queue
+                        </div>
+                      ) : (
                         <button
                           onClick={() => handlePromoteToQueue(item)}
-                          className="flex items-center gap-1 px-2 py-1.5 bg-b1/10 hover:bg-b1/20 text-b1 rounded-lg text-[10px] font-bold transition-colors active:scale-95"
-                          title="Add to listing queue"
+                          className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-green hover:bg-green/90 active:opacity-80 transition-colors"
+                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                         >
-                          <ArrowSquareRight size={12} weight="bold" />
-                          Queue
+                          <ShoppingCart size={13} weight="bold" />
+                          Add to Queue
                         </button>
                       )}
+                      <div className="w-px h-5 bg-s2 flex-shrink-0" />
+                      {/* Delete */}
                       <button
                         onClick={() => handleDeleteScan(item.id)}
-                        className="flex items-center gap-1 px-2 py-1.5 bg-s1 hover:bg-red/10 text-t3 hover:text-red rounded-lg text-[10px] font-bold transition-colors active:scale-95"
+                        className="w-12 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
                         title="Remove from scan history"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        <Trash size={12} weight="bold" />
-                        Delete
+                        <Trash size={14} weight="bold" />
                       </button>
                     </div>
                   </Card>
