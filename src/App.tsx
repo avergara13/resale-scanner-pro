@@ -720,11 +720,16 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
-    // Per-operator session counter — derived from allSessions, never conflicts between devices
+    // Per-operator session counter — derived from allSessions, never conflicts between devices.
+    // Uses max(sessionNumber) across ALL sessions (including soft-deleted) to guarantee
+    // unique IDs even after deletions. Matching by operatorId handles multi-operator teams;
+    // sessions without operatorId (pre-profile or no-profile) are grouped together.
     const profile = settings?.userProfile
-    const operatorId = profile?.operatorId || 'default'
-    const operatorSessions = (allSessions || []).filter(s => !s.deletedAt && s.operatorId === operatorId)
-    const sessionNumber = operatorSessions.length + 1
+    const operatorId = profile?.operatorId
+    const operatorAllSessions = (allSessions || []).filter(s =>
+      operatorId ? s.operatorId === operatorId : !s.operatorId
+    )
+    const sessionNumber = operatorAllSessions.reduce((max, s) => Math.max(max, s.sessionNumber || 0), 0) + 1
     const initial = profile?.operatorInitial || ''
     const prefix = initial ? `${initial}-` : '#'
     const name = `${prefix}${String(sessionNumber).padStart(3, '0')}`
