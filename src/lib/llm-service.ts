@@ -253,7 +253,7 @@ export function parseResearchPrice(text: string): number {
   let m: RegExpExecArray | null
   while ((m = dollarRe.exec(text)) !== null) {
     const v = parseFloat(m[1].replace(/,/g, ''))
-    if (v >= 2 && v <= 2000) amounts.push(v)  // filter out retail-tag noise & extremely high values
+    if (v >= 2 && v <= 50000) amounts.push(v)  // filter out noise but keep high-value resale items
   }
   if (amounts.length > 0) {
     amounts.sort((a, b) => a - b)
@@ -491,17 +491,36 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
 
   // All other tasks (and Claude fallback) → Gemini Flash
   if (geminiApiKey && geminiApiKey.length >= 10) {
-    return callGemini(prompt, geminiApiKey, {
-      model: model || 'gemini-2.5-flash',
-      jsonMode,
-      maxTokens: maxTokens || (task === 'listing' ? 2048 : 1024),
-      temperature: temperature ?? (task === 'chat' ? 0.7 : 0.4),
-      systemInstruction: systemPrompt,
+    try {
+      return await callGemini(prompt, geminiApiKey, {
+        model: model || 'gemini-2.5-flash',
+        jsonMode,
+        maxTokens: maxTokens || (task === 'listing' ? 2048 : 1024),
+        temperature: temperature ?? (task === 'chat' ? 0.7 : 0.4),
+        systemInstruction: systemPrompt,
+      })
+    } catch (geminiError) {
+      // If Claude key is available and Gemini just failed, try Claude as last resort
+      if (anthropicApiKey && anthropicApiKey.length >= 10 && task !== 'complex') {
+        console.warn('[LLM] Gemini failed, falling back to Claude:', geminiError)
+        return callClaude(prompt, anthropicApiKey, {
+          model: model || 'claude-haiku-4-5-20251001',
+          maxTokens: maxTokens || 1024,
+          systemPrompt,
+        })
+      }
+      throw geminiError
+    }
+  }
+
+  // No Gemini key — try Claude directly for any task type
+  if (anthropicApiKey && anthropicApiKey.length >= 10) {
+    return callClaude(prompt, anthropicApiKey, {
+      model: model || 'claude-haiku-4-5-20251001',
+      maxTokens: maxTokens || 1024,
+      systemPrompt,
     })
   }
 
-  const tried: string[] = []
-  if (task === 'complex' && anthropicApiKey) tried.push('Claude (failed)')
-  if (!geminiApiKey || geminiApiKey.length < 10) tried.push('Gemini (no API key)')
-  throw new Error(`AI unavailable${tried.length ? ` — ${tried.join(', ')}` : ''} — configure API keys in Settings`)
+  throw new Error('AI unavailable — configure a Gemini or Claude API key in Settings')
 }

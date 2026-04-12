@@ -1,4 +1,4 @@
-import { retryFetch, aggressiveRetry } from './retry-service'
+import { retryFetch } from './retry-service'
 
 export interface GeminiVisionResponse {
   productName: string
@@ -101,7 +101,35 @@ export class GeminiService {
       })
 
       const textContent = this.extractResponseText(data)
-      const result = JSON.parse(textContent) as GeminiVisionResponse
+
+      // Gemini may return markdown-fenced JSON or malformed output —
+      // strip fences before parsing and fall back to regex extraction.
+      let result: GeminiVisionResponse
+      try {
+        const cleaned = textContent.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+        result = JSON.parse(cleaned) as GeminiVisionResponse
+      } catch {
+        // Attempt to extract key fields from the raw text as a fallback
+        console.warn('Gemini returned non-JSON vision response, attempting regex extraction')
+        const nameMatch = textContent.match(/"productName"\s*:\s*"([^"]+)"/)
+        const descMatch = textContent.match(/"description"\s*:\s*"([^"]+)"/)
+        const catMatch = textContent.match(/"category"\s*:\s*"([^"]+)"/)
+        const condMatch = textContent.match(/"condition"\s*:\s*"([^"]+)"/)
+        const brandMatch = textContent.match(/"brand"\s*:\s*"([^"]+)"/)
+        const confMatch = textContent.match(/"confidence"\s*:\s*([\d.]+)/)
+        result = {
+          productName: nameMatch?.[1] || 'Unknown Product',
+          description: descMatch?.[1] || '',
+          category: catMatch?.[1] || 'General',
+          condition: condMatch?.[1] || 'Used',
+          brand: brandMatch?.[1] || undefined,
+          model: undefined,
+          keyFeatures: [],
+          searchTerms: [],
+          confidence: confMatch ? parseFloat(confMatch[1]) : 0.3,
+          suggestedTags: [],
+        } as GeminiVisionResponse
+      }
 
       return {
         productName: result.productName || 'Unknown Product',

@@ -483,7 +483,7 @@ function App() {
                     i === 2 ? { ...s, data: `Est. market value ~$${directPrice.toFixed(2)}` } : s
                   ))
                 }
-              } catch { /* fall through to Tier 3 */ }
+              } catch (e) { console.warn('[Scan] Tier 2 LLM pricing failed:', e) }
 
               if (!gotPrice) {
                 // Tier 3: Claude deep research fallback (task: 'complex' tries Anthropic first)
@@ -504,7 +504,8 @@ function App() {
                       i === 2 ? { ...s, data: 'Market data unavailable — enter price above' } : s
                     ))
                   }
-                } catch {
+                } catch (e) {
+                  console.warn('[Scan] Tier 3 Claude research failed:', e)
                   setPipeline(prev => prev.map((s, i) =>
                     i === 2 ? { ...s, data: 'Market data unavailable — enter price above' } : s
                   ))
@@ -530,7 +531,7 @@ function App() {
                   i === 2 ? { ...s, data: `Est. value ~$${fallbackPrice.toFixed(2)} (Claude research)` } : s
                 ))
               }
-            } catch { /* both failed */ }
+            } catch (e) { console.warn('[Scan] Outer LLM fallback failed:', e) }
             if (!recovered) {
               setPipeline(prev => prev.map((s, i) =>
                 i === 2 ? { ...s, data: 'Search unavailable' } : s
@@ -699,8 +700,9 @@ function App() {
       setScreen('scan-result')
     } catch (error) {
       console.error('Pipeline error:', error)
-      setPipeline(prev => prev.map(s => ({ 
-        ...s, 
+      reset() // Clear stuck 'analyzing' captureState
+      setPipeline(prev => prev.map(s => ({
+        ...s,
         status: s.status === 'processing' ? 'error' : s.status,
         error: 'Analysis failed'
       })))
@@ -708,11 +710,12 @@ function App() {
       }
     } catch (outerError) {
       // Catch errors from optimizeAndCache or any unhandled rejection
+      reset() // Clear stuck 'analyzing' captureState
       const msg = outerError instanceof Error ? outerError.message : 'Unknown error'
       console.error('Capture failed:', msg)
       toast.error(msg.toLowerCase().includes('quota') ? 'Storage full — clearing cache and retrying. Please try again.' : `Capture failed: ${msg}`)
     }
-  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, simulateProgress, completeStep, tagSuggestionService, setScanHistory])
+  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset, simulateProgress, completeStep, tagSuggestionService, setScanHistory])
 
   const handleRemoveFromQueue = useCallback((id: string) => {
     setQueue((prev) => (prev || []).filter(item => item.id !== id))
