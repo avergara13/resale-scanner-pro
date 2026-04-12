@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
+import { logActivity, ACTIVITY_LOG_KEY, MAX_ACTIVITY_ENTRIES, type ActivityEntry } from './lib/activity-log'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BottomNav } from './components/BottomNav'
 import { AppHeader } from './components/AppHeader'
@@ -81,6 +82,7 @@ function App() {
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
   const [allTags] = useKV<ItemTag[]>('all-tags', [])
   const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
+  const [, setActivityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
   const [settings, setSettings] = useKV<AppSettings>('settings', {
     voiceEnabled: true,
     autoCapture: true,
@@ -169,7 +171,7 @@ function App() {
     setAllSessions((prev) => (prev || []).map(s =>
       s.id === sessionId ? { ...s, deletedAt: undefined } : s
     ))
-    toast.success('Session restored')
+    logActivity('Session restored')
   }, [setAllSessions])
 
   const handlePermanentDeleteSession = useCallback((sessionId: string) => {
@@ -631,7 +633,7 @@ function App() {
         })
       }
 
-      toast.success(decision === 'BUY' ? '✅ Analysis complete — it\'s a BUY!' : '❌ Analysis done — PASS')
+      logActivity(decision === 'BUY' ? '✅ Analysis complete — it\'s a BUY!' : '❌ Analysis done — PASS')
       setScreen('scan-result')
     } catch (error) {
       console.error('Pipeline error:', error)
@@ -680,7 +682,7 @@ function App() {
     setSession(newSession)
     setSelectedSessionId(id)
     setScreen('session-detail')
-    toast.success('Session started')
+    logActivity('Session started')
   }, [allSessions, setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Resume an existing open session — navigate to its detail screen
@@ -710,7 +712,7 @@ function App() {
           setAllSessions((prev) => (prev || []).map(s =>
             s.id === sessionId ? { ...s, deletedAt: undefined } : s
           ))
-          toast.success('Session restored')
+          logActivity('Session restored')
         },
       },
       duration: 10000,
@@ -743,7 +745,7 @@ function App() {
         (prev || []).map(s => s.id === session.id ? endedSession : s)
       )
       setSession(undefined)
-      toast.success('Session ended')
+      logActivity('Session ended')
     }
   }, [session, setSession, setAllSessions, setQueue])
 
@@ -876,7 +878,7 @@ function App() {
       if (result.pageId && notionService) {
         notionService.updateListingStatus(result.pageId, { status: 'published' }).catch(e => console.warn('Notion status update failed:', e))
       }
-      toast.success('Pushed to Notion ✓')
+      logActivity('Pushed to Notion ✓')
     } else {
       toast.error(`Notion error: ${result.error}`)
     }
@@ -895,7 +897,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'sold', soldPrice, soldOn, soldDate }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item marked as sold')
+    logActivity('Item marked as sold')
   }, [setQueue, queue, notionService])
 
   const loadLiveSoldItems = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -919,7 +921,7 @@ function App() {
     try {
       await updateSoldItemShipping(pageId, update)
       await loadLiveSoldItems({ silent: true })
-      toast.success('Shipping details saved')
+      logActivity('Shipping details saved')
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to save shipping details'
       toast.error(message)
@@ -936,7 +938,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'shipped', trackingNumber, shippingCarrier, shippedDate }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item marked as shipped')
+    logActivity('Item marked as shipped')
   }, [setQueue, queue, notionService])
 
   const handleMarkCompleted = useCallback((itemId: string) => {
@@ -947,7 +949,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'completed' }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Transaction completed')
+    logActivity('Transaction completed')
   }, [setQueue, queue, notionService])
 
   const handleMarkReturned = useCallback((itemId: string, reason?: string) => {
@@ -959,7 +961,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'returned', returnedDate, returnReason: reason }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item marked as returned')
+    logActivity('Item marked as returned')
   }, [setQueue, queue, notionService])
 
   const handleDelist = useCallback((itemId: string) => {
@@ -971,7 +973,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'delisted', delistedDate }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item delisted')
+    logActivity('Item delisted')
   }, [setQueue, queue, notionService])
 
   const handleRelistItem = useCallback((itemId: string) => {
@@ -997,7 +999,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'ready' }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item re-listed')
+    logActivity('Item re-listed')
   }, [setQueue, queue, notionService])
 
   const handleSaveDraft = useCallback((price: number, notes: string) => {
@@ -1022,7 +1024,7 @@ function App() {
     setCurrentItem(undefined)
     setPipeline([])
     setScreen('agent')
-    toast.success('Draft saved to queue')
+    logActivity('Draft saved to queue')
   }, [currentItem, setQueue, setScreen])
 
   const handleRescan = useCallback(() => {
@@ -1077,7 +1079,7 @@ function App() {
       return s
     }))
 
-    toast.success(`Recalculated: ${decision} — ${profitMetrics.profitMargin.toFixed(1)}% margin`)
+    logActivity(`Recalculated: ${decision} — ${profitMetrics.profitMargin.toFixed(1)}% margin`)
   }, [currentItem, settings, triggerSuccess, triggerFail])
 
   const handleCreateListingFromScan = useCallback(async (
@@ -1143,7 +1145,6 @@ function App() {
       }
       return [...current, listingItem]
     })
-    const toastId = toast.loading('Adding to queue…')
     // Optimize directly with listingItem — avoids stale queue closure read
     // (handleOptimizeItem looks up the item from queue, which hasn't committed yet)
     try {
@@ -1160,10 +1161,8 @@ function App() {
           ? { ...i, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
           : i
       ))
-      toast.dismiss(toastId)
-      toast.success('Added to queue — listing optimized')
+      logActivity('Added to queue — listing optimized')
     } catch {
-      toast.dismiss(toastId)
       toast.error('Optimization failed — item saved, edit manually in Queue')
     }
   }, [currentItem, setQueue, listingOptimizationService, settings])
@@ -1203,7 +1202,7 @@ function App() {
     setCurrentItem(undefined)
     setPipeline([])
     setScreen('agent')
-    toast.success('Passed — saved to scan history')
+    logActivity('Passed — saved to scan history')
   }, [currentItem, setQueue, setScreen])
 
   const handleMaybeFromScan = useCallback((price: number, notes: string) => {
@@ -1230,7 +1229,7 @@ function App() {
     setCurrentItem(undefined)
     setPipeline([])
     setScreen('agent')
-    toast.success('Saved as Maybe — tap in Queue to re-evaluate')
+    logActivity('Saved as Maybe — tap in Queue to re-evaluate')
   }, [currentItem, setQueue, setScreen])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
@@ -1285,13 +1284,13 @@ function App() {
     )
     
     if (unanalyzedItems.length === 0) {
-      toast.info('No quick drafts to analyze')
+      logActivity('No quick drafts to analyze', 'info')
       return
     }
 
     setIsBatchAnalyzing(true)
     setBatchProgress({ current: 0, total: unanalyzedItems.length, currentItemName: '' })
-    toast.info(`Analyzing ${unanalyzedItems.length} item${unanalyzedItems.length !== 1 ? 's' : ''}...`)
+    logActivity(`Analyzing ${unanalyzedItems.length} item${unanalyzedItems.length !== 1 ? 's' : ''}...`, 'info')
 
     let processedCount = 0
     let buyCount = 0
@@ -1460,9 +1459,9 @@ function App() {
       )
     }
     if (skippedItems.length > 0) {
-      toast.info(`${skippedItems.length} item(s) skipped (no image)`)
+      logActivity(`${skippedItems.length} item(s) skipped (no image)`, 'info')
     }
-    toast.success(`Analyzed ${processedCount} items: ${buyCount} BUY, ${passCount} PASS`)
+    logActivity(`Analyzed ${processedCount} items: ${buyCount} BUY, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
   const handleUpdateCurrentItem = useCallback((itemId: string, updates: Partial<ScannedItem>) => {
@@ -1529,7 +1528,7 @@ function App() {
             }
           : i
       ))
-      toast.success(`${platform.charAt(0).toUpperCase() + platform.slice(1)} listing generated`)
+      logActivity(`${platform.charAt(0).toUpperCase() + platform.slice(1)} listing generated`)
     } catch (error) {
       console.error('Platform listing generation failed:', error)
       toast.error(`Failed to generate ${platform} listing`)
@@ -1633,6 +1632,16 @@ function App() {
   useEffect(() => {
     setSession(undefined)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Activity log listener — persists silent activity events to KV
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const entry = (e as CustomEvent<ActivityEntry>).detail
+      setActivityLog(prev => [entry, ...(prev || []).slice(0, MAX_ACTIVITY_ENTRIES - 1)])
+    }
+    window.addEventListener('rsp:activity', handler)
+    return () => window.removeEventListener('rsp:activity', handler)
+  }, [setActivityLog])
 
   // Migrate legacy GO → BUY decision labels
   useEffect(() => {

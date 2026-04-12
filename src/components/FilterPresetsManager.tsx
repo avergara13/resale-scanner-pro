@@ -9,6 +9,7 @@ import { Badge } from './ui/badge'
 import { Slider } from './ui/slider'
 import { Switch } from './ui/switch'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import { TagManager } from './TagManager'
 import type { CategoryPreset, ItemTag, Decision } from '@/types'
 import { cn } from '@/lib/utils'
@@ -163,10 +164,10 @@ export function FilterPresetsManager({ isOpen, onClose, onApplyPreset }: FilterP
 
     if (editingPreset) {
       setPresets((prev) => (prev || []).map(p => p.id === editingPreset.id ? newPreset : p))
-      toast.success('Preset updated')
+      logActivity('Preset updated')
     } else {
       setPresets((prev) => [...(prev || []), newPreset])
-      toast.success('Preset created')
+      logActivity('Preset created')
     }
 
     resetForm()
@@ -182,17 +183,17 @@ export function FilterPresetsManager({ isOpen, onClose, onApplyPreset }: FilterP
       isDefault: false,
     }
     setPresets((prev) => [...(prev || []), duplicated])
-    toast.success('Preset duplicated')
+    logActivity('Preset duplicated')
   }
 
   const handleDeletePreset = (presetId: string) => {
     setPresets((prev) => (prev || []).filter(p => p.id !== presetId))
-    toast.success('Preset deleted')
+    logActivity('Preset deleted')
   }
 
   const handleCreateTag = (tag: ItemTag) => {
     setTags((prev) => [...(prev || []), tag])
-    toast.success('Tag created')
+    logActivity('Tag created')
   }
 
   const handleDeleteTag = (tagId: string) => {
@@ -202,7 +203,7 @@ export function FilterPresetsManager({ isOpen, onClose, onApplyPreset }: FilterP
       tags: p.tags.filter(t => t !== tagId)
     })))
     setSelectedTags(prev => prev.filter(t => t !== tagId))
-    toast.success('Tag deleted')
+    logActivity('Tag deleted')
   }
 
   const toggleDecision = (decision: Decision) => {
@@ -296,7 +297,7 @@ export function FilterPresetsManager({ isOpen, onClose, onApplyPreset }: FilterP
                       className="h-7 px-2 flex-1 text-[10px]"
                       onClick={() => {
                         onApplyPreset(preset)
-                        toast.success(`Applied preset: ${preset.name}`)
+                        logActivity(`Applied preset: ${preset.name}`)
                       }}
                     >
                       Apply
