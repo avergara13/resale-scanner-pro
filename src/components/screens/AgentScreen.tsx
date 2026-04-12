@@ -1409,7 +1409,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
             {/* Messages — pb clears the floating input bar */}
             {chatMessages.length > 0 && (
-            <div ref={pullToRefresh.containerRef} className="flex-1 overflow-y-auto px-4">
+            <div ref={pullToRefresh.containerRef} className="flex-1 min-h-0 overflow-y-auto px-4">
               <div className="py-4 space-y-4" style={{ paddingBottom: '80px' }}>
                 {chatMessages.map((msg, index) => (
                   <motion.div
