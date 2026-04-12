@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { useKV } from '@github/spark/hooks'
+import { logActivity, ACTIVITY_LOG_KEY, type ActivityEntry } from '@/lib/activity-log'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -49,6 +51,8 @@ interface SettingsScreenProps {
 
 export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
+  const [activityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
+  const recentActivity = (activityLog || []).slice(0, 50)
 
   const toggleKeyVisibility = (key: string) => {
     setShowKeys(prev => ({ ...prev, [key]: !prev[key] }))
@@ -92,7 +96,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
     }
 
     onUpdate(defaultSettings)
-    toast.success('Settings reset to defaults - API keys preserved')
+    logActivity('Settings reset to defaults - API keys preserved')
   }
 
   const hasKey = (key?: string) => key && key.length > 8
@@ -1367,6 +1371,44 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             <p className="text-xs text-t2 text-center">
               This will reset all settings and stored data
             </p>
+          </div>
+
+          {/* Recent Activity Log */}
+          <div className="rounded-2xl border border-s2 bg-fg overflow-hidden">
+            <div className="px-4 py-3 border-b border-s2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ClockCounterClockwise size={15} weight="bold" className="text-t3" />
+                <span className="text-[11px] font-bold uppercase tracking-widest text-t3">Recent Activity</span>
+              </div>
+              {recentActivity.length > 0 && (
+                <span className="text-[10px] text-t3">{recentActivity.length} events</span>
+              )}
+            </div>
+            {recentActivity.length === 0 ? (
+              <div className="px-4 py-6 text-center">
+                <p className="text-xs text-t3">No recent activity</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-s1">
+                {recentActivity.map(entry => {
+                  const ts = new Date(entry.timestamp)
+                  const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                  const dateStr = ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  return (
+                    <div key={entry.id} className="px-4 py-2.5 flex items-start gap-3">
+                      <span className={cn(
+                        'w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0',
+                        entry.type === 'error' ? 'bg-red' : entry.type === 'info' ? 'bg-b1' : 'bg-green'
+                      )} />
+                      <span className="flex-1 text-[12px] text-t2 leading-snug">{entry.message}</span>
+                      <span className="text-[10px] text-t3 flex-shrink-0 whitespace-nowrap">
+                        {dateStr} {timeStr}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

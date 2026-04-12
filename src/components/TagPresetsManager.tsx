@@ -6,6 +6,7 @@ import { Input } from './ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
 import { Badge } from './ui/badge'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import type { ItemTag } from '@/types'
 
 interface TagPreset {
@@ -287,7 +288,7 @@ export function TagPresetsManager({ onApplyPreset }: TagPresetsManagerProps) {
     }
 
     setPresets((prev) => [...(prev || []), newPreset])
-    toast.success(`Created preset: ${newPreset.name}`)
+    logActivity(`Created preset: ${newPreset.name}`)
     resetForm()
     setIsCreateOpen(false)
   }
@@ -313,7 +314,7 @@ export function TagPresetsManager({ onApplyPreset }: TagPresetsManagerProps) {
           : p
       )
     )
-    toast.success(`Updated preset: ${newPresetName}`)
+    logActivity(`Updated preset: ${newPresetName}`)
     resetForm()
     setEditingPreset(null)
   }
@@ -329,7 +330,7 @@ export function TagPresetsManager({ onApplyPreset }: TagPresetsManagerProps) {
     }
 
     setPresets((prev) => [...(prev || []), duplicatedPreset])
-    toast.success(`Duplicated preset: ${preset.name}`)
+    logActivity(`Duplicated preset: ${preset.name}`)
   }
 
   const handleDeletePreset = (presetId: string) => {
@@ -340,7 +341,7 @@ export function TagPresetsManager({ onApplyPreset }: TagPresetsManagerProps) {
     }
 
     setPresets((prev) => (prev || []).filter((p) => p.id !== presetId))
-    toast.success('Preset deleted')
+    logActivity('Preset deleted')
   }
 
   const handleEditPreset = (preset: TagPreset) => {
@@ -615,7 +616,7 @@ export function TagPresetsManager({ onApplyPreset }: TagPresetsManagerProps) {
               <Button
                 onClick={() => {
                   onApplyPreset(preset.tags)
-                  toast.success(`Applied ${preset.name} tags`)
+                  logActivity(`Applied ${preset.name} tags`)
                 }}
                 size="sm"
                 className="w-full h-8 text-[10px] font-bold"

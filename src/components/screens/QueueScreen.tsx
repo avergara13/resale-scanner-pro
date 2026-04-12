@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
@@ -211,7 +211,7 @@ function SortableItem({
                         e.stopPropagation()
                         const updatedTags = item.tags?.filter(t => t !== tagId) || []
                         onEditTags(item.id, updatedTags)
-                        toast.success(`Removed tag: ${tag.name}`)
+                        logActivity(`Removed tag: ${tag.name}`)
                       }}
                       className="flex items-center justify-center hover:opacity-70 transition-opacity p-0.5"
                       aria-label={`Remove ${tag.name} tag`}
@@ -591,13 +591,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       onRemove(id)
     })
     
-    toast.success(`Removed ${selectedIds.size} item${selectedIds.size !== 1 ? 's' : ''}`)
+    logActivity(`Removed ${selectedIds.size} item${selectedIds.size !== 1 ? 's' : ''}`)
     setSelectedIds(new Set())
   }
 
   const handleExportCSV = () => {
     if (selectedIds.size === 0) {
-      toast.error('No items selected')
       return
     }
 
@@ -630,7 +629,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     
-    toast.success(`Exported ${selectedIds.size} item${selectedIds.size !== 1 ? 's' : ''} to CSV`)
+    logActivity(`Exported ${selectedIds.size} item${selectedIds.size !== 1 ? 's' : ''} to CSV`)
   }
 
   const allFilteredSelected = filteredItems.length > 0 && selectedIds.size === filteredItems.length
@@ -646,15 +645,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         const itemText = diffAmount !== 1 ? 's' : ''
         
         if (diff > 0) {
-          toast.success(`📈 Showing ${diffAmount} more item${itemText}`, {
-            duration: 2000,
-            className: 'bg-green/10 border-green/30 text-green',
-          })
+          logActivity(`📈 Showing ${diffAmount} more item${itemText}`)
         } else {
-          toast.info(`📉 Showing ${diffAmount} fewer item${itemText}`, {
-            duration: 2000,
-            className: 'bg-amber/10 border-amber/30 text-amber',
-          })
+          logActivity(`📉 Showing ${diffAmount} fewer item${itemText}`, 'info')
         }
       }
     }
@@ -1284,7 +1277,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                                       e.stopPropagation()
                                       const updatedTags = item.tags?.filter(t => t !== tagId) || []
                                       onEdit(item.id, { tags: updatedTags })
-                                      toast.success(`Removed tag: ${tag.name}`)
+                                      logActivity(`Removed tag: ${tag.name}`)
                                     }}
                                     className="flex items-center justify-center hover:opacity-70 transition-opacity"
                                     aria-label={`Remove ${tag.name} tag`}

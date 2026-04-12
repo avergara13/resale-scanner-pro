@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
 import type { Session, ScannedItem, ThriftStoreLocation } from '@/types'
 
@@ -72,7 +72,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     const trimmed = editName.trim()
     if (trimmed) {
       updateSession({ name: trimmed })
-      toast.success('Session name updated')
+      logActivity('Session name updated')
     }
     setEditingName(false)
   }, [editName, updateSession])
@@ -87,7 +87,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
         type: editLocationType,
       }
       updateSession({ location })
-      toast.success('Location updated')
+      logActivity('Location updated')
     }
     setEditingLocation(false)
   }, [editLocationName, editLocationAddress, editLocationType, session, updateSession])
@@ -96,7 +96,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     const amount = parseFloat(editGoalAmount)
     if (amount > 0) {
       updateSession({ profitGoal: amount })
-      toast.success('Profit goal updated')
+      logActivity('Profit goal updated')
     }
     setEditingGoal(false)
   }, [editGoalAmount, updateSession])
@@ -131,7 +131,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   const [geoLoading, setGeoLoading] = useState(false)
   const handleAutoLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      toast.error('Location not supported on this device')
+      logActivity('Location not supported on this device', 'info')
       return
     }
     setGeoLoading(true)
@@ -140,13 +140,13 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
         setGeoLoading(false)
         setEditLocationAddress(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`)
         setEditingLocation(true)
-        toast.success('Location detected — pick a store')
+        logActivity('Location detected — pick a store')
       },
       () => {
         setGeoLoading(false)
         // Fallback: just open the location editor
         startEditLocation()
-        toast.info('Could not detect location — enter manually')
+        logActivity('Could not detect location — enter manually', 'info')
       },
       { enableHighAccuracy: true, timeout: 8000 }
     )
@@ -239,7 +239,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                   onClick={() => {
                     const next = session.sessionType === 'personal' ? 'business' : 'personal'
                     updateSession({ sessionType: next })
-                    toast.success(next === 'personal' ? '👤 Personal session' : '💼 Business session')
+                    logActivity(next === 'personal' ? '👤 Personal session' : '💼 Business session')
                   }}
                   aria-label={`Toggle to ${session.sessionType === 'personal' ? 'business' : 'personal'}`}
                   className={cn(

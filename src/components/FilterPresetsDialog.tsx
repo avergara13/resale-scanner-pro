@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import { useFilterPresets, type FilterPreset } from '@/hooks/use-filter-presets'
 import type { AdvancedFilterOptions } from './AdvancedFilters'
 import { cn } from '@/lib/utils'
@@ -53,7 +54,7 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
     }
 
     savePreset(newPresetName.trim(), currentFilters)
-    toast.success(`Preset "${newPresetName.trim()}" saved`)
+    logActivity(`Preset "${newPresetName.trim()}" saved`)
     setNewPresetName('')
   }
 
@@ -62,13 +63,13 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
     if (filters) {
       onApplyPreset(filters)
       setIsOpen(false)
-      toast.success('Preset applied')
+      logActivity('Preset applied')
     }
   }
 
   const handleDeletePreset = (id: string, name: string) => {
     deletePreset(id)
-    toast.success(`Preset "${name}" deleted`)
+    logActivity(`Preset "${name}" deleted`)
   }
 
   const handleStartEdit = (preset: FilterPreset) => {
@@ -81,7 +82,7 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
       renamePreset(editingId, editingName.trim())
       setEditingId(null)
       setEditingName('')
-      toast.success('Preset renamed')
+      logActivity('Preset renamed')
     }
   }
 
@@ -93,7 +94,7 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
   const handleDuplicatePreset = (preset: FilterPreset) => {
     const newPreset = duplicatePreset(preset.id)
     if (newPreset) {
-      toast.success(`Preset "${preset.name}" duplicated`)
+      logActivity(`Preset "${preset.name}" duplicated`)
     }
   }
 
@@ -101,7 +102,7 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
     setCustomizingId(preset.id)
     onApplyPreset(preset.filters)
     setIsOpen(false)
-    toast.info(`Customize "${preset.name}" and save as new preset`)
+    logActivity(`Customize "${preset.name}" and save as new preset`, 'info')
   }
 
   const getFilterSummary = (filters: AdvancedFilterOptions): string[] => {

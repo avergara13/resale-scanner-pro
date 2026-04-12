@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
 import { createPirateShipUrl } from '@/lib/shipping-rate-service'
 import { recommendShipping, analyzeSoldBatch } from '@/lib/shipping-intelligence'
@@ -176,7 +177,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
         itemWeightLbs: draft.itemWeightLbs || undefined,
         packageDims: draft.packageDims || undefined,
       } : m))
-      toast.success('Manual sale updated locally')
+      logActivity('Manual sale updated locally')
       return
     }
 
@@ -415,12 +416,12 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                       if (item.isManualEntry) {
                         const manualId = item.salePageId.replace(/^manual-/, '')
                         setManualSales(prev => (prev || []).map(m => m.id === manualId ? { ...m, shippingStatus: '✅ Shipped' as SoldShippingStatus } : m))
-                        toast.success('Shipped!')
+                        logActivity('Shipped!')
                       } else {
                         setSavingItemId(item.salePageId)
                         try {
                           await onUpdateShipping(item.salePageId, { shippingStatus: '✅ Shipped' })
-                          toast.success('Marked as shipped!')
+                          logActivity('Marked as shipped!')
                         } finally {
                           setSavingItemId(null)
                         }
@@ -547,7 +548,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                           onClick={() => {
                             const manualId = item.salePageId.replace(/^manual-/, '')
                             setManualSales(prev => (prev || []).filter(m => m.id !== manualId))
-                            toast.success('Manual sale removed')
+                            logActivity('Manual sale removed')
                           }}
                         >
                           <X size={12} />
@@ -568,7 +569,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
         onClose={() => setShowManualDialog(false)}
         onSave={(entry) => {
           setManualSales(prev => [...(prev || []), entry])
-          toast.success('Sale logged locally')
+          logActivity('Sale logged locally')
           setShowManualDialog(false)
         }}
       />

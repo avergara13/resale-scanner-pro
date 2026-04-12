@@ -11,6 +11,7 @@ import {
 } from './ui/dialog'
 import { ScrollArea } from './ui/scroll-area'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import type { ItemTag } from '@/types'
 
 interface BulkTagOperationsProps {
@@ -80,7 +81,7 @@ export function BulkTagOperations({
     }
 
     onApplyTags(Array.from(selectedTagsToApply))
-    toast.success(
+    logActivity(
       `Applied ${selectedTagsToApply.size} tag${selectedTagsToApply.size !== 1 ? 's' : ''} to ${selectedCount} item${selectedCount !== 1 ? 's' : ''}`
     )
     setSelectedTagsToApply(new Set())
@@ -94,7 +95,7 @@ export function BulkTagOperations({
     }
 
     onRemoveTags(Array.from(selectedTagsToRemove))
-    toast.success(
+    logActivity(
       `Removed ${selectedTagsToRemove.size} tag${selectedTagsToRemove.size !== 1 ? 's' : ''} from ${selectedCount} item${selectedCount !== 1 ? 's' : ''}`
     )
     setSelectedTagsToRemove(new Set())
@@ -116,7 +117,7 @@ export function BulkTagOperations({
     }
 
     onCreateTag(newTag)
-    toast.success(`Created tag: ${newTagName}`)
+    logActivity(`Created tag: ${newTagName}`)
     setNewTagName('')
     setSelectedColor(DEFAULT_TAG_COLORS[0])
     setIsCreatingTag(false)
