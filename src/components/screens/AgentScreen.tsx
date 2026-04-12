@@ -1581,7 +1581,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                 return (
                   <Card
                     key={item.id}
-                    className="bg-fg border-s2 flex flex-col gap-0 overflow-hidden"
+                    className="border-s2/60 flex flex-col gap-0 overflow-hidden"
+                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
                   >
                     {/* ── Info row ── */}
                     <div className="p-3 flex gap-3 items-start">
@@ -1589,7 +1590,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                         <img
                           src={item.imageThumbnail || item.imageData}
                           alt={item.productName || 'Item'}
-                          className="w-14 h-14 rounded-lg object-cover border border-s2 flex-shrink-0"
+                          className="w-14 h-14 rounded-xl object-cover border border-s2/60 flex-shrink-0"
                         />
                       )}
                       <div className="flex-1 min-w-0 space-y-1">
@@ -1627,7 +1628,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                     </div>
 
                     {/* ── Action row ── */}
-                    <div className="border-t border-s2 flex items-center">
+                    <div className="border-t border-s2/60 flex items-center">
                       {/* Reopen — go back to scan analysis */}
                       <button
                         onClick={() => onOpenScanItem?.(item)}
@@ -1647,8 +1648,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
                       ) : (
                         <button
                           onClick={() => handlePromoteToQueue(item)}
-                          className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-green hover:bg-green/90 active:opacity-80 transition-colors"
-                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                          className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-none"
+                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                         >
                           <ShoppingCart size={13} weight="bold" />
                           Add to Queue
