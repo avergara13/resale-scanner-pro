@@ -113,8 +113,8 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
         {rightItems.map((item) => {
           const Icon = item.icon
           const isActive = currentScreen === item.id
-          // In sessionMode, all right-side tabs (Listings, Sold) are disabled
-          const isDisabled = sessionMode
+          // In sessionMode, Listings is disabled (session-scoped); Sold is always available (cross-session)
+          const isDisabled = sessionMode && item.id !== 'sold'
 
           return (
             <button
