@@ -417,7 +417,10 @@ export function AIScreen({
               {/* ── 1. Quick Summary — only when we have real pricing data ── */}
               {hasDecision && currentItem && hasPriceData && (
                 <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
-                  <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
+                  <Card
+                    className="mt-3 sm:mt-4 p-3 sm:p-4 border-s2/60 overflow-hidden"
+                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+                  >
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
@@ -438,19 +441,22 @@ export function AIScreen({
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
-                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
+                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
                           <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Buy Price</p>
                           <p className="text-base sm:text-lg font-mono font-bold text-t1">
                             ${currentItem.purchasePrice.toFixed(2)}
                           </p>
                         </div>
-                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
+                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
                           <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Sell Price</p>
                           <p className="text-base sm:text-lg font-mono font-bold text-t1">
                             ${currentItem.estimatedSellPrice?.toFixed(2) || '--'}
                           </p>
                         </div>
-                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
+                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
                           <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
                           <p
                             className={cn(
@@ -465,7 +471,8 @@ export function AIScreen({
                             {currentItem.profitMargin?.toFixed(1) || '--'}%
                           </p>
                         </div>
-                        <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
+                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
+                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
                           <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
                           <p className="text-base sm:text-lg font-mono font-bold text-t1">
                             {currentItem.profitMargin != null && currentItem.estimatedSellPrice
@@ -482,7 +489,10 @@ export function AIScreen({
               {/* ── 2. Listing draft form — always visible once pipeline is done ── */}
               {pipelineComplete && !listingAdded && (
                 <Collapsible open={formOpen} onOpenChange={setFormOpen}>
-                  <Card className="mt-3 p-3 sm:p-4 bg-fg border-s2">
+                  <Card
+                    className="mt-3 p-3 sm:p-4 border-s2/60"
+                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+                  >
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
@@ -738,7 +748,10 @@ export function AIScreen({
               {/* ── 3. Photos — collapsible multi-photo strip ── */}
               {(currentItem?.imageData || currentItem?.imageThumbnail) && (
                 <Collapsible open={imageOpen} onOpenChange={setImageOpen}>
-                  <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
+                  <Card
+                    className="mt-3 sm:mt-4 p-3 sm:p-4 border-s2/60 overflow-hidden"
+                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+                  >
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
