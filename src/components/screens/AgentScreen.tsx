@@ -227,7 +227,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>(chatKey, EMPTY_CHAT_SESSIONS)
   const [activeSessionId, setActiveSessionId] = useKV<string | null>(activeKey, null)
   const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', EMPTY_TODOS)
-  const [activeTab, setActiveTab] = useState<'chat' | 'scans' | 'tasks'>('chat')
+  const [activeTab, setActiveTab] = useKV<'chat' | 'scans' | 'tasks'>('agent-active-tab', 'chat')
   const [viewMode, setViewMode] = useState<'list' | 'chat'>('list')
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
