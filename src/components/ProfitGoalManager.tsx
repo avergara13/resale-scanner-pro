@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
 import type { ProfitGoal, ProfitGoalProgress, Session, ScannedItem } from '@/types'
 
@@ -117,14 +118,14 @@ export function ProfitGoalManager({ sessions = [], items = [] }: ProfitGoalManag
       return [...deactivatedGoals, goal]
     })
 
-    toast.success('Profit goal created!')
+    logActivity('Profit goal created!')
     setIsDialogOpen(false)
     setNewGoal({ type: 'daily', targetAmount: '', customDays: '7' })
   }
 
   const handleDeleteGoal = (goalId: string) => {
     setGoals((prev) => (prev || []).filter(g => g.id !== goalId))
-    toast.success('Goal removed')
+    logActivity('Goal removed')
   }
 
   const activeGoals = (goals || []).filter(g => {

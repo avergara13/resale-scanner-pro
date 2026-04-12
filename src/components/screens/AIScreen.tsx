@@ -347,38 +347,14 @@ export function AIScreen({
       {/* ── Scrollable content ── */}
       <div className="flex-1 overflow-y-auto" ref={pullToRefresh.containerRef}>
         <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-6">
-          {pipeline.length === 0 ? (
-            /* Empty / waiting state */
-            <div className="space-y-4 sm:space-y-6">
-              <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-3 sm:mb-4">
-                  <Scan size={32} strokeWidth={1.5} className="text-b1 sm:w-10 sm:h-10" />
-                </div>
-                <h3 className="text-base sm:text-lg font-bold text-t1 mb-1.5 sm:mb-2">Ready to Scan</h3>
-                <p className="text-xs sm:text-sm text-t3 max-w-xs mb-4">
-                  Tap the camera button to scan an item and start AI analysis
-                </p>
-                {onOpenCamera && (
-                  <button
-                    onClick={onOpenCamera}
-                    className="flex items-center gap-2 px-5 py-3 bg-b1 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform"
-                  >
-                    <Scan size={16} weight="bold" />
-                    Scan an Item
-                  </button>
-                )}
-              </div>
-              <div className="px-2 sm:px-4">
-                <ApiStatusIndicator settings={settings} />
-              </div>
-            </div>
-          ) : (
-            /* Pipeline in progress or complete */
+          {(!currentItem && pipeline.length === 0) ? null : (
+            /* Scan result — shown as soon as currentItem exists OR pipeline is running */
             <div className="space-y-3 sm:space-y-4">
-              <PipelinePanel steps={pipeline} />
+              {/* Pipeline steps — only visible during an active scan */}
+              {pipeline.length > 0 && <PipelinePanel steps={pipeline} />}
 
               {/* Market velocity "still searching" banner */}
-              {isPipelineRunning && (() => {
+              {pipeline.length > 0 && isPipelineRunning && (() => {
                 const marketStep = pipeline.find(p => p.id === 'market')
                 const isMarketStuck =
                   marketStep?.status === 'processing' && (marketStep.progress ?? 0) >= 90

@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
 import { getNetProfit } from '@/lib/profit-utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
@@ -307,7 +308,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       if (current.some(i => i.id === queueItem.id)) return current
       return [...current, queueItem]
     })
-    toast.success(`${item.productName || 'Item'} added to queue`)
+    logActivity(`${item.productName || 'Item'} added to queue`)
   }, [setQueueKV])
 
   const prevMessageCount = useRef(chatMessages.length)
@@ -580,7 +581,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         }
 
         addMsg(`🏁 **Pipeline complete!** Check your Queue to review results. You can manually edit any listing before final publishing.`)
-        toast.success('Full pipeline complete')
+        logActivity('Full pipeline complete')
         setIsProcessing(false)
         return
       }
@@ -644,7 +645,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
           )
         )
         
-        toast.success(`Optimized ${buyItems.length} listings`)
+        logActivity(`Optimized ${buyItems.length} listings`)
         setIsProcessing(false)
         return
       }
@@ -714,7 +715,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
           )
         )
         
-        toast.success(`Pushed ${successCount} listings to Notion`)
+        logActivity(`Pushed ${successCount} listings to Notion`)
         setIsProcessing(false)
         return
       }

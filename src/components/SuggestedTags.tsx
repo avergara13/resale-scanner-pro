@@ -3,7 +3,7 @@ import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import { motion, AnimatePresence } from 'framer-motion'
-import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import type { TagSuggestion } from '@/lib/tag-suggestion-service'
 
 interface SuggestedTagsProps {
@@ -21,24 +21,19 @@ export function SuggestedTags({ suggestions, onApply, onApplyTag, appliedTags = 
 
   const handleApplyAll = () => {
     if (allApplied) {
-      toast.info('All tags already applied')
+      logActivity('All tags already applied', 'info')
       return
     }
     onApply(unappliedSuggestions.map(s => s.tag.id))
-    toast.success(`Applied ${unappliedSuggestions.length} tag${unappliedSuggestions.length !== 1 ? 's' : ''}`, {
-      icon: <CheckCircle size={16} weight="fill" className="text-green" />
-    })
+    logActivity(`Applied ${unappliedSuggestions.length} tag${unappliedSuggestions.length !== 1 ? 's' : ''}`)
   }
 
   const handleApplyTag = (suggestion: TagSuggestion) => {
     const isApplied = appliedTags.includes(suggestion.tag.id)
     onApplyTag(suggestion.tag.id)
-    
+
     if (!isApplied) {
-      toast.success(`Applied "${suggestion.tag.name}"`, {
-        icon: <Tag size={16} weight="fill" className="text-[var(--b1)]" />,
-        description: suggestion.reason
-      })
+      logActivity(`Applied "${suggestion.tag.name}"`)
     }
   }
 

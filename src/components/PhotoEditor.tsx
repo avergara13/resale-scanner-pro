@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { photoEditorService } from '@/lib/photo-editor-service'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import type { GeminiService } from '@/lib/gemini-service'
 
 interface PhotoEditorProps {
@@ -62,7 +63,7 @@ export function PhotoEditor({ imageData, onSave, onCancel, geminiService }: Phot
         filter: selectedFilter,
       })
       setPreview(edited)
-      toast.success('Filters applied')
+      logActivity('Filters applied')
     } catch (error) {
       console.error('Photo edit error:', error)
       toast.error('Failed to apply filters')
@@ -81,7 +82,7 @@ export function PhotoEditor({ imageData, onSave, onCancel, geminiService }: Phot
       setSaturation(1.15)
       setSharpness(0.3)
       setSelectedFilter('clean')
-      toast.success('Optimized for eBay')
+      logActivity('Optimized for eBay')
     } catch (error) {
       console.error('Optimization error:', error)
       toast.error('Optimization failed')
@@ -99,7 +100,7 @@ export function PhotoEditor({ imageData, onSave, onCancel, geminiService }: Phot
       setContrast(10)
       setSaturation(1.1)
       setSharpness(0.2)
-      toast.success('Auto-enhanced')
+      logActivity('Auto-enhanced')
     } catch (error) {
       console.error('Auto-enhance error:', error)
       toast.error('Auto-enhance failed')
@@ -113,7 +114,7 @@ export function PhotoEditor({ imageData, onSave, onCancel, geminiService }: Phot
     try {
       const cropped = await photoEditorService.cropToSquare(imageData)
       setPreview(cropped)
-      toast.success('Cropped to square')
+      logActivity('Cropped to square')
     } catch (error) {
       console.error('Crop error:', error)
       toast.error('Crop failed')
@@ -126,11 +127,11 @@ export function PhotoEditor({ imageData, onSave, onCancel, geminiService }: Phot
     setIsProcessing(true)
     try {
       if (!geminiService) {
-        toast.info('Using basic background removal. Configure Gemini API for AI-powered removal.')
+        logActivity('Using basic background removal. Configure Gemini API for AI-powered removal.', 'info')
       }
       const removed = await photoEditorService.removeBackground(preview, geminiService || null, bgRemovalMode)
       setPreview(removed)
-      toast.success('Background removed')
+      logActivity('Background removed')
     } catch (error) {
       console.error('Background removal error:', error)
       toast.error('Background removal failed')
@@ -176,7 +177,7 @@ export function PhotoEditor({ imageData, onSave, onCancel, geminiService }: Phot
     setFlipV(false)
     setSelectedFilter('none')
     setPreview(imageData)
-    toast.info('Reset to original')
+    logActivity('Reset to original', 'info')
   }
 
   const handleSave = () => {
