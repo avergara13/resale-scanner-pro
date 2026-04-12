@@ -111,6 +111,9 @@ function SortableItem({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    background: 'color-mix(in oklch, var(--fg) 88%, transparent)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
   }
 
   return (
@@ -119,8 +122,8 @@ function SortableItem({
       style={style}
       className={cn(
         // Reset Card defaults (gap-6, py-6, bg-card) and apply scan-card DNA
-        "border overflow-hidden flex flex-col gap-0 p-0 py-0 bg-fg transition-colors",
-        isSelected ? 'border-b1' : 'border-s2'
+        "border overflow-hidden flex flex-col gap-0 p-0 py-0 transition-colors",
+        isSelected ? 'border-b1' : 'border-s2/60'
       )}
     >
       {/* ── Info row ── */}
@@ -156,10 +159,10 @@ function SortableItem({
           <img
             src={item.imageThumbnail || item.imageData}
             alt={item.productName || 'Item'}
-            className="w-14 h-14 object-cover object-center rounded-lg border border-s2 flex-shrink-0 self-start"
+            className="w-14 h-14 object-cover object-center rounded-xl border border-s2/60 flex-shrink-0 self-start"
           />
         ) : (
-          <div className="w-14 h-14 rounded-lg border border-s2 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-xl border border-s2/60 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
             <Package size={20} weight="duotone" className="text-s3" />
           </div>
         )}
@@ -260,7 +263,7 @@ function SortableItem({
 
       {/* ── Action bar — same pattern as scan cards, queue-specific CTAs ── */}
       <div className={cn(
-        "border-t border-s2 flex items-center",
+        "border-t border-s2/60 flex items-center",
         isSelected && "bg-accent-3/10"
       )}>
         {/* Edit */}
@@ -313,8 +316,8 @@ function SortableItem({
             <button
               onClick={() => onOpenSoldDialog(item)}
               aria-label="Mark as sold"
-              className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-green hover:bg-green/90 active:opacity-80 transition-colors"
-              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-none"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
             >
               Sold
             </button>
@@ -356,8 +359,8 @@ function SortableItem({
           <button
             onClick={() => onBuyItem(item.id)}
             aria-label="Buy this item"
-            className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-green hover:bg-green/90 active:opacity-80 transition-colors"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-none"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
           >
             Buy ✅
           </button>
@@ -382,7 +385,7 @@ function SortableItem({
       </div>
       {/* Delete confirmation row — only visible after tapping ⋮ */}
       {confirmDelete && (
-        <div className="px-3 pb-3 pt-2 border-t border-s2 flex items-center justify-between gap-2">
+        <div className="px-3 pb-3 pt-2 border-t border-s2/60 flex items-center justify-between gap-2">
           <p className="text-[10px] text-t3 leading-tight">Remove this item from your queue?</p>
           <div className="flex gap-2 shrink-0">
             <button
@@ -919,7 +922,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
             </div>
             <div className="flex gap-2 pt-1">
               <Button
-                className="flex-1 bg-green hover:bg-green/90 text-white h-10"
+                className="flex-1 text-white h-10 font-bold active:scale-[0.98] transition-all"
+                style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                 onClick={() => {
                   if (soldDialogItemId && onMarkAsSold) {
                     const price = parseFloat(soldPrice) || 0
@@ -1403,7 +1407,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                               size="sm"
                               onClick={() => onBuyItem(item.id)}
                               aria-label="Buy this item"
-                              className="flex-1 bg-green hover:opacity-90 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
+                              className="flex-1 text-white h-7 md:h-8 text-[11px] md:text-xs font-bold active:scale-[0.98] transition-all"
+                              style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                             >
                               Buy ✅
                             </Button>

@@ -34,7 +34,10 @@ function PastSessionCard({
   const startDate = new Date(session.startTime)
 
   return (
-    <Card className="border-s2 overflow-hidden">
+    <Card
+      className="border-s2/60 overflow-hidden"
+      style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+    >
       <button onClick={() => setExpanded(!expanded)} className="w-full p-3 text-left active:bg-s1/50 transition-colors">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -73,22 +76,22 @@ function PastSessionCard({
       </button>
 
       {expanded && (
-        <div className="border-t border-s2 px-3 py-2 space-y-2">
+        <div className="border-t border-s2/60 px-3 py-2 space-y-2">
           {/* Micro-analytics */}
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="p-2 bg-s1 rounded-lg">
+            <div className="p-2 rounded-lg border border-s2/40" style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}>
               <p className="text-[9px] text-t3 uppercase">Avg Profit</p>
               <p className="text-xs font-bold text-t1 font-mono">
                 ${buyCount > 0 ? (totalProfit / buyCount).toFixed(2) : '0.00'}
               </p>
             </div>
-            <div className="p-2 bg-s1 rounded-lg">
+            <div className="p-2 rounded-lg border border-s2/40" style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}>
               <p className="text-[9px] text-t3 uppercase">Revenue</p>
               <p className="text-xs font-bold text-t1 font-mono">
                 ${items.filter(i => i.decision === 'BUY').reduce((s, i) => s + (i.estimatedSellPrice || 0), 0).toFixed(2)}
               </p>
             </div>
-            <div className="p-2 bg-s1 rounded-lg">
+            <div className="p-2 rounded-lg border border-s2/40" style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}>
               <p className="text-[9px] text-t3 uppercase">BUY Rate</p>
               <p className="text-xs font-bold text-b1">{buyRate}%</p>
             </div>
@@ -105,7 +108,7 @@ function PastSessionCard({
           {items.length > 0 && (
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {items.map(item => (
-                <div key={item.id} className="flex items-center justify-between py-1.5 px-2 bg-bg rounded text-[10px]">
+                <div key={item.id} className="flex items-center justify-between py-1.5 px-2 rounded text-[10px]" style={{ background: 'color-mix(in oklch, var(--bg) 90%, transparent)' }}>
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <Badge variant="secondary" className={`text-[8px] px-1 py-0 flex-shrink-0 ${item.decision === 'BUY' ? 'bg-green/10 text-green' : item.decision === 'PASS' ? 'bg-red/10 text-red' : 'bg-amber/10 text-amber'}`}>
                       {item.decision}

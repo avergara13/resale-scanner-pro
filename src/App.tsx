@@ -1069,15 +1069,17 @@ function App() {
   }, [currentItem, setQueue, setScreen])
 
   const handleReanalyzeCurrentItem = useCallback(() => {
-    if (!currentItem?.imageData) {
-      // Full image not in memory (e.g. reopened from scan history) — open camera for new photo
-      setCameraOpen(true)
+    // Use the best available image — full base64 first, then optimized/thumbnail fallbacks.
+    // Re-analyze NEVER opens the camera; that's the camera button's job.
+    const imageToUse = currentItem?.imageData || currentItem?.imageOptimized || currentItem?.imageThumbnail
+    if (!imageToUse || !currentItem) {
+      toast.error('No image in memory to re-analyze. Use the camera button to add a new photo.')
       return
     }
     // Re-run the full AI pipeline on the existing photo, preserving the item ID.
     // This lets the user retry a failed scan or get a second opinion without creating a duplicate card.
     handleCapture(
-      currentItem.imageData,
+      imageToUse,
       currentItem.purchasePrice,
       currentItem.location,
       undefined,
