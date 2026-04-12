@@ -1725,6 +1725,15 @@ function App() {
     return () => clearTimeout(timer)
   }, [screen])
 
+  // Guard: if scan-result is shown with no item (e.g. deep-link or state cleared),
+  // redirect to agent. Must be an effect — not inline in JSX — to avoid
+  // calling setScreen during render (React render purity violation).
+  useEffect(() => {
+    if (screen === 'scan-result' && !currentItem) {
+      setScreen('agent')
+    }
+  }, [screen, currentItem])
+
   return (
     <div 
       id="app-container" 
@@ -1839,7 +1848,6 @@ function App() {
               />
             </motion.div>
           )}
-          {screen === 'scan-result' && !currentItem && (() => { setScreen('agent'); return null })()}
           {screen === 'scan-result' && currentItem && (
             <motion.div
               key="scan-result"
@@ -1953,7 +1961,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0 overflow-hidden"
             >
               <SettingsScreen
                 settings={settings}
