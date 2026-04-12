@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { logActivity, ACTIVITY_LOG_KEY, type ActivityEntry } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
@@ -32,7 +32,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target, ArrowCounterClockwise } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target, ArrowCounterClockwise, Bug } from '@phosphor-icons/react'
+import { DEBUG_LOG_KEY, type DebugEntry, type DebugLevel } from '@/lib/debug-log'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
 import { IncidentLogViewer } from '../IncidentLogViewer'
@@ -53,6 +54,19 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
   const [activityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
   const recentActivity = (activityLog || []).slice(0, 50)
+
+  // Debug console state
+  const [activityTab, setActivityTab] = useState<'activity' | 'debug'>('activity')
+  const [debugFilter, setDebugFilter] = useState<DebugLevel | null>(null)
+  const [debugLog, setDebugLog] = useKV<DebugEntry[]>(DEBUG_LOG_KEY, [])
+  const filteredDebugEntries = useMemo(() =>
+    (debugLog || [])
+      .filter(e => !debugFilter || e.level === debugFilter)
+      .slice(0, 100),
+    [debugLog, debugFilter]
+  )
+  const debugErrors = (debugLog || []).filter(e => e.level === 'error').length
+  const clearDebugLog = useCallback(() => setDebugLog([]), [setDebugLog])
 
   const toggleKeyVisibility = (key: string) => {
     setShowKeys(prev => ({ ...prev, [key]: !prev[key] }))
@@ -174,7 +188,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
       <div className="flex-1 px-3 py-4">
         <div className="space-y-3 pb-24 w-full max-w-full">
-          <Accordion type="multiple" defaultValue={['connections']} className="space-y-3">
+          <Accordion type="multiple" defaultValue={[]} className="space-y-3">
 
             {/* ════════════════════════════════════════════════════════
                 SECTION 1 — CONNECTIONS (API Keys & Integrations)
@@ -886,7 +900,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   </p>
                 </div>
 
-                <Accordion type="multiple" defaultValue={['health']} className="space-y-2">
+                <Accordion type="multiple" defaultValue={[]} className="space-y-2">
 
                   {/* Health */}
                   <AccordionItem value="health" className="border border-green/20 rounded-lg px-3 bg-fg">
@@ -1057,40 +1071,137 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             </p>
           </div>
 
-          {/* ── Recent Activity Log ── */}
+          {/* ── Activity + Debug Console ── */}
           <div className="rounded-2xl border border-s2 bg-fg overflow-hidden">
-            <div className="px-4 py-3 border-b border-s2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ClockCounterClockwise size={15} weight="bold" className="text-t3" />
-                <span className="text-[11px] font-bold uppercase tracking-widest text-t3">Recent Activity</span>
-              </div>
-              {recentActivity.length > 0 && (
-                <span className="text-[10px] text-t3">{recentActivity.length} events</span>
-              )}
+            {/* Tab bar */}
+            <div className="flex border-b border-s2">
+              <button
+                onClick={() => setActivityTab('activity')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-colors',
+                  activityTab === 'activity' ? 'text-t1 border-b-2 border-b1' : 'text-t3 hover:text-t2'
+                )}
+              >
+                <ClockCounterClockwise size={13} weight="bold" />
+                Activity
+              </button>
+              <button
+                onClick={() => setActivityTab('debug')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-colors',
+                  activityTab === 'debug' ? 'text-t1 border-b-2 border-red' : 'text-t3 hover:text-t2'
+                )}
+              >
+                <Bug size={13} weight="bold" />
+                Debug
+                {debugErrors > 0 && (
+                  <span className="text-[9px] font-bold bg-red/10 text-red border border-red/20 rounded px-1">{debugErrors}</span>
+                )}
+              </button>
             </div>
-            {recentActivity.length === 0 ? (
-              <div className="px-4 py-6 text-center">
-                <p className="text-xs text-t3">No recent activity</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-s1">
-                {recentActivity.map(entry => {
-                  const ts = new Date(entry.timestamp)
-                  const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-                  const dateStr = ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  return (
-                    <div key={entry.id} className="px-4 py-2.5 flex items-start gap-3">
-                      <span className={cn(
-                        'w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0',
-                        entry.type === 'error' ? 'bg-red' : entry.type === 'info' ? 'bg-b1' : 'bg-green'
-                      )} />
-                      <span className="flex-1 text-[12px] text-t2 leading-snug">{entry.message}</span>
-                      <span className="text-[10px] text-t3 flex-shrink-0 whitespace-nowrap">
-                        {dateStr} {timeStr}
-                      </span>
-                    </div>
-                  )
-                })}
+
+            {/* Activity tab */}
+            {activityTab === 'activity' && (
+              <>
+                <div className="px-4 py-3 border-b border-s2 flex items-center justify-between">
+                  {recentActivity.length > 0 && (
+                    <span className="text-[10px] text-t3">{recentActivity.length} events</span>
+                  )}
+                </div>
+                {recentActivity.length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-xs text-t3">No recent activity</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-s1">
+                    {recentActivity.map(entry => {
+                      const ts = new Date(entry.timestamp)
+                      const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                      const dateStr = ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                      return (
+                        <div key={entry.id} className="px-4 py-2.5 flex items-start gap-3">
+                          <span className={cn(
+                            'w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0',
+                            entry.type === 'error' ? 'bg-red' : entry.type === 'info' ? 'bg-b1' : 'bg-green'
+                          )} />
+                          <span className="flex-1 text-[12px] text-t2 leading-snug">{entry.message}</span>
+                          <span className="text-[10px] text-t3 flex-shrink-0 whitespace-nowrap">
+                            {dateStr} {timeStr}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Debug Console tab */}
+            {activityTab === 'debug' && (
+              <div>
+                {/* Toolbar */}
+                <div className="px-3 py-2 border-b border-s2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    {(['error', 'warn', 'info', 'debug'] as DebugLevel[]).map(lvl => (
+                      <button
+                        key={lvl}
+                        onClick={() => setDebugFilter(f => f === lvl ? null : lvl)}
+                        className={cn(
+                          'text-[9px] font-bold px-1.5 py-0.5 rounded border transition-all',
+                          debugFilter === lvl
+                            ? lvl === 'error' ? 'bg-red/15 text-red border-red/30'
+                              : lvl === 'warn' ? 'bg-amber/15 text-amber border-amber/30'
+                              : 'bg-b1/15 text-b1 border-b1/30'
+                            : 'bg-s1 text-t3 border-s2'
+                        )}
+                      >
+                        {lvl.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={clearDebugLog}
+                    className="text-[9px] text-t3 hover:text-red transition-colors font-bold"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                {/* Entries */}
+                {filteredDebugEntries.length === 0 ? (
+                  <div className="px-4 py-8 text-center">
+                    <Bug size={28} weight="duotone" className="text-t3 mx-auto mb-2" />
+                    <p className="text-xs font-bold text-t2 mb-1">Debug Console Ready</p>
+                    <p className="text-[10px] text-t3 max-w-[200px] mx-auto">
+                      Errors, API calls, and state events will appear here when wired up
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-s1 max-h-64 overflow-y-auto font-mono">
+                    {filteredDebugEntries.map(entry => (
+                      <div key={entry.id} className="px-3 py-2 flex items-start gap-2">
+                        <span className={cn(
+                          'text-[9px] font-bold flex-shrink-0 px-1 rounded mt-0.5',
+                          entry.level === 'error' ? 'bg-red/10 text-red' :
+                          entry.level === 'warn' ? 'bg-amber/10 text-amber' :
+                          entry.level === 'info' ? 'bg-b1/10 text-b1' : 'text-t3'
+                        )}>
+                          {entry.level.toUpperCase()}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[9px] text-t3">[{entry.source}]</span>
+                          <span className="text-[10px] text-t1 ml-1 leading-snug">{entry.message}</span>
+                          {entry.data && (
+                            <pre className="text-[9px] text-t3 mt-0.5 overflow-x-auto whitespace-pre-wrap break-all">{entry.data}</pre>
+                          )}
+                        </div>
+                        <span className="text-[9px] text-t3 flex-shrink-0">
+                          {new Date(entry.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
