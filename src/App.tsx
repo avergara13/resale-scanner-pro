@@ -2427,7 +2427,15 @@ function App() {
             setScreen(s)
           }
         }}
-        onCameraOpen={() => setCameraOpen(true)}
+        onCameraOpen={() => {
+          // If no session is open, auto-start one so the scan is always session-scoped.
+          // handleStartSession sets the KV session and navigates to session-detail;
+          // the camera overlay opens on top of it so the first scan lands in the new session.
+          if (!session?.active) {
+            handleStartSession()
+          }
+          setCameraOpen(true)
+        }}
         captureState={captureState}
         sessionMode={!session?.active}
       />

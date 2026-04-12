@@ -108,6 +108,21 @@ function SortableItem({
 
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  // Listing completion — 6 fields required before an item is ready to push
+  // productName + price (40 pts core) + category + condition + description + AI optimization (60 pts)
+  const completionPct = (() => {
+    if (item.decision !== 'BUY' || item.listingStatus === 'published') return null
+    const fields = [
+      { filled: !!item.productName,          pts: 20 },
+      { filled: !!item.estimatedSellPrice,   pts: 20 },
+      { filled: !!item.category,             pts: 15 },
+      { filled: !!item.condition,            pts: 15 },
+      { filled: !!item.description,          pts: 15 },
+      { filled: !!item.optimizedListing,     pts: 15 },
+    ]
+    return fields.reduce((sum, f) => sum + (f.filled ? f.pts : 0), 0)
+  })()
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -127,6 +142,23 @@ function SortableItem({
         isSelected ? 'border-b1' : 'border-s2/60'
       )}
     >
+      {/* ── Listing completion bar — top of card, only for BUY items not yet published ── */}
+      {completionPct !== null && (
+        <div className="relative w-full h-1.5 flex-shrink-0" style={{ background: 'color-mix(in oklch, var(--s2) 40%, transparent)' }}>
+          <div
+            className="h-full transition-all duration-500"
+            style={{
+              width: `${completionPct}%`,
+              background: completionPct === 100
+                ? 'var(--green)'
+                : completionPct >= 60
+                ? 'var(--amber)'
+                : 'var(--red)',
+            }}
+          />
+        </div>
+      )}
+
       {/* ── Info row ── */}
       <div className={cn(
         "p-3 flex gap-2.5 items-start",
@@ -180,18 +212,28 @@ function SortableItem({
                 <span className="text-[7px] font-bold bg-purple-500/15 text-purple-500 px-1 py-0.5 rounded flex-shrink-0 uppercase">Personal</span>
               )}
             </div>
-            {item.profitMargin != null && isFinite(item.profitMargin) && (
-              <span className={cn(
-                "flex-shrink-0 font-mono font-bold text-[9px] px-1.5 py-0.5 rounded border",
-                item.profitMargin > 40
-                  ? 'bg-green/10 text-green border-green/30'
-                  : item.profitMargin > 25
-                  ? 'bg-amber/10 text-amber border-amber/30'
-                  : 'bg-red/10 text-red border-red/30'
-              )}>
-                {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
-              </span>
-            )}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {completionPct !== null && (
+                <span className={cn(
+                  "font-mono font-bold text-[8px] px-1 py-0.5 rounded",
+                  completionPct === 100 ? 'text-green' : completionPct >= 60 ? 'text-amber' : 'text-red'
+                )}>
+                  {completionPct}%
+                </span>
+              )}
+              {item.profitMargin != null && isFinite(item.profitMargin) && (
+                <span className={cn(
+                  "font-mono font-bold text-[9px] px-1.5 py-0.5 rounded border",
+                  item.profitMargin > 40
+                    ? 'bg-green/10 text-green border-green/30'
+                    : item.profitMargin > 25
+                    ? 'bg-amber/10 text-amber border-amber/30'
+                    : 'bg-red/10 text-red border-red/30'
+                )}>
+                  {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Prices */}
