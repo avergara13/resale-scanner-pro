@@ -21,10 +21,11 @@ interface AppHeaderProps {
   onNavigateToSettings: () => void
   onNavigateToTrends?: () => void
   onBack?: () => void
+  backLabel?: string
   showTrends?: boolean
 }
 
-export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, onBack, showTrends }: AppHeaderProps) {
+export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, onBack, backLabel, showTrends }: AppHeaderProps) {
   const title = SCREEN_TITLES[screen] || ''
   const isSubScreen = !['session', 'agent', 'queue', 'sold'].includes(screen as string)
 
@@ -32,8 +33,11 @@ export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, on
     <header className="sticky top-0 z-30 flex items-center justify-between px-4 h-11 bg-fg border-b border-s1 flex-shrink-0">
       <div className="flex items-center gap-2">
         {isSubScreen && onBack && (
-          <button onClick={onBack} className="w-10 h-10 flex items-center justify-center rounded-lg text-t1 hover:bg-s1 transition-colors active:opacity-60 -ml-2">
+          <button onClick={onBack} className="flex items-center gap-1 h-10 px-1 rounded-lg text-t1 hover:bg-s1 transition-colors active:opacity-60 -ml-2">
             <ArrowLeft size={18} weight="bold" />
+            {backLabel && (
+              <span className="text-[11px] font-semibold tracking-wide text-t2 uppercase">{backLabel}</span>
+            )}
           </button>
         )}
         <span className="text-[11px] font-black tracking-widest text-t1 uppercase">{title}</span>

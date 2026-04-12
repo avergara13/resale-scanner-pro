@@ -61,6 +61,9 @@ function App() {
   const [cameraOpen, setCameraOpen] = useState(false)
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
+  // Tracks whether the current scan-result was opened from the Agent Scans tab (Reopen)
+  // vs a fresh camera scan. Used to show "← Scans" back label in the header.
+  const [openedFromScans, setOpenedFromScans] = useState(false)
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
@@ -1756,9 +1759,10 @@ function App() {
         onNavigateToSettings={() => setScreen('settings')}
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
+        backLabel={screen === 'scan-result' && openedFromScans ? 'Scans' : undefined}
         onBack={
           screen === 'scan-result'
-            ? () => setScreen('agent')
+            ? () => { setOpenedFromScans(false); setScreen('agent') }
             : screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
             ? () => setScreen('session')
             : screen === 'tag-analytics' || screen === 'location-insights'
@@ -1843,6 +1847,7 @@ function App() {
                 onOpenScanItem={(item) => {
                   setCurrentItem(item)
                   setPipeline([])
+                  setOpenedFromScans(true)
                   setScreen('scan-result')
                 }}
               />

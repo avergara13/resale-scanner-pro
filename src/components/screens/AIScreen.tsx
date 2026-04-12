@@ -253,7 +253,13 @@ export function AIScreen({
   const [imageOpen, setImageOpen] = useCollapsePreference('ai-image', false)
   const { isListening, startListening, isSupported } = useVoiceInput()
 
+  // True when pipeline completed a decision OR when reopening a finalized item
+  // (pipeline is empty on reopen, but currentItem.decision holds the result).
+  // Restricted to BUY/PASS — PENDING is the initial value set by handleCapture
+  // on every new item, so including it would falsely trigger hasDecision on
+  // fresh scans and race the pipeline (Codex P1).
   const hasDecision = pipeline.some(p => p.id === 'decision' && p.status === 'complete')
+    || (currentItem?.decision === 'BUY' || currentItem?.decision === 'PASS')
   const isPipelineRunning = pipeline.length > 0 && pipeline.some(p => p.status === 'processing')
   const decision = currentItem?.decision
   const canSaveDraft = !!(currentItem?.imageData || description.trim().length > 0)
