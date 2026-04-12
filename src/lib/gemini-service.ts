@@ -40,25 +40,35 @@ export class GeminiService {
   async analyzeProductImage(
     imageData: string,
     options: GeminiAnalysisOptions = {},
-    purchasePrice?: number
+    purchasePrice?: number,
+    additionalImages?: string[]    // optional photos 2-5 for richer context
   ): Promise<GeminiVisionResponse> {
-    const base64Data = imageData.includes('base64,') 
-      ? imageData.split('base64,')[1] 
+    const base64Data = imageData.includes('base64,')
+      ? imageData.split('base64,')[1]
       : imageData
 
-    const prompt = this.buildVisionPrompt(options, purchasePrice)
+    const imageParts = [
+      { inline_data: { mime_type: 'image/jpeg', data: base64Data } },
+      ...(additionalImages || []).map(img => ({
+        inline_data: {
+          mime_type: 'image/jpeg',
+          data: img.includes('base64,') ? img.split('base64,')[1] : img,
+        }
+      }))
+    ]
+
+    const multiImageNote = (additionalImages?.length)
+      ? `\nYou have received ${additionalImages.length + 1} photos of the same item from different angles. Analyze all photos together for the most accurate product identification, pricing, and condition assessment.`
+      : ''
+
+    const prompt = this.buildVisionPrompt(options, purchasePrice) + multiImageNote
 
     const requestBody = {
       contents: [
         {
           parts: [
             { text: prompt },
-            {
-              inline_data: {
-                mime_type: 'image/jpeg',
-                data: base64Data,
-              },
-            },
+            ...imageParts,
           ],
         },
       ],

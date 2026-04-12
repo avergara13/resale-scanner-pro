@@ -59,6 +59,7 @@ function App() {
   const [showSessionTrends, setShowSessionTrends] = useState(false)
   const [agentPendingMessage, setAgentPendingMessage] = useState<string | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraMode, setCameraMode] = useState<'new-scan' | 'add-photo' | 'replace-primary'>('new-scan')
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
   // Tracks whether the current scan-result was opened from the Agent Scans tab (Reopen)
@@ -213,6 +214,19 @@ function App() {
   }, [])
 
   const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct, existingItem?: ScannedItem) => {
+    // Route to add-photo handler — append this image to the current item without a new pipeline run
+    if (cameraMode === 'add-photo') {
+      setCameraMode('new-scan')
+      setCameraOpen(false)
+      await handleAddPhotoToCurrentItem(imageData)
+      return
+    }
+
+    // Replace-primary mode — treat currentItem as the existing item so ID is preserved
+    const effectiveExistingItem =
+      cameraMode === 'replace-primary' && currentItem ? currentItem : existingItem
+    if (cameraMode === 'replace-primary') setCameraMode('new-scan')
+
     triggerCapture()
     setCameraOpen(false)
 
@@ -221,9 +235,9 @@ function App() {
 
     // If re-analyzing an existing item, preserve its ID and metadata so we don't
     // create a duplicate card in scan history. Otherwise create a fresh item.
-    const newItem: ScannedItem = existingItem
+    const newItem: ScannedItem = effectiveExistingItem
       ? {
-          ...existingItem,
+          ...effectiveExistingItem,
           imageData: optimized.original,
           imageThumbnail: optimized.thumbnail,
           imageOptimized: optimized.original,
@@ -266,7 +280,12 @@ function App() {
       
       if (geminiService) {
         try {
-          visionResult = await geminiService.analyzeProductImage(imageData, {}, price)
+          visionResult = await geminiService.analyzeProductImage(
+            imageData,
+            {},
+            price,
+            newItem.additionalImageData?.length ? newItem.additionalImageData : undefined,
+          )
           mockProductName = visionResult.productName
           
           completeStep(0)
@@ -631,11 +650,12 @@ function App() {
       const persistableItem = { ...updatedItem }
       delete persistableItem.imageData
       delete persistableItem.imageOptimized
+      delete persistableItem.additionalImageData  // strip full base64; keep additionalImages thumbnails
       setScanHistory(prev => {
         const existing = prev || []
-        if (existingItem) {
+        if (effectiveExistingItem) {
           // Re-analyze path: replace the existing scan history entry in-place (no new card)
-          const idx = existing.findIndex(i => i.id === existingItem.id)
+          const idx = existing.findIndex(i => i.id === effectiveExistingItem.id)
           if (idx !== -1) return existing.map((i, j) => j === idx ? persistableItem : i)
         }
         return [persistableItem, ...existing.slice(0, 499)]
@@ -1064,6 +1084,63 @@ function App() {
       currentItem,   // existingItem → pipeline updates in place, scan history entry replaced
     )
   }, [currentItem, handleCapture])
+
+  // ─── Multi-photo handlers ──────────────────────────────────────────────────
+
+  // Appends a new photo to the current item without triggering a new pipeline run.
+  // Called when cameraMode === 'add-photo' routes back from handleCapture.
+  const handleAddPhotoToCurrentItem = useCallback(async (imageData: string) => {
+    if (!currentItem) return
+    const totalPhotos = 1 + (currentItem.additionalImages?.length || 0)
+    if (totalPhotos >= 5) {
+      toast.error('Maximum 5 photos per item reached')
+      return
+    }
+    const optimized = await optimizeAndCache(imageData)
+    setCurrentItem(prev => prev ? {
+      ...prev,
+      additionalImages: [...(prev.additionalImages || []), optimized.thumbnail],
+      additionalImageData: [...(prev.additionalImageData || []), optimized.original],
+    } : prev)
+    toast('Photo added — tap Re-analyze to scan with all photos')
+  }, [currentItem, optimizeAndCache])
+
+  const handleDeleteAdditionalPhoto = useCallback((index: number) => {
+    setCurrentItem(prev => {
+      if (!prev) return prev
+      const imgs = [...(prev.additionalImages || [])]
+      const data = [...(prev.additionalImageData || [])]
+      imgs.splice(index, 1)
+      data.splice(index, 1)
+      return { ...prev, additionalImages: imgs, additionalImageData: data }
+    })
+  }, [])
+
+  const handleDeletePrimaryPhoto = useCallback(() => {
+    if (!currentItem) return
+    const additional = currentItem.additionalImages || []
+    const additionalData = currentItem.additionalImageData || []
+    if (additional.length > 0) {
+      // Promote first additional image to primary
+      setCurrentItem(prev => prev ? {
+        ...prev,
+        imageThumbnail: additional[0],
+        imageData: additionalData[0] || prev.imageData,
+        additionalImages: additional.slice(1),
+        additionalImageData: additionalData.slice(1),
+      } : prev)
+      toast('Primary photo updated')
+    } else {
+      // No alternatives — open camera to take a replacement primary photo
+      setCameraMode('replace-primary')
+      setCameraOpen(true)
+    }
+  }, [currentItem])
+
+  const openCameraForAddPhoto = useCallback(() => {
+    setCameraMode('add-photo')
+    setCameraOpen(true)
+  }, [])
 
   const handleRecalculate = useCallback((newPrice: number, newSellPrice?: number, newShipping?: number) => {
     if (!Number.isFinite(newPrice) || newPrice < 0) {
@@ -1940,7 +2017,10 @@ function App() {
                 onMaybeItem={handleMaybeFromScan}
                 onRecalculate={handleRecalculate}
                 onRescan={handleReanalyzeCurrentItem}
-                onOpenCamera={() => setCameraOpen(true)}
+                onOpenCamera={openCameraForAddPhoto}
+                onAddPhoto={openCameraForAddPhoto}
+                onDeletePhoto={handleDeleteAdditionalPhoto}
+                onDeletePrimaryPhoto={handleDeletePrimaryPhoto}
               />
             </motion.div>
           )}
