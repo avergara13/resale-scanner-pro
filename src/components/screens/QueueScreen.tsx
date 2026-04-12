@@ -60,7 +60,7 @@ interface QueueScreenProps {
   onBuyItem?: (id: string) => void
 }
 
-type FilterOption = 'ALL' | 'BUY'
+type FilterOption = 'ALL' | 'ITEMS' | 'LISTED'
 type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc' | 'tag-count-desc' | 'tag-count-asc' | 'tag-name-asc' | 'tag-name-desc' | 'manual'
 
 interface SortableItemProps {
@@ -481,7 +481,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     }
     
     if (preset.filters?.decision && preset.filters.decision.length === 1) {
-      const validFilters: FilterOption[] = ['ALL', 'BUY']
+      const validFilters: FilterOption[] = ['ALL', 'ITEMS', 'LISTED']
       const val = preset.filters.decision[0]
       setFilter(validFilters.includes(val as FilterOption) ? (val as FilterOption) : 'ALL')
     } else {
@@ -535,7 +535,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
 
     const matchesFilter =
       filter === 'ALL' ||
-      (filter === 'BUY' && item.decision === 'BUY')
+      (filter === 'ITEMS' && item.decision === 'BUY' && item.listingStatus !== 'published') ||
+      (filter === 'LISTED' && item.listingStatus === 'published')
     
     if (!matchesFilter) return false
 
@@ -627,7 +628,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   })
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
   
-  const buyCount = queueItems.filter(item => item.decision === 'BUY').length
+  const itemsCount = queueItems.filter(item =>
+    item.decision === 'BUY' && item.listingStatus !== 'published'
+  ).length
+  const listedCount = queueItems.filter(item =>
+    item.listingStatus === 'published'
+  ).length
   const hasActiveAdvancedFilters =
     (advancedFilters.tags?.length ?? 0) > 0 ||
     (advancedFilters.locations?.length ?? 0) > 0 ||
@@ -1070,10 +1076,16 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <span>All</span>
             </button>
             <button
-              onClick={() => setFilter('BUY')}
-              className={cn('tab-btn', filter === 'BUY' && 'active')}
+              onClick={() => setFilter('ITEMS')}
+              className={cn('tab-btn', filter === 'ITEMS' && 'active')}
             >
-              <span>Listed{buyCount > 0 && ` (${buyCount})`}</span>
+              <span>Items{itemsCount > 0 && ` (${itemsCount})`}</span>
+            </button>
+            <button
+              onClick={() => setFilter('LISTED')}
+              className={cn('tab-btn', filter === 'LISTED' && 'active')}
+            >
+              <span>Listed{listedCount > 0 && ` (${listedCount})`}</span>
             </button>
           </div>
         </div>
@@ -1189,7 +1201,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           ) : (
             <div className="w-20 h-20 rounded-full bg-s1 flex items-center justify-center mb-4">
               <p className="text-3xl">
-                {searchQuery ? '🔍' : filter === 'BUY' ? '✅' : '📦'}
+                {searchQuery ? '🔍' : filter === 'LISTED' ? '✅' : '📦'}
               </p>
             </div>
           )}
@@ -1198,7 +1210,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               ? 'No items found'
               : queueItems.length === 0
                 ? 'Queue is empty'
-                : `No ${filter} items`
+                : filter === 'LISTED'
+                  ? 'Nothing listed yet'
+                  : 'No items to list'
             }
           </h2>
           <p className="text-sm text-t2 max-w-xs">
@@ -1206,7 +1220,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               ? `No items match "${searchQuery}". Try a different search term.`
               : queueItems.length === 0
                 ? 'Tap the icon above to add an item manually, or scan with the camera'
-                : `Try selecting a different filter to view items`
+                : filter === 'LISTED'
+                  ? 'Items will appear here once pushed to eBay or Notion'
+                  : 'Try selecting a different filter to view items'
             }
           </p>
           {searchQuery && (
