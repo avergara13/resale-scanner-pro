@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import type { Session, ScannedItem, ProfitGoal } from '@/types'
 
 function PastSessionCard({
-  session, items, buyCount, passCount, totalProfit, bestFind, duration, buyRate, formatDuration, onDelete, onViewDetail
+  session, items, buyCount, passCount, totalProfit, bestFind, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail
 }: {
   session: Session
   items: ScannedItem[]
@@ -24,6 +24,7 @@ function PastSessionCard({
   bestFind: ScannedItem | null
   duration: number
   buyRate: number
+  listedCount: number
   formatDuration: (ms: number) => string
   onDelete: () => void
   onViewDetail: () => void
@@ -59,12 +60,15 @@ function PastSessionCard({
           {startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
           {session.location && ` · ${session.location.name}`}
         </div>
-        <div className="flex gap-3 text-[10px] ml-6">
+        <div className="flex gap-3 text-[10px] ml-6 flex-wrap">
           <span className="text-t2">{session.itemsScanned} scans</span>
           <span className="text-green font-bold">{buyCount} BUY</span>
           <span className="text-red font-bold">{passCount} PASS</span>
           <span className="text-green font-mono font-bold">${totalProfit.toFixed(2)}</span>
           <span className="text-b1 font-bold">{buyRate}%</span>
+          {listedCount > 0 && (
+            <span className="text-b1 font-bold">{listedCount} listed</span>
+          )}
         </div>
       </button>
 
@@ -355,6 +359,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
                     const buyItems = sessionItems.filter(i => i.decision === 'BUY')
                     const passItems = sessionItems.filter(i => i.decision === 'PASS')
+                    const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
                     const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
                     const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
                     const duration = (s.endTime || Date.now()) - s.startTime
@@ -366,6 +371,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         items={sessionItems}
                         buyCount={buyItems.length}
                         passCount={passItems.length}
+                        listedCount={listedItems.length}
                         totalProfit={totalProfit}
                         bestFind={bestFind}
                         duration={duration}
@@ -393,6 +399,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
                     const buyItems = sessionItems.filter(i => i.decision === 'BUY')
                     const passItems = sessionItems.filter(i => i.decision === 'PASS')
+                    const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
                     const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
                     const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
                     const duration = (s.endTime || Date.now()) - s.startTime
@@ -404,6 +411,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         items={sessionItems}
                         buyCount={buyItems.length}
                         passCount={passItems.length}
+                        listedCount={listedItems.length}
                         totalProfit={totalProfit}
                         bestFind={bestFind}
                         duration={duration}
