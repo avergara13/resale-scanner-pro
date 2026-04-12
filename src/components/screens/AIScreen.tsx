@@ -253,7 +253,10 @@ export function AIScreen({
   const [imageOpen, setImageOpen] = useCollapsePreference('ai-image', false)
   const { isListening, startListening, isSupported } = useVoiceInput()
 
+  // True when pipeline completed a decision OR when reopening a pre-analyzed item
+  // (pipeline is empty on reopen, but currentItem.decision already holds the result)
   const hasDecision = pipeline.some(p => p.id === 'decision' && p.status === 'complete')
+    || !!(currentItem?.decision)
   const isPipelineRunning = pipeline.length > 0 && pipeline.some(p => p.status === 'processing')
   const decision = currentItem?.decision
   const canSaveDraft = !!(currentItem?.imageData || description.trim().length > 0)
