@@ -1839,7 +1839,8 @@ function App() {
               />
             </motion.div>
           )}
-          {screen === 'scan-result' && (
+          {screen === 'scan-result' && !currentItem && (() => { setScreen('agent'); return null })()}
+          {screen === 'scan-result' && currentItem && (
             <motion.div
               key="scan-result"
               custom={slideDir.current}
