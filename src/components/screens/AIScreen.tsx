@@ -251,6 +251,7 @@ export function AIScreen({
   const [formOpen, setFormOpen] = useCollapsePreference('ai-listing-form', true)
   const [summaryOpen, setSummaryOpen] = useCollapsePreference('ai-summary', false)
   const [imageOpen, setImageOpen] = useCollapsePreference('ai-image', false)
+  const [confirmPass, setConfirmPass] = useState(false)
   const { isListening, startListening, isSupported } = useVoiceInput()
 
   // hasDecision: true only when we have a FINALIZED decision (BUY or PASS).
@@ -301,6 +302,7 @@ export function AIScreen({
     setShippingCost('')
     setDescription('')
     setListingAdded(false)
+    setConfirmPass(false)
   }, [currentItem?.id])
 
   // Pre-fill form once the pipeline finishes (any decision, including PENDING)
@@ -777,10 +779,10 @@ export function AIScreen({
       <div className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md safe-bottom">
         {pipelineComplete ? (
           listingAdded ? (
-            /* Success state — offer to scan another item */
+            /* Success state — offer to scan another item (new photo via camera) */
             <div className="p-2.5 sm:p-3">
               <Button
-                onClick={() => onRescan?.()}
+                onClick={() => onOpenCamera?.()}
                 className="w-full h-11 bg-b1 hover:bg-b2 text-white font-semibold text-sm"
               >
                 <Scan size={15} weight="bold" className="mr-1.5" />
@@ -815,18 +817,37 @@ export function AIScreen({
                   className="flex-shrink-0 h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
                 >
                   <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
-                  Rescan
+                  Re-analyze
                 </Button>
-                <Button
-                  onClick={() => onPassItem(parseFloat(buyPrice) || 0, description)}
-                  disabled={!canSaveDraft}
-                  variant="outline"
-                  className="flex-1 h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
-                >
-                  <XCircle size={15} weight="bold" className="mr-1" />
-                  Pass
-                </Button>
-                {onMaybeItem && (
+                {/* Pass — 2-step confirm to prevent accidental dismissal */}
+                {confirmPass ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmPass(false)}
+                      className="flex-1 h-10 text-xs text-t3 border-s2 hover:bg-s1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => { onPassItem(parseFloat(buyPrice) || 0, description); setConfirmPass(false) }}
+                      className="flex-1 h-10 text-xs font-bold bg-red hover:opacity-90 text-white border-0"
+                    >
+                      Confirm Pass
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => setConfirmPass(true)}
+                    disabled={!canSaveDraft}
+                    variant="outline"
+                    className="flex-1 h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                  >
+                    <XCircle size={15} weight="bold" className="mr-1" />
+                    Pass
+                  </Button>
+                )}
+                {!confirmPass && onMaybeItem && (
                   <Button
                     onClick={() => onMaybeItem(parseFloat(buyPrice) || 0, description)}
                     disabled={!canSaveDraft}
@@ -838,15 +859,20 @@ export function AIScreen({
                   </Button>
                 )}
               </div>
-              {/* Row 2: primary CTA — full width, tall, prominent */}
+              {/* Row 2: primary CTA — locked when PENDING (no real decision yet) */}
               <Button
                 onClick={handleAddToQueue}
-                disabled={!canSaveDraft}
+                disabled={!canSaveDraft || decision === 'PENDING'}
                 className="w-full h-11 sm:h-12 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-sm font-bold shadow-md shadow-green/20"
               >
                 <ShoppingCart size={16} weight="bold" className="mr-2" />
                 Add to Queue
               </Button>
+              {decision === 'PENDING' && (
+                <p className="text-center text-[10px] text-t3 -mt-1 leading-tight">
+                  Enter a sell price and tap Recalculate to unlock
+                </p>
+              )}
             </div>
           )
         ) : isPipelineRunning ? (
@@ -899,7 +925,7 @@ export function AIScreen({
                   className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
                 >
                   <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
-                  Rescan
+                  Re-analyze
                 </Button>
               )}
               <Button

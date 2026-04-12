@@ -212,27 +212,37 @@ function App() {
     ))
   }, [])
 
-  const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
+  const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct, existingItem?: ScannedItem) => {
     triggerCapture()
     setCameraOpen(false)
 
     try {
       const optimized = await optimizeAndCache(imageData)
-    
-    const newItem: ScannedItem = {
-      id: Date.now().toString(),
-      timestamp: Date.now(),
-      imageData: optimized.original,
-      imageThumbnail: optimized.thumbnail,
-      imageOptimized: optimized.original,
-      purchasePrice: price,
-      decision: 'PENDING',
-      inQueue: false,
-      location,
-      sessionId: session?.id,
-      // Pre-seed from barcode lookup; Gemini vision will overwrite with better data if available
-      productName: barcodeProduct?.title || undefined,
-    }
+
+    // If re-analyzing an existing item, preserve its ID and metadata so we don't
+    // create a duplicate card in scan history. Otherwise create a fresh item.
+    const newItem: ScannedItem = existingItem
+      ? {
+          ...existingItem,
+          imageData: optimized.original,
+          imageThumbnail: optimized.thumbnail,
+          imageOptimized: optimized.original,
+          decision: 'PENDING' as const,   // reset for clean pipeline run
+        }
+      : {
+          id: Date.now().toString(),
+          timestamp: Date.now(),
+          imageData: optimized.original,
+          imageThumbnail: optimized.thumbnail,
+          imageOptimized: optimized.original,
+          purchasePrice: price,
+          decision: 'PENDING',
+          inQueue: false,
+          location,
+          sessionId: session?.id,
+          // Pre-seed from barcode lookup; Gemini vision will overwrite with better data if available
+          productName: barcodeProduct?.title || undefined,
+        }
     setCurrentItem(newItem)
     setScreen('scan-result')
 
@@ -621,7 +631,15 @@ function App() {
       const persistableItem = { ...updatedItem }
       delete persistableItem.imageData
       delete persistableItem.imageOptimized
-      setScanHistory(prev => [persistableItem, ...(prev || []).slice(0, 499)])
+      setScanHistory(prev => {
+        const existing = prev || []
+        if (existingItem) {
+          // Re-analyze path: replace the existing scan history entry in-place (no new card)
+          const idx = existing.findIndex(i => i.id === existingItem.id)
+          if (idx !== -1) return existing.map((i, j) => j === idx ? persistableItem : i)
+        }
+        return [persistableItem, ...existing.slice(0, 499)]
+      })
 
       if (session?.active) {
         setSession((prev) => {
@@ -1030,11 +1048,22 @@ function App() {
     logActivity('Draft saved to queue')
   }, [currentItem, setQueue, setScreen])
 
-  const handleRescan = useCallback(() => {
-    setCurrentItem(undefined)
-    setPipeline([])
-    setCameraOpen(true)
-  }, [])
+  const handleReanalyzeCurrentItem = useCallback(() => {
+    if (!currentItem?.imageData) {
+      // Full image not in memory (e.g. reopened from scan history) — open camera for new photo
+      setCameraOpen(true)
+      return
+    }
+    // Re-run the full AI pipeline on the existing photo, preserving the item ID.
+    // This lets the user retry a failed scan or get a second opinion without creating a duplicate card.
+    handleCapture(
+      currentItem.imageData,
+      currentItem.purchasePrice,
+      currentItem.location,
+      undefined,
+      currentItem,   // existingItem → pipeline updates in place, scan history entry replaced
+    )
+  }, [currentItem, handleCapture])
 
   const handleRecalculate = useCallback((newPrice: number, newSellPrice?: number, newShipping?: number) => {
     if (!Number.isFinite(newPrice) || newPrice < 0) {
@@ -1206,7 +1235,7 @@ function App() {
       toast.error('No image to save')
       return
     }
-    // Keep imageThumbnail for queue display; strip heavy blobs
+    // Strip heavy blobs — keep thumbnail for scan history display
     const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     // Recompute metrics if price changed — keeps stored profitMargin accurate
@@ -1218,26 +1247,28 @@ function App() {
       )
       resolvedMargin = freshMetrics.profitMargin
     }
+    // PASS items go to scan history only — NOT the listing queue.
+    // The listing queue is reserved exclusively for items the buyer intends to purchase.
     const passItem: ScannedItem = {
       ...lightweight,
       purchasePrice: effectivePrice,
       profitMargin: resolvedMargin,
       notes: notes || currentItem!.notes,
-      inQueue: true,
+      inQueue: false,
       decision: 'PASS',
     }
-    setQueue(prev => {
-      const current = prev || []
-      if (current.some(i => i.id === passItem.id)) {
-        return current.map(i => i.id === passItem.id ? passItem : i)
-      }
-      return [...current, passItem]
+    // Update the scan history entry (first written during handleCapture) with final prices/notes
+    setScanHistory(prev => {
+      const existing = prev || []
+      const idx = existing.findIndex(i => i.id === passItem.id)
+      if (idx !== -1) return existing.map((i, j) => j === idx ? passItem : i)
+      return [passItem, ...existing.slice(0, 499)]  // fallback: prepend if somehow missing
     })
     setCurrentItem(undefined)
     setPipeline([])
-    setScreen('agent')
-    logActivity('Passed — saved to scan history')
-  }, [currentItem, setQueue, setScreen])
+    setScreen('session')
+    logActivity('Passed — logged to scan history')
+  }, [currentItem, setScanHistory, settings, setScreen])
 
   const handleMaybeFromScan = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
@@ -1246,25 +1277,28 @@ function App() {
     }
     const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
+    // Maybe items go to scan history only — NOT the listing queue.
+    // The buyer can reopen from Scan History to continue researching before deciding.
     const maybeItem: ScannedItem = {
       ...lightweight,
       purchasePrice: effectivePrice,
       notes: notes || currentItem!.notes,
-      inQueue: true,
+      inQueue: false,
       decision: 'PENDING',
     }
-    setQueue(prev => {
-      const current = prev || []
-      if (current.some(i => i.id === maybeItem.id)) {
-        return current.map(i => i.id === maybeItem.id ? maybeItem : i)
-      }
-      return [...current, maybeItem]
+    // Update the scan history entry with the current prices/notes
+    setScanHistory(prev => {
+      const existing = prev || []
+      const idx = existing.findIndex(i => i.id === maybeItem.id)
+      if (idx !== -1) return existing.map((i, j) => j === idx ? maybeItem : i)
+      return [maybeItem, ...existing.slice(0, 499)]
     })
     setCurrentItem(undefined)
     setPipeline([])
-    setScreen('agent')
-    logActivity('Saved as Maybe — tap in Queue to re-evaluate')
-  }, [currentItem, setQueue, setScreen])
+    setScreen('session')
+    toast('Saved to research history — reopen from Scan History to continue')
+    logActivity('Saved for later research — not added to queue')
+  }, [currentItem, setScanHistory, setScreen])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
@@ -1905,7 +1939,7 @@ function App() {
                 onPassItem={handlePassFromScan}
                 onMaybeItem={handleMaybeFromScan}
                 onRecalculate={handleRecalculate}
-                onRescan={handleRescan}
+                onRescan={handleReanalyzeCurrentItem}
                 onOpenCamera={() => setCameraOpen(true)}
               />
             </motion.div>
