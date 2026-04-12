@@ -1822,7 +1822,7 @@ function App() {
               className="absolute inset-0 overflow-hidden"
             >
               <AgentScreen
-                isCurrentScreen={screen === 'agent'}
+                isCurrentScreen={screen === 'agent' && !cameraOpen}
                 queueItems={queue || []}
                 soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
                 settings={settings}
