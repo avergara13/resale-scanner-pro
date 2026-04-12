@@ -926,6 +926,15 @@ function App() {
       ? listing.price - item.purchasePrice
       : (item.estimatedSellPrice || 0) - item.purchasePrice
 
+    // Resolve session context for traceability — item carries the session UUID,
+    // look it up in allSessions to get the human-readable name ('AV-001') and number.
+    const linkedSession = (allSessions || []).find(s => s.id === item.sessionId)
+    const expenseType = linkedSession?.sessionType === 'business'
+      ? '💼 Business' as const
+      : linkedSession?.sessionType === 'personal'
+      ? '🏡 Personal' as const
+      : undefined
+
     const result = await notionService.pushListing({
       title: listing?.title || item.productName || 'Unknown Item',
       description: listing?.description || item.description || '',
@@ -942,6 +951,12 @@ function App() {
       timestamp: item.timestamp,
       location: item.location?.name,
       notes: item.notes,
+      // Session + operator traceability
+      sessionId: linkedSession?.name,
+      sessionNumber: linkedSession?.sessionNumber,
+      scannedBy: item.scannedBy,
+      operatorName: linkedSession?.operatorName || settings?.userProfile?.operatorName,
+      expenseType,
     })
 
     if (result.success) {
@@ -958,7 +973,7 @@ function App() {
     } else {
       toast.error(`Notion error: ${result.error}`)
     }
-  }, [setQueue, notionService])
+  }, [setQueue, notionService, allSessions, settings])
 
   const handleMarkAsSold = useCallback((
     itemId: string,
