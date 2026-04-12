@@ -1749,10 +1749,7 @@ function App() {
       />
 
       <div
-        className="flex-1 relative w-full pb-24"
-        style={{
-          minHeight: 'calc(100vh - 96px)',
-        }}
+        className="flex-1 relative w-full"
       >
         <AnimatePresence mode="wait">
           {screen === 'session' && (
@@ -2081,7 +2078,8 @@ function App() {
         </AnimatePresence>
       </div>
 
-      <div className="h-[80px] sm:h-[88px] flex-shrink-0" />
+      {/* Spacer exactly matches BottomNav height: h-[52px] grid + max(safe-area-inset-bottom, 4px) */}
+      <div className="flex-shrink-0" style={{ height: 'max(56px, calc(52px + env(safe-area-inset-bottom, 0px)))' }} />
 
       <BottomNav
         currentScreen={screen}

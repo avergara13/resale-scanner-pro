@@ -32,7 +32,7 @@ export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, on
     <header className="sticky top-0 z-30 flex items-center justify-between px-4 h-11 bg-fg border-b border-s1 flex-shrink-0">
       <div className="flex items-center gap-2">
         {isSubScreen && onBack && (
-          <button onClick={onBack} className="w-8 h-8 flex items-center justify-center rounded-lg text-t1 hover:bg-s1 transition-colors active:opacity-60 -ml-1">
+          <button onClick={onBack} className="w-10 h-10 flex items-center justify-center rounded-lg text-t1 hover:bg-s1 transition-colors active:opacity-60 -ml-2">
             <ArrowLeft size={18} weight="bold" />
           </button>
         )}
