@@ -171,8 +171,16 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
 
   const duration = (session.endTime || Date.now()) - session.startTime
   const startDate = new Date(session.startTime)
-  const buyRate = session.itemsScanned > 0 ? Math.round((session.buyCount / session.itemsScanned) * 100) : 0
+
+  // Derive all counts from live item data — session metadata counters can lag
+  const buyItems = sessionItems.filter(i => i.decision === 'BUY')
+  const passItems = sessionItems.filter(i => i.decision === 'PASS')
   const maybeCount = sessionItems.filter(i => i.decision === 'PENDING').length
+  const liveBuyCount = buyItems.length
+  const livePassCount = passItems.length
+  const totalScans = sessionItems.length
+  const buyRate = totalScans > 0 ? Math.round((liveBuyCount / totalScans) * 100) : 0
+  const estimatedProfit = buyItems.reduce((s, i) => s + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
@@ -358,7 +366,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               )}
             >
               <div className="text-base font-bold text-green leading-tight">
-                ${session.totalPotentialProfit.toFixed(2)}
+                ${estimatedProfit.toFixed(2)}
               </div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Est. Profit</div>
             </div>
@@ -369,7 +377,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
               )}
             >
-              <div className="text-base font-bold text-t1 leading-tight">{session.itemsScanned}</div>
+              <div className="text-base font-bold text-t1 leading-tight">{totalScans}</div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
             <div className="stat-card flex-1 p-3">
@@ -390,14 +398,14 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               <div>
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold mono text-green">{session.buyCount}</p>
+                  <p className="text-2xl font-bold mono text-green">{liveBuyCount}</p>
                   <CheckCircle size={20} weight="fill" className="text-green" />
                 </div>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">PASS</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold mono text-red">{session.passCount}</p>
+                  <p className="text-2xl font-bold mono text-red">{livePassCount}</p>
                   <XCircle size={20} weight="fill" className="text-red" />
                 </div>
               </div>
@@ -415,13 +423,13 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
           <Card className="p-6 mb-4">
             <h3 className="text-sm font-semibold text-t3 uppercase tracking-wide mb-3">Potential Profit</h3>
             <p className="text-4xl font-bold mono text-t1">
-              ${session.totalPotentialProfit.toFixed(2)}
+              ${estimatedProfit.toFixed(2)}
             </p>
             <p className="text-sm text-t3 mt-2">
-              From {session.buyCount} items{' '}
-              {session.buyCount > 0 && (
+              From {liveBuyCount} items{' '}
+              {liveBuyCount > 0 && (
                 <span className="mono">
-                  (${(session.totalPotentialProfit / session.buyCount).toFixed(2)} avg)
+                  (${(estimatedProfit / liveBuyCount).toFixed(2)} avg)
                 </span>
               )}
             </p>
