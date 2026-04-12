@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowClockwise, ArrowSquareOut, CheckCircle, Package, SpinnerGap, Truck, Plus, Sparkle, X } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +12,8 @@ import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
 import { createPirateShipUrl } from '@/lib/shipping-rate-service'
 import { recommendShipping, analyzeSoldBatch } from '@/lib/shipping-intelligence'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import type { SoldItem, SoldShippingStatus, SoldShippingUpdateInput, SoldDelistStatus, ManualSaleEntry } from '@/types'
 
 type FulfillmentFilter = 'all' | 'need-label' | 'label-ready' | 'shipped'
@@ -204,6 +206,25 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
     return new Date(lastSyncedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   }, [lastSyncedAt])
 
+  const handlePullRefresh = useCallback(async () => {
+    onRefresh()
+    await new Promise(resolve => setTimeout(resolve, 800))
+  }, [onRefresh])
+
+  const {
+    containerRef: soldContainerRef,
+    isPulling,
+    isRefreshing,
+    pullDistance,
+    progress,
+    shouldTrigger,
+  } = usePullToRefresh({
+    onRefresh: handlePullRefresh,
+    threshold: 80,
+    maxPullDistance: 150,
+    enabled: true,
+  })
+
   // Loading state only applies if we have no items at all (live + manual)
   if (loading && mergedItems.length === 0) {
     return (
@@ -294,9 +315,25 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
 
       {/* ── Scrollable list ───────────────────────────────────────────── */}
       <div
-        className="flex-1 overflow-y-auto px-3 pt-2 space-y-2"
-        style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 80px)' }}
+        ref={soldContainerRef}
+        className="flex-1 overflow-y-auto scrollable-content overscroll-y-contain"
       >
+        <PullToRefreshIndicator
+          isPulling={isPulling}
+          isRefreshing={isRefreshing}
+          pullDistance={pullDistance}
+          progress={progress}
+          shouldTrigger={shouldTrigger}
+        />
+        <div
+          className="px-3 pt-2 space-y-2"
+          style={{
+            paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 0px) + 80px)',
+            transform: `translateY(${isPulling ? pullDistance : isRefreshing ? 60 : 0}px)`,
+            transition: isPulling ? 'none' : 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            willChange: isPulling || isRefreshing ? 'transform' : 'auto',
+          }}
+        >
         {filteredItems.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-8 py-16">
             <Package size={48} className="text-t3 opacity-40 mb-4" weight="duotone" />
@@ -561,6 +598,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
             )
           })
         )}
+        </div> {/* end transform wrapper */}
       </div>
 
       {/* ── Manual Sale Dialog ──────────────────────────────────────── */}

@@ -199,14 +199,10 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
   })
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      id="scr-session" 
-      className="flex flex-col h-full overflow-y-auto scrollable-content"
-      style={{
-        paddingTop: isPulling ? `${pullDistance}px` : isRefreshing ? '60px' : '0px',
-        transition: isPulling ? 'none' : 'padding-top 0.2s ease-out'
-      }}
+      id="scr-session"
+      className="h-full overflow-y-auto scrollable-content overscroll-y-contain"
     >
       <PullToRefreshIndicator
         isPulling={isPulling}
@@ -216,11 +212,19 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
         shouldTrigger={shouldTrigger}
       />
 
+      {/* Content wrapper: GPU-composited transform instead of paddingTop reflow */}
+      <div
+        style={{
+          transform: `translateY(${isPulling ? pullDistance : isRefreshing ? 60 : 0}px)`,
+          transition: isPulling ? 'none' : 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          willChange: isPulling || isRefreshing ? 'transform' : 'auto',
+        }}
+      >
+
       <div className="px-4 pt-3 pb-6">
 
       {showTrends ? (
         <div
-          className="flex-1 overflow-y-auto"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
         >
           {/* Back button */}
@@ -417,6 +421,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
         </div>
       )}
       </div>
+      </div> {/* end content transform wrapper */}
     </div>
   )
 }
