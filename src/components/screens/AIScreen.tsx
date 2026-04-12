@@ -64,7 +64,7 @@ interface AIScreenProps {
   onCreateListing: (price: number, notes: string, draft: ListingDraftOverrides) => void
   onPassItem: (price: number, notes: string) => void
   onMaybeItem?: (price: number, notes: string) => void
-  onRecalculate?: (price: number) => void
+  onRecalculate?: (buyPrice: number, sellPrice?: number, shippingCost?: number) => void
   onRescan?: () => void
   onOpenCamera?: () => void
 }
@@ -698,11 +698,20 @@ export function AIScreen({
           ) : (
             /* Decision available — main action bar */
             <div className="p-2.5 sm:p-3 space-y-2">
-              {/* Recalculate — only when buy price has diverged from analyzed price */}
-              {buyPrice !== '' &&
-                parseFloat(buyPrice) !== currentItem?.purchasePrice && (
+              {/* Recalculate — show when buy price changed OR sell price entered on a no-price item */}
+              {((buyPrice !== '' && parseFloat(buyPrice) !== (currentItem?.purchasePrice ?? 0)) ||
+                (estSellPrice !== '' && parseFloat(estSellPrice) > 0 && !(currentItem?.estimatedSellPrice))) && (
                   <Button
-                    onClick={() => onRecalculate?.(parseFloat(buyPrice))}
+                    onClick={() => {
+                      const bp = parseFloat(buyPrice)
+                      const sp = parseFloat(estSellPrice)
+                      const sc = parseFloat(shippingCost)
+                      onRecalculate?.(
+                        Number.isFinite(bp) ? bp : 0,
+                        Number.isFinite(sp) && sp > 0 ? sp : undefined,
+                        Number.isFinite(sc) && sc >= 0 ? sc : undefined,
+                      )
+                    }}
                     className="w-full bg-amber hover:opacity-90 text-white h-10 font-semibold text-xs sm:text-sm"
                   >
                     <ArrowClockwise size={15} weight="bold" className="mr-1.5" />

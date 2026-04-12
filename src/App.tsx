@@ -1036,21 +1036,49 @@ function App() {
     setCameraOpen(true)
   }, [])
 
-  const handleRecalculate = useCallback((newPrice: number) => {
+  const handleRecalculate = useCallback((newPrice: number, newSellPrice?: number, newShipping?: number) => {
     if (!Number.isFinite(newPrice) || newPrice < 0) {
       toast.error('Enter a valid price (0 or more)')
       return
     }
-    if (!currentItem?.estimatedSellPrice) {
-      toast.error('No sell price found — tap Rescan to re-analyze, or ask AI in Chat')
+
+    // Use form-provided sell price first; fall back to existing item value.
+    // This unblocks PENDING items where the AI found no market price — the
+    // user can manually enter both buy and sell prices and get a real decision.
+    const effectiveSellPrice = (newSellPrice && newSellPrice > 0)
+      ? newSellPrice
+      : currentItem?.estimatedSellPrice
+
+    if (!effectiveSellPrice || effectiveSellPrice <= 0) {
+      toast.error('Enter a sell price in the Listing Draft to recalculate')
       return
     }
-    const shipping = settings?.defaultShippingCost || 5.0
-    const feePercent = settings?.ebayFeePercent || 12.9
-    const minMargin = settings?.minProfitMargin || 30
-    const profitMetrics = calculateProfitFallback(newPrice, currentItem.estimatedSellPrice, shipping, feePercent)
 
-    const decision = makeDecision(currentItem.estimatedSellPrice, newPrice, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
+    // Use form-provided shipping if valid; fall back to settings default.
+    const effectiveShipping = (newShipping != null && Number.isFinite(newShipping) && newShipping >= 0)
+      ? newShipping
+      : (settings?.defaultShippingCost || 5.0)
+
+    const feePercent = settings?.ebayFeePercent || 12.9
+    const adFeePercent = settings?.ebayAdFeePercent || 3.0
+    const minMargin = settings?.minProfitMargin || 30
+
+    const profitMetrics = calculateProfitFallback(
+      newPrice,
+      effectiveSellPrice,
+      effectiveShipping,
+      feePercent,
+      0.30,         // per-order fee
+      adFeePercent,
+    )
+
+    const decision = makeDecision(
+      effectiveSellPrice,
+      newPrice,
+      profitMetrics.profitMargin,
+      profitMetrics.netProfit,
+      minMargin,
+    )
 
     const freeItemPlatformHint =
       newPrice === 0 && decision === 'PASS'
@@ -1064,13 +1092,16 @@ function App() {
     }
 
     const updatedMarketData = {
-      ...currentItem.marketData,
+      ...currentItem?.marketData,
       ...(freeItemPlatformHint ? { recommendedPlatform: freeItemPlatformHint } : { recommendedPlatform: undefined }),
     }
 
     setCurrentItem(prev => prev ? {
       ...prev,
       purchasePrice: newPrice,
+      // Persist the sell price so Quick Summary and Queue card both reflect
+      // the user-entered value, not a stale 0 from the failed AI lookup.
+      estimatedSellPrice: effectiveSellPrice,
       profitMargin: profitMetrics.profitMargin,
       decision,
       marketData: updatedMarketData,
@@ -1082,7 +1113,7 @@ function App() {
       return s
     }))
 
-    logActivity(`Recalculated: ${decision} — ${profitMetrics.profitMargin.toFixed(1)}% margin`)
+    logActivity(`Recalculated: ${decision} — buy $${newPrice.toFixed(2)} sell $${effectiveSellPrice.toFixed(2)} → ${profitMetrics.profitMargin.toFixed(1)}% margin`)
   }, [currentItem, settings, triggerSuccess, triggerFail])
 
   const handleCreateListingFromScan = useCallback(async (
