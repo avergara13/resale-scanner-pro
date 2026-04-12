@@ -1068,6 +1068,12 @@ function App() {
     logActivity('Draft saved to queue')
   }, [currentItem, setQueue, setScreen])
 
+  // Opens a specific ScannedItem (from session/history) directly into the scan-result screen
+  const handleOpenItemFromSession = useCallback((item: ScannedItem) => {
+    setCurrentItem(item)
+    setScreen('scan-result')
+  }, [setCurrentItem, setScreen])
+
   const handleReanalyzeCurrentItem = useCallback(() => {
     // Use the best available image — full base64 first, then optimized/thumbnail fallbacks.
     // Re-analyze NEVER opens the camera; that's the camera button's job.
@@ -1287,6 +1293,10 @@ function App() {
       }
       return [...current, listingItem]
     })
+    // Navigate to queue immediately — optimization runs in the background
+    setCurrentItem(undefined)
+    setPipeline([])
+    setScreen('queue')
     // Optimize directly with listingItem — avoids stale queue closure read
     // (handleOptimizeItem looks up the item from queue, which hasn't committed yet)
     try {
@@ -1374,8 +1384,8 @@ function App() {
     })
     setCurrentItem(undefined)
     setPipeline([])
-    setScreen('session')
-    toast('Saved to research history — reopen from Scan History to continue')
+    setScreen('agent')
+    toast('Saved to Scans — tap it to continue researching')
     logActivity('Saved for later research — not added to queue')
   }, [currentItem, setScanHistory, setScreen])
 
@@ -1829,6 +1839,8 @@ function App() {
 
   const prevScreenRef = useRef<Screen>(screen)
   const slideDir = useRef<'left' | 'right' | 'none'>('none')
+  // Remembers where the user was before opening Settings so back returns there
+  const settingsReturnScreen = useRef<Screen>('session')
 
   if (prevScreenRef.current !== screen) {
     const prevIdx = SCREEN_TAB_ORDER[prevScreenRef.current]
@@ -1900,14 +1912,16 @@ function App() {
       
       <AppHeader
         screen={screen}
-        onNavigateToSettings={() => setScreen('settings')}
+        onNavigateToSettings={() => { settingsReturnScreen.current = screen; setScreen('settings') }}
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
         backLabel={screen === 'scan-result' && openedFromScans ? 'Scans' : undefined}
         onBack={
           screen === 'scan-result'
             ? () => { setOpenedFromScans(false); setScreen('agent') }
-            : screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
+            : screen === 'settings'
+            ? () => setScreen(settingsReturnScreen.current)
+            : screen === 'session-detail' || screen === 'scan-history'
             ? () => setScreen('session')
             : screen === 'tag-analytics' || screen === 'location-insights'
             ? () => setScreen('queue')
@@ -1950,6 +1964,8 @@ function App() {
                 onPermanentDeleteSession={handlePermanentDeleteSession}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
+                onOpenItem={handleOpenItemFromSession}
+                onNavigateTo={(s) => setScreen(s)}
               />
             </motion.div>
           )}
@@ -2221,6 +2237,9 @@ function App() {
                 onUpdateSessions={setAllSessions}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
+                onOpenItem={handleOpenItemFromSession}
+                onOpenChat={() => setScreen('agent')}
+                onNavigateTo={(s) => setScreen(s)}
               />
             </motion.div>
           )}
