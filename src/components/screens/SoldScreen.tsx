@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowClockwise, ArrowSquareOut, CheckCircle, Package, SpinnerGap, Truck, Plus, Sparkle, X } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
+import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -292,6 +293,9 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
         </div>
 
       </div>
+
+      {/* Live session banner — slim, between tab bar and stats strip */}
+      <SessionLiveBanner />
 
       {/* ── Slim stats strip — matches Agent inline style ─────────────── */}
       <div

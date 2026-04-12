@@ -2429,7 +2429,7 @@ function App() {
         }}
         onCameraOpen={() => setCameraOpen(true)}
         captureState={captureState}
-        sessionMode={screen === 'session'}
+        sessionMode={!session?.active}
       />
 
       <CameraOverlay

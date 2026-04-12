@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Trash, Eye, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus, DotsThreeVertical } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
+import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -850,6 +851,10 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       id="scr-queue"
       className="h-full w-full overflow-y-auto overflow-x-hidden scrollable-content overscroll-y-contain"
     >
+      {/* Live session banner — sticky at top of scroll container */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 20 }}>
+        <SessionLiveBanner />
+      </div>
       <PullToRefreshIndicator
         isPulling={isPulling}
         isRefreshing={isRefreshing}

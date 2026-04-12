@@ -10,10 +10,11 @@ import { LocationInsights } from '../LocationInsights'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { useDeviceId } from '@/hooks/use-device-id'
 import type { Session, ScannedItem, ProfitGoal, Screen } from '@/types'
 
 function PastSessionCard({
-  session, items, buyCount, passCount, totalProfit, bestFind, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail, onOpenItem, onNavigateTo
+  session, items, buyCount, passCount, totalProfit, bestFind, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail, onOpenItem, onNavigateTo, isCurrentSession = false
 }: {
   session: Session
   items: ScannedItem[]
@@ -29,10 +30,12 @@ function PastSessionCard({
   onViewDetail: () => void
   onOpenItem?: (item: ScannedItem) => void
   onNavigateTo?: (screen: Screen) => void
+  isCurrentSession?: boolean
 })
  {
   const [expanded, setExpanded] = useState(false)
   const startDate = new Date(session.startTime)
+  const sessionStatus = isCurrentSession ? 'live' : session.active ? 'idle' : 'ended'
 
   return (
     <Card
@@ -42,12 +45,25 @@ function PastSessionCard({
       <button onClick={() => setExpanded(!expanded)} className="w-full p-3 text-left active:bg-s1/50 transition-colors">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Clock size={14} className={session.active ? 'text-green flex-shrink-0' : 'text-t3 flex-shrink-0'} />
+            <Clock
+              size={14}
+              className={cn(
+                'flex-shrink-0',
+                sessionStatus === 'live' && 'text-green animate-pulse',
+                sessionStatus === 'idle' && 'text-amber',
+                sessionStatus === 'ended' && 'text-t3'
+              )}
+            />
             <span className="text-xs font-bold text-t1 truncate">
               {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </span>
             {session.active && (
-              <span className="text-[8px] font-bold bg-green/15 text-green px-1.5 py-0.5 rounded-md uppercase">Open</span>
+              <span className={cn(
+                'text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase',
+                sessionStatus === 'live' ? 'bg-green/15 text-green' : 'bg-amber/15 text-amber'
+              )}>
+                {sessionStatus === 'live' ? 'Live' : 'Idle'}
+              </span>
             )}
             {session.sessionType === 'personal' && (
               <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase">Personal</span>
@@ -208,6 +224,8 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
     })
   }, [queue, scanHistory])
   const [goals] = useKV<ProfitGoal[]>('profit-goals', [])
+  const deviceId = useDeviceId()
+  const [currentDeviceSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
 
   const personalSessionIds = useMemo(() => {
     const ids = new Set<string>()
@@ -418,6 +436,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         onViewDetail={() => { onResumeSession?.(s.id) }}
                         onOpenItem={onOpenItem}
                         onNavigateTo={onNavigateTo}
+                        isCurrentSession={s.id === currentDeviceSession?.id}
                       />
                     )
                   })}
@@ -460,6 +479,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         onViewDetail={() => { onViewSessionDetail?.(s.id) }}
                         onOpenItem={onOpenItem}
                         onNavigateTo={onNavigateTo}
+                        isCurrentSession={s.id === currentDeviceSession?.id}
                       />
                     )
                   })}

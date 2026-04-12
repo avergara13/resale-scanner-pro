@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useKV } from '@github/spark/hooks'
+import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import {
   Robot,
   Sparkle,
@@ -224,7 +225,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const deviceId = useDeviceId()
   const [currentSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const sessionId = currentSession?.id
-  const [bannerCollapsed, setBannerCollapsed] = useKV<boolean>('agent-banner-collapsed', false)
+  // bannerCollapsed state is now managed inside SessionLiveBanner (shared KV key)
   const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])
   const activeKey = useMemo(() => sessionId ? `active-chat-session-${sessionId}` : 'active-chat-session-global', [sessionId])
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>(chatKey, EMPTY_CHAT_SESSIONS)
@@ -1364,35 +1365,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
       {/* ── Chrome: tab bar + stats bar — flex-shrink-0 keeps it out of scroll ── */}
       <div className="flex-shrink-0 z-20 bg-fg">
-        {/* Session context indicator — visible only when inside an active scanning session */}
-        {currentSession?.active && !bannerCollapsed && (
-          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-b1/20" style={{ background: 'color-mix(in oklch, var(--b1) 8%, var(--fg))' }}>
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-b1 animate-pulse flex-shrink-0" />
-            <span className="text-[10px] font-bold text-b1 truncate">
-              {currentSession.name || `Session #${String(currentSession.sessionNumber ?? 1).padStart(3, '0')}`}
-            </span>
-            <button
-              onClick={() => setBannerCollapsed(true)}
-              className="ml-auto flex items-center gap-1 text-[10px] text-t3 hover:text-t2 transition-colors flex-shrink-0"
-              aria-label="Collapse session banner"
-            >
-              <span className="font-medium">Active</span>
-              <CaretUp size={10} weight="bold" />
-            </button>
-          </div>
-        )}
-        {/* Collapsed indicator — tap to restore banner */}
-        {currentSession?.active && bannerCollapsed && (
-          <button
-            onClick={() => setBannerCollapsed(false)}
-            className="w-full flex items-center justify-center gap-1.5 py-0.5 border-b border-b1/20 transition-colors hover:opacity-80"
-            style={{ background: 'color-mix(in oklch, var(--b1) 8%, var(--fg))' }}
-            aria-label="Expand session banner"
-          >
-            <span className="inline-block w-1 h-1 rounded-full bg-b1 flex-shrink-0" />
-            <CaretDown size={9} weight="bold" className="text-b1" />
-          </button>
-        )}
+        {/* Premium live session banner — shared component, self-contained */}
+        <SessionLiveBanner />
         <div className="border-b border-s1">
           <div className="tab-bar px-3">
             <button
