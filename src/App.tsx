@@ -720,11 +720,6 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
-    const now = new Date()
-    const hour = now.getHours()
-    const timeOfDay = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
-    const dayName = now.toLocaleDateString('en-US', { weekday: 'short' })
-    const monthDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     // Per-operator session counter — derived from allSessions, never conflicts between devices
     const profile = settings?.userProfile
     const operatorId = profile?.operatorId || 'default'
@@ -732,7 +727,7 @@ function App() {
     const sessionNumber = operatorSessions.length + 1
     const initial = profile?.operatorInitial || ''
     const prefix = initial ? `${initial}-` : '#'
-    const name = `${prefix}${String(sessionNumber).padStart(3, '0')} — ${dayName} ${timeOfDay} — ${monthDay}`
+    const name = `${prefix}${String(sessionNumber).padStart(3, '0')}`
     const id = Date.now().toString()
     const newSession: Session = {
       id,
