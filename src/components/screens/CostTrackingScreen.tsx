@@ -1,344 +1,219 @@
-import { useState } from 'react'
-import { ArrowLeft, CurrencyDollar, TrendUp, TrendDown, Warning, CalendarBlank, Database, Lightning, Eye, ShoppingCart, FileText, ArrowsClockwise } from '@phosphor-icons/react'
-import { Button } from '@/components/ui/button'
+import { useState, useMemo } from 'react'
+import { TrendUp, Package, ShoppingBag, ArrowsClockwise } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useCostTracking } from '@/hooks/use-cost-tracking'
 import { API_COST_CONFIGS } from '@/lib/cost-tracking-service'
-import type { ApiService } from '@/types'
 import { cn } from '@/lib/utils'
+import type { ScannedItem } from '@/types'
 
 interface CostTrackingScreenProps {
   onBack: () => void
+  queueItems?: ScannedItem[]
+  scanHistory?: ScannedItem[]
 }
 
-const SERVICE_ICONS: Record<ApiService, React.ReactNode> = {
-  gemini: <Lightning className="w-5 h-5" />,
-  googleLens: <Eye className="w-5 h-5" />,
-  googleCustomSearch: <Database className="w-5 h-5" />,
-  ebay: <ShoppingCart className="w-5 h-5" />,
-  notion: <FileText className="w-5 h-5" />,
-  openai: <Lightning className="w-5 h-5" />
-}
+type Period = 'today' | 'week' | 'month' | 'all'
+const PERIOD_LABELS: Record<Period, string> = { today: 'Today', week: 'Week', month: 'Month', all: 'All Time' }
+const PERIOD_MS: Record<Period, number> = { today: 86_400_000, week: 604_800_000, month: 2_592_000_000, all: Infinity }
 
-const SERVICE_COLORS: Record<ApiService, string> = {
-  gemini: 'text-blue-600 dark:text-blue-400',
-  googleLens: 'text-purple-600 dark:text-purple-400',
-  googleCustomSearch: 'text-green-600 dark:text-green-400',
-  ebay: 'text-yellow-600 dark:text-yellow-400',
-  notion: 'text-pink-600 dark:text-pink-400',
-  openai: 'text-indigo-600 dark:text-indigo-400'
-}
+export function CostTrackingScreen({ onBack, queueItems, scanHistory }: CostTrackingScreenProps) {
+  const [period, setPeriod] = useState<Period>('month')
+  const [showApiCosts, setShowApiCosts] = useState(false)
+  const { costData, isLoading, refreshData } = useCostTracking(period)
 
-export function CostTrackingScreen({ onBack }: CostTrackingScreenProps) {
-  const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('month')
-  const { costData, alerts, budgets, isLoading, refreshData } = useCostTracking(period)
-  const [expandedServices, setExpandedServices] = useState<Record<string, boolean>>({})
+  const cutoff = useMemo(() => {
+    return period === 'all' ? 0 : Date.now() - PERIOD_MS[period]
+  }, [period])
 
-  const toggleService = (service: string) => {
-    setExpandedServices(prev => ({ ...prev, [service]: !prev[service] }))
-  }
-
-  const formatCurrency = (amount: number) => {
-    if (amount === 0) return '$0.00'
-    if (amount < 0.01) return `$${amount.toFixed(4)}`
-    return `$${amount.toFixed(2)}`
-  }
-
-  const getPeriodLabel = () => {
-    switch (period) {
-      case 'today': return 'Today'
-      case 'week': return 'Last 7 Days'
-      case 'month': return 'Last 30 Days'
-      case 'all': return 'All Time'
+  const { buyItems, allPeriodItems } = useMemo(() => {
+    const all = [...(queueItems || []), ...(scanHistory || [])]
+    const seen = new Set<string>()
+    const unique = all.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true })
+    const periodItems = unique.filter(i => i.timestamp >= cutoff)
+    return {
+      allPeriodItems: periodItems,
+      buyItems: periodItems
+        .filter(i => i.decision === 'BUY')
+        .sort((a, b) => (b.profitMargin || 0) - (a.profitMargin || 0)),
     }
-  }
+  }, [queueItems, scanHistory, cutoff])
+
+  const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
+  const totalRevenue = buyItems.reduce((s, i) => s + (i.estimatedSellPrice || 0), 0)
+  const totalProfit = totalRevenue - totalInvested
+  const avgROI = totalInvested > 0 ? Math.round((totalProfit / totalInvested) * 100) : 0
+  const buyRate = allPeriodItems.length > 0 ? Math.round((buyItems.length / allPeriodItems.length) * 100) : 0
 
   return (
-    <div className="flex flex-col h-full w-full bg-background">
-      <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background border-b border-border">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onBack}
-            className="touch-target"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold text-t1">💰 API Cost Tracking</h1>
-            <p className="text-xs text-t3">{getPeriodLabel()}</p>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={refreshData}
-          className="touch-target"
-          disabled={isLoading}
-        >
-          <ArrowsClockwise className={cn("w-5 h-5", isLoading && "animate-spin")} />
-        </Button>
-      </div>
+    <div className="flex flex-col h-full bg-bg">
+      <div className="flex-1 overflow-y-auto pb-24">
+        <div className="px-4 pt-4 space-y-4">
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
-        {alerts.length > 0 && (
-          <Card className="p-4 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800">
-            <div className="flex items-start gap-3">
-              <Warning className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-red-900 dark:text-red-100">Cost Alerts</h3>
-                <div className="space-y-2 mt-2">
-                  {alerts.map(alert => (
-                    <div key={alert.id} className="text-sm text-red-800 dark:text-red-200">
-                      • {alert.message}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        <Tabs value={period} onValueChange={(v) => setPeriod(v as typeof period)} className="w-full">
-          <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="today">Today</TabsTrigger>
-            <TabsTrigger value="week">Week</TabsTrigger>
-            <TabsTrigger value="month">Month</TabsTrigger>
-            <TabsTrigger value="all">All</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="loading-spinner" />
-          </div>
-        ) : costData ? (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="stat-card p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <CurrencyDollar className="w-5 h-5 text-b1" />
-                  <span className="text-xs font-medium text-t3 uppercase tracking-wide">Total Cost</span>
-                </div>
-                <div className="text-2xl font-bold text-t1">
-                  {formatCurrency(costData.totalCost)}
-                </div>
-                {costData.projectedMonthlyCost && period !== 'month' && period !== 'all' && (
-                  <div className="text-xs text-t3 mt-1">
-                    ~{formatCurrency(costData.projectedMonthlyCost)}/mo projected
-                  </div>
+          {/* Period selector */}
+          <div className="flex gap-1 bg-s1 p-1 rounded-xl">
+            {(['today', 'week', 'month', 'all'] as Period[]).map(p => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  'flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all',
+                  period === p ? 'bg-fg text-t1 shadow-sm' : 'text-t3 hover:text-t2'
                 )}
-              </Card>
+              >
+                {p === 'all' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
+          </div>
 
-              <Card className="stat-card p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Database className="w-5 h-5 text-green" />
-                  <span className="text-xs font-medium text-t3 uppercase tracking-wide">Requests</span>
-                </div>
-                <div className="text-2xl font-bold text-t1">
-                  {costData.totalRequests.toLocaleString()}
-                </div>
-                <div className="text-xs text-t3 mt-1">
-                  {costData.totalRequests > 0 
-                    ? formatCurrency(costData.totalCost / costData.totalRequests) 
-                    : '$0.00'} avg/request
-                </div>
-              </Card>
+          {/* Summary tiles */}
+          <div className="grid grid-cols-2 gap-2">
+            <div
+              className="stat-card p-3"
+              style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+            >
+              <p className="text-[9px] text-t3 uppercase tracking-wider mb-1">Est. Profit</p>
+              <p className={cn('text-xl font-bold mono leading-tight', totalProfit >= 0 ? 'text-green' : 'text-red')}>
+                {totalProfit >= 0 ? '+' : ''}${Math.abs(totalProfit).toFixed(2)}
+              </p>
+              <p className="text-[10px] text-t3 mt-0.5">{buyItems.length} items</p>
             </div>
+            <div
+              className="stat-card p-3"
+              style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+            >
+              <p className="text-[9px] text-t3 uppercase tracking-wider mb-1">Avg ROI</p>
+              <p className={cn('text-xl font-bold mono leading-tight', avgROI >= 0 ? 'text-green' : 'text-red')}>
+                {avgROI >= 0 ? '+' : ''}{avgROI}%
+              </p>
+              <p className="text-[10px] text-t3 mt-0.5">BUY rate {buyRate}%</p>
+            </div>
+            <div
+              className="stat-card p-3"
+              style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+            >
+              <p className="text-[9px] text-t3 uppercase tracking-wider mb-1">Invested</p>
+              <p className="text-xl font-bold mono text-t1 leading-tight">${totalInvested.toFixed(2)}</p>
+              <p className="text-[10px] text-t3 mt-0.5">purchase cost</p>
+            </div>
+            <div
+              className="stat-card p-3"
+              style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+            >
+              <p className="text-[9px] text-t3 uppercase tracking-wider mb-1">Est. Revenue</p>
+              <p className="text-xl font-bold mono text-b1 leading-tight">${totalRevenue.toFixed(2)}</p>
+              <p className="text-[10px] text-t3 mt-0.5">if all sell</p>
+            </div>
+          </div>
 
-            {costData.services.length > 0 && (
-              <div className="space-y-3">
-                <h2 className="text-sm font-semibold text-t2 uppercase tracking-wide flex items-center gap-2">
-                  <CalendarBlank className="w-4 h-4" />
-                  Services Breakdown
-                </h2>
-
-                {costData.services.map(service => {
-                  const config = API_COST_CONFIGS[service.service]
-                  const percentOfTotal = costData.totalCost > 0 
-                    ? (service.totalCost / costData.totalCost) * 100 
-                    : 0
-                  const isExpanded = expandedServices[service.service]
-
-                  return (
-                    <Collapsible
-                      key={service.service}
-                      open={isExpanded}
-                      onOpenChange={() => toggleService(service.service)}
+          {/* BUY items list */}
+          {buyItems.length > 0 ? (
+            <div className="space-y-2">
+              <h3 className="text-[10px] font-bold text-t3 uppercase tracking-wider flex items-center gap-1.5">
+                <TrendUp size={12} />
+                Inventory — {PERIOD_LABELS[period]} ({buyItems.length})
+              </h3>
+              {buyItems.map(item => {
+                const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
+                const margin = item.profitMargin || 0
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-s2/60"
+                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+                  >
+                    {item.imageThumbnail || item.imageData ? (
+                      <img
+                        src={item.imageThumbnail || item.imageData}
+                        alt={item.productName || 'Item'}
+                        className="w-10 h-10 rounded-xl object-cover flex-shrink-0 border border-s2/60"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-s1 flex items-center justify-center flex-shrink-0 border border-s2/60">
+                        <Package size={16} className="text-t3" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-t1 truncate">{item.productName || 'Unknown Item'}</p>
+                      <p className="text-[10px] text-t3 font-mono">
+                        ${item.purchasePrice.toFixed(2)} → ${(item.estimatedSellPrice || 0).toFixed(2)}
+                        {profit !== 0 && (
+                          <span className={cn('ml-1.5', profit > 0 ? 'text-green' : 'text-red')}>
+                            ({profit > 0 ? '+' : ''}${profit.toFixed(2)})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        'text-[9px] font-bold flex-shrink-0',
+                        margin > 0
+                          ? 'bg-green/10 text-green border border-green/20'
+                          : 'bg-red/10 text-red border border-red/20'
+                      )}
                     >
-                      <Card className="stat-card overflow-hidden">
-                        <CollapsibleTrigger className="w-full p-4 text-left">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className={cn("p-2 rounded-lg bg-s1", SERVICE_COLORS[service.service])}>
-                                {SERVICE_ICONS[service.service]}
-                              </div>
-                              <div>
-                                <h3 className="font-semibold text-t1">{config.name}</h3>
-                                <p className="text-xs text-t3">{service.totalRequests} requests</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-t1">
-                                {formatCurrency(service.totalCost)}
-                              </div>
-                              <div className="text-xs text-t3">
-                                {percentOfTotal.toFixed(1)}% of total
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mt-3">
-                            <Progress value={percentOfTotal} className="h-2" />
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-                            <div>
-                              <span className="text-t3">Success:</span>{' '}
-                              <span className="font-semibold text-green">{service.successfulRequests}</span>
-                            </div>
-                            <div>
-                              <span className="text-t3">Failed:</span>{' '}
-                              <span className="font-semibold text-red">{service.failedRequests}</span>
-                            </div>
-                            <div>
-                              <span className="text-t3">Avg:</span>{' '}
-                              <span className="font-semibold text-t1">
-                                {formatCurrency(service.averageCostPerRequest)}
-                              </span>
-                            </div>
-                          </div>
-                        </CollapsibleTrigger>
-
-                        <CollapsibleContent>
-                          <div className="px-4 pb-4 pt-2 border-t border-border">
-                            <h4 className="text-xs font-semibold text-t2 mb-2 uppercase tracking-wide">
-                              Cost by Operation
-                            </h4>
-                            <div className="space-y-2">
-                              {Object.entries(service.costByOperation)
-                                .sort(([, a], [, b]) => (b as number) - (a as number))
-                                .map(([operation, cost]) => (
-                                  <div key={operation} className="flex items-center justify-between text-sm">
-                                    <span className="text-t2">{operation}</span>
-                                    <span className="font-mono text-t1">{formatCurrency(cost)}</span>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        </CollapsibleContent>
-                      </Card>
-                    </Collapsible>
-                  )
-                })}
-              </div>
-            )}
-
-            {costData.topCostOperations.length > 0 && (
-              <div className="space-y-3">
-                <h2 className="text-sm font-semibold text-t2 uppercase tracking-wide flex items-center gap-2">
-                  <TrendUp className="w-4 h-4" />
-                  Top Cost Operations
-                </h2>
-
-                <Card className="stat-card p-4">
-                  <div className="space-y-3">
-                    {costData.topCostOperations.map((op, index) => {
-                      const config = API_COST_CONFIGS[op.service]
-                      const percentOfTotal = costData.totalCost > 0 
-                        ? (op.cost / costData.totalCost) * 100 
-                        : 0
-
-                      return (
-                        <div key={`${op.service}-${op.operation}`} className="flex items-center gap-3">
-                          <Badge variant="secondary" className="w-6 h-6 flex items-center justify-center p-0">
-                            {index + 1}
-                          </Badge>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <div>
-                                <span className="text-sm font-medium text-t1">{op.operation}</span>
-                                <span className="text-xs text-t3 ml-2">({config.name})</span>
-                              </div>
-                              <span className="text-sm font-bold text-t1">{formatCurrency(op.cost)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Progress value={percentOfTotal} className="h-1.5 flex-1" />
-                              <span className="text-xs text-t3 w-12 text-right">{op.count}x</span>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                      {margin >= 0 ? '+' : ''}{margin.toFixed(0)}%
+                    </Badge>
                   </div>
-                </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-6">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1/20 to-b2/10 border border-b1/20 flex items-center justify-center mb-5">
+                <ShoppingBag size={32} weight="duotone" className="text-b1" />
               </div>
-            )}
+              <h3 className="text-lg font-bold text-t1 mb-2">No BUY items yet</h3>
+              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">
+                Items you decide to buy will appear here with profit projections
+              </p>
+            </div>
+          )}
 
-            {costData.services.length === 0 && costData.totalRequests === 0 && (
-              <Card className="stat-card p-8 text-center">
-                <CurrencyDollar className="w-12 h-12 mx-auto text-s3 mb-3" />
-                <h3 className="font-semibold text-t2 mb-1">No API usage yet</h3>
-                <p className="text-sm text-t3">
-                  Start scanning items to track API costs
-                </p>
-              </Card>
-            )}
-
-            {budgets.length > 0 && (
-              <div className="space-y-3">
-                <h2 className="text-sm font-semibold text-t2 uppercase tracking-wide flex items-center gap-2">
-                  <Warning className="w-4 h-4" />
-                  Active Budgets
-                </h2>
-
-                {budgets.map(budget => {
-                  const percentUsed = (costData.totalCost / budget.limit) * 100
-                  const isWarning = percentUsed >= budget.warningThreshold
-                  const isExceeded = percentUsed >= 100
-
+          {/* API Costs — secondary collapsible */}
+          <Collapsible open={showApiCosts} onOpenChange={setShowApiCosts}>
+            <CollapsibleTrigger className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl bg-s1 text-[11px] font-bold text-t3 hover:text-t2 transition-colors">
+              <span>API Usage Costs</span>
+              <div className="flex items-center gap-2">
+                {!isLoading && costData && (
+                  <span className="font-mono text-t1">${costData.totalCost.toFixed(4)}</span>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); refreshData() }}
+                  className="p-1 rounded hover:bg-s2 transition-colors"
+                  aria-label="Refresh API costs"
+                >
+                  <ArrowsClockwise size={12} className={cn(isLoading && 'animate-spin')} />
+                </button>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2 space-y-1.5">
+              {costData && costData.services.length > 0 ? (
+                costData.services.map(service => {
+                  const config = API_COST_CONFIGS[service.service]
                   return (
-                    <Card key={budget.id} className="stat-card p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-semibold text-t1 capitalize">{budget.period} Budget</span>
-                        <Badge variant={isExceeded ? 'destructive' : isWarning ? 'secondary' : 'default'}>
-                          {percentUsed.toFixed(1)}%
-                        </Badge>
+                    <div
+                      key={service.service}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg border border-s2/60"
+                      style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}
+                    >
+                      <span className="text-[11px] text-t2">{config.name}</span>
+                      <div className="text-right">
+                        <span className="text-[11px] font-mono text-t1">${service.totalCost.toFixed(4)}</span>
+                        <span className="text-[10px] text-t3 ml-2">{service.totalRequests}x</span>
                       </div>
-                      <div className="mb-2">
-                        <Progress 
-                          value={Math.min(percentUsed, 100)} 
-                          className={cn(
-                            "h-2",
-                            isExceeded && "bg-red-200 dark:bg-red-900",
-                            isWarning && !isExceeded && "bg-yellow-200 dark:bg-yellow-900"
-                          )}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-t3">
-                        <span>{formatCurrency(costData.totalCost)} used</span>
-                        <span>{formatCurrency(budget.limit)} limit</span>
-                      </div>
-                    </Card>
+                    </div>
                   )
-                })}
-              </div>
-            )}
-          </>
-        ) : (
-          <Card className="stat-card p-8 text-center">
-            <Warning className="w-12 h-12 mx-auto text-s3 mb-3" />
-            <h3 className="font-semibold text-t2 mb-1">No data available</h3>
-            <p className="text-sm text-t3">
-              Unable to load cost tracking data
-            </p>
-          </Card>
-        )}
+                })
+              ) : (
+                <p className="text-[11px] text-t3 text-center py-3">No API usage in this period</p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+
+        </div>
       </div>
     </div>
   )

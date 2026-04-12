@@ -2189,6 +2189,8 @@ function App() {
             >
               <CostTrackingScreen
                 onBack={() => setScreen('settings')}
+                queueItems={queue || []}
+                scanHistory={scanHistory || []}
               />
             </motion.div>
           )}

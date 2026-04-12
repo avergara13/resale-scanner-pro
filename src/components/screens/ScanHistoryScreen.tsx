@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { Trash, FloppyDisk, CheckSquare, Square, ArrowLeft, Clock, Package, Funnel } from '@phosphor-icons/react'
+import { Trash, FloppyDisk, CheckSquare, Square, Clock, Package } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -79,25 +79,8 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
   return (
     <div className="flex flex-col h-full bg-bg">
       <div className="px-4 pt-3 pb-3 border-b border-s2 bg-fg">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-s1 transition-colors">
-              <ArrowLeft size={20} weight="bold" className="text-t1" />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-t1">Scan History</h1>
-              <p className="text-[10px] text-t3 uppercase tracking-wider">{(scanHistory || []).length} total scans</p>
-            </div>
-          </div>
-          {(scanHistory || []).length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearAll} className="text-red text-xs">
-              Clear All
-            </Button>
-          )}
-        </div>
-
-        {/* Filter tabs */}
-        <div className="flex gap-1.5">
+        {/* Filter tabs + Clear All */}
+        <div className="flex items-center gap-1.5">
           {(['all', 'BUY', 'PASS', 'PENDING'] as const).map(f => (
             <button
               key={f}
@@ -110,6 +93,11 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
               {f === 'all' ? `All (${(scanHistory || []).length})` : f}
             </button>
           ))}
+          {(scanHistory || []).length > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearAll} className="text-red text-[10px] px-2 h-7 flex-shrink-0">
+              Clear
+            </Button>
+          )}
         </div>
       </div>
 
