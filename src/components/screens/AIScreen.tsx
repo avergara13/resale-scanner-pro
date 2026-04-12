@@ -13,6 +13,7 @@ import {
   FloppyDisk,
   CheckCircle,
   ClipboardText,
+  Camera,
 } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -783,7 +784,7 @@ export function AIScreen({
             <div className="p-2.5 sm:p-3">
               <Button
                 onClick={() => onOpenCamera?.()}
-                className="w-full h-11 bg-b1 hover:bg-b2 text-white font-semibold text-sm"
+                className="w-full h-11 rounded-xl bg-b1 hover:bg-b2 text-white font-semibold text-sm active:scale-[0.97] transition-all"
               >
                 <Scan size={15} weight="bold" className="mr-1.5" />
                 Scan Another Item
@@ -802,7 +803,7 @@ export function AIScreen({
                       Number.isFinite(shipPriceFloat) && shipPriceFloat >= 0 ? shipPriceFloat : undefined,
                     )
                   }}
-                  className="w-full bg-amber hover:opacity-90 text-white h-10 font-semibold text-xs sm:text-sm"
+                  className="w-full rounded-xl bg-amber hover:opacity-90 text-white h-10 font-semibold text-sm active:scale-[0.97] transition-all"
                 >
                   <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
                   Recalculate ROI
@@ -814,7 +815,7 @@ export function AIScreen({
                 <Button
                   onClick={() => onRescan?.()}
                   variant="outline"
-                  className="flex-shrink-0 h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
+                  className="flex-shrink-0 h-10 px-3 rounded-xl border border-s2 text-t2 hover:text-t1 hover:bg-s1 font-semibold text-xs active:scale-[0.97] transition-all"
                 >
                   <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
                   Re-analyze
@@ -825,13 +826,13 @@ export function AIScreen({
                     <Button
                       variant="outline"
                       onClick={() => setConfirmPass(false)}
-                      className="flex-1 h-10 text-xs text-t3 border-s2 hover:bg-s1"
+                      className="flex-1 h-10 rounded-xl text-xs text-t3 border border-s2 hover:bg-s1 active:scale-[0.97] transition-all"
                     >
                       Cancel
                     </Button>
                     <Button
                       onClick={() => { onPassItem(parseFloat(buyPrice) || 0, description); setConfirmPass(false) }}
-                      className="flex-1 h-10 text-xs font-bold bg-red hover:opacity-90 text-white border-0"
+                      className="flex-1 h-10 rounded-xl text-xs font-bold bg-red hover:opacity-90 text-white border-0 active:scale-[0.97] transition-all"
                     >
                       Confirm Pass
                     </Button>
@@ -841,7 +842,7 @@ export function AIScreen({
                     onClick={() => setConfirmPass(true)}
                     disabled={!canSaveDraft}
                     variant="outline"
-                    className="flex-1 h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                    className="flex-1 h-10 rounded-xl border border-red/40 text-red hover:bg-red/10 font-semibold text-xs sm:text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
                   >
                     <XCircle size={15} weight="bold" className="mr-1" />
                     Pass
@@ -852,22 +853,32 @@ export function AIScreen({
                     onClick={() => onMaybeItem(parseFloat(buyPrice) || 0, description)}
                     disabled={!canSaveDraft}
                     variant="outline"
-                    className="flex-1 h-10 border-amber-400/50 text-amber-500 hover:bg-amber-400/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
+                    className="flex-1 h-10 rounded-xl border border-amber-400/50 text-amber-500 hover:bg-amber-400/10 font-semibold text-xs sm:text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
                   >
                     <BookmarkSimple size={15} weight="bold" className="mr-1" />
                     Maybe
                   </Button>
                 )}
               </div>
-              {/* Row 2: primary CTA — locked when PENDING (no real decision yet) */}
-              <Button
-                onClick={handleAddToQueue}
-                disabled={!canSaveDraft || decision === 'PENDING'}
-                className="w-full h-11 sm:h-12 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-sm font-bold shadow-md shadow-green/20"
-              >
-                <ShoppingCart size={16} weight="bold" className="mr-2" />
-                Add to Queue
-              </Button>
+              {/* Row 2: camera + primary CTA — CTA locked when PENDING */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onOpenCamera?.()}
+                  className="w-11 h-11 flex-shrink-0 rounded-xl border border-s2 text-t2 hover:text-t1 hover:bg-s1 flex items-center justify-center active:scale-[0.97] transition-all"
+                  style={{ touchAction: 'manipulation' }}
+                  title="Open camera"
+                >
+                  <Camera size={18} weight="bold" />
+                </button>
+                <Button
+                  onClick={handleAddToQueue}
+                  disabled={!canSaveDraft || decision === 'PENDING'}
+                  className="flex-1 h-11 rounded-xl bg-green hover:opacity-90 text-white font-bold shadow-sm shadow-green/20 disabled:opacity-40 disabled:cursor-not-allowed text-sm active:scale-[0.97] transition-all"
+                >
+                  <ShoppingCart size={16} weight="bold" className="mr-2" />
+                  Add to Queue
+                </Button>
+              </div>
               {decision === 'PENDING' && (
                 <p className="text-center text-[10px] text-t3 -mt-1 leading-tight">
                   Enter a sell price and tap Recalculate to unlock
@@ -922,7 +933,7 @@ export function AIScreen({
                 <Button
                   onClick={() => onRescan()}
                   variant="outline"
-                  className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
+                  className="flex-shrink-0 h-10 px-3 rounded-xl border border-s2 text-t2 hover:text-t1 hover:bg-s1 font-semibold text-xs active:scale-[0.97] transition-all"
                 >
                   <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
                   Re-analyze
@@ -931,10 +942,10 @@ export function AIScreen({
               <Button
                 onClick={() => onSaveDraft(parseFloat(buyPrice), description)}
                 disabled={!canSaveDraft}
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                className="flex-1 rounded-xl bg-b1 hover:bg-b2 text-white h-10 font-semibold disabled:opacity-40 disabled:cursor-not-allowed text-sm active:scale-[0.97] transition-all"
               >
                 <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
-                SAVE DRAFT TO QUEUE
+                Save Draft to Queue
               </Button>
             </div>
           </div>
