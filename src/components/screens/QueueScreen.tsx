@@ -1178,45 +1178,46 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       </div>
 
       {filteredItems.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
+        <div className="flex flex-col items-center justify-center min-h-[58vh] px-6 text-center">
           {queueItems.length === 0 && onAddManualItem ? (
-            <button
-              onClick={() => setShowAddDialog(true)}
-              className="w-24 h-24 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-4 shadow-lg active:scale-95 transition-all"
-            >
-              <Package size={40} weight="duotone" className="text-white" />
-            </button>
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-s1 flex items-center justify-center mb-4">
-              <p className="text-3xl">
-                {searchQuery ? '🔍' : filter === 'BUY' ? '✅' : '📦'}
+            <>
+              <button
+                onClick={() => setShowAddDialog(true)}
+                className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg active:scale-95 transition-all"
+                style={{ boxShadow: 'var(--send-glow)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <Package size={44} weight="duotone" className="text-white" />
+              </button>
+              <h2 className="text-xl font-bold text-t1 mb-2">Queue is empty</h2>
+              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">
+                Tap the icon above to add an item manually, or use the camera to scan one
               </p>
-            </div>
-          )}
-          <h2 className="text-lg font-semibold text-t1 mb-2">
-            {searchQuery
-              ? 'No items found'
-              : queueItems.length === 0
-                ? 'Queue is empty'
-                : `No ${filter} items`
-            }
-          </h2>
-          <p className="text-sm text-t2 max-w-xs">
-            {searchQuery
-              ? `No items match "${searchQuery}". Try a different search term.`
-              : queueItems.length === 0
-                ? 'Tap the icon above to add an item manually, or scan with the camera'
-                : `Try selecting a different filter to view items`
-            }
-          </p>
-          {searchQuery && (
-            <Button
-              onClick={() => setSearchQuery('')}
-              variant="outline"
-              className="mt-4 border-s2 text-t2 hover:bg-s1 hover:text-t1"
-            >
-              Clear Search
-            </Button>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 rounded-3xl bg-s1 flex items-center justify-center mb-5">
+                <p className="text-3xl">
+                  {searchQuery ? '🔍' : filter === 'BUY' ? '✅' : '📦'}
+                </p>
+              </div>
+              <h2 className="text-xl font-bold text-t1 mb-2">
+                {searchQuery ? 'No items found' : `No ${filter} items`}
+              </h2>
+              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">
+                {searchQuery
+                  ? `No items match "${searchQuery}". Try a different search term.`
+                  : 'Try selecting a different filter to view items'}
+              </p>
+              {searchQuery && (
+                <Button
+                  onClick={() => setSearchQuery('')}
+                  variant="outline"
+                  className="mt-4 border-s2 text-t2 hover:bg-s1 hover:text-t1"
+                >
+                  Clear Search
+                </Button>
+              )}
+            </>
           )}
         </div>
       ) : (

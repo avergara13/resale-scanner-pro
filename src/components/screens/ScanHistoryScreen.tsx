@@ -149,10 +149,12 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
           }}
         >
           {filteredHistory.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Clock size={40} weight="duotone" className="text-t3 mb-3" />
-              <h3 className="text-base font-semibold text-t1 mb-1">No scan history</h3>
-              <p className="text-xs text-t3 max-w-xs">Scans will appear here as you use the AI camera</p>
+            <div className="flex flex-col items-center justify-center min-h-[55vh] text-center px-6">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1/20 to-b2/10 border border-b1/20 flex items-center justify-center mb-5">
+                <Clock size={36} weight="duotone" className="text-b1" />
+              </div>
+              <h3 className="text-lg font-bold text-t1 mb-2">No scan history</h3>
+              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">Scans will appear here as you use the AI camera</p>
             </div>
           ) : (
             filteredHistory.map(item => {
