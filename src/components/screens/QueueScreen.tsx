@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, Eye, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
+import { Trash, Eye, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus, DotsThreeVertical } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -60,7 +60,7 @@ interface QueueScreenProps {
   onBuyItem?: (id: string) => void
 }
 
-type FilterOption = 'ALL' | 'BUY' | 'PASS' | 'PENDING'
+type FilterOption = 'ALL' | 'BUY'
 type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc' | 'tag-count-desc' | 'tag-count-asc' | 'tag-name-asc' | 'tag-name-desc' | 'manual'
 
 interface SortableItemProps {
@@ -104,6 +104,8 @@ function SortableItem({
     transition,
     isDragging,
   } = useSortable({ id: item.id })
+
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -363,18 +365,43 @@ function SortableItem({
           <div className="flex-1" />
         )}
 
-        {/* Delete */}
+        {/* Overflow menu — tap to reveal delete confirmation (prevents accidental removal) */}
         <div className="w-px h-5 bg-s2 flex-shrink-0" />
         <button
-          onClick={() => onRemove(item.id)}
-          title="Remove"
-          aria-label="Remove item"
-          className="w-11 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
+          onClick={() => setConfirmDelete(v => !v)}
+          title="More options"
+          aria-label="More options"
+          className={cn(
+            'w-11 h-10 flex items-center justify-center transition-colors',
+            confirmDelete ? 'text-red bg-red/10' : 'text-t3 hover:text-t1 hover:bg-s1'
+          )}
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         >
-          <Trash size={13} weight="bold" />
+          <DotsThreeVertical size={15} weight="bold" />
         </button>
       </div>
+      {/* Delete confirmation row — only visible after tapping ⋮ */}
+      {confirmDelete && (
+        <div className="px-3 pb-3 pt-2 border-t border-s2 flex items-center justify-between gap-2">
+          <p className="text-[10px] text-t3 leading-tight">Remove this item from your queue?</p>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="text-[10px] font-semibold text-t3 hover:text-t1 px-2 py-1 rounded transition-colors"
+              style={{ touchAction: 'manipulation' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { onRemove(item.id); setConfirmDelete(false) }}
+              className="text-[10px] font-bold text-red px-2 py-1 rounded bg-red/10 hover:bg-red/20 transition-colors"
+              style={{ touchAction: 'manipulation' }}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }
@@ -454,7 +481,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     }
     
     if (preset.filters?.decision && preset.filters.decision.length === 1) {
-      const validFilters: FilterOption[] = ['ALL', 'BUY', 'PASS', 'PENDING']
+      const validFilters: FilterOption[] = ['ALL', 'BUY']
       const val = preset.filters.decision[0]
       setFilter(validFilters.includes(val as FilterOption) ? (val as FilterOption) : 'ALL')
     } else {
@@ -508,9 +535,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
 
     const matchesFilter =
       filter === 'ALL' ||
-      (filter === 'BUY' && item.decision === 'BUY') ||
-      (filter === 'PASS' && item.decision === 'PASS') ||
-      (filter === 'PENDING' && item.decision === 'PENDING')
+      (filter === 'BUY' && item.decision === 'BUY')
     
     if (!matchesFilter) return false
 
@@ -603,8 +628,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
   
   const buyCount = queueItems.filter(item => item.decision === 'BUY').length
-  const passCount = queueItems.filter(item => item.decision === 'PASS').length
-  const pendingCount = queueItems.filter(item => item.decision === 'PENDING').length
   const hasActiveAdvancedFilters =
     (advancedFilters.tags?.length ?? 0) > 0 ||
     (advancedFilters.locations?.length ?? 0) > 0 ||
@@ -1051,18 +1074,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               className={cn('tab-btn', filter === 'BUY' && 'active')}
             >
               <span>Listed{buyCount > 0 && ` (${buyCount})`}</span>
-            </button>
-            <button
-              onClick={() => setFilter('PASS')}
-              className={cn('tab-btn', filter === 'PASS' && 'active')}
-            >
-              <span>Passed{passCount > 0 && ` (${passCount})`}</span>
-            </button>
-            <button
-              onClick={() => setFilter('PENDING')}
-              className={cn('tab-btn', filter === 'PENDING' && 'active')}
-            >
-              <span>Pending{pendingCount > 0 && ` (${pendingCount})`}</span>
             </button>
           </div>
         </div>
