@@ -1016,7 +1016,10 @@ ${activeGoalsSummary || 'None'}
 ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} (${t.createdBy})`).join('\n') : 'No pending tasks'}
 
 ### Settings
-- Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%`
+- Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%${settings?.userProfile?.aiContext ? `
+
+### Operator Context
+${settings.userProfile.aiContext}` : ''}`
 
       // Include last 4 messages for conversational continuity
       const recentHistory = chatMessages.slice(-4).map(m =>

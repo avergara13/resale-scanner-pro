@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target, ArrowCounterClockwise, Bug } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target, ArrowCounterClockwise, Bug, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { DEBUG_LOG_KEY, type DebugEntry, type DebugLevel } from '@/lib/debug-log'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
@@ -52,6 +52,7 @@ interface SettingsScreenProps {
 
 export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
+  const [aiContextExpanded, setAiContextExpanded] = useState(false)
   const [activityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
   const recentActivity = (activityLog || []).slice(0, 50)
 
@@ -224,25 +225,33 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 />
               </div>
             </div>
+            {/* AI Context Notes — collapsible */}
             <div>
-              <Label className="text-[10px] text-t3 uppercase tracking-wider">Focus Areas</Label>
-              <Input
-                value={settings.userProfile?.focus || ''}
-                onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, focus: e.target.value } as any })}
-                placeholder="Electronics, Sneakers, Housewares"
-                className="h-8 text-sm mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-[10px] text-t3 uppercase tracking-wider">AI Context Notes</Label>
-              <textarea
-                value={settings.userProfile?.aiContext || ''}
-                onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, aiContext: e.target.value } as any })}
-                placeholder="I focus on electronics and sneakers. Min 35% margin. Ship within 2 days."
-                rows={2}
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1 resize-none"
-              />
-              <p className="text-[9px] text-t3 mt-1">Injected into every AI prompt — helps the agent give personalized advice</p>
+              <button
+                onClick={() => setAiContextExpanded(p => !p)}
+                className="w-full flex items-center justify-between"
+              >
+                <Label className="text-[10px] text-t3 uppercase tracking-wider pointer-events-none">AI Context Notes</Label>
+                <span className="flex items-center gap-1 text-t3">
+                  {!aiContextExpanded && settings.userProfile?.aiContext && (
+                    <span className="text-[9px] text-t2 truncate max-w-[160px]">{settings.userProfile.aiContext}</span>
+                  )}
+                  {aiContextExpanded ? <CaretUp size={10} weight="bold" /> : <CaretDown size={10} weight="bold" />}
+                </span>
+              </button>
+              {aiContextExpanded && (
+                <div className="mt-1.5">
+                  <textarea
+                    value={settings.userProfile?.aiContext || ''}
+                    onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, aiContext: e.target.value } as any })}
+                    placeholder="I focus on electronics and sneakers. Min 35% margin. Ship within 2 days."
+                    rows={3}
+                    autoFocus
+                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                  />
+                  <p className="text-[9px] text-t3 mt-1">Injected into every AI prompt — helps the agent give personalized advice</p>
+                </div>
+              )}
             </div>
             {settings.userProfile?.operatorName && (
               <p className="text-[10px] text-t3 flex items-center gap-1.5">
