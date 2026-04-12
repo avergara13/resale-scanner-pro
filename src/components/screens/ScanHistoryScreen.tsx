@@ -164,8 +164,13 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
                   key={item.id}
                   className={cn(
                     'p-3 border transition-all',
-                    isSelected ? 'border-b1 bg-b1/5' : 'border-s2'
+                    isSelected ? 'border-b1' : 'border-s2/60'
                   )}
+                  style={
+                    isSelected
+                      ? { background: 'color-mix(in oklch, var(--b1) 8%, var(--fg))' }
+                      : { background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }
+                  }
                 >
                   <div className="flex items-start gap-3">
                     <button onClick={() => toggleSelect(item.id)} className="mt-0.5 flex-shrink-0">
@@ -179,10 +184,10 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
                       <img
                         src={item.imageThumbnail || item.imageData}
                         alt={item.productName || 'Scan'}
-                        className="w-12 h-12 rounded-lg object-cover bg-s1 flex-shrink-0"
+                        className="w-12 h-12 rounded-xl object-cover bg-s1 flex-shrink-0"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-lg bg-s1 flex items-center justify-center flex-shrink-0">
+                      <div className="w-12 h-12 rounded-xl bg-s1 flex items-center justify-center flex-shrink-0">
                         <Package size={20} className="text-t3" />
                       </div>
                     )}
@@ -197,9 +202,9 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
                           variant="secondary"
                           className={cn(
                             'text-[9px] font-bold flex-shrink-0',
-                            item.decision === 'BUY' ? 'bg-green/10 text-green' :
-                            item.decision === 'PASS' ? 'bg-red/10 text-red' :
-                            'bg-amber/10 text-amber'
+                            item.decision === 'BUY' ? 'bg-green/10 text-green border border-green/20' :
+                            item.decision === 'PASS' ? 'bg-red/10 text-red border border-red/20' :
+                            'bg-amber/10 text-amber border border-amber/20'
                           )}
                         >
                           {item.decision}
