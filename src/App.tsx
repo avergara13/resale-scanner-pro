@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
 import { logActivity, ACTIVITY_LOG_KEY, MAX_ACTIVITY_ENTRIES, type ActivityEntry } from './lib/activity-log'
+import { logDebug, DEBUG_LOG_KEY, MAX_DEBUG_ENTRIES, type DebugEntry } from './lib/debug-log'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BottomNav } from './components/BottomNav'
 import { AppHeader } from './components/AppHeader'
@@ -87,6 +88,7 @@ function App() {
   const [allTags] = useKV<ItemTag[]>('all-tags', [])
   const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [, setActivityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
+  const [, setDebugLog] = useKV<DebugEntry[]>(DEBUG_LOG_KEY, [])
   const [settings, setSettings] = useKV<AppSettings>('settings', {
     voiceEnabled: true,
     autoCapture: true,
@@ -270,12 +272,13 @@ function App() {
     setPipeline(steps)
     
     startAnalyzing()
-    
+    logDebug('Scan pipeline started', 'info', 'scan', { price, hasGemini: !!geminiService, hasLens: !!googleLensService })
+
     try {
       let visionResult: GeminiVisionResponse | undefined
       // Fall back to barcode title if Gemini vision is unavailable
       let mockProductName = barcodeProduct?.title || 'Unknown Product'
-      
+
       simulateProgress(0, 3000)
       
       if (geminiService) {
@@ -681,6 +684,12 @@ function App() {
       }
 
       logActivity(decision === 'BUY' ? '✅ Analysis complete — it\'s a BUY!' : '❌ Analysis done — PASS')
+      logDebug(`Scan complete — ${decision}`, 'info', 'scan', {
+        product: updatedItem.productName,
+        buyPrice: updatedItem.purchasePrice,
+        sellPrice: updatedItem.estimatedSellPrice,
+        margin: updatedItem.profitMargin,
+      })
       setScreen('scan-result')
     } catch (error) {
       console.error('Pipeline error:', error)
@@ -1829,6 +1838,73 @@ function App() {
     window.addEventListener('rsp:activity', handler)
     return () => window.removeEventListener('rsp:activity', handler)
   }, [setActivityLog])
+
+  // Debug log listener — persists rsp:debug events dispatched by logDebug() to KV
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const entry = (e as CustomEvent<DebugEntry>).detail
+      setDebugLog(prev => [entry, ...(prev || []).slice(0, MAX_DEBUG_ENTRIES - 1)])
+    }
+    window.addEventListener('rsp:debug', handler)
+    return () => window.removeEventListener('rsp:debug', handler)
+  }, [setDebugLog])
+
+  // Capture console.error + console.warn into the debug console
+  useEffect(() => {
+    let capturing = false // prevent recursion
+    const origError = console.error.bind(console)
+    const origWarn = console.warn.bind(console)
+    console.error = (...args: unknown[]) => {
+      origError(...args)
+      if (!capturing) {
+        capturing = true
+        logDebug(args.map(a => a instanceof Error ? a.message : String(a)).join(' ').slice(0, 300), 'error', 'console')
+        capturing = false
+      }
+    }
+    console.warn = (...args: unknown[]) => {
+      origWarn(...args)
+      if (!capturing) {
+        capturing = true
+        logDebug(args.map(a => String(a)).join(' ').slice(0, 300), 'warn', 'console')
+        capturing = false
+      }
+    }
+    return () => {
+      console.error = origError
+      console.warn = origWarn
+    }
+  }, [])
+
+  // Intercept fetch to log Gemini + eBay + Google API calls and errors
+  useEffect(() => {
+    const origFetch = window.fetch.bind(window)
+    window.fetch = async (...args: Parameters<typeof fetch>) => {
+      const url = typeof args[0] === 'string' ? args[0]
+        : args[0] instanceof URL ? args[0].href
+        : (args[0] as Request).url || ''
+      const isGemini = url.includes('generativelanguage.googleapis.com')
+      const isEbay = url.includes('api.ebay.com')
+      const isLens = url.includes('customsearch.googleapis.com') || url.includes('lens.google')
+      const service = isGemini ? 'gemini' : isEbay ? 'ebay' : isLens ? 'google-lens' : null
+      if (service) {
+        logDebug(`${service} request`, 'debug', service, { url: url.slice(0, 120) })
+      }
+      try {
+        const res = await origFetch(...args)
+        if (service && !res.ok) {
+          logDebug(`${service} HTTP ${res.status}`, 'error', service, { status: res.status, url: url.slice(0, 120) })
+        }
+        return res
+      } catch (err) {
+        if (service) {
+          logDebug(`${service} fetch failed`, 'error', service, { error: String(err) })
+        }
+        throw err
+      }
+    }
+    return () => { window.fetch = origFetch }
+  }, [])
 
   // Migrate legacy GO → BUY decision labels
   useEffect(() => {
