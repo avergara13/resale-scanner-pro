@@ -813,14 +813,10 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   })
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      id="scr-queue" 
-      className="flex flex-col h-full w-full overflow-y-auto overflow-x-hidden scrollable-content"
-      style={{ 
-        paddingTop: isPulling || isRefreshing ? `${Math.max(pullDistance, 60)}px` : '0px',
-        transition: isPulling ? 'none' : 'padding-top 0.3s ease-out'
-      }}
+      id="scr-queue"
+      className="h-full w-full overflow-y-auto overflow-x-hidden scrollable-content overscroll-y-contain"
     >
       <PullToRefreshIndicator
         isPulling={isPulling}
@@ -829,6 +825,14 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         progress={progress}
         shouldTrigger={shouldTrigger}
       />
+      {/* GPU-composited transform wrapper — replaces paddingTop reflow */}
+      <div
+        style={{
+          transform: `translateY(${isPulling ? pullDistance : isRefreshing ? 60 : 0}px)`,
+          transition: isPulling ? 'none' : 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          willChange: isPulling || isRefreshing ? 'transform' : 'auto',
+        }}
+      >
       <ItemEditDialog
         item={editingItem}
         isOpen={editingItem !== null}
@@ -1452,6 +1456,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           })()}
         </div>
       )}
+      </div> {/* end transform wrapper */}
     </div>
   )
 }

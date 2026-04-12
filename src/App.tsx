@@ -1805,7 +1805,7 @@ function App() {
       />
 
       <div
-        className="flex-1 relative w-full"
+        className="flex-1 relative w-full overflow-hidden"
       >
         <AnimatePresence mode="wait">
           {screen === 'session' && (
@@ -1818,7 +1818,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <SessionScreen
                 showTrends={showSessionTrends}
@@ -2016,7 +2016,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <TagAnalyticsScreen
                 items={queue || []}
@@ -2035,7 +2035,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <LocationInsightsScreen
                 items={queue || []}
@@ -2053,7 +2053,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <CostTrackingScreen
                 onBack={() => setScreen('settings')}
@@ -2070,7 +2070,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <ScanHistoryScreen
                 onBack={() => setScreen('session')}
@@ -2094,7 +2094,7 @@ function App() {
               exit="exit"
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <SessionDetailScreen
                 sessionId={selectedSessionId}

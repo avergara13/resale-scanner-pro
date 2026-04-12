@@ -1546,7 +1546,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
       {/* ── Scans tab ── */}
       {activeTab === 'scans' && (
-        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 overflow-y-auto">
+        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 overflow-y-auto scrollable-content overscroll-y-contain">
           <div className="p-4 space-y-3 pb-6">
             {sessionScans.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center py-12 px-4">
@@ -1675,8 +1675,8 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
 
       {/* ── Tasks tab ── */}
       {activeTab === 'tasks' && (
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="flex-1 overflow-y-auto">
+        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 overflow-y-auto scrollable-content overscroll-y-contain">
+          <div className="flex-1">
             <div className="p-4 space-y-1">
               {(todos || []).length === 0 && (
                 <div className="flex flex-col items-center justify-center text-center py-12 px-4">
