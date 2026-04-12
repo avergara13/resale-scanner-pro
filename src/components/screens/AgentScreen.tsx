@@ -1672,7 +1672,7 @@ ${settings.userProfile.aiContext}` : ''}`
                       ) : (
                         <button
                           onClick={() => handlePromoteToQueue(item)}
-                          className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-none"
+                          className="flex-1 h-8 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-xl mx-1.5"
                           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                         >
                           <ShoppingCart size={13} weight="bold" />
