@@ -1189,7 +1189,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           ) : (
             <div className="w-20 h-20 rounded-full bg-s1 flex items-center justify-center mb-4">
               <p className="text-3xl">
-                {searchQuery ? '🔍' : filter === 'BUY' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
+                {searchQuery ? '🔍' : filter === 'BUY' ? '✅' : '📦'}
               </p>
             </div>
           )}
