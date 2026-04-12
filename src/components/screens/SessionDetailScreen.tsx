@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CheckCircle, XCircle, TrendUp, Package, PencilSimple, Check, X } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, TrendUp, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
-import type { Session, ScannedItem, ThriftStoreLocation } from '@/types'
+import type { Session, ScannedItem, ThriftStoreLocation, Screen } from '@/types'
 
 interface SessionDetailScreenProps {
   sessionId: string
@@ -20,9 +20,12 @@ interface SessionDetailScreenProps {
   onUpdateSessions?: (updater: (prev: Session[]) => Session[]) => void
   queueItems?: ScannedItem[]
   scanHistory?: ScannedItem[]
+  onOpenItem?: (item: ScannedItem) => void
+  onOpenChat?: () => void
+  onNavigateTo?: (screen: Screen) => void
 }
 
-export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp }: SessionDetailScreenProps) {
+export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo }: SessionDetailScreenProps) {
   const [allSessionsFallback, setAllSessionsFallback] = useKV<Session[]>('all-sessions', [])
   const allSessions = allSessionsProp ?? allSessionsFallback
   const setAllSessions = onUpdateSessions ?? setAllSessionsFallback
@@ -169,6 +172,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   const duration = (session.endTime || Date.now()) - session.startTime
   const startDate = new Date(session.startTime)
   const buyRate = session.itemsScanned > 0 ? Math.round((session.buyCount / session.itemsScanned) * 100) : 0
+  const maybeCount = sessionItems.filter(i => i.decision === 'PENDING').length
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
@@ -275,6 +279,16 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                   <span className="text-base leading-none">🎯</span>
                   <span>{session.profitGoal ? `$${session.profitGoal}` : 'Goal'}</span>
                 </button>
+                {onOpenChat && (
+                  <button
+                    onClick={onOpenChat}
+                    aria-label="Open session chat"
+                    className="h-9 flex items-center justify-center gap-1.5 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95 bg-b1/10 text-b1"
+                  >
+                    <ChatCircle size={14} weight="bold" />
+                    <span>Chat</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -336,13 +350,25 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
 
           {/* Stats row — matches active session layout */}
           <div className="flex gap-2 mb-4">
-            <div className="stat-card flex-1 p-3">
+            <div
+              onClick={() => onNavigateTo?.('cost-tracking')}
+              className={cn(
+                'stat-card flex-1 p-3 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+            >
               <div className="text-base font-bold text-green leading-tight">
                 ${session.totalPotentialProfit.toFixed(2)}
               </div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Est. Profit</div>
             </div>
-            <div className="stat-card flex-1 p-3">
+            <div
+              onClick={() => onNavigateTo?.('scan-history')}
+              className={cn(
+                'stat-card flex-1 p-3 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+            >
               <div className="text-base font-bold text-t1 leading-tight">{session.itemsScanned}</div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
@@ -360,7 +386,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               </Badge>
               <span className="text-sm mono text-t3">{formatDuration(duration)}</span>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY</p>
                 <div className="flex items-baseline gap-2">
@@ -373,6 +399,13 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 <div className="flex items-baseline gap-2">
                   <p className="text-2xl font-bold mono text-red">{session.passCount}</p>
                   <XCircle size={20} weight="fill" className="text-red" />
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">MAYBE</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold mono text-amber">{maybeCount}</p>
+                  <Question size={20} weight="fill" className="text-amber" />
                 </div>
               </div>
             </div>
@@ -420,7 +453,15 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
 
               <div className="space-y-1.5">
                 {filteredItems.map(item => (
-                  <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-s1 rounded-lg">
+                  <div
+                    key={item.id}
+                    onClick={() => onOpenItem?.(item)}
+                    className={cn(
+                      'flex items-center justify-between py-2 px-3 rounded-lg border border-s2/40 transition-colors',
+                      onOpenItem && 'cursor-pointer hover:border-b1/30 hover:bg-b1/5 active:bg-b1/10'
+                    )}
+                    style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}
+                  >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Badge
                         variant="secondary"
@@ -443,6 +484,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                           <span className="text-[10px] font-mono text-green">${item.estimatedSellPrice.toFixed(2)}</span>
                         </>
                       )}
+                      {onOpenItem && <CaretRight size={10} className="text-t3 flex-shrink-0 ml-1" />}
                     </div>
                   </div>
                 ))}

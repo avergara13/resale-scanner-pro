@@ -11,10 +11,10 @@ import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
-import type { Session, ScannedItem, ProfitGoal } from '@/types'
+import type { Session, ScannedItem, ProfitGoal, Screen } from '@/types'
 
 function PastSessionCard({
-  session, items, buyCount, passCount, totalProfit, bestFind, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail
+  session, items, buyCount, passCount, totalProfit, bestFind, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail, onOpenItem, onNavigateTo
 }: {
   session: Session
   items: ScannedItem[]
@@ -28,6 +28,8 @@ function PastSessionCard({
   formatDuration: (ms: number) => string
   onDelete: () => void
   onViewDetail: () => void
+  onOpenItem?: (item: ScannedItem) => void
+  onNavigateTo?: (screen: Screen) => void
 })
  {
   const [expanded, setExpanded] = useState(false)
@@ -79,13 +81,27 @@ function PastSessionCard({
         <div className="border-t border-s2/60 px-3 py-2 space-y-2">
           {/* Micro-analytics */}
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="p-2 rounded-lg border border-s2/40" style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}>
+            <div
+              onClick={() => onNavigateTo?.('cost-tracking')}
+              className={cn(
+                'p-2 rounded-lg border border-s2/40 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+              style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}
+            >
               <p className="text-[9px] text-t3 uppercase">Avg Profit</p>
               <p className="text-xs font-bold text-t1 font-mono">
                 ${buyCount > 0 ? (totalProfit / buyCount).toFixed(2) : '0.00'}
               </p>
             </div>
-            <div className="p-2 rounded-lg border border-s2/40" style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}>
+            <div
+              onClick={() => onNavigateTo?.('queue')}
+              className={cn(
+                'p-2 rounded-lg border border-s2/40 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+              style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}
+            >
               <p className="text-[9px] text-t3 uppercase">Revenue</p>
               <p className="text-xs font-bold text-t1 font-mono">
                 ${items.filter(i => i.decision === 'BUY').reduce((s, i) => s + (i.estimatedSellPrice || 0), 0).toFixed(2)}
@@ -98,7 +114,13 @@ function PastSessionCard({
           </div>
 
           {bestFind && (
-            <div className="flex items-center gap-2 p-2 bg-green/5 border border-green/20 rounded-lg">
+            <div
+              onClick={() => bestFind && onOpenItem?.(bestFind)}
+              className={cn(
+                'flex items-center gap-2 p-2 bg-green/5 border border-green/20 rounded-lg',
+                bestFind && onOpenItem && 'cursor-pointer hover:bg-green/10 active:bg-green/15 transition-colors'
+              )}
+            >
               <TrendUp size={14} className="text-green flex-shrink-0" />
               <span className="text-[10px] text-t2 truncate">Best: <span className="font-bold text-t1">{bestFind.productName}</span> ({bestFind.profitMargin?.toFixed(0)}%)</span>
             </div>
@@ -108,7 +130,15 @@ function PastSessionCard({
           {items.length > 0 && (
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {items.map(item => (
-                <div key={item.id} className="flex items-center justify-between py-1.5 px-2 rounded text-[10px]" style={{ background: 'color-mix(in oklch, var(--bg) 90%, transparent)' }}>
+                <div
+                  key={item.id}
+                  onClick={() => onOpenItem?.(item)}
+                  className={cn(
+                    'flex items-center justify-between py-1.5 px-2 rounded text-[10px] transition-colors',
+                    onOpenItem && 'cursor-pointer hover:bg-b1/10 active:bg-b1/15'
+                  )}
+                  style={{ background: 'color-mix(in oklch, var(--bg) 90%, transparent)' }}
+                >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <Badge variant="secondary" className={`text-[8px] px-1 py-0 flex-shrink-0 ${item.decision === 'BUY' ? 'bg-green/10 text-green' : item.decision === 'PASS' ? 'bg-red/10 text-red' : 'bg-amber/10 text-amber'}`}>
                       {item.decision}
@@ -153,9 +183,11 @@ interface SessionScreenProps {
   onPermanentDeleteSession?: (sessionId: string) => void
   queueItems?: ScannedItem[]
   scanHistory?: ScannedItem[]
+  onOpenItem?: (item: ScannedItem) => void
+  onNavigateTo?: (screen: Screen) => void
 }
 
-export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp }: SessionScreenProps) {
+export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp, onOpenItem, onNavigateTo }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   // Use props from App.tsx (single source of truth) instead of local useKV
   // This ensures deletes/updates propagate immediately
@@ -382,6 +414,8 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         formatDuration={formatDuration}
                         onDelete={() => { onDeleteSession?.(s.id) }}
                         onViewDetail={() => { onResumeSession?.(s.id) }}
+                        onOpenItem={onOpenItem}
+                        onNavigateTo={onNavigateTo}
                       />
                     )
                   })}
@@ -422,6 +456,8 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         formatDuration={formatDuration}
                         onDelete={() => { onDeleteSession?.(s.id) }}
                         onViewDetail={() => { onViewSessionDetail?.(s.id) }}
+                        onOpenItem={onOpenItem}
+                        onNavigateTo={onNavigateTo}
                       />
                     )
                   })}
