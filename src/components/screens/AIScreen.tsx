@@ -253,13 +253,39 @@ export function AIScreen({
   const [imageOpen, setImageOpen] = useCollapsePreference('ai-image', false)
   const { isListening, startListening, isSupported } = useVoiceInput()
 
-  // True when pipeline completed a decision OR when reopening a pre-analyzed item
-  // (pipeline is empty on reopen, but currentItem.decision already holds the result)
+  // hasDecision: true only when we have a FINALIZED decision (BUY or PASS).
+  // PENDING is the initial value every new scan starts with — including it here
+  // causes panels to flash before the pipeline runs and the action bar to appear
+  // prematurely. PENDING is handled separately via pipelineComplete below.
   const hasDecision = pipeline.some(p => p.id === 'decision' && p.status === 'complete')
-    || !!(currentItem?.decision)
+    || (currentItem?.decision === 'BUY' || currentItem?.decision === 'PASS')
+
   const isPipelineRunning = pipeline.length > 0 && pipeline.some(p => p.status === 'processing')
+
+  // pipelineComplete: true when the pipeline has finished ALL work (any decision,
+  // including PENDING) OR when viewing a reopened item (no active pipeline).
+  // This gates the Listing Draft and action bar so they appear once the AI is done.
+  const pipelineComplete = pipeline.length === 0
+    ? !!(currentItem)  // reopened item — always ready
+    : !isPipelineRunning && pipeline.every(p => p.status === 'complete' || p.status === 'error')
+
+  // hasPriceData: we have real market pricing to show in Quick Summary
+  const hasPriceData = !!(currentItem?.estimatedSellPrice && currentItem.estimatedSellPrice > 0)
+
   const decision = currentItem?.decision
   const canSaveDraft = !!(currentItem?.imageData || description.trim().length > 0)
+
+  // Derived floats for form-change detection (computed once, used in multiple places)
+  const buyPriceFloat = parseFloat(buyPrice)
+  const sellPriceFloat = parseFloat(estSellPrice)
+  const shipPriceFloat = parseFloat(shippingCost)
+
+  // formHasChanges: show Recalculate when ANY input differs from what's stored on the item.
+  // Covers: editing AI-provided sell price, adjusting shipping, changing buy price.
+  const formHasChanges =
+    (buyPrice !== '' && Number.isFinite(buyPriceFloat) && buyPriceFloat !== (currentItem?.purchasePrice ?? 0)) ||
+    (estSellPrice !== '' && Number.isFinite(sellPriceFloat) && sellPriceFloat > 0 && sellPriceFloat !== (currentItem?.estimatedSellPrice ?? 0)) ||
+    (shippingCost !== '' && Number.isFinite(shipPriceFloat) && shipPriceFloat >= 0 && shipPriceFloat !== (settings?.defaultShippingCost ?? 5.0))
 
   const handleRefresh = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, 600))
@@ -277,15 +303,17 @@ export function AIScreen({
     setListingAdded(false)
   }, [currentItem?.id])
 
-  // Pre-fill form once the decision step completes
-  // if-guards on each field prevent overwriting user edits
+  // Pre-fill form once the pipeline finishes (any decision, including PENDING)
+  // if-guards on each field prevent overwriting user edits after initial fill
   useEffect(() => {
-    if (!hasDecision || !currentItem) return
+    if (!pipelineComplete || !currentItem) return
     if (itemName === '') setItemName(currentItem.productName || '')
     if (category === '') setCategory(currentItem.category || '')
     if (condition === '') setCondition('Good')
-    if (buyPrice === '' && (currentItem.purchasePrice ?? 0) > 0) {
-      setBuyPrice(String(currentItem.purchasePrice))
+    // Always pre-fill buy price so user can see and edit the assumed cost
+    // purchasePrice=0 → empty string (user sees "free / $0 assumed")
+    if (buyPrice === '') {
+      setBuyPrice(currentItem.purchasePrice > 0 ? String(currentItem.purchasePrice) : '')
     }
     if (estSellPrice === '' && currentItem.estimatedSellPrice) {
       setEstSellPrice(currentItem.estimatedSellPrice.toFixed(2))
@@ -297,19 +325,19 @@ export function AIScreen({
       setDescription(currentItem.description)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasDecision, currentItem?.id]) // minimal deps — if-guards prevent overwrites
+  }, [pipelineComplete, currentItem?.id]) // minimal deps — if-guards prevent overwrites
 
-  // Auto-scroll to decision when it first appears
+  // Auto-scroll to decision/result when pipeline finishes (BUY, PASS, or PENDING "needs price")
   const decisionRef = useRef<HTMLDivElement>(null)
-  const prevHasDecision = useRef(false)
+  const prevPipelineComplete = useRef(false)
   useEffect(() => {
-    if (hasDecision && !prevHasDecision.current) {
+    if (pipelineComplete && !prevPipelineComplete.current) {
       setTimeout(() => {
         decisionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 400)
     }
-    prevHasDecision.current = hasDecision
-  }, [hasDecision])
+    prevPipelineComplete.current = pipelineComplete
+  }, [pipelineComplete])
 
   const pullToRefresh = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -370,15 +398,15 @@ export function AIScreen({
                 )
               })()}
 
-              {/* Decision signal */}
-              {hasDecision && decision && (
+              {/* Decision signal — show once pipeline is done, including PENDING "needs price" */}
+              {pipelineComplete && decision && (
                 <div className="mt-3 sm:mt-4" ref={decisionRef}>
                   <DecisionSignal decision={decision} item={currentItem} />
                 </div>
               )}
 
-              {/* ── 1. Quick Summary — financials at a glance ── */}
-              {hasDecision && currentItem && (
+              {/* ── 1. Quick Summary — only when we have real pricing data ── */}
+              {hasDecision && currentItem && hasPriceData && (
                 <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
                   <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
                     <CollapsibleTrigger className="w-full">
@@ -442,8 +470,8 @@ export function AIScreen({
                 </Collapsible>
               )}
 
-              {/* ── 2. Listing draft form ── */}
-              {hasDecision && !listingAdded && (
+              {/* ── 2. Listing draft form — always visible once pipeline is done ── */}
+              {pipelineComplete && !listingAdded && (
                 <Collapsible open={formOpen} onOpenChange={setFormOpen}>
                   <Card className="mt-3 p-3 sm:p-4 bg-fg border-s2">
                     <CollapsibleTrigger className="w-full">
@@ -557,6 +585,70 @@ export function AIScreen({
                             />
                           </div>
                         </div>
+
+                        {/* ── Price range pills — tap to fill Sell $ from market data ── */}
+                        {(currentItem?.lensAnalysis?.priceRange || currentItem?.estimatedSellPrice || currentItem?.marketData?.ebayPriceRange) && (
+                          <div className="flex items-center gap-1.5 flex-wrap -mt-0.5">
+                            <span className="text-[9px] text-t3 font-medium uppercase tracking-wide shrink-0">
+                              Range:
+                            </span>
+                            {/* eBay min / max */}
+                            {currentItem?.marketData?.ebayPriceRange && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.marketData!.ebayPriceRange!.min.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  Low ${currentItem.marketData.ebayPriceRange.min.toFixed(0)}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.marketData!.ebayPriceRange!.max.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  High ${currentItem.marketData.ebayPriceRange.max.toFixed(0)}
+                                </button>
+                              </>
+                            )}
+                            {/* Lens avg (only when no eBay range to avoid duplicates) */}
+                            {currentItem?.lensAnalysis?.priceRange && !currentItem?.marketData?.ebayPriceRange && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.min.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  Low ${currentItem.lensAnalysis.priceRange.min.toFixed(0)}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.average.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1/80 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  Avg ${currentItem.lensAnalysis.priceRange.average.toFixed(0)}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.max.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  High ${currentItem.lensAnalysis.priceRange.max.toFixed(0)}
+                                </button>
+                              </>
+                            )}
+                            {/* AI suggested price — always shown when available */}
+                            {currentItem?.estimatedSellPrice && (
+                              <button
+                                type="button"
+                                onClick={() => setEstSellPrice(currentItem!.estimatedSellPrice!.toFixed(2))}
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-b1/15 text-b1 active:bg-b1/25 transition-colors"
+                              >
+                                AI ${currentItem.estimatedSellPrice.toFixed(0)}
+                              </button>
+                            )}
+                          </div>
+                        )}
 
                         {/* Description */}
                         <div>
@@ -683,7 +775,7 @@ export function AIScreen({
 
       {/* ── Bottom action bar ── */}
       <div className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md safe-bottom">
-        {hasDecision ? (
+        {pipelineComplete ? (
           listingAdded ? (
             /* Success state — offer to scan another item */
             <div className="p-2.5 sm:p-3">
@@ -696,28 +788,24 @@ export function AIScreen({
               </Button>
             </div>
           ) : (
-            /* Decision available — main action bar */
+            /* Pipeline done (BUY / PASS / PENDING) — show all actions */
             <div className="p-2.5 sm:p-3 space-y-2">
-              {/* Recalculate — show when buy price changed OR sell price entered on a no-price item */}
-              {((buyPrice !== '' && parseFloat(buyPrice) !== (currentItem?.purchasePrice ?? 0)) ||
-                (estSellPrice !== '' && parseFloat(estSellPrice) > 0 && !(currentItem?.estimatedSellPrice))) && (
-                  <Button
-                    onClick={() => {
-                      const bp = parseFloat(buyPrice)
-                      const sp = parseFloat(estSellPrice)
-                      const sc = parseFloat(shippingCost)
-                      onRecalculate?.(
-                        Number.isFinite(bp) ? bp : 0,
-                        Number.isFinite(sp) && sp > 0 ? sp : undefined,
-                        Number.isFinite(sc) && sc >= 0 ? sc : undefined,
-                      )
-                    }}
-                    className="w-full bg-amber hover:opacity-90 text-white h-10 font-semibold text-xs sm:text-sm"
-                  >
-                    <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
-                    ♻️ Recalculate with new price
-                  </Button>
-                )}
+              {/* Recalculate — shown when ANY of buy, sell, or shipping differ from stored values */}
+              {formHasChanges && (
+                <Button
+                  onClick={() => {
+                    onRecalculate?.(
+                      Number.isFinite(buyPriceFloat) ? buyPriceFloat : 0,
+                      Number.isFinite(sellPriceFloat) && sellPriceFloat > 0 ? sellPriceFloat : undefined,
+                      Number.isFinite(shipPriceFloat) && shipPriceFloat >= 0 ? shipPriceFloat : undefined,
+                    )
+                  }}
+                  className="w-full bg-amber hover:opacity-90 text-white h-10 font-semibold text-xs sm:text-sm"
+                >
+                  <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
+                  Recalculate ROI
+                </Button>
+              )}
 
               {/* Row 1: secondary actions */}
               <div className="flex gap-2">
@@ -766,18 +854,6 @@ export function AIScreen({
           <div className="flex items-center justify-center gap-2 h-12 text-xs text-t3 font-medium">
             <span className="w-2 h-2 rounded-full bg-b1 animate-pulse" />
             Analyzing… decision coming
-          </div>
-        ) : pipeline.length > 0 ? (
-          /* Pipeline ended without a decision (error path) */
-          <div className="p-2.5 sm:p-3">
-            <Button
-              onClick={() => onRescan?.()}
-              variant="outline"
-              className="w-full h-10 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-sm"
-            >
-              <ArrowCounterClockwise size={14} weight="bold" className="mr-1.5" />
-              Rescan
-            </Button>
           </div>
         ) : (
           /* No pipeline yet — quick draft capture */
