@@ -1982,6 +1982,14 @@ function App() {
     }
   }, []) // intentionally empty deps — runs once on mount
 
+  // Track the last non-settings screen so the settings back button always
+  // returns to where the user came from, regardless of the navigation path.
+  useEffect(() => {
+    if (screen !== 'settings') {
+      settingsReturnScreen.current = screen
+    }
+  }, [screen])
+
   // Directional slide transitions —————————————————————————————————————————
   // Tab screens have a fixed left-to-right order.  Secondary/push screens
   // (settings, session-detail, scan-result, …) always push in from the right
@@ -2075,7 +2083,7 @@ function App() {
       
       <AppHeader
         screen={screen}
-        onNavigateToSettings={() => { settingsReturnScreen.current = screen; setScreen('settings') }}
+        onNavigateToSettings={() => setScreen('settings')}
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
         backLabel={screen === 'scan-result' && openedFromScans ? 'Scans' : undefined}

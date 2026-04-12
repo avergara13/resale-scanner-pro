@@ -1,4 +1,4 @@
-import { Play, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, ArrowLeft } from '@phosphor-icons/react'
+import { Play, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, TrendUp, ArrowLeft } from '@phosphor-icons/react'
 import { useState, useCallback, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -45,15 +45,18 @@ function PastSessionCard({
       <button onClick={() => setExpanded(!expanded)} className="w-full p-3 text-left active:bg-s1/50 transition-colors">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Clock
-              size={14}
-              className={cn(
-                'flex-shrink-0',
-                sessionStatus === 'live' && 'text-green animate-pulse',
-                sessionStatus === 'idle' && 'text-amber',
-                sessionStatus === 'ended' && 'text-t3'
+            {/* Status dot — mirrors Sold page card dots for visual consistency */}
+            <span className="relative flex-shrink-0" style={{ width: 10, height: 10 }}>
+              {sessionStatus === 'live' && (
+                <span className="absolute inset-0 rounded-full bg-green animate-ping opacity-60" />
               )}
-            />
+              <span className={cn(
+                'relative block w-2.5 h-2.5 rounded-full',
+                sessionStatus === 'live' && 'bg-green',
+                sessionStatus === 'idle' && 'bg-amber',
+                sessionStatus === 'ended' && 'bg-t3/40'
+              )} />
+            </span>
             <span className="text-xs font-bold text-t1 truncate">
               {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </span>
