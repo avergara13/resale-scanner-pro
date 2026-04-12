@@ -199,7 +199,16 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 <Label className="text-[10px] text-t3 uppercase tracking-wider">Name</Label>
                 <Input
                   value={settings.userProfile?.operatorName || ''}
-                  onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, operatorId: (settings.userProfile?.operatorId || e.target.value.toLowerCase().replace(/\s+/g, '-').slice(0, 20)), operatorName: e.target.value, operatorInitial: (settings.userProfile?.operatorInitial || e.target.value.slice(0, 1).toUpperCase()) } as any })}
+                  onChange={(e) => {
+                    // Lock operatorId only if the user previously saved a name (stable slug on edits).
+                    // For a new profile (no prior operatorName), regenerate from the full current value
+                    // on every keystroke so the final saved ID matches the complete name, not just
+                    // the first character typed.
+                    const existingId = settings.userProfile?.operatorName
+                      ? settings.userProfile.operatorId
+                      : undefined
+                    onUpdate({ userProfile: { ...settings.userProfile, operatorId: existingId || e.target.value.toLowerCase().replace(/\s+/g, '-').slice(0, 20), operatorName: e.target.value, operatorInitial: e.target.value.slice(0, 1).toUpperCase() || settings.userProfile?.operatorInitial || '' } as any })
+                  }}
                   placeholder="Angel"
                   className="h-8 text-sm mt-1"
                 />

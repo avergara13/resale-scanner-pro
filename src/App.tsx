@@ -1871,7 +1871,12 @@ function App() {
   const hasMigratedRef = useRef(false)
   useEffect(() => {
     if (hasMigratedRef.current) return
-    if (legacySettings?.geminiApiKey && !settings?.geminiApiKey) {
+    // Migrate if any meaningful legacy setting exists and the device slot is still empty.
+    // Checking only geminiApiKey misses users whose legacy settings had Notion keys,
+    // thresholds, or a user profile but no Gemini key.
+    const hasLegacy = !!(legacySettings?.geminiApiKey || legacySettings?.notionApiKey || legacySettings?.userProfile)
+    const hasDevice = !!(settings?.geminiApiKey || settings?.notionApiKey || settings?.userProfile)
+    if (hasLegacy && !hasDevice) {
       hasMigratedRef.current = true
       setSettings((prev: AppSettings) => ({ ...prev, ...legacySettings }))
       logDebug('Settings auto-migrated from global to device scope', 'info', 'migration')
