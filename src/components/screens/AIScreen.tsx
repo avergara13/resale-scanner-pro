@@ -943,7 +943,8 @@ export function AIScreen({
                 <Button
                   onClick={handleAddToQueue}
                   disabled={!canSaveDraft || decision === 'PENDING'}
-                  className="flex-1 h-11 rounded-xl bg-green hover:opacity-90 text-white font-bold shadow-sm shadow-green/20 disabled:opacity-40 disabled:cursor-not-allowed text-sm active:scale-[0.97] transition-all"
+                  className="flex-1 h-11 rounded-xl text-white font-bold shadow-sm shadow-green/20 disabled:opacity-40 disabled:cursor-not-allowed text-sm active:scale-[0.97] transition-all"
+                  style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                 >
                   <ShoppingCart size={16} weight="bold" className="mr-2" />
                   Add to Queue

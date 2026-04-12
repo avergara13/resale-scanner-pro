@@ -922,7 +922,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
             </div>
             <div className="flex gap-2 pt-1">
               <Button
-                className="flex-1 bg-green hover:bg-green/90 text-white h-10"
+                className="flex-1 text-white h-10 font-bold active:scale-[0.98] transition-all"
+                style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                 onClick={() => {
                   if (soldDialogItemId && onMarkAsSold) {
                     const price = parseFloat(soldPrice) || 0

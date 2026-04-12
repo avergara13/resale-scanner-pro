@@ -335,11 +335,19 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           }}
         >
         {filteredItems.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-8 py-16">
-            <Package size={48} className="text-t3 opacity-40 mb-4" weight="duotone" />
-            <h3 className="text-base font-bold text-t1">No matching sales</h3>
-            <p className="text-xs text-t3 max-w-sm mt-1">
-              The Sales database is connected, but nothing matches this filter.
+          <div className="flex flex-col items-center justify-center min-h-[58vh] text-center px-6">
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1/20 to-b2/10 border border-b1/20 flex items-center justify-center mb-5"
+              style={{ boxShadow: '0 0 24px color-mix(in oklch, var(--b1) 15%, transparent)' }}
+            >
+              <Package size={36} weight="duotone" className="text-b1" />
+            </div>
+            <h3 className="text-lg font-bold text-t1 mb-2">
+              {mergedItems.length === 0 ? 'No sales yet' : 'Nothing matches this filter'}
+            </h3>
+            <p className="text-sm text-t2 max-w-[220px] leading-relaxed">
+              {mergedItems.length === 0
+                ? 'Sales will appear here once items are marked as sold or synced from your store'
+                : 'Try a different filter tab to view your sales'}
             </p>
           </div>
         ) : (
