@@ -38,7 +38,7 @@ import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { BarcodeProduct } from './lib/barcode-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform, SoldItem, SoldShippingUpdateInput, UserProfile } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, SoldItem, SoldShippingUpdateInput, UserProfile } from './types'
 import { cn } from './lib/utils'
 import { useDeviceId } from './hooks/use-device-id'
 
@@ -1741,42 +1741,6 @@ function App() {
     }
   }, [queue, setQueue, setCurrentItem, setPipeline, setScreen, handleCapture])
 
-  const handleOptimizeForPlatform = useCallback(async (itemId: string, platform: ResalePlatform) => {
-    const item = (queue || []).find(i => i.id === itemId)
-    if (!item) return
-
-    // Ensure eBay listing exists first — generate it if not
-    if (!item.optimizedListing) {
-      await handleOptimizeItem(itemId)
-    }
-
-    const freshItem = (queue || []).find(i => i.id === itemId)
-    if (!freshItem?.optimizedListing || !listingOptimizationService) return
-
-    try {
-      const platformListing = await listingOptimizationService.generatePlatformListing(
-        freshItem,
-        platform,
-        freshItem.optimizedListing
-      )
-      setQueue(prev => (prev || []).map(i =>
-        i.id === itemId
-          ? {
-              ...i,
-              optimizedListing: {
-                ...i.optimizedListing!,
-                platformListings: { ...i.optimizedListing!.platformListings, [platform]: platformListing }
-              }
-            }
-          : i
-      ))
-      logActivity(`${platform.charAt(0).toUpperCase() + platform.slice(1)} listing generated`)
-    } catch (error) {
-      console.error('Platform listing generation failed:', error)
-      toast.error(`Failed to generate ${platform} listing`)
-    }
-  }, [queue, setQueue, listingOptimizationService, handleOptimizeItem])
-
   // Seed 3 test items so the queue cards can be verified (dev/debug only)
   useEffect(() => {
     if (import.meta.env.DEV && queue && queue.length === 0) {
@@ -2288,7 +2252,6 @@ function App() {
                 item={detailItem}
                 onClose={() => setDetailItemId(null)}
                 onOptimize={handleOptimizeItem}
-                onOptimizeForPlatform={handleOptimizeForPlatform}
                 settings={settings}
                 onEdit={handleEditQueueItem}
               />

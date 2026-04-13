@@ -378,6 +378,7 @@ Return a JSON object with this exact structure:
     return Math.min(score, 100)
   }
 
+  /** @deprecated Platform-specific listing generation moved to n8n downstream pipeline. RSP is data collection only. */
   async generatePlatformListing(
     item: ScannedItem,
     platform: ResalePlatform,
@@ -489,6 +490,7 @@ Return ONLY valid JSON:
     }
   }
 
+  /** @deprecated See generatePlatformListing */
   private generateFallbackPlatformListing(
     _item: ScannedItem,
     platform: ResalePlatform,

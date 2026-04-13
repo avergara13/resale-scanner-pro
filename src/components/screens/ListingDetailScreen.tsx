@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -15,26 +14,14 @@ import {
   PaperPlaneRight,
   CircleNotch,
   Sparkle,
-  ShoppingBag,
   Tag,
   TrendUp,
-  Info,
   Copy,
   Check,
 } from '@phosphor-icons/react'
 import { callLLM } from '@/lib/llm-service'
 import { cn } from '@/lib/utils'
-import type { ScannedItem, ResalePlatform, AppSettings } from '@/types'
-
-// ── Platform metadata ──────────────────────────────────────────────────────
-
-const PLATFORMS: Array<{ id: ResalePlatform; label: string; fee: number; color: string }> = [
-  { id: 'ebay',      label: 'eBay',       fee: 12.9, color: 'text-amber' },
-  { id: 'mercari',   label: 'Mercari',    fee: 10,   color: 'text-red' },
-  { id: 'poshmark',  label: 'Poshmark',   fee: 20,   color: 'text-pink-400' },
-  { id: 'whatnot',   label: 'Whatnot',    fee: 8,    color: 'text-purple-400' },
-  { id: 'facebook',  label: 'Facebook',   fee: 0,    color: 'text-blue-400' },
-]
+import type { ScannedItem, AppSettings } from '@/types'
 
 // ── Inline chat types ──────────────────────────────────────────────────────
 
@@ -101,186 +88,12 @@ function CopyButton({ text, className }: { text: string; className?: string }) {
   )
 }
 
-// ── Platform listing tab content ───────────────────────────────────────────
-
-interface PlatformTabProps {
-  platform: ResalePlatform
-  item: ScannedItem
-  onGenerate: (platform: ResalePlatform) => Promise<void>
-  isGenerating: boolean
-}
-
-function PlatformTab({ platform, item, onGenerate, isGenerating }: PlatformTabProps) {
-  const meta = PLATFORMS.find(p => p.id === platform)!
-  const listing = item.optimizedListing?.platformListings?.[platform]
-  const ebayListing = item.optimizedListing
-
-  // For eBay, read from optimizedListing directly
-  const isEbay = platform === 'ebay'
-  const title = isEbay ? ebayListing?.title : listing?.title
-  const description = isEbay ? ebayListing?.description : listing?.description
-  const price = isEbay ? ebayListing?.price : listing?.price
-  const condition = isEbay ? ebayListing?.condition : listing?.condition
-  const shipping = isEbay ? ebayListing?.shippingCost : listing?.shippingCost
-  const notes = isEbay ? undefined : listing?.platformNotes
-  const hasListing = isEbay ? !!ebayListing : !!listing
-  const seoScore = isEbay ? ebayListing?.seoScore : undefined
-
-  const netPrice = price != null && meta.fee > 0
-    ? price * (1 - meta.fee / 100)
-    : price
-
-  return (
-    <div className="space-y-3 py-2">
-      {/* Fee badge */}
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className={cn('text-[10px] font-mono border-s3', meta.color)}>
-          {meta.fee > 0 ? `${meta.fee}% fee` : 'No fee (local)'}
-        </Badge>
-        {price != null && netPrice != null && (
-          <span className="text-[10px] text-t3 font-mono">
-            List ${price.toFixed(2)} → after fee ~${netPrice.toFixed(2)}
-          </span>
-        )}
-      </div>
-
-      {hasListing ? (
-        <div className="space-y-3">
-          {/* Title */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-medium text-t2">Title</Label>
-              {title && <CopyButton text={title} />}
-            </div>
-            <div className="text-sm text-t1 font-medium leading-snug bg-s1 rounded-md px-2.5 py-2 border border-s2">
-              {title || '—'}
-            </div>
-            {title && (
-              <span className="text-[10px] text-s4 font-mono">{title.length} chars</span>
-            )}
-            {isEbay && seoScore != null && <SEOScoreBar score={seoScore} />}
-          </div>
-
-          {/* Price */}
-          {price != null && (
-            <div className="flex gap-3">
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs font-medium text-t2">List Price</Label>
-                <div className="text-sm font-bold font-mono text-t1 bg-s1 rounded-md px-2.5 py-1.5 border border-s2">
-                  ${price.toFixed(2)}
-                </div>
-              </div>
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs font-medium text-t2">After Fees</Label>
-                <div className="text-sm font-bold font-mono text-green bg-green/5 rounded-md px-2.5 py-1.5 border border-green/20">
-                  ${netPrice?.toFixed(2)}
-                </div>
-              </div>
-              {shipping != null && (
-                <div className="flex-1 space-y-1">
-                  <Label className="text-xs font-medium text-t2">Shipping</Label>
-                  <div className="text-sm font-mono text-t2 bg-s1 rounded-md px-2.5 py-1.5 border border-s2">
-                    {shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Condition */}
-          {condition && (
-            <div className="space-y-1">
-              <Label className="text-xs font-medium text-t2">Condition</Label>
-              <div className="text-xs text-t2 bg-s1 rounded-md px-2.5 py-1.5 border border-s2">{condition}</div>
-            </div>
-          )}
-
-          {/* Description */}
-          {description && (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-t2">Description</Label>
-                <CopyButton text={description} />
-              </div>
-              <ScrollArea className="h-28">
-                <div className="text-xs text-t2 bg-s1 rounded-md px-2.5 py-2 border border-s2 whitespace-pre-wrap leading-relaxed">
-                  {description}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-
-          {/* Item Specifics (eBay) */}
-          {isEbay && ebayListing?.itemSpecifics && Object.keys(ebayListing.itemSpecifics).length > 0 && (
-            <div className="space-y-1">
-              <Label className="text-xs font-medium text-t2">Item Specifics</Label>
-              <div className="grid grid-cols-2 gap-1">
-                {Object.entries(ebayListing.itemSpecifics).slice(0, 8).map(([k, v]) => (
-                  <div key={k} className="flex gap-1 text-[10px] bg-s1 rounded px-2 py-1 border border-s2">
-                    <span className="text-s4 font-medium shrink-0">{k}:</span>
-                    <span className="text-t2 truncate">{v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Platform notes */}
-          {notes && (
-            <div className="flex gap-1.5 items-start p-2 bg-b1/10 border border-b1/20 rounded-md">
-              <Info size={12} weight="bold" className="text-b1 shrink-0 mt-0.5" />
-              <span className="text-[10px] text-t2 leading-relaxed">{notes}</span>
-            </div>
-          )}
-
-          {/* Regen button */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onGenerate(platform)}
-            disabled={isGenerating}
-            className="w-full h-7 text-[11px] border-s2 text-t2 hover:text-t1 hover:bg-s1"
-          >
-            {isGenerating
-              ? <CircleNotch size={12} className="mr-1.5 animate-spin" />
-              : <Sparkle size={12} className="mr-1.5" />
-            }
-            Regenerate {meta.label} listing
-          </Button>
-        </div>
-      ) : (
-        <div className="py-6 flex flex-col items-center gap-3">
-          <ShoppingBag size={32} className="text-s3" />
-          <div className="text-center">
-            <p className="text-sm text-t2 font-medium">No {meta.label} listing yet</p>
-            <p className="text-xs text-t3 mt-0.5">
-              {isEbay ? 'Generate your eBay listing first' : `Tap below to adapt your eBay listing for ${meta.label}`}
-            </p>
-          </div>
-          <Button
-            onClick={() => onGenerate(platform)}
-            disabled={isGenerating}
-            className="bg-b1 hover:bg-b2 text-bg h-8 text-xs font-medium"
-          >
-            {isGenerating
-              ? <CircleNotch size={13} className="mr-1.5 animate-spin" />
-              : <Sparkle size={13} className="mr-1.5" />
-            }
-            Generate {meta.label} listing
-          </Button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Main component ─────────────────────────────────────────────────────────
 
 interface ListingDetailScreenProps {
   item: ScannedItem
   onClose: () => void
   onOptimize: (itemId: string) => Promise<void>
-  onOptimizeForPlatform: (itemId: string, platform: ResalePlatform) => Promise<void>
   settings?: AppSettings
   onEdit?: (itemId: string, updates: Partial<ScannedItem>) => void
 }
@@ -289,12 +102,9 @@ export function ListingDetailScreen({
   item,
   onClose,
   onOptimize,
-  onOptimizeForPlatform,
   settings,
   onEdit,
 }: ListingDetailScreenProps) {
-  const [activeTab, setActiveTab] = useState<ResalePlatform>('ebay')
-  const [generatingPlatform, setGeneratingPlatform] = useState<ResalePlatform | null>(null)
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [chatInput, setChatInput] = useState('')
   const [isChatProcessing, setIsChatProcessing] = useState(false)
@@ -408,19 +218,6 @@ export function ListingDetailScreen({
     }
   }, [chatInput, isChatProcessing, agentSystemPrompt, settings])
 
-  const handleGenerate = useCallback(async (platform: ResalePlatform) => {
-    setGeneratingPlatform(platform)
-    try {
-      if (platform === 'ebay') {
-        await onOptimize(item.id)
-      } else {
-        await onOptimizeForPlatform(item.id, platform)
-      }
-    } finally {
-      setGeneratingPlatform(null)
-    }
-  }, [item.id, onOptimize, onOptimizeForPlatform])
-
   const profitDisplay = item.profitMargin != null && isFinite(item.profitMargin)
     ? `${item.profitMargin >= 0 ? '+' : ''}${item.profitMargin.toFixed(0)}%`
     : null
@@ -505,35 +302,114 @@ export function ListingDetailScreen({
               </div>
             </div>
 
-            {/* Platform tabs */}
-            <Tabs value={activeTab} onValueChange={v => setActiveTab(v as ResalePlatform)}>
-              <TabsList className="w-full h-8 bg-s1 p-0.5 gap-0.5 rounded-lg">
-                {PLATFORMS.map(p => (
-                  <TabsTrigger
-                    key={p.id}
-                    value={p.id}
-                    className={cn(
-                      'flex-1 text-[10px] h-7 rounded-md font-medium transition-all',
-                      'data-[state=active]:bg-bg data-[state=active]:shadow-sm',
-                      activeTab === p.id ? p.color : 'text-t3'
-                    )}
-                  >
-                    {p.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+            {/* eBay listing */}
+            {item.optimizedListing ? (
+              <div className="space-y-3">
+                {/* Title */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-t2">eBay Title</Label>
+                    {item.optimizedListing.title && <CopyButton text={item.optimizedListing.title} />}
+                  </div>
+                  <div className="text-sm text-t1 font-medium leading-snug bg-s1 rounded-md px-2.5 py-2 border border-s2">
+                    {item.optimizedListing.title || '—'}
+                  </div>
+                  {item.optimizedListing.title && (
+                    <span className="text-[10px] text-s4 font-mono">{item.optimizedListing.title.length} chars</span>
+                  )}
+                  {item.optimizedListing.seoScore != null && <SEOScoreBar score={item.optimizedListing.seoScore} />}
+                </div>
 
-              {PLATFORMS.map(p => (
-                <TabsContent key={p.id} value={p.id} className="mt-3 focus-visible:outline-none">
-                  <PlatformTab
-                    platform={p.id}
-                    item={item}
-                    onGenerate={handleGenerate}
-                    isGenerating={generatingPlatform === p.id}
-                  />
-                </TabsContent>
-              ))}
-            </Tabs>
+                {/* Price */}
+                {item.optimizedListing.price != null && (
+                  <div className="flex gap-3">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs font-medium text-t2">List Price</Label>
+                      <div className="text-sm font-bold font-mono text-t1 bg-s1 rounded-md px-2.5 py-1.5 border border-s2">
+                        ${item.optimizedListing.price.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs font-medium text-t2">After Fees (12.9%)</Label>
+                      <div className="text-sm font-bold font-mono text-green bg-green/5 rounded-md px-2.5 py-1.5 border border-green/20">
+                        ${(item.optimizedListing.price * 0.871).toFixed(2)}
+                      </div>
+                    </div>
+                    {item.optimizedListing.shippingCost != null && (
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-xs font-medium text-t2">Shipping</Label>
+                        <div className="text-sm font-mono text-t2 bg-s1 rounded-md px-2.5 py-1.5 border border-s2">
+                          {item.optimizedListing.shippingCost === 0 ? 'Free' : `$${item.optimizedListing.shippingCost.toFixed(2)}`}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Condition */}
+                {item.optimizedListing.condition && (
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-t2">Condition</Label>
+                    <div className="text-xs text-t2 bg-s1 rounded-md px-2.5 py-1.5 border border-s2">{item.optimizedListing.condition}</div>
+                  </div>
+                )}
+
+                {/* Description */}
+                {item.optimizedListing.description && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium text-t2">Description</Label>
+                      <CopyButton text={item.optimizedListing.description} />
+                    </div>
+                    <ScrollArea className="h-28">
+                      <div className="text-xs text-t2 bg-s1 rounded-md px-2.5 py-2 border border-s2 whitespace-pre-wrap leading-relaxed">
+                        {item.optimizedListing.description}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+
+                {/* Item Specifics */}
+                {item.optimizedListing.itemSpecifics && Object.keys(item.optimizedListing.itemSpecifics).length > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium text-t2">Item Specifics</Label>
+                    <div className="grid grid-cols-2 gap-1">
+                      {Object.entries(item.optimizedListing.itemSpecifics).slice(0, 8).map(([k, v]) => (
+                        <div key={k} className="flex gap-1 text-[10px] bg-s1 rounded px-2 py-1 border border-s2">
+                          <span className="text-s4 font-medium shrink-0">{k}:</span>
+                          <span className="text-t2 truncate">{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Regen button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onOptimize(item.id)}
+                  className="w-full h-7 text-[11px] border-s2 text-t2 hover:text-t1 hover:bg-s1"
+                >
+                  <Sparkle size={12} className="mr-1.5" />
+                  Regenerate eBay listing
+                </Button>
+              </div>
+            ) : (
+              <div className="py-6 flex flex-col items-center gap-3">
+                <div className="text-center">
+                  <p className="text-sm text-t2 font-medium">No eBay listing yet</p>
+                  <p className="text-xs text-t3 mt-0.5">Generate your eBay listing to see details here</p>
+                </div>
+                <Button
+                  onClick={() => onOptimize(item.id)}
+                  className="bg-b1 hover:bg-b2 text-bg h-8 text-xs font-medium"
+                >
+                  <Sparkle size={13} className="mr-1.5" />
+                  Generate eBay listing
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Embedded agent panel */}

@@ -144,10 +144,7 @@ export class NotionService {
       // GROUP 3 — Pricing
       'Purchase Price': { number: listing.purchasePrice },
       'Listing Price':  { number: listing.price },
-      'Profit':         { number: listing.profit },
-      'Profit Margin':  { number: listing.profitMargin },
       'Min Acceptable Price': { number: minAcceptable },
-      'Quantity Available':   rt('1'),
       'eBay Listing Type':    { select: { name: 'Buy It Now' } },
 
       // GROUP 4 — Shipping defaults
@@ -162,10 +159,7 @@ export class NotionService {
       'AI Researched': { checkbox: true },
       'Photos Taken':  { checkbox: !!(listing.hasImage || (listing.images && listing.images.length > 0)) },
 
-      // Legacy / existing fields kept for backward compat
-      'Price':          { number: listing.price },
       'Date Acquired':  { date: { start: new Date(listing.timestamp).toISOString() } },
-      'Tags':           { multi_select: listing.tags.map(tag => ({ name: tag })) },
     }
 
     // ── Extended optional properties ─────────────────────────────────────────
@@ -190,11 +184,10 @@ export class NotionService {
     if (listing.bestOfferMin)           extended['Best Offer Min $']       = rt(listing.bestOfferMin)
     if (listing.packageWeightLbs != null) extended['Package Weight (lbs)'] = { number: listing.packageWeightLbs }
     if (listing.packageSize)            extended['Package Size']           = { select: { name: listing.packageSize } }
-    if (listing.packageDims)            extended['Package Dims']           = rt(listing.packageDims)
     if (listing.aiConfidence)           extended['AI Confidence']          = { select: { name: listing.aiConfidence } }
     if (listing.marketNotes)            extended['Market Notes']           = rt(listing.marketNotes)
     if (listing.photoCount != null)     extended['Photo Count']            = { number: listing.photoCount }
-    if (listing.sourceVendor)           extended['Source / Vendor']        = rt(listing.sourceVendor)
+    if (listing.sourceVendor || listing.scannedBy) extended['Source / Vendor'] = rt(listing.sourceVendor || listing.scannedBy || '')
     if (listing.notes)                  extended['Market Notes']           = rt(listing.notes)
 
     // ── Session traceability ─────────────────────────────────────────────────
@@ -202,8 +195,6 @@ export class NotionService {
     if (listing.expenseType)          sessionProperties['Expense Type']   = { select: { name: listing.expenseType } }
     if (typeof listing.sessionNumber === 'number') sessionProperties['Session #'] = { number: listing.sessionNumber }
     if (listing.sessionId)            sessionProperties['Session ID']     = rt(listing.sessionId)
-    if (listing.scannedBy)            sessionProperties['Source / Vendor'] = rt(listing.scannedBy)
-    if (listing.operatorName)         sessionProperties['Operator']       = rt(listing.operatorName)
 
     // Description block in page body
     const children = [
