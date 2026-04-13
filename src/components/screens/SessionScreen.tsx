@@ -422,7 +422,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                     const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
                     const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
                     const duration = (s.endTime || Date.now()) - s.startTime
-                    const buyRate = s.itemsScanned > 0 ? Math.round((s.buyCount / s.itemsScanned) * 100) : 0
+                    const buyRate = sessionItems.length > 0 ? Math.round((buyItems.length / sessionItems.length) * 100) : 0
                     return (
                       <PastSessionCard
                         key={s.id}
@@ -465,7 +465,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                     const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
                     const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
                     const duration = (s.endTime || Date.now()) - s.startTime
-                    const buyRate = s.itemsScanned > 0 ? Math.round((s.buyCount / s.itemsScanned) * 100) : 0
+                    const buyRate = sessionItems.length > 0 ? Math.round((buyItems.length / sessionItems.length) * 100) : 0
                     return (
                       <PastSessionCard
                         key={s.id}

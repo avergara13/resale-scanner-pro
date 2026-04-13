@@ -96,6 +96,7 @@ interface ListingDetailScreenProps {
   onOptimize: (itemId: string) => Promise<void>
   settings?: AppSettings
   onEdit?: (itemId: string, updates: Partial<ScannedItem>) => void
+  onPushToNotion?: (itemId: string) => Promise<void>
 }
 
 export function ListingDetailScreen({
@@ -104,6 +105,7 @@ export function ListingDetailScreen({
   onOptimize,
   settings,
   onEdit,
+  onPushToNotion,
 }: ListingDetailScreenProps) {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -392,16 +394,28 @@ export function ListingDetailScreen({
                   </div>
                 )}
 
-                {/* Regen button */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onOptimize(item.id)}
-                  className="w-full h-9 text-xs border-s2 text-t2 hover:text-t1 hover:bg-s1 rounded-xl"
-                >
-                  <Sparkle size={13} className="mr-1.5" />
-                  Regenerate eBay listing
-                </Button>
+                {/* Regen + List buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onOptimize(item.id)}
+                    className="flex-1 h-9 text-xs border-s2 text-t2 hover:text-t1 hover:bg-s1 rounded-xl"
+                  >
+                    <Sparkle size={13} className="mr-1.5" />
+                    Regenerate
+                  </Button>
+                  {onPushToNotion && item.listingStatus !== 'published' && (
+                    <Button
+                      size="sm"
+                      onClick={() => onPushToNotion(item.id)}
+                      className="flex-1 h-9 text-xs font-bold text-white rounded-xl"
+                      style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                    >
+                      List on Notion
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="py-6 flex flex-col items-center gap-3">
