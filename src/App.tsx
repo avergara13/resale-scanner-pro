@@ -224,6 +224,35 @@ function App() {
     ))
   }, [])
 
+  // Pure session factory — returns a Session object without side effects.
+  // Used by both handleStartSession (manual) and handleCapture (auto-start).
+  const createSession = useCallback((): Session => {
+    const profile = settings?.userProfile ?? globalProfile
+    const operatorId = profile?.operatorId
+    const operatorAllSessions = (allSessions || []).filter(s =>
+      operatorId ? s.operatorId === operatorId : !s.operatorId
+    )
+    const sessionNumber = operatorAllSessions.reduce((max, s) => Math.max(max, s.sessionNumber || 0), 0) + 1
+    const initial = profile?.operatorInitial || ''
+    const prefix = initial ? `${initial}-` : '#'
+    const name = `${prefix}${String(sessionNumber).padStart(3, '0')}`
+    return {
+      id: Date.now().toString(),
+      name,
+      sessionNumber,
+      startTime: Date.now(),
+      itemsScanned: 0,
+      buyCount: 0,
+      passCount: 0,
+      totalPotentialProfit: 0,
+      active: true,
+      sessionType: 'business',
+      operatorId: profile?.operatorId,
+      operatorName: profile?.operatorName,
+      operatorInitial: profile?.operatorInitial,
+    }
+  }, [allSessions, settings?.userProfile, globalProfile])
+
   const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct, existingItem?: ScannedItem) => {
     // Route to add-photo handler — append this image to the current item without a new pipeline run
     if (cameraMode === 'add-photo') {
@@ -243,6 +272,17 @@ function App() {
 
     try {
       const optimized = await optimizeAndCache(imageData)
+
+    // Guarantee every NEW scan has an active session — auto-create if none exists.
+    // Uses the session ID directly (not via state) to eliminate race conditions.
+    // Re-analyze / add-photo modes operate on existing items that already have a sessionId.
+    let activeSession = session
+    if (!effectiveExistingItem && !activeSession?.active) {
+      activeSession = createSession()
+      setAllSessions(prev => [...(prev || []), activeSession!])
+      setSession(activeSession)
+      setSelectedSessionId(activeSession.id)
+    }
 
     // If re-analyzing an existing item, preserve its ID and metadata so we don't
     // create a duplicate card in scan history. Otherwise create a fresh item.
@@ -264,7 +304,7 @@ function App() {
           decision: 'PENDING',
           inQueue: false,
           location,
-          sessionId: session?.id,
+          sessionId: activeSession?.id,
           scannedBy: settings?.userProfile?.operatorId,
           // Pre-seed from barcode lookup; Gemini vision will overwrite with better data if available
           productName: barcodeProduct?.title || undefined,
@@ -707,7 +747,7 @@ function App() {
         return [persistableItem, ...existing.slice(0, 499)]
       })
 
-      if (session?.active) {
+      if (activeSession?.active) {
         setSession((prev) => {
           if (!prev) return prev
           return {
@@ -745,7 +785,7 @@ function App() {
       console.error('Capture failed:', msg)
       toast.error(msg.toLowerCase().includes('quota') ? 'Storage full — clearing cache and retrying. Please try again.' : `Capture failed: ${msg}`)
     }
-  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset, simulateProgress, completeStep, tagSuggestionService, setScanHistory])
+  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset, simulateProgress, completeStep, tagSuggestionService, setScanHistory, createSession, setAllSessions, setSelectedSessionId])
 
   const handleRemoveFromQueue = useCallback((id: string) => {
     setQueue((prev) => (prev || []).filter(item => item.id !== id))
@@ -753,43 +793,14 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
-    // Per-operator session counter — derived from allSessions, never conflicts between devices.
-    // Uses max(sessionNumber) across ALL sessions (including soft-deleted) to guarantee
-    // unique IDs even after deletions. Matching by operatorId handles multi-operator teams;
-    // sessions without operatorId (pre-profile or no-profile) are grouped together.
-    // Prefer device-scoped profile; fall back to global profile (set by any device)
-    const profile = settings?.userProfile ?? globalProfile
-    const operatorId = profile?.operatorId
-    const operatorAllSessions = (allSessions || []).filter(s =>
-      operatorId ? s.operatorId === operatorId : !s.operatorId
-    )
-    const sessionNumber = operatorAllSessions.reduce((max, s) => Math.max(max, s.sessionNumber || 0), 0) + 1
-    const initial = profile?.operatorInitial || ''
-    const prefix = initial ? `${initial}-` : '#'
-    const name = `${prefix}${String(sessionNumber).padStart(3, '0')}`
-    const id = Date.now().toString()
-    const newSession: Session = {
-      id,
-      name,
-      sessionNumber,
-      startTime: Date.now(),
-      itemsScanned: 0,
-      buyCount: 0,
-      passCount: 0,
-      totalPotentialProfit: 0,
-      active: true,
-      sessionType: 'business',
-      operatorId: profile?.operatorId,
-      operatorName: profile?.operatorName,
-      operatorInitial: profile?.operatorInitial,
-    }
+    const newSession = createSession()
     setAllSessions((prev) => [...(prev || []), newSession])
     setSession(newSession)
-    setSelectedSessionId(id)
+    setSelectedSessionId(newSession.id)
     setScreen('session-detail')
-    logActivity(`Session started${profile?.operatorName ? ` by ${profile.operatorName}` : ''}`)
-    logDebug('Session started', 'info', 'session', { id, operatorId, sessionNumber })
-  }, [allSessions, settings?.userProfile, globalProfile, setSession, setAllSessions, setSelectedSessionId, setScreen])
+    logActivity(`Session started${newSession.operatorName ? ` by ${newSession.operatorName}` : ''}`)
+    logDebug('Session started', 'info', 'session', { id: newSession.id, operatorId: newSession.operatorId, sessionNumber: newSession.sessionNumber })
+  }, [createSession, setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -2424,9 +2435,10 @@ function App() {
               className="absolute inset-0"
             >
               <CostTrackingScreen
-                onBack={() => setScreen('settings')}
+                onBack={() => setScreen(secondaryReturnScreen.current)}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
+                sessionId={secondaryReturnScreen.current === 'session-detail' ? selectedSessionId ?? undefined : undefined}
               />
             </motion.div>
           )}
@@ -2443,7 +2455,7 @@ function App() {
               className="absolute inset-0"
             >
               <ScanHistoryScreen
-                onBack={() => setScreen('session')}
+                onBack={() => setScreen(secondaryReturnScreen.current)}
                 onSaveAsDraft={(item) => {
                   setQueue(prev => {
                     const current = prev || []
@@ -2451,6 +2463,8 @@ function App() {
                     return [...current, { ...item, inQueue: true }]
                   })
                 }}
+                sessionId={secondaryReturnScreen.current === 'session-detail' ? selectedSessionId ?? undefined : undefined}
+                scanHistory={secondaryReturnScreen.current === 'session-detail' ? scanHistory || [] : undefined}
               />
             </motion.div>
           )}
