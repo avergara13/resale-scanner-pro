@@ -1152,7 +1152,7 @@ ${settings.userProfile.aiContext}` : ''}`
   // Shared stats bar used in both views
   const statsBar = (
     <div
-      className="px-4 border-b border-s1/50"
+      className="px-3 border-b border-s1/50"
       style={{ background: 'color-mix(in oklch, var(--fg) 90%, transparent)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)', height: '36px', display: 'flex', alignItems: 'center' }}
     >
       <div className="flex items-center gap-3 flex-1 overflow-x-auto scrollbar-none">
@@ -1370,7 +1370,7 @@ ${settings.userProfile.aiContext}` : ''}`
       <div className="flex-shrink-0 z-20 bg-fg">
         {/* Premium live session banner — shared component, self-contained */}
         <SessionLiveBanner />
-        <div className="border-b border-s1">
+        <div className="pt-2 pb-2 border-b border-s1">
           <div className="tab-bar px-3">
             <button
               onClick={() => setActiveTab('chat')}
