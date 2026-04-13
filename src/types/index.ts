@@ -362,6 +362,15 @@ export interface SharedTodo {
   createdAt: number
 }
 
+export interface AgentToolCall {
+  tool: 'rerun_pipeline' | 'create_listing' | 'update_item' | 'batch_analyze_queue'
+       | 'add_task' | 'complete_task' | 'clear_tasks'
+  itemId?: string
+  updates?: Partial<ScannedItem>
+  taskText?: string
+  taskId?: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'

@@ -439,9 +439,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       return false
     }
 
+    // Exclude promoted items (optimizing/ready/published) from BUY tab — they belong in the listing flow
+    const isPromoted = ['optimizing', 'ready', 'published'].includes(item.listingStatus ?? '')
+
     const matchesFilter =
       filter === 'ALL' ||
-      (filter === 'BUY' && item.decision === 'BUY') ||
+      (filter === 'BUY' && item.decision === 'BUY' && !isPromoted) ||
       (filter === 'PASS' && item.decision === 'PASS') ||
       (filter === 'PENDING' && item.decision === 'PENDING')
     
@@ -535,7 +538,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   })
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
   
-  const buyCount = queueItems.filter(item => item.decision === 'BUY').length
+  const buyCount = queueItems.filter(item => item.decision === 'BUY' && !['optimizing', 'ready', 'published'].includes(item.listingStatus ?? '')).length
   const passCount = queueItems.filter(item => item.decision === 'PASS').length
   const pendingCount = queueItems.filter(item => item.decision === 'PENDING').length
   const hasActiveAdvancedFilters =
