@@ -570,6 +570,41 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // ── Notion proxy — browser can't call api.notion.com directly (CORS) ──
+  if (requestUrl.pathname === '/api/notion/push' && req.method === 'POST') {
+    try {
+      const body = await readRequestBody(req)
+      const result = await notionRequest('/pages', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      sendJson(res, 200, result)
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[notion/push] failed:', error.message)
+      sendJson(res, status, { error: error.message, ...(error.payload || {}) })
+    }
+    return
+  }
+
+  const notionStatusMatch = requestUrl.pathname.match(/^\/api\/notion\/status\/([^/]+)$/)
+  if (notionStatusMatch && req.method === 'PATCH') {
+    try {
+      const pageId = notionStatusMatch[1]
+      const body = await readRequestBody(req)
+      const result = await notionRequest(`/pages/${pageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      })
+      sendJson(res, 200, result)
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[notion/status] failed:', error.message)
+      sendJson(res, status, { error: error.message, ...(error.payload || {}) })
+    }
+    return
+  }
+
   if (requestUrl.pathname === '/api/sold-items' && req.method === 'GET') {
     try {
       sendJson(res, 200, await getSoldFeed())

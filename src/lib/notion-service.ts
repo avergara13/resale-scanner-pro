@@ -213,12 +213,11 @@ export class NotionService {
     ]
 
     const attemptPush = async (properties: Record<string, unknown>) => {
-      return await retryFetch('https://api.notion.com/v1/pages', {
+      // Route through backend proxy — browser can't call api.notion.com directly (CORS)
+      return await retryFetch('/api/notion/push', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
-          'Notion-Version': '2022-06-28'
         },
         body: JSON.stringify({
           parent: { database_id: this.databaseId },
@@ -311,12 +310,11 @@ export class NotionService {
 
       // Status updates are the most-visible Notion writes (Sold → Shipped → Delisted chain).
       // Bump retries + widen backoff so transient 429/503s don't strand an item in the wrong state.
-      await retryFetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      // Route through backend proxy — browser can't call api.notion.com directly (CORS)
+      await retryFetch(`/api/notion/status/${pageId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
-          'Notion-Version': '2022-06-28',
         },
         body: JSON.stringify({ properties }),
       }, { maxRetries: 4, initialDelay: 1000, maxDelay: 8000, timeout: 20000 })
