@@ -228,30 +228,38 @@ export function ListingDetailScreen({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg w-full h-[90dvh] p-0 bg-bg border-s2 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-s2 shrink-0">
+      {/* [&>button]:hidden suppresses shadcn's auto-injected DialogClose X button — ← is the sole close affordance */}
+      <DialogContent className="max-w-lg w-full h-[90dvh] p-0 bg-bg border-s2 flex flex-col overflow-hidden [&>button]:hidden">
+        {/* Header — 3-zone: back | title+badge | spacer */}
+        <div className="flex items-center gap-3 px-3 py-2.5 border-b border-s2 shrink-0">
+          {/* Back / close */}
           <Button variant="ghost" size="sm" onClick={onClose}
-            className="h-7 w-7 p-0 text-t3 hover:text-t1 -ml-1">
-            <ArrowLeft size={16} weight="bold" />
+            className="h-8 w-8 p-0 text-t3 hover:text-t1 shrink-0 -ml-0.5 rounded-xl">
+            <ArrowLeft size={17} weight="bold" />
           </Button>
+
+          {/* Title block — grows, truncates gracefully */}
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-t1 truncate">
+            <h2 className="text-[13px] font-semibold text-t1 leading-tight truncate">
               {item.productName || 'Unnamed Item'}
             </h2>
-            <p className="text-[10px] text-t3 truncate">{item.category || 'Uncategorized'}</p>
-          </div>
-          {item.decision && (
-            <Badge
-              className={cn('text-xs font-bold shrink-0 h-7 px-2.5 rounded-md mr-6',
-                item.decision === 'BUY' ? 'bg-green/20 text-green' :
-                item.decision === 'PENDING' ? 'bg-amber/20 text-amber' :
-                'bg-red/20 text-red'
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-[10px] text-t3 truncate">{item.category || 'Uncategorized'}</p>
+              {item.decision && (
+                <span className={cn(
+                  'text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full shrink-0',
+                  item.decision === 'BUY'     ? 'bg-green/15 text-green' :
+                  item.decision === 'PENDING' ? 'bg-amber/15 text-amber' :
+                                                'bg-red/15 text-red'
+                )}>
+                  {item.decision}
+                </span>
               )}
-            >
-              {item.decision}
-            </Badge>
-          )}
+            </div>
+          </div>
+
+          {/* Right spacer — keeps title centered visually */}
+          <div className="h-8 w-8 shrink-0" />
         </div>
 
         {/* Scrollable body */}
@@ -330,7 +338,7 @@ export function ListingDetailScreen({
                       </div>
                     </div>
                     <div className="flex-1 space-y-1">
-                      <Label className="text-xs font-medium text-t2">After Fees (12.9%)</Label>
+                      <Label className="text-xs font-medium text-t2">Net (−12.9%)</Label>
                       <div className="text-sm font-bold font-mono text-green bg-green/5 rounded-md px-2.5 py-1.5 border border-green/20">
                         ${(item.optimizedListing.price * 0.871).toFixed(2)}
                       </div>
@@ -389,9 +397,9 @@ export function ListingDetailScreen({
                   size="sm"
                   variant="outline"
                   onClick={() => onOptimize(item.id)}
-                  className="w-full h-7 text-[11px] border-s2 text-t2 hover:text-t1 hover:bg-s1"
+                  className="w-full h-9 text-xs border-s2 text-t2 hover:text-t1 hover:bg-s1 rounded-xl"
                 >
-                  <Sparkle size={12} className="mr-1.5" />
+                  <Sparkle size={13} className="mr-1.5" />
                   Regenerate eBay listing
                 </Button>
               </div>
@@ -403,7 +411,7 @@ export function ListingDetailScreen({
                 </div>
                 <Button
                   onClick={() => onOptimize(item.id)}
-                  className="bg-b1 hover:bg-b2 text-bg h-8 text-xs font-medium"
+                  className="bg-b1 hover:bg-b2 text-bg h-9 text-xs font-medium rounded-xl"
                 >
                   <Sparkle size={13} className="mr-1.5" />
                   Generate eBay listing
