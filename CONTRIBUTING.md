@@ -133,7 +133,7 @@ for Railway's health checks.
 **Changes:**
 - `server.js` — new file. Node http server (no dependencies), reads
   `process.env.PORT` from Railway env injection, serves `dist/` with SPA routing,
-  `/health` returns `ok`. Identical pattern to `avergara13/sous-chef`.
+  `/health` returns `ok`. Identical pattern to `avergara13/sous-chef-app`.
 
 **Verification:**
 - Pattern confirmed live on `https://sous-chef-production.up.railway.app`

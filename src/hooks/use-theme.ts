@@ -4,11 +4,6 @@ import { useKV } from '@github/spark/hooks'
 export type ThemeMode = 'light' | 'dark' | 'auto'
 export type Theme = 'light' | 'dark'
 
-function getTimeBasedTheme(): Theme {
-  const hour = new Date().getHours()
-  return (hour >= 6 && hour < 18) ? 'light' : 'dark'
-}
-
 function getSystemTheme(): Theme {
   if (typeof window !== 'undefined' && window.matchMedia) {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -25,7 +20,7 @@ export function useTheme() {
     if (themeMode === 'auto') {
       if (useAmbientLight) {
         let sensorCleanup: (() => void) | undefined
-        
+
         const startSensor = async () => {
           try {
             if ('AmbientLightSensor' in window) {
@@ -42,42 +37,26 @@ export function useTheme() {
             console.log('Ambient light sensor not available')
           }
         }
-        
+
         startSensor()
-        
+
         return () => {
           if (sensorCleanup) {
             sensorCleanup()
           }
         }
       } else {
-        setActualTheme(getTimeBasedTheme())
-        
-        const interval = setInterval(() => {
-          setActualTheme(getTimeBasedTheme())
-        }, 60000)
-        
-        return () => clearInterval(interval)
+        // Follow system preference in auto mode
+        setActualTheme(getSystemTheme())
+
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+        const handleChange = () => setActualTheme(getSystemTheme())
+        mediaQuery.addEventListener('change', handleChange)
+        return () => mediaQuery.removeEventListener('change', handleChange)
       }
     } else if (themeMode) {
       setActualTheme(themeMode)
     }
-  }, [themeMode, useAmbientLight])
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    
-    const handleChange = () => {
-      if (themeMode === 'auto' && !useAmbientLight) {
-        const systemTheme = getSystemTheme()
-        if (systemTheme) {
-          setActualTheme(systemTheme)
-        }
-      }
-    }
-    
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
   }, [themeMode, useAmbientLight])
 
   useEffect(() => {

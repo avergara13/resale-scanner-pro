@@ -25,6 +25,7 @@ import {
   type FalsePositivePattern,
 } from '@/lib/false-positive-analyzer'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 
 export function FalsePositiveAnalyzerPanel() {
   const [corrections, setCorrections] = useKV<DetectionCorrection[]>('detection-corrections', [])
@@ -60,7 +61,7 @@ export function FalsePositiveAnalyzerPanel() {
     a.download = `false-positive-analysis-${Date.now()}.json`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success('Analysis data exported')
+    logActivity('Analysis data exported')
   }
 
   const handleImport = () => {
@@ -78,7 +79,7 @@ export function FalsePositiveAnalyzerPanel() {
         if (data.corrections) {
           setCorrections(data.corrections)
         }
-        toast.success('Analysis data imported')
+        logActivity('Analysis data imported')
       } catch (error) {
         toast.error('Failed to import data')
       }
@@ -305,7 +306,7 @@ export function FalsePositiveAnalyzerPanel() {
                   </div>
                   {Array.from(report.optimalThresholds.perCategory.entries())
                     .slice(0, 5)
-                    .map(([category, threshold]) => (
+                    .map(([category, threshold]: [string, number]) => (
                       <div key={category} className="flex items-center justify-between p-2 bg-s1 rounded">
                         <span className="text-xs text-s4">{category}</span>
                         <Badge variant="outline" className="font-mono text-xs border-s3">
@@ -500,7 +501,7 @@ export function FalsePositiveAnalyzerPanel() {
                     variant="outline"
                     className="w-full justify-start border-s2 text-left h-auto py-3"
                     onClick={() => {
-                      toast.info('Apply recommended threshold: ' + (report.optimalThresholds.globalConfidence * 100).toFixed(0) + '%')
+                      logActivity('Apply recommended threshold: ' + (report.optimalThresholds.globalConfidence * 100).toFixed(0) + '%', 'info')
                     }}
                   >
                     <div className="flex-1">
@@ -517,7 +518,7 @@ export function FalsePositiveAnalyzerPanel() {
                     variant="outline"
                     className="w-full justify-start border-s2 text-left h-auto py-3"
                     onClick={() => {
-                      toast.info('Filtering low confidence detections')
+                      logActivity('Filtering low confidence detections', 'info')
                     }}
                   >
                     <div className="flex-1">
@@ -534,7 +535,7 @@ export function FalsePositiveAnalyzerPanel() {
                     variant="outline"
                     className="w-full justify-start border-s2 text-left h-auto py-3"
                     onClick={() => {
-                      toast.info('Configuring category-specific thresholds')
+                      logActivity('Configuring category-specific thresholds', 'info')
                     }}
                   >
                     <div className="flex-1">

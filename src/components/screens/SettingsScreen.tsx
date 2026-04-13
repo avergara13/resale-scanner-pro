@@ -1,19 +1,21 @@
-import { useState } from 'react'
-import { toast } from 'sonner'
+import { useState, useMemo, useCallback } from 'react'
+import { useKV } from '@github/spark/hooks'
+import { logActivity, ACTIVITY_LOG_KEY, type ActivityEntry } from '@/lib/activity-log'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { 
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -30,17 +32,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target, ArrowCounterClockwise } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target, ArrowCounterClockwise, Bug, CaretDown, CaretUp } from '@phosphor-icons/react'
+import { DEBUG_LOG_KEY, type DebugEntry, type DebugLevel } from '@/lib/debug-log'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
 import { IncidentLogViewer } from '../IncidentLogViewer'
 import { DetectionHistoryViewer } from '../DetectionHistoryViewer'
 import { FalsePositiveAnalyzerPanel } from '../FalsePositiveAnalyzer'
-import { ThemeToggle } from '../ThemeToggle'
 import { TagPresetsManager } from '../TagPresetsManager'
 import { CompressionAnalytics } from '../CompressionAnalytics'
 import { RetryConfigPanel } from '../RetryConfigPanel'
-import { ArrowLeft } from '@phosphor-icons/react'
 import type { AppSettings, ItemTag } from '@/types'
 
 interface SettingsScreenProps {
@@ -49,8 +50,24 @@ interface SettingsScreenProps {
   onBack?: () => void
 }
 
-export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenProps) {
+export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
+  const [aiContextExpanded, setAiContextExpanded] = useState(false)
+  const [activityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
+  const recentActivity = (activityLog || []).slice(0, 50)
+
+  // Debug console state
+  const [activityTab, setActivityTab] = useState<'activity' | 'debug'>('activity')
+  const [debugFilter, setDebugFilter] = useState<DebugLevel | null>(null)
+  const [debugLog, setDebugLog] = useKV<DebugEntry[]>(DEBUG_LOG_KEY, [])
+  const filteredDebugEntries = useMemo(() =>
+    (debugLog || [])
+      .filter(e => !debugFilter || e.level === debugFilter)
+      .slice(0, 100),
+    [debugLog, debugFilter]
+  )
+  const debugErrors = (debugLog || []).filter(e => e.level === 'error').length
+  const clearDebugLog = useCallback(() => setDebugLog([]), [setDebugLog])
 
   const toggleKeyVisibility = (key: string) => {
     setShowKeys(prev => ({ ...prev, [key]: !prev[key] }))
@@ -85,14 +102,53 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
       minProfitMargin: 30,
       defaultShippingCost: 5.0,
       ebayFeePercent: 12.9,
-      paypalFeePercent: 3.49,
+      ebayAdFeePercent: 3.0,
+      shippingMaterialsCost: 0.75,
+      paypalFeePercent: 0,
       preferredAiModel: 'gemini-2.5-flash',
       imageQuality: { preset: 'balanced' },
       ...preservedKeys,
     }
 
     onUpdate(defaultSettings)
-    toast.success('Settings reset to defaults - API keys preserved')
+    logActivity('Settings reset to defaults - API keys preserved')
+  }
+
+  const handleClearAllData = () => {
+    onUpdate({
+      voiceEnabled: true,
+      autoCapture: true,
+      agenticMode: true,
+      liveSearchEnabled: true,
+      darkMode: false,
+      themeMode: 'auto',
+      useAmbientLight: false,
+      apiNotificationsEnabled: false,
+      minProfitMargin: 30,
+      defaultShippingCost: 5.0,
+      ebayFeePercent: 12.9,
+      ebayAdFeePercent: 3.0,
+      shippingMaterialsCost: 0.75,
+      paypalFeePercent: 0,
+      preferredAiModel: 'gemini-2.5-flash',
+      imageQuality: { preset: 'balanced' },
+      enableLensInBatch: true,
+      lensSkipConfidence: 0.85,
+      geminiApiKey: '',
+      anthropicApiKey: '',
+      notionApiKey: '',
+      googleApiKey: '',
+      googleSearchEngineId: '',
+      ebayAppId: '',
+      ebayDevId: '',
+      ebayCertId: '',
+      ebayApiKey: '',
+      supabaseUrl: '',
+      supabaseKey: '',
+      n8nWebhookUrl: '',
+      notionDatabaseId: '',
+    })
+    logActivity('All app data cleared — settings and API keys reset', 'info')
   }
 
   const hasKey = (key?: string) => key && key.length > 8
@@ -113,1127 +169,519 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
       id="scr-settings"
       className="flex flex-col h-full overflow-y-auto overflow-x-hidden"
     >
-      <div className="px-4 pt-2 pb-4 border-b border-s2 bg-fg">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            {onBack && (
-              <button onClick={onBack} className="p-1.5 -ml-1 rounded-lg hover:bg-s1 transition-colors active:opacity-60">
-                <ArrowLeft size={20} weight="bold" className="text-t1" />
-              </button>
-            )}
-            <div>
-              <h1 className="text-2xl font-semibold text-t1 mb-1">Settings</h1>
-              <p className="text-sm text-t2">Configure AI models, APIs, and business rules</p>
+      {/* ── Status Bar ── */}
+      <div className="px-4 py-2 border-b border-s2 bg-fg">
+        <div className="flex items-center gap-4 overflow-x-auto scrollbar-none">
+          {([
+            ['AI', aiConfigured],
+            ['Google', googleConfigured],
+            ['eBay', ebayConfigured],
+            ['Database', supabaseConfigured],
+            ['Notion', notionConfigured],
+          ] as [string, boolean][]).map(([label, ok]) => (
+            <div key={label} className="flex items-center gap-1.5 flex-shrink-0">
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ok ? 'bg-green' : 'bg-s3'}`} />
+              <span className={`text-[11px] font-semibold ${ok ? 'text-t1' : 'text-t3'}`}>{label}</span>
             </div>
-          </div>
-          <ThemeToggle />
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={aiConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(aiConfigured)}
-            <span className="text-xs">AI</span>
-          </Badge>
-          <Badge variant={googleConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(googleConfigured)}
-            <span className="text-xs">Google</span>
-          </Badge>
-          <Badge variant={ebayConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(ebayConfigured)}
-            <span className="text-xs">eBay</span>
-          </Badge>
-          <Badge variant={supabaseConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(supabaseConfigured)}
-            <span className="text-xs">Database</span>
-          </Badge>
-          <Badge variant={notionConfigured ? "default" : "secondary"} className="gap-1.5">
-            {getStatusIcon(notionConfigured)}
-            <span className="text-xs">Notion</span>
-          </Badge>
+          ))}
         </div>
       </div>
 
       <div className="flex-1 px-3 py-4">
-        <div className="space-y-4 pb-24 w-full max-w-full">
-          <Accordion type="multiple" defaultValue={['health']} className="space-y-4">
-            <AccordionItem value="health" className="border border-green/20 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green animate-pulse" />
-                  <span>Live API Health Status</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-4 bg-gradient-to-br from-green-bg to-transparent border border-green/20 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green text-t1 flex-shrink-0">
-                      <Info size={16} weight="fill" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-t1 mb-1">Real-Time Monitoring</p>
-                      <p className="text-xs text-t2 leading-relaxed">
-                        Run a live health check on demand from this panel. Persistently failing integrations are shown here so scans can fall back cleanly instead of failing silently.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+        <div className="space-y-3 pb-24 w-full max-w-full">
 
-                <ApiStatusIndicator settings={settings} liveUpdates={true} checkInterval={0} />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="history" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                📊 Connection History & Downtime Tracking
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-t2 leading-relaxed">
-                      Track connection events and identify downtime patterns over the last 30 days. Analyze service reliability and incident history.
-                    </p>
-                  </div>
-                </div>
-
-                <ConnectionHistoryPanel settings={settings} />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="retry" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🔄 Retry Configuration
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-4 bg-gradient-to-br from-b1/10 to-b1/5 border-2 border-b1/40 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-b1 text-t1 flex-shrink-0">
-                      <ClockCounterClockwise size={20} weight="duotone" />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <p className="text-sm font-semibold text-t1">Per-Endpoint Retry Policies</p>
-                      <p className="text-xs text-t2 leading-relaxed">
-                        Each API endpoint has optimized retry behavior based on priority level. Critical endpoints get more retries and longer timeouts. Configure caching and backoff strategies per service.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <RetryConfigPanel />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="incidents" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🚨 Incident Logs & API Issues
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-t2 leading-relaxed">
-                      Comprehensive incident log viewer for diagnosing API connection issues. Filter by service, view detailed error messages, and track resolution times. Export logs for external analysis.
-                    </p>
-                  </div>
-                </div>
-
-                <IncidentLogViewer settings={settings} />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="detection" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                <div className="flex items-center gap-2">
-                  📸 Multi-Object Detection History
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-t2 leading-relaxed">
-                      Track multi-object detection accuracy over time. Review past scans, confirmed detections, and false positives to monitor AI performance.
-                    </p>
-                  </div>
-                </div>
-
-                <DetectionHistoryViewer />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="false-positives" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                <div className="flex items-center gap-2">
-                  🎯 False Positive Analysis & Optimization
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-4 bg-gradient-to-br from-amber/10 to-amber/5 border-2 border-amber/40 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber text-bg flex-shrink-0">
-                      <Target size={20} weight="duotone" />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <p className="text-sm font-semibold text-t1">Optimize Detection Accuracy</p>
-                      <p className="text-xs text-t2 leading-relaxed">
-                        Review false positive patterns to improve multi-object detection. Analyze misidentifications, confidence distributions, and apply recommended thresholds to reduce errors.
-                      </p>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <Badge variant="outline" className="text-xs border-amber text-amber gap-1">
-                          <CheckCircle size={12} weight="fill" />
-                          Pattern Detection
-                        </Badge>
-                        <Badge variant="outline" className="text-xs border-amber text-amber gap-1">
-                          <CheckCircle size={12} weight="fill" />
-                          Threshold Optimization
-                        </Badge>
-                        <Badge variant="outline" className="text-xs border-amber text-amber gap-1">
-                          <CheckCircle size={12} weight="fill" />
-                          AI Recommendations
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <FalsePositiveAnalyzerPanel />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="ai" className="border border-b1/20 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🤖 AI Configuration
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-t2 leading-relaxed">
-                      Configure your preferred AI model. Gemini 2.0 Flash is recommended for cost-efficient real-time analysis.
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="ai-model" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
-                    Preferred AI Model
-                  </Label>
-                  <Select 
-                    value={settings.preferredAiModel || 'gemini-2.5-flash'}
-                    onValueChange={(value) => onUpdate({ preferredAiModel: value as AppSettings['preferredAiModel'] })}
-                  >
-                    <SelectTrigger id="ai-model" className="font-mono text-sm">
-                      <SelectValue placeholder="Select model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</SelectItem>
-                      <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
-                      <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet (Backup)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="gemini-api-key" className="text-xs uppercase tracking-wide text-t2">
-                      Google Gemini API Key
-                    </Label>
-                    <button
-                      onClick={() => toggleKeyVisibility('gemini')}
-                      className="text-t2 hover:text-t1"
-                    >
-                      {showKeys.gemini ? <EyeClosed size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <Input
-                    id="gemini-api-key"
-                    type={showKeys.gemini ? 'text' : 'password'}
-                    value={settings.geminiApiKey || ''}
-                    onChange={(e) => onUpdate({ geminiApiKey: e.target.value })}
-                    placeholder="AIzaSy..."
-                    className="font-mono text-sm"
-                  />
-                  {hasKey(settings.geminiApiKey) && (
-                    <p className="text-xs text-green mt-1 flex items-center gap-1">
-                      <CheckCircle size={12} weight="fill" /> Key configured
-                    </p>
+          {/* ═══════════ MY PROFILE — Device operator identity ═══════════ */}
+          <div className="border border-b1/20 rounded-lg px-3 py-3 bg-fg space-y-3">
+            <p className="text-sm font-semibold text-t1 uppercase tracking-wide flex items-center gap-2">
+              <span className="text-base">👤</span> My Profile
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-[10px] text-t3 uppercase tracking-wider">Name</Label>
+                <Input
+                  value={settings.userProfile?.operatorName || ''}
+                  onChange={(e) => {
+                    // Lock operatorId only if the user previously saved a name (stable slug on edits).
+                    // For a new profile (no prior operatorName), regenerate from the full current value
+                    // on every keystroke so the final saved ID matches the complete name, not just
+                    // the first character typed.
+                    const existingId = settings.userProfile?.operatorName
+                      ? settings.userProfile.operatorId
+                      : undefined
+                    onUpdate({ userProfile: { ...settings.userProfile, operatorId: existingId || e.target.value.toLowerCase().replace(/\s+/g, '-').slice(0, 20), operatorName: e.target.value, operatorInitial: e.target.value.slice(0, 1).toUpperCase() || settings.userProfile?.operatorInitial || '' } as any })
+                  }}
+                  placeholder="Angel"
+                  className="h-8 text-sm mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-t3 uppercase tracking-wider">Initials</Label>
+                <Input
+                  value={settings.userProfile?.operatorInitial || ''}
+                  onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, operatorInitial: e.target.value.toUpperCase().slice(0, 3) } as any })}
+                  placeholder="AV"
+                  maxLength={3}
+                  className="h-8 text-sm mt-1 uppercase"
+                />
+              </div>
+            </div>
+            {/* AI Context Notes — collapsible */}
+            <div>
+              <button
+                onClick={() => setAiContextExpanded(p => !p)}
+                className="w-full flex items-center justify-between"
+              >
+                <Label className="text-[10px] text-t3 uppercase tracking-wider pointer-events-none">AI Context Notes</Label>
+                <span className="flex items-center gap-1 text-t3">
+                  {!aiContextExpanded && settings.userProfile?.aiContext && (
+                    <span className="text-[9px] text-t2 truncate max-w-[160px]">{settings.userProfile.aiContext}</span>
                   )}
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="anthropic-api-key" className="text-xs uppercase tracking-wide text-t2">
-                      Anthropic API Key (Backup)
-                    </Label>
-                    <button
-                      onClick={() => toggleKeyVisibility('anthropic')}
-                      className="text-t2 hover:text-t1"
-                    >
-                      {showKeys.anthropic ? <EyeClosed size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <Input
-                    id="anthropic-api-key"
-                    type={showKeys.anthropic ? 'text' : 'password'}
-                    value={settings.anthropicApiKey || ''}
-                    onChange={(e) => onUpdate({ anthropicApiKey: e.target.value })}
-                    placeholder="sk-ant-..."
-                    className="font-mono text-sm"
+                  {aiContextExpanded ? <CaretUp size={10} weight="bold" /> : <CaretDown size={10} weight="bold" />}
+                </span>
+              </button>
+              {aiContextExpanded && (
+                <div className="mt-1.5">
+                  <textarea
+                    value={settings.userProfile?.aiContext || ''}
+                    onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, aiContext: e.target.value } as any })}
+                    placeholder="I focus on electronics and sneakers. Min 35% margin. Ship within 2 days."
+                    rows={3}
+                    autoFocus
+                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
                   />
+                  <p className="text-[9px] text-t3 mt-1">Injected into every AI prompt — helps the agent give personalized advice</p>
                 </div>
-              </AccordionContent>
-            </AccordionItem>
+              )}
+            </div>
+            {settings.userProfile?.operatorName && (
+              <p className="text-[10px] text-t3 flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-b1" />
+                Active as <strong className="text-t1">{settings.userProfile.operatorName}</strong>
+                {settings.userProfile.operatorInitial && <span className="text-[9px] text-b1 font-bold bg-b1/10 px-1.5 py-0.5 rounded">{settings.userProfile.operatorInitial}</span>}
+              </p>
+            )}
+          </div>
 
-            <AccordionItem value="google" className="border border-b1/20 rounded-lg px-3 bg-fg">
+          <Accordion type="multiple" defaultValue={[]} className="space-y-3">
+
+            {/* ════════════════════════════════════════════════════════
+                SECTION 1 — CONNECTIONS (API Keys & Integrations)
+               ════════════════════════════════════════════════════════ */}
+            <AccordionItem value="connections" className="border border-b1/20 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                <div className="flex items-center gap-2">
-                  🔍 Google Cloud APIs — Enhanced Product ID
-                </div>
+                🔑 Connections
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-4 bg-gradient-to-br from-b1/10 to-b1/5 border-2 border-b1/40 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-b1 text-t1 flex-shrink-0">
-                      <Info size={20} weight="fill" />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <p className="text-sm font-semibold text-t1">Supercharge Product Identification</p>
-                      <p className="text-xs text-t2 leading-relaxed">
-                        Google Cloud Vision API identifies products from photos with high accuracy. Combined with Custom Search, you get real-time price comparisons and visual matches across the web.
-                      </p>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <Badge variant="outline" className="text-xs border-b1 text-b1 gap-1">
-                          <CheckCircle size={12} weight="fill" />
-                          Visual Matching
-                        </Badge>
-                        <Badge variant="outline" className="text-xs border-b1 text-b1 gap-1">
-                          <CheckCircle size={12} weight="fill" />
-                          Price Discovery
-                        </Badge>
-                        <Badge variant="outline" className="text-xs border-b1 text-b1 gap-1">
-                          <CheckCircle size={12} weight="fill" />
-                          Web-Scale Search
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <AccordionContent className="space-y-6 pt-2 w-full max-w-full">
 
-                <div className="p-4 bg-s1 border border-s2 rounded-lg">
-                  <p className="text-xs font-semibold text-t1 mb-3 uppercase tracking-wide">📋 Quick Setup Guide</p>
-                  <ol className="text-xs text-t2 space-y-2 ml-1">
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">1.</span>
-                      <span>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-b1 underline hover:text-b2">console.cloud.google.com</a></span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">2.</span>
-                      <span>Create a new project or select existing one</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">3.</span>
-                      <span>Enable <strong>Cloud Vision API</strong> (required for product identification)</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">4.</span>
-                      <span>Optionally enable <strong>Custom Search API</strong> for enhanced results</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">5.</span>
-                      <span>Go to <strong>Credentials → Create API Key</strong></span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">6.</span>
-                      <span>Restrict key to enabled APIs for security</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">7.</span>
-                      <span>Copy the API key (starts with <code className="font-mono text-t1 bg-s2 px-1 rounded">AIzaSy...</code>) and paste below</span>
-                    </li>
-                  </ol>
-                  <div className="mt-4 p-3 bg-blue-bg border border-b1/20 rounded-md">
-                    <p className="text-xs text-t2">
-                      <strong className="text-b1">📖 Detailed Guide:</strong> See <a href="GOOGLE_CLOUD_SETUP.md" target="_blank" rel="noopener noreferrer" className="text-b1 underline hover:text-b2">GOOGLE_CLOUD_SETUP.md</a> for complete setup instructions, pricing info, and troubleshooting.
-                    </p>
-                  </div>
-                </div>
-
-                <Separator className="bg-s2" />
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="google-api-key" className="text-xs uppercase tracking-wide text-t2">
-                      <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">1</span>
-                        Google Cloud API Key
-                      </span>
-                    </Label>
-                    <button
-                      onClick={() => toggleKeyVisibility('google')}
-                      className="text-t2 hover:text-t1 touch-target"
-                    >
-                      {showKeys.google ? <EyeClosed size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <Input
-                    id="google-api-key"
-                    type={showKeys.google ? 'text' : 'password'}
-                    value={settings.googleApiKey || ''}
-                    onChange={(e) => onUpdate({ googleApiKey: e.target.value })}
-                    placeholder="AIzaSy... (Cloud Vision API)"
-                    className="font-mono text-sm"
-                  />
-                  {hasKey(settings.googleApiKey) && (
-                    <div className="mt-2 p-3 bg-gradient-to-br from-green-bg to-transparent border border-green/30 rounded-md">
-                      <p className="text-xs text-green font-semibold flex items-center gap-1.5">
-                        <CheckCircle size={14} weight="fill" /> 
-                        Google Cloud Vision Active — Enhanced Product ID Enabled!
-                      </p>
-                      <p className="text-xs text-t2 mt-1">
-                        The app will now use Google Vision API for accurate product identification from photos.
-                      </p>
-                    </div>
-                  )}
-                  {!hasKey(settings.googleApiKey) && (
-                    <p className="text-xs text-amber mt-1.5 flex items-center gap-1">
-                      <Info size={12} weight="fill" />
-                      Required for visual product identification and matching
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="google-search-engine-id" className="text-xs uppercase tracking-wide text-t2">
-                      <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-s3 text-t1 text-[10px] font-bold">2</span>
-                        Custom Search Engine ID (Optional)
-                      </span>
-                    </Label>
-                  </div>
-                  <Input
-                    id="google-search-engine-id"
-                    type="text"
-                    value={settings.googleSearchEngineId || ''}
-                    onChange={(e) => onUpdate({ googleSearchEngineId: e.target.value })}
-                    placeholder="cx:123456789..."
-                    className="font-mono text-sm"
-                  />
-                  {hasKey(settings.googleSearchEngineId) && (
-                    <p className="text-xs text-green mt-1 flex items-center gap-1">
-                      <CheckCircle size={12} weight="fill" /> Enhanced visual search enabled
-                    </p>
-                  )}
-                  <p className="text-xs text-t2 mt-1">
-                    For enhanced visual search. Create at <a href="https://programmablesearchengine.google.com" target="_blank" rel="noopener noreferrer" className="text-b1 underline hover:text-b2">programmablesearchengine.google.com</a>
+                {/* ── AI ── */}
+                <div className="space-y-4">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full ${aiConfigured ? 'bg-green' : 'bg-s3'}`} />
+                    AI Model
                   </p>
-                </div>
 
-                <Separator className="bg-s2" />
-
-                <div className="p-4 bg-s1 border border-s2 rounded-lg space-y-3">
-                  <p className="text-xs font-semibold text-t1 uppercase tracking-wide">🎯 What You'll Get</p>
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Visual Product ID:</strong> Identify products from photos with 90%+ accuracy
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Web Matching:</strong> Find similar products across eBay, Amazon, Mercari, etc.
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Price Discovery:</strong> See what items are selling for across platforms
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Confidence Scores:</strong> Get reliability ratings on identifications
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Smart Caching:</strong> Cost optimization skips redundant API calls (saves ~40% quota)
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-s1 border border-s2 rounded-lg space-y-2">
-                  <p className="text-xs font-semibold text-t1 uppercase tracking-wide">💰 Free Tier Limits</p>
-                  <div className="space-y-1.5 text-xs text-t2">
-                    <div className="flex justify-between">
-                      <span>Vision API:</span>
-                      <span className="font-semibold text-t1">1,000 requests/month free</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Custom Search:</span>
-                      <span className="font-semibold text-t1">100 queries/day free</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Typical usage:</span>
-                      <span className="font-semibold text-green">Usually stays within free tier</span>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-s2">
-                    <p className="text-xs text-t2">
-                      💡 <strong className="text-t1">Pro Tip:</strong> Enable billing but set up alerts at $5 and $10. Most users scan 20-50 items/day and never exceed free tier with smart caching enabled.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-amber/10 border border-amber/30 rounded-md">
-                  <p className="text-xs text-t2">
-                    <strong className="text-amber">⚠️ Cost Optimization:</strong> When Gemini is 92%+ confident in a product ID, Google Lens is automatically skipped to save API quota. This reduces Custom Search usage by ~40% on clear product photos.
-                  </p>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="ebay" className="border border-b1/20 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                <div className="flex items-center gap-2">
-                  💰 eBay Integration — Market Pricing
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-4 bg-gradient-to-br from-green-bg to-transparent border-2 border-green/30 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green text-t1 flex-shrink-0">
-                      <Info size={20} weight="fill" />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <p className="text-sm font-semibold text-t1">Get Real-Time Market Intelligence</p>
-                      <p className="text-xs text-t2 leading-relaxed">
-                        Connect to eBay's API to see live market pricing, sold item data, and accurate profit calculations. Configure once and unlock instant market research on every scan.
-                      </p>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <Badge variant="outline" className="text-xs border-green text-green gap-1">
-                          <CheckCircle size={12} weight="fill" />
-                          Live Sold Prices
-                        </Badge>
-                        <Badge variant="outline" className="text-xs border-green text-green gap-1">
-                          <CheckCircle size={12} weight="fill" />
-                          Active Listings
-                        </Badge>
-                        <Badge variant="outline" className="text-xs border-green text-green gap-1">
-                          <CheckCircle size={12} weight="fill" />
-                          Sell-Through Rates
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-s1 border border-s2 rounded-lg">
-                  <p className="text-xs font-semibold text-t1 mb-3 uppercase tracking-wide">📋 Quick Setup Guide</p>
-                  <ol className="text-xs text-t2 space-y-2 ml-1">
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">1.</span>
-                      <span>Go to <a href="https://developer.ebay.com/my/keys" target="_blank" rel="noopener noreferrer" className="text-b1 underline hover:text-b2">developer.ebay.com/my/keys</a></span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">2.</span>
-                      <span>Sign in with your eBay account (or create a developer account)</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">3.</span>
-                      <span>Create a new "Production" keyset (not Sandbox)</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">4.</span>
-                      <span>Copy your <strong>App ID (Client ID)</strong>, <strong>Dev ID</strong>, and <strong>Cert ID (Client Secret)</strong></span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">5.</span>
-                      <span>Generate an <strong>OAuth User Token</strong> by clicking "Get a Token from eBay via Your Application"</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="flex-shrink-0 font-semibold text-t1">6.</span>
-                      <span>Paste all credentials below and start seeing live market data!</span>
-                    </li>
-                  </ol>
-                  <div className="mt-4 p-3 bg-blue-bg border border-b1/20 rounded-md">
-                    <p className="text-xs text-t2">
-                      <strong className="text-b1">💡 Pro Tip:</strong> OAuth tokens expire after 2 hours. You'll need to regenerate them periodically. The app will notify you when it's time to refresh.
-                    </p>
-                  </div>
-                </div>
-
-                <Separator className="bg-s2" />
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="ebay-app-id" className="text-xs uppercase tracking-wide text-t2">
-                      <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">1</span>
-                        eBay App ID (Client ID)
-                      </span>
+                  <div>
+                    <Label htmlFor="ai-model" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Preferred AI Model
                     </Label>
-                    <button
-                      onClick={() => toggleKeyVisibility('ebayApp')}
-                      className="text-t2 hover:text-t1 touch-target"
+                    <Select
+                      value={settings.preferredAiModel || 'gemini-2.5-flash'}
+                      onValueChange={(value) => onUpdate({ preferredAiModel: value as AppSettings['preferredAiModel'] })}
                     >
-                      {showKeys.ebayApp ? <EyeClosed size={16} /> : <Eye size={16} />}
-                    </button>
+                      <SelectTrigger id="ai-model" className="font-mono text-sm">
+                        <SelectValue placeholder="Select model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</SelectItem>
+                        <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
+                        <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet (Backup)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Input
-                    id="ebay-app-id"
-                    type={showKeys.ebayApp ? 'text' : 'password'}
-                    value={settings.ebayAppId || ''}
-                    onChange={(e) => onUpdate({ ebayAppId: e.target.value })}
-                    placeholder="YourApp-YourApp-PRD-..."
-                    className="font-mono text-sm"
-                  />
-                  {hasKey(settings.ebayAppId) && (
-                    <p className="text-xs text-green mt-1 flex items-center gap-1">
-                      <CheckCircle size={12} weight="fill" /> App ID configured
-                    </p>
-                  )}
-                </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="ebay-dev-id" className="text-xs uppercase tracking-wide text-t2">
-                      <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">2</span>
-                        eBay Dev ID
-                      </span>
-                    </Label>
-                    <button
-                      onClick={() => toggleKeyVisibility('ebayDev')}
-                      className="text-t2 hover:text-t1 touch-target"
-                    >
-                      {showKeys.ebayDev ? <EyeClosed size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <Input
-                    id="ebay-dev-id"
-                    type={showKeys.ebayDev ? 'text' : 'password'}
-                    value={settings.ebayDevId || ''}
-                    onChange={(e) => onUpdate({ ebayDevId: e.target.value })}
-                    placeholder="a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
-                    className="font-mono text-sm"
-                  />
-                  {hasKey(settings.ebayDevId) && (
-                    <p className="text-xs text-green mt-1 flex items-center gap-1">
-                      <CheckCircle size={12} weight="fill" /> Dev ID configured
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="ebay-cert-id" className="text-xs uppercase tracking-wide text-t2">
-                      <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">3</span>
-                        eBay Cert ID (Client Secret)
-                      </span>
-                    </Label>
-                    <button
-                      onClick={() => toggleKeyVisibility('ebayCert')}
-                      className="text-t2 hover:text-t1 touch-target"
-                    >
-                      {showKeys.ebayCert ? <EyeClosed size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <Input
-                    id="ebay-cert-id"
-                    type={showKeys.ebayCert ? 'text' : 'password'}
-                    value={settings.ebayCertId || ''}
-                    onChange={(e) => onUpdate({ ebayCertId: e.target.value })}
-                    placeholder="PRD-1234abcd5678efgh-90ijk12l"
-                    className="font-mono text-sm"
-                  />
-                  {hasKey(settings.ebayCertId) && (
-                    <p className="text-xs text-green mt-1 flex items-center gap-1">
-                      <CheckCircle size={12} weight="fill" /> Cert ID configured
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="ebay-api-key" className="text-xs uppercase tracking-wide text-t2">
-                      <span className="flex items-center gap-1.5">
-                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-b1 text-t1 text-[10px] font-bold">4</span>
-                        eBay OAuth User Token
-                      </span>
-                    </Label>
-                    <button
-                      onClick={() => toggleKeyVisibility('ebayToken')}
-                      className="text-t2 hover:text-t1 touch-target"
-                    >
-                      {showKeys.ebayToken ? <EyeClosed size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <Input
-                    id="ebay-api-key"
-                    type={showKeys.ebayToken ? 'text' : 'password'}
-                    value={settings.ebayApiKey || ''}
-                    onChange={(e) => onUpdate({ ebayApiKey: e.target.value })}
-                    placeholder="v^1.1#i^1#..."
-                    className="font-mono text-sm"
-                  />
-                  {hasKey(settings.ebayApiKey) && hasKey(settings.ebayAppId) ? (
-                    <div className="mt-2 p-3 bg-gradient-to-br from-green-bg to-transparent border border-green/30 rounded-md">
-                      <p className="text-xs text-green font-semibold flex items-center gap-1.5">
-                        <CheckCircle size={14} weight="fill" /> 
-                        eBay Integration Active — Live Market Pricing Enabled!
-                      </p>
-                      <p className="text-xs text-t2 mt-1">
-                        You'll now see real sold prices, active listings, and accurate profit calculations on every scan.
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-amber mt-1.5 flex items-center gap-1">
-                      <Info size={12} weight="fill" />
-                      Complete all 4 fields above to unlock live market data
-                    </p>
-                  )}
-                </div>
-
-                <Separator className="bg-s2" />
-
-                <div className="p-4 bg-s1 border border-s2 rounded-lg space-y-3">
-                  <p className="text-xs font-semibold text-t1 uppercase tracking-wide">🎯 What You'll Get</p>
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Real Sold Prices:</strong> See what items actually sold for (avg, median, recent sales)
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Active Listings:</strong> Current competition and pricing trends
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Sell-Through Rate:</strong> Demand indicator (high = hot item)
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Profit Calculator:</strong> Net profit after eBay fees, PayPal fees, and shipping
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="text-green mt-0.5 flex-shrink-0" size={14} weight="fill" />
-                      <div className="text-xs text-t2">
-                        <strong className="text-t1">Smart Recommendations:</strong> Suggested listing price based on market data
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-amber/10 border border-amber/30 rounded-md">
-                  <p className="text-xs text-t2">
-                    <strong className="text-amber">⚠️ Important:</strong> OAuth tokens expire after 2 hours. When you see "eBay API unavailable" errors, return here and generate a new token. Future updates will add automatic token refresh.
-                  </p>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="database" className="border border-b1/20 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🗄️ Database & Automation
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="supabase-url" className="text-xs uppercase tracking-wide text-t2">
-                      Supabase Project URL
-                    </Label>
-                  </div>
-                  <Input
-                    id="supabase-url"
-                    type="text"
-                    value={settings.supabaseUrl || ''}
-                    onChange={(e) => onUpdate({ supabaseUrl: e.target.value })}
-                    placeholder="https://xxxxx.supabase.co"
-                    className="font-mono text-sm"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="supabase-key" className="text-xs uppercase tracking-wide text-t2">
-                      Supabase Anon Key
-                    </Label>
-                    <button
-                      onClick={() => toggleKeyVisibility('supabase')}
-                      className="text-t2 hover:text-t1"
-                    >
-                      {showKeys.supabase ? <EyeClosed size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <Input
-                    id="supabase-key"
-                    type={showKeys.supabase ? 'text' : 'password'}
-                    value={settings.supabaseKey || ''}
-                    onChange={(e) => onUpdate({ supabaseKey: e.target.value })}
-                    placeholder="eyJ..."
-                    className="font-mono text-sm"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="n8n-webhook" className="text-xs uppercase tracking-wide text-t2">
-                      n8n Webhook URL
-                    </Label>
-                  </div>
-                  <Input
-                    id="n8n-webhook"
-                    type="text"
-                    value={settings.n8nWebhookUrl || ''}
-                    onChange={(e) => onUpdate({ n8nWebhookUrl: e.target.value })}
-                    placeholder="https://your-n8n.app/webhook/..."
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-t2 mt-1">For automated workflows and data sync</p>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Label htmlFor="notion-api-key" className="text-xs uppercase tracking-wide text-t2">
-                      Notion Integration Token
-                    </Label>
-                    <button
-                      onClick={() => toggleKeyVisibility('notion')}
-                      className="text-t2 hover:text-t1"
-                    >
-                      {showKeys.notion ? <EyeClosed size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <Input
-                    id="notion-api-key"
-                    type={showKeys.notion ? 'text' : 'password'}
-                    value={settings.notionApiKey || ''}
-                    onChange={(e) => onUpdate({ notionApiKey: e.target.value })}
-                    placeholder="secret_..."
-                    className="font-mono text-sm"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="notion-db-id" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
-                    Notion Database ID
-                  </Label>
-                  <Input
-                    id="notion-db-id"
-                    type="text"
-                    value={settings.notionDatabaseId || ''}
-                    onChange={(e) => onUpdate({ notionDatabaseId: e.target.value })}
-                    placeholder="Database ID for inventory tracking"
-                    className="font-mono text-sm"
-                  />
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="features" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🎛️ Feature Toggles
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="flex items-center justify-between py-2">
                   <div>
-                    <Label htmlFor="agentic-mode" className="text-sm text-t1 font-medium">
-                      Agentic Mode
-                    </Label>
-                    <p className="text-xs text-t2 mt-0.5">AI agents assist throughout workflow</p>
-                  </div>
-                  <Switch
-                    id="agentic-mode"
-                    checked={settings.agenticMode}
-                    onCheckedChange={(checked) => onUpdate({ agenticMode: checked })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <Label htmlFor="live-search" className="text-sm text-t1 font-medium">
-                      Live Search
-                    </Label>
-                    <p className="text-xs text-t2 mt-0.5">Real-time Google Search & Maps data</p>
-                  </div>
-                  <Switch
-                    id="live-search"
-                    checked={settings.liveSearchEnabled}
-                    onCheckedChange={(checked) => onUpdate({ liveSearchEnabled: checked })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <Label htmlFor="lens-in-batch" className="text-sm text-t1 font-medium">
-                      Google Lens in Batch
-                    </Label>
-                    <p className="text-xs text-t2 mt-0.5">Run visual search during batch analysis</p>
-                  </div>
-                  <Switch
-                    id="lens-in-batch"
-                    checked={settings.enableLensInBatch !== false}
-                    onCheckedChange={(checked) => onUpdate({ enableLensInBatch: checked })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <Label htmlFor="lens-confidence" className="text-sm text-t1 font-medium">
-                      Lens Skip Confidence
-                    </Label>
-                    <p className="text-xs text-t2 mt-0.5">Skip Google Lens when AI confidence exceeds this (0-1)</p>
-                  </div>
-                  <Input
-                    id="lens-confidence"
-                    type="number"
-                    min={0.5}
-                    max={1}
-                    step={0.05}
-                    value={settings.lensSkipConfidence ?? 0.85}
-                    onChange={(e) => onUpdate({ lensSkipConfidence: parseFloat(e.target.value) || 0.85 })}
-                    className="w-20 h-8 text-sm text-right"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <Label htmlFor="voice-enabled" className="text-sm text-t1 font-medium">
-                      Voice Input
-                    </Label>
-                    <p className="text-xs text-t2 mt-0.5">Voice commands and dictation</p>
-                  </div>
-                  <Switch
-                    id="voice-enabled"
-                    checked={settings.voiceEnabled}
-                    onCheckedChange={(checked) => onUpdate({ voiceEnabled: checked })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <Label htmlFor="auto-capture" className="text-sm text-t1 font-medium">
-                      Auto-Capture
-                    </Label>
-                    <p className="text-xs text-t2 mt-0.5">Analyze immediately after photo</p>
-                  </div>
-                  <Switch
-                    id="auto-capture"
-                    checked={settings.autoCapture}
-                    onCheckedChange={(checked) => onUpdate({ autoCapture: checked })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-2">
-                  <div>
-                    <Label htmlFor="api-notifications" className="text-sm text-t1 font-medium">
-                      API Connection Notifications
-                    </Label>
-                    <p className="text-xs text-t2 mt-0.5">Show alerts when APIs go offline</p>
-                  </div>
-                  <Switch
-                    id="api-notifications"
-                    checked={settings.apiNotificationsEnabled || false}
-                    onCheckedChange={(checked) => onUpdate({ apiNotificationsEnabled: checked })}
-                  />
-                </div>
-
-                <Separator className="bg-s2" />
-
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="theme-mode" className="text-sm text-t1 font-medium">
-                      Theme Mode
-                    </Label>
-                    <p className="text-xs text-t2 mt-0.5">Optimized for low-light scanning</p>
-                  </div>
-                  <Select 
-                    value={settings.themeMode || 'auto'}
-                    onValueChange={(value) => onUpdate({ themeMode: value as 'light' | 'dark' | 'auto' })}
-                  >
-                    <SelectTrigger id="theme-mode" className="text-sm">
-                      <SelectValue placeholder="Select theme" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">☀️ Light</SelectItem>
-                      <SelectItem value="dark">🌙 Dark</SelectItem>
-                      <SelectItem value="auto">🔄 Auto</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {settings.themeMode === 'auto' && (
-                    <div className="p-3 bg-blue-bg border border-b1/20 rounded-md">
-                      <p className="text-xs text-t2">
-                        <span className="font-semibold text-b1">🕐 Time-based mode:</span> Automatically switches to light theme from 6 AM to 6 PM, and dark theme from 6 PM to 6 AM.
-                      </p>
-                    </div>
-                  )}
-                  {settings.themeMode === 'dark' && (
-                    <p className="text-xs text-t2">Always use dark theme for scanning</p>
-                  )}
-                  {settings.themeMode === 'light' && (
-                    <p className="text-xs text-t2">Always use light theme</p>
-                  )}
-                </div>
-
-                {settings.themeMode === 'auto' && (
-                  <div className="flex items-center justify-between py-2 pl-4 border-l-2 border-b1">
-                    <div>
-                      <Label htmlFor="use-ambient-light" className="text-sm text-t1 font-medium">
-                        Use Ambient Light Sensor
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="gemini-api-key" className="text-xs uppercase tracking-wide text-t2">
+                        Google Gemini API Key
                       </Label>
-                      <p className="text-xs text-t2 mt-0.5">Switch theme based on room lighting (experimental)</p>
+                      <button onClick={() => toggleKeyVisibility('gemini')} className="text-t2 hover:text-t1">
+                        {showKeys.gemini ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
-                    <Switch
-                      id="use-ambient-light"
-                      checked={settings.useAmbientLight || false}
-                      onCheckedChange={(checked) => onUpdate({ useAmbientLight: checked })}
+                    <Input
+                      id="gemini-api-key"
+                      type={showKeys.gemini ? 'text' : 'password'}
+                      value={settings.geminiApiKey || ''}
+                      onChange={(e) => onUpdate({ geminiApiKey: e.target.value })}
+                      placeholder="AIzaSy..."
+                      className="font-mono text-sm"
+                    />
+                    {hasKey(settings.geminiApiKey) && (
+                      <p className="text-xs text-green mt-1 flex items-center gap-1">
+                        <CheckCircle size={12} weight="fill" /> Key configured
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="anthropic-api-key" className="text-xs uppercase tracking-wide text-t2">
+                        Anthropic API Key (Backup)
+                      </Label>
+                      <button onClick={() => toggleKeyVisibility('anthropic')} className="text-t2 hover:text-t1">
+                        {showKeys.anthropic ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <Input
+                      id="anthropic-api-key"
+                      type={showKeys.anthropic ? 'text' : 'password'}
+                      value={settings.anthropicApiKey || ''}
+                      onChange={(e) => onUpdate({ anthropicApiKey: e.target.value })}
+                      placeholder="sk-ant-..."
+                      className="font-mono text-sm"
                     />
                   </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
+                </div>
 
-            <AccordionItem value="image-quality" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                📸 Image Quality
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-t2 leading-relaxed">
-                      Choose a quality preset that balances loading speed and image detail. Higher quality takes longer to process but provides better visuals for listings.
+                <Separator className="bg-s2" />
+
+                {/* ── Google Cloud ── */}
+                <div className="space-y-4">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full ${googleConfigured ? 'bg-green' : 'bg-s3'}`} />
+                    Google Cloud — Product Identification
+                  </p>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="google-api-key" className="text-xs uppercase tracking-wide text-t2">
+                        Google Cloud API Key
+                      </Label>
+                      <button onClick={() => toggleKeyVisibility('google')} className="text-t2 hover:text-t1">
+                        {showKeys.google ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <Input
+                      id="google-api-key"
+                      type={showKeys.google ? 'text' : 'password'}
+                      value={settings.googleApiKey || ''}
+                      onChange={(e) => onUpdate({ googleApiKey: e.target.value })}
+                      placeholder="AIzaSy... (Cloud Vision API)"
+                      className="font-mono text-sm"
+                    />
+                    {hasKey(settings.googleApiKey) && (
+                      <p className="text-xs text-green mt-1 flex items-center gap-1">
+                        <CheckCircle size={14} weight="fill" /> Google Cloud Vision Active
+                      </p>
+                    )}
+                    {!hasKey(settings.googleApiKey) && (
+                      <p className="text-xs text-amber mt-1.5 flex items-center gap-1">
+                        <Info size={12} weight="fill" /> Required for visual product identification
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="google-search-engine-id" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Custom Search Engine ID (Optional)
+                    </Label>
+                    <Input
+                      id="google-search-engine-id"
+                      type="text"
+                      value={settings.googleSearchEngineId || ''}
+                      onChange={(e) => onUpdate({ googleSearchEngineId: e.target.value })}
+                      placeholder="cx:123456789..."
+                      className="font-mono text-sm"
+                    />
+                    {hasKey(settings.googleSearchEngineId) && (
+                      <p className="text-xs text-green mt-1 flex items-center gap-1">
+                        <CheckCircle size={12} weight="fill" /> Enhanced visual search enabled
+                      </p>
+                    )}
+                    <p className="text-xs text-t2 mt-1">
+                      Create at{' '}
+                      <a href="https://programmablesearchengine.google.com" target="_blank" rel="noopener noreferrer" className="text-b1 underline hover:text-b2">
+                        programmablesearchengine.google.com
+                      </a>
+                    </p>
+                  </div>
+
+                  {/* Collapsible setup guide */}
+                  <details className="group rounded-lg border border-s2 bg-s1">
+                    <summary className="cursor-pointer px-3 py-2.5 text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2 select-none">
+                      <span className="transition-transform group-open:rotate-90">›</span>
+                      Setup Guide
+                    </summary>
+                    <div className="px-3 pb-3 space-y-2">
+                      <ol className="text-xs text-t2 space-y-1.5 ml-1">
+                        <li className="flex gap-2"><span className="font-semibold text-t1">1.</span><span>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-b1 underline">console.cloud.google.com</a></span></li>
+                        <li className="flex gap-2"><span className="font-semibold text-t1">2.</span><span>Create or select a project</span></li>
+                        <li className="flex gap-2"><span className="font-semibold text-t1">3.</span><span>Enable <strong>Cloud Vision API</strong></span></li>
+                        <li className="flex gap-2"><span className="font-semibold text-t1">4.</span><span>Optionally enable <strong>Custom Search API</strong></span></li>
+                        <li className="flex gap-2"><span className="font-semibold text-t1">5.</span><span>Credentials → Create API Key → restrict to enabled APIs</span></li>
+                      </ol>
+                      <p className="text-xs text-t3 pt-1">Vision: 1,000 req/mo free · Custom Search: 100 queries/day free</p>
+                    </div>
+                  </details>
+
+                  <div className="p-3 bg-amber/10 border border-amber/30 rounded-md">
+                    <p className="text-xs text-t2">
+                      <strong className="text-amber">⚡ Cost Tip:</strong> When Gemini is 92%+ confident, Google Lens is auto-skipped — saves ~40% API quota.
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Label htmlFor="image-quality-preset" className="text-xs uppercase tracking-wide text-t2">
-                    Quality Preset
-                  </Label>
-                  <Select
-                    value={settings.imageQuality?.preset || 'balanced'}
-                    onValueChange={(value) => onUpdate({ imageQuality: { preset: value as any } })}
-                  >
-                    <SelectTrigger id="image-quality-preset" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fast">
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="font-medium">⚡ Fast</span>
-                          <span className="text-xs text-t3">Fastest loading, lower quality</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="balanced">
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="font-medium">⚖️ Balanced</span>
-                          <span className="text-xs text-t3">Recommended - good balance</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="quality">
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="font-medium">✨ Quality</span>
-                          <span className="text-xs text-t3">Higher quality, slower loading</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="maximum">
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="font-medium">🎯 Maximum</span>
-                          <span className="text-xs text-t3">Best quality for pro listings</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                <Separator className="bg-s2" />
 
-                  <div className="p-3 bg-s1 border border-s2 rounded-md text-xs space-y-2">
-                    <div className="flex justify-between text-t2">
-                      <span>Thumbnail Size:</span>
-                      <span className="font-mono text-t1">
-                        {settings.imageQuality?.preset === 'fast' ? '120px' :
-                         settings.imageQuality?.preset === 'quality' ? '300px' :
-                         settings.imageQuality?.preset === 'maximum' ? '400px' : '200px'}
-                      </span>
+                {/* ── eBay ── */}
+                <div className="space-y-4">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full ${ebayConfigured ? 'bg-green' : 'bg-s3'}`} />
+                    eBay — Market Pricing
+                  </p>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="ebay-app-id" className="text-xs uppercase tracking-wide text-t2">
+                        App ID (Client ID)
+                      </Label>
+                      <button onClick={() => toggleKeyVisibility('ebayApp')} className="text-t2 hover:text-t1">
+                        {showKeys.ebayApp ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
-                    <div className="flex justify-between text-t2">
-                      <span>Max Image Size:</span>
-                      <span className="font-mono text-t1">
-                        {settings.imageQuality?.preset === 'fast' ? '600px' :
-                         settings.imageQuality?.preset === 'quality' ? '1200px' :
-                         settings.imageQuality?.preset === 'maximum' ? '1600px' : '800px'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-t2">
-                      <span>Format:</span>
-                      <span className="font-mono text-t1">
-                        {settings.imageQuality?.preset === 'quality' || settings.imageQuality?.preset === 'maximum' ? 'WebP' : 'JPEG'}
-                      </span>
-                    </div>
+                    <Input
+                      id="ebay-app-id"
+                      type={showKeys.ebayApp ? 'text' : 'password'}
+                      value={settings.ebayAppId || ''}
+                      onChange={(e) => onUpdate({ ebayAppId: e.target.value })}
+                      placeholder="YourApp-YourApp-PRD-..."
+                      className="font-mono text-sm"
+                    />
+                    {hasKey(settings.ebayAppId) && (
+                      <p className="text-xs text-green mt-1 flex items-center gap-1">
+                        <CheckCircle size={12} weight="fill" /> App ID configured
+                      </p>
+                    )}
                   </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
 
-            <AccordionItem value="compression" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                💾 Compression Analytics
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-t2 leading-relaxed">
-                      Track how much storage and loading time you've saved through image compression. Analytics help you optimize quality settings for best performance.
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="ebay-dev-id" className="text-xs uppercase tracking-wide text-t2">
+                        Dev ID
+                      </Label>
+                      <button onClick={() => toggleKeyVisibility('ebayDev')} className="text-t2 hover:text-t1">
+                        {showKeys.ebayDev ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <Input
+                      id="ebay-dev-id"
+                      type={showKeys.ebayDev ? 'text' : 'password'}
+                      value={settings.ebayDevId || ''}
+                      onChange={(e) => onUpdate({ ebayDevId: e.target.value })}
+                      placeholder="a1b2c3d4-e5f6-..."
+                      className="font-mono text-sm"
+                    />
+                    {hasKey(settings.ebayDevId) && (
+                      <p className="text-xs text-green mt-1 flex items-center gap-1">
+                        <CheckCircle size={12} weight="fill" /> Dev ID configured
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="ebay-cert-id" className="text-xs uppercase tracking-wide text-t2">
+                        Cert ID (Client Secret)
+                      </Label>
+                      <button onClick={() => toggleKeyVisibility('ebayCert')} className="text-t2 hover:text-t1">
+                        {showKeys.ebayCert ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <Input
+                      id="ebay-cert-id"
+                      type={showKeys.ebayCert ? 'text' : 'password'}
+                      value={settings.ebayCertId || ''}
+                      onChange={(e) => onUpdate({ ebayCertId: e.target.value })}
+                      placeholder="PRD-1234abcd5678efgh-..."
+                      className="font-mono text-sm"
+                    />
+                    {hasKey(settings.ebayCertId) && (
+                      <p className="text-xs text-green mt-1 flex items-center gap-1">
+                        <CheckCircle size={12} weight="fill" /> Cert ID configured
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="ebay-api-key" className="text-xs uppercase tracking-wide text-t2">
+                        OAuth User Token
+                      </Label>
+                      <button onClick={() => toggleKeyVisibility('ebayToken')} className="text-t2 hover:text-t1">
+                        {showKeys.ebayToken ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <Input
+                      id="ebay-api-key"
+                      type={showKeys.ebayToken ? 'text' : 'password'}
+                      value={settings.ebayApiKey || ''}
+                      onChange={(e) => onUpdate({ ebayApiKey: e.target.value })}
+                      placeholder="v^1.1#i^1#..."
+                      className="font-mono text-sm"
+                    />
+                    {hasKey(settings.ebayApiKey) && hasKey(settings.ebayAppId) ? (
+                      <p className="text-xs text-green mt-1 flex items-center gap-1">
+                        <CheckCircle size={14} weight="fill" /> eBay Integration Active
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber mt-1.5 flex items-center gap-1">
+                        <Info size={12} weight="fill" /> Complete all 4 fields to unlock live market data
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Collapsible setup guide */}
+                  <details className="group rounded-lg border border-s2 bg-s1">
+                    <summary className="cursor-pointer px-3 py-2.5 text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2 select-none">
+                      <span className="transition-transform group-open:rotate-90">›</span>
+                      Setup Guide
+                    </summary>
+                    <div className="px-3 pb-3 space-y-2">
+                      <ol className="text-xs text-t2 space-y-1.5 ml-1">
+                        <li className="flex gap-2"><span className="font-semibold text-t1">1.</span><span>Go to <a href="https://developer.ebay.com/my/keys" target="_blank" rel="noopener noreferrer" className="text-b1 underline">developer.ebay.com/my/keys</a></span></li>
+                        <li className="flex gap-2"><span className="font-semibold text-t1">2.</span><span>Sign in with your eBay account</span></li>
+                        <li className="flex gap-2"><span className="font-semibold text-t1">3.</span><span>Create a <strong>Production</strong> keyset (not Sandbox)</span></li>
+                        <li className="flex gap-2"><span className="font-semibold text-t1">4.</span><span>Copy App ID, Dev ID, and Cert ID</span></li>
+                        <li className="flex gap-2"><span className="font-semibold text-t1">5.</span><span>Generate an OAuth User Token</span></li>
+                      </ol>
+                    </div>
+                  </details>
+
+                  <div className="p-3 bg-amber/10 border border-amber/30 rounded-md">
+                    <p className="text-xs text-t2">
+                      <strong className="text-amber">⚠️ Note:</strong> OAuth tokens expire after 2 hours. Regenerate when you see "eBay API unavailable" errors.
                     </p>
                   </div>
                 </div>
 
-                <CompressionAnalytics />
-              </AccordionContent>
-            </AccordionItem>
+                <Separator className="bg-s2" />
 
-            <AccordionItem value="tag-presets" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🏷️ Tag Presets
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
-                <div className="p-3 bg-s1 border border-s2 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <Info className="text-b1 mt-0.5" size={16} />
-                    <p className="text-xs text-t2 leading-relaxed">
-                      Create and manage preset collections of tags for common product categories. Apply presets quickly when editing items in the queue.
-                    </p>
+                {/* ── Database & Integrations ── */}
+                <div className="space-y-4">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full ${supabaseConfigured ? 'bg-green' : 'bg-s3'}`} />
+                    Database & Integrations
+                  </p>
+
+                  <div>
+                    <Label htmlFor="supabase-url" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Supabase Project URL
+                    </Label>
+                    <Input
+                      id="supabase-url"
+                      type="text"
+                      value={settings.supabaseUrl || ''}
+                      onChange={(e) => onUpdate({ supabaseUrl: e.target.value })}
+                      placeholder="https://xxxxx.supabase.co"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="supabase-key" className="text-xs uppercase tracking-wide text-t2">
+                        Supabase Anon Key
+                      </Label>
+                      <button onClick={() => toggleKeyVisibility('supabase')} className="text-t2 hover:text-t1">
+                        {showKeys.supabase ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <Input
+                      id="supabase-key"
+                      type={showKeys.supabase ? 'text' : 'password'}
+                      value={settings.supabaseKey || ''}
+                      onChange={(e) => onUpdate({ supabaseKey: e.target.value })}
+                      placeholder="eyJ..."
+                      className="font-mono text-sm"
+                    />
+                  </div>
+
+                  <Separator className="bg-s1" />
+
+                  <div className="flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full ${notionConfigured ? 'bg-green' : 'bg-s3'}`} />
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Notion</p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="notion-api-key" className="text-xs uppercase tracking-wide text-t2">
+                        Notion Integration Token
+                      </Label>
+                      <button onClick={() => toggleKeyVisibility('notion')} className="text-t2 hover:text-t1">
+                        {showKeys.notion ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <Input
+                      id="notion-api-key"
+                      type={showKeys.notion ? 'text' : 'password'}
+                      value={settings.notionApiKey || ''}
+                      onChange={(e) => onUpdate({ notionApiKey: e.target.value })}
+                      placeholder="secret_..."
+                      className="font-mono text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="notion-db-id" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Notion Database ID
+                    </Label>
+                    <Input
+                      id="notion-db-id"
+                      type="text"
+                      value={settings.notionDatabaseId || ''}
+                      onChange={(e) => onUpdate({ notionDatabaseId: e.target.value })}
+                      placeholder="Database ID for inventory tracking"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+
+                  <Separator className="bg-s1" />
+
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Automation</p>
+
+                  <div>
+                    <Label htmlFor="n8n-webhook" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      n8n Webhook URL
+                    </Label>
+                    <Input
+                      id="n8n-webhook"
+                      type="text"
+                      value={settings.n8nWebhookUrl || ''}
+                      onChange={(e) => onUpdate({ n8nWebhookUrl: e.target.value })}
+                      placeholder="https://your-n8n.app/webhook/..."
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-t2 mt-1">For automated workflows and data sync</p>
                   </div>
                 </div>
-                
-                <TagPresetsManager 
-                  onApplyPreset={(tags: ItemTag[]) => {
-                    console.log('Applied preset tags:', tags)
-                  }} 
-                />
               </AccordionContent>
             </AccordionItem>
 
+            {/* ════════════════════════════════════════════════════════
+                SECTION 2 — BUSINESS RULES
+               ════════════════════════════════════════════════════════ */}
             <AccordionItem value="business" className="border border-s2 rounded-lg px-3 bg-fg">
               <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
                 💰 Business Rules
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
+                  <p className="text-xs text-t2 leading-relaxed">
+                    These values drive BUY/PASS decisions and profit calculations on every scan.
+                  </p>
+                </div>
+
                 <div>
                   <Label htmlFor="min-profit" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
                     Min. Profit Margin (%)
@@ -1251,61 +699,495 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                   <p className="text-xs text-t2 mt-1">Minimum margin for BUY decision</p>
                 </div>
 
-                <div>
-                  <Label htmlFor="shipping-cost" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
-                    Default Shipping Cost ($)
-                  </Label>
-                  <Input
-                    id="shipping-cost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={settings.defaultShippingCost}
-                    onChange={(e) => onUpdate({ defaultShippingCost: parseFloat(e.target.value) || 0 })}
-                    className="font-mono"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="ebay-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      eBay Fee (%)
+                    </Label>
+                    <Input
+                      id="ebay-fee"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="50"
+                      value={settings.ebayFeePercent}
+                      onChange={(e) => onUpdate({ ebayFeePercent: parseFloat(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="ad-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Ad Fee (%)
+                    </Label>
+                    <Input
+                      id="ad-fee"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="15"
+                      value={settings.ebayAdFeePercent ?? 3.0}
+                      onChange={(e) => onUpdate({ ebayAdFeePercent: parseFloat(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="ebay-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
-                    eBay Fee (%)
-                  </Label>
-                  <Input
-                    id="ebay-fee"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="50"
-                    value={settings.ebayFeePercent}
-                    onChange={(e) => onUpdate({ ebayFeePercent: parseFloat(e.target.value) || 0 })}
-                    className="font-mono"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="paypal-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
-                    PayPal Fee (%)
-                  </Label>
-                  <Input
-                    id="paypal-fee"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="10"
-                    value={settings.paypalFeePercent}
-                    onChange={(e) => onUpdate({ paypalFeePercent: parseFloat(e.target.value) || 0 })}
-                    className="font-mono"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="shipping-cost" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Shipping ($)
+                    </Label>
+                    <Input
+                      id="shipping-cost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={settings.defaultShippingCost}
+                      onChange={(e) => onUpdate({ defaultShippingCost: parseFloat(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="materials-cost" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Materials ($/item)
+                    </Label>
+                    <Input
+                      id="materials-cost"
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      max="10"
+                      value={settings.shippingMaterialsCost ?? 0.75}
+                      onChange={(e) => onUpdate({ shippingMaterialsCost: parseFloat(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
+
+            {/* ════════════════════════════════════════════════════════
+                SECTION 3 — PREFERENCES (Features + Theme + Image)
+               ════════════════════════════════════════════════════════ */}
+            <AccordionItem value="preferences" className="border border-s2 rounded-lg px-3 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
+                🎛️ Preferences
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
+
+                {/* Feature Toggles */}
+                <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Features</p>
+
+                <div className="flex items-center justify-between py-1.5">
+                  <div>
+                    <Label htmlFor="agentic-mode" className="text-sm text-t1 font-medium">Agentic Mode</Label>
+                    <p className="text-xs text-t2 mt-0.5">AI agents assist throughout workflow</p>
+                  </div>
+                  <Switch id="agentic-mode" checked={settings.agenticMode} onCheckedChange={(checked) => onUpdate({ agenticMode: checked })} />
+                </div>
+
+                <div className="flex items-center justify-between py-1.5">
+                  <div>
+                    <Label htmlFor="live-search" className="text-sm text-t1 font-medium">Live Search</Label>
+                    <p className="text-xs text-t2 mt-0.5">Real-time Google Search & Maps data</p>
+                  </div>
+                  <Switch id="live-search" checked={settings.liveSearchEnabled} onCheckedChange={(checked) => onUpdate({ liveSearchEnabled: checked })} />
+                </div>
+
+                <div className="flex items-center justify-between py-1.5">
+                  <div>
+                    <Label htmlFor="lens-in-batch" className="text-sm text-t1 font-medium">Google Lens in Batch</Label>
+                    <p className="text-xs text-t2 mt-0.5">Run visual search during batch analysis</p>
+                  </div>
+                  <Switch id="lens-in-batch" checked={settings.enableLensInBatch !== false} onCheckedChange={(checked) => onUpdate({ enableLensInBatch: checked })} />
+                </div>
+
+                <div className="flex items-center justify-between py-1.5">
+                  <div>
+                    <Label htmlFor="lens-confidence" className="text-sm text-t1 font-medium">Lens Skip Confidence</Label>
+                    <p className="text-xs text-t2 mt-0.5">Skip Lens when AI confidence exceeds (0–1)</p>
+                  </div>
+                  <Input
+                    id="lens-confidence"
+                    type="number"
+                    min={0.5}
+                    max={1}
+                    step={0.05}
+                    value={settings.lensSkipConfidence ?? 0.85}
+                    onChange={(e) => onUpdate({ lensSkipConfidence: parseFloat(e.target.value) || 0.85 })}
+                    className="w-20 h-8 text-sm text-right"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between py-1.5">
+                  <div>
+                    <Label htmlFor="voice-enabled" className="text-sm text-t1 font-medium">Voice Input</Label>
+                    <p className="text-xs text-t2 mt-0.5">Voice commands and dictation</p>
+                  </div>
+                  <Switch id="voice-enabled" checked={settings.voiceEnabled} onCheckedChange={(checked) => onUpdate({ voiceEnabled: checked })} />
+                </div>
+
+                <div className="flex items-center justify-between py-1.5">
+                  <div>
+                    <Label htmlFor="auto-capture" className="text-sm text-t1 font-medium">Auto-Capture</Label>
+                    <p className="text-xs text-t2 mt-0.5">Analyze immediately after photo</p>
+                  </div>
+                  <Switch id="auto-capture" checked={settings.autoCapture} onCheckedChange={(checked) => onUpdate({ autoCapture: checked })} />
+                </div>
+
+                <div className="flex items-center justify-between py-1.5">
+                  <div>
+                    <Label htmlFor="api-notifications" className="text-sm text-t1 font-medium">API Connection Alerts</Label>
+                    <p className="text-xs text-t2 mt-0.5">Show alerts when APIs go offline</p>
+                  </div>
+                  <Switch id="api-notifications" checked={settings.apiNotificationsEnabled || false} onCheckedChange={(checked) => onUpdate({ apiNotificationsEnabled: checked })} />
+                </div>
+
+                <Separator className="bg-s2" />
+
+                {/* Theme */}
+                <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Appearance</p>
+
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="theme-mode" className="text-sm text-t1 font-medium">Theme Mode</Label>
+                    <p className="text-xs text-t2 mt-0.5">Optimized for low-light scanning</p>
+                  </div>
+                  <Select
+                    value={settings.themeMode || 'auto'}
+                    onValueChange={(value) => onUpdate({ themeMode: value as 'light' | 'dark' | 'auto' })}
+                  >
+                    <SelectTrigger id="theme-mode" className="text-sm">
+                      <SelectValue placeholder="Select theme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="light">☀️ Light</SelectItem>
+                      <SelectItem value="dark">🌙 Dark</SelectItem>
+                      <SelectItem value="auto">🔄 Auto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {settings.themeMode === 'auto' && (
+                    <p className="text-xs text-t2 px-1">
+                      <span className="font-semibold text-b1">🕐</span> Light 6 AM – 6 PM, dark 6 PM – 6 AM
+                    </p>
+                  )}
+                </div>
+
+                {settings.themeMode === 'auto' && (
+                  <div className="flex items-center justify-between py-1.5 pl-4 border-l-2 border-b1">
+                    <div>
+                      <Label htmlFor="use-ambient-light" className="text-sm text-t1 font-medium">Ambient Light Sensor</Label>
+                      <p className="text-xs text-t2 mt-0.5">Switch theme based on room lighting</p>
+                    </div>
+                    <Switch id="use-ambient-light" checked={settings.useAmbientLight || false} onCheckedChange={(checked) => onUpdate({ useAmbientLight: checked })} />
+                  </div>
+                )}
+
+                <Separator className="bg-s2" />
+
+                {/* Image Quality */}
+                <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Image Quality</p>
+
+                <div className="space-y-3">
+                  <Select
+                    value={settings.imageQuality?.preset || 'balanced'}
+                    onValueChange={(value) => onUpdate({ imageQuality: { preset: value as any } })}
+                  >
+                    <SelectTrigger id="image-quality-preset" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fast">⚡ Fast — Fastest loading, lower quality</SelectItem>
+                      <SelectItem value="balanced">⚖️ Balanced — Recommended</SelectItem>
+                      <SelectItem value="quality">✨ Quality — Higher quality, slower</SelectItem>
+                      <SelectItem value="maximum">🎯 Maximum — Best for pro listings</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <div className="p-3 bg-s1 border border-s2 rounded-md text-xs space-y-1.5">
+                    <div className="flex justify-between text-t2">
+                      <span>Thumbnail:</span>
+                      <span className="font-mono text-t1">
+                        {settings.imageQuality?.preset === 'fast' ? '120px' :
+                         settings.imageQuality?.preset === 'quality' ? '300px' :
+                         settings.imageQuality?.preset === 'maximum' ? '400px' : '200px'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-t2">
+                      <span>Max Size:</span>
+                      <span className="font-mono text-t1">
+                        {settings.imageQuality?.preset === 'fast' ? '600px' :
+                         settings.imageQuality?.preset === 'quality' ? '1200px' :
+                         settings.imageQuality?.preset === 'maximum' ? '1600px' : '800px'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-t2">
+                      <span>Format:</span>
+                      <span className="font-mono text-t1">
+                        {settings.imageQuality?.preset === 'quality' || settings.imageQuality?.preset === 'maximum' ? 'WebP' : 'JPEG'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator className="bg-s2" />
+
+                {/* Compression Analytics */}
+                <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Compression Analytics</p>
+                <CompressionAnalytics />
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* ════════════════════════════════════════════════════════
+                SECTION 4 — TAG PRESETS
+               ════════════════════════════════════════════════════════ */}
+            <AccordionItem value="tags" className="border border-s2 rounded-lg px-3 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
+                🏷️ Tag Presets
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
+                  <p className="text-xs text-t2 leading-relaxed">
+                    Create preset tag collections for common product categories. Apply presets quickly when editing items in the queue.
+                  </p>
+                </div>
+
+                <TagPresetsManager
+                  onApplyPreset={(tags: ItemTag[]) => {
+                    logActivity(`Applied tag preset (${tags.length} tags)`)
+                  }}
+                />
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* ════════════════════════════════════════════════════════
+                SECTION 5 — DIAGNOSTICS (All monitoring panels)
+               ════════════════════════════════════════════════════════ */}
+            <AccordionItem value="diagnostics" className="border border-s2 rounded-lg px-3 bg-fg">
+              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
+                📡 Diagnostics
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 pt-2 w-full max-w-full">
+                <div className="p-3 bg-s1 border border-s2 rounded-md">
+                  <p className="text-xs text-t2 leading-relaxed">
+                    Monitor API health, connection history, retry policies, incident logs, and detection accuracy.
+                  </p>
+                </div>
+
+                <Accordion type="multiple" defaultValue={[]} className="space-y-2">
+
+                  {/* Health */}
+                  <AccordionItem value="health" className="border border-green/20 rounded-lg px-3 bg-fg">
+                    <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
+                        Live API Health
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2 w-full max-w-full">
+                      <ApiStatusIndicator settings={settings} liveUpdates={true} checkInterval={0} />
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  {/* Connection History */}
+                  <AccordionItem value="history" className="border border-s2 rounded-lg px-3 bg-fg">
+                    <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
+                      📊 Connection History
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2 w-full max-w-full">
+                      <ConnectionHistoryPanel settings={settings} />
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  {/* Retry Config */}
+                  <AccordionItem value="retry" className="border border-s2 rounded-lg px-3 bg-fg">
+                    <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
+                      🔄 Retry Configuration
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2 w-full max-w-full">
+                      <RetryConfigPanel />
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  {/* Incidents */}
+                  <AccordionItem value="incidents" className="border border-s2 rounded-lg px-3 bg-fg">
+                    <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
+                      🚨 Incident Logs
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2 w-full max-w-full">
+                      <IncidentLogViewer settings={settings} />
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  {/* Detection History */}
+                  <AccordionItem value="detection" className="border border-s2 rounded-lg px-3 bg-fg">
+                    <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
+                      📸 Detection History
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2 w-full max-w-full">
+                      <DetectionHistoryViewer />
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  {/* False Positive Analysis */}
+                  <AccordionItem value="false-positives" className="border border-s2 rounded-lg px-3 bg-fg">
+                    <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
+                      🎯 False Positive Analysis
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2 w-full max-w-full">
+                      <FalsePositiveAnalyzerPanel />
+                    </AccordionContent>
+                  </AccordionItem>
+
+                </Accordion>
+              </AccordionContent>
+            </AccordionItem>
+
           </Accordion>
 
-          <div className="pt-4 space-y-3">
+          {/* ── Activity + Debug Console ── */}
+          <div className="rounded-2xl border border-s2 bg-fg overflow-hidden">
+            {/* Tab bar */}
+            <div className="flex border-b border-s2">
+              <button
+                onClick={() => setActivityTab('activity')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-colors',
+                  activityTab === 'activity' ? 'text-t1 border-b-2 border-b1' : 'text-t3 hover:text-t2'
+                )}
+              >
+                <ClockCounterClockwise size={13} weight="bold" />
+                Activity
+              </button>
+              <button
+                onClick={() => setActivityTab('debug')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-colors',
+                  activityTab === 'debug' ? 'text-t1 border-b-2 border-red' : 'text-t3 hover:text-t2'
+                )}
+              >
+                <Bug size={13} weight="bold" />
+                Debug
+                {debugErrors > 0 && (
+                  <span className="text-[9px] font-bold bg-red/10 text-red border border-red/20 rounded px-1">{debugErrors}</span>
+                )}
+              </button>
+            </div>
+
+            {/* Activity tab */}
+            {activityTab === 'activity' && (
+              <>
+                <div className="px-4 py-3 border-b border-s2 flex items-center justify-between">
+                  {recentActivity.length > 0 && (
+                    <span className="text-[10px] text-t3">{recentActivity.length} events</span>
+                  )}
+                </div>
+                {recentActivity.length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-xs text-t3">No recent activity</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-s1">
+                    {recentActivity.map(entry => {
+                      const ts = new Date(entry.timestamp)
+                      const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                      const dateStr = ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                      return (
+                        <div key={entry.id} className="px-4 py-2.5 flex items-start gap-3">
+                          <span className={cn(
+                            'w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0',
+                            entry.type === 'error' ? 'bg-red' : entry.type === 'info' ? 'bg-b1' : 'bg-green'
+                          )} />
+                          <span className="flex-1 text-[12px] text-t2 leading-snug">{entry.message}</span>
+                          <span className="text-[10px] text-t3 flex-shrink-0 whitespace-nowrap">
+                            {dateStr} {timeStr}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Debug Console tab */}
+            {activityTab === 'debug' && (
+              <div>
+                {/* Toolbar */}
+                <div className="px-3 py-2 border-b border-s2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    {(['error', 'warn', 'info', 'debug'] as DebugLevel[]).map(lvl => (
+                      <button
+                        key={lvl}
+                        onClick={() => setDebugFilter(f => f === lvl ? null : lvl)}
+                        className={cn(
+                          'text-[9px] font-bold px-1.5 py-0.5 rounded border transition-all',
+                          debugFilter === lvl
+                            ? lvl === 'error' ? 'bg-red/15 text-red border-red/30'
+                              : lvl === 'warn' ? 'bg-amber/15 text-amber border-amber/30'
+                              : 'bg-b1/15 text-b1 border-b1/30'
+                            : 'bg-s1 text-t3 border-s2'
+                        )}
+                      >
+                        {lvl.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={clearDebugLog}
+                    className="text-[9px] text-t3 hover:text-red transition-colors font-bold"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                {/* Entries */}
+                {filteredDebugEntries.length === 0 ? (
+                  <div className="px-4 py-8 text-center">
+                    <Bug size={28} weight="duotone" className="text-t3 mx-auto mb-2" />
+                    <p className="text-xs font-bold text-t2 mb-1">Debug Console Ready</p>
+                    <p className="text-[10px] text-t3 max-w-[200px] mx-auto">
+                      Errors, API calls, and state events will appear here when wired up
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-s1 max-h-64 overflow-y-auto font-mono">
+                    {filteredDebugEntries.map(entry => (
+                      <div key={entry.id} className="px-3 py-2 flex items-start gap-2">
+                        <span className={cn(
+                          'text-[9px] font-bold flex-shrink-0 px-1 rounded mt-0.5',
+                          entry.level === 'error' ? 'bg-red/10 text-red' :
+                          entry.level === 'warn' ? 'bg-amber/10 text-amber' :
+                          entry.level === 'info' ? 'bg-b1/10 text-b1' : 'text-t3'
+                        )}>
+                          {entry.level.toUpperCase()}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[9px] text-t3">[{entry.source}]</span>
+                          <span className="text-[10px] text-t1 ml-1 leading-snug">{entry.message}</span>
+                          {entry.data && (
+                            <pre className="text-[9px] text-t3 mt-0.5 overflow-x-auto whitespace-pre-wrap break-all">{entry.data}</pre>
+                          )}
+                        </div>
+                        <span className="text-[9px] text-t3 flex-shrink-0">
+                          {new Date(entry.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Reset / Clear — at the bottom below Activity/Debug ── */}
+          <div className="space-y-3 pt-2">
+            <Separator className="bg-s2" />
+
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full gap-2 border-b1 text-b1 hover:bg-b1/10 hover:border-b1"
                 >
                   <ArrowCounterClockwise size={18} weight="bold" />
@@ -1319,38 +1201,32 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
                     Reset All Settings?
                   </AlertDialogTitle>
                   <AlertDialogDescription className="space-y-3 text-sm">
-                    <p>
-                      This will restore all settings to their default values.
-                    </p>
+                    <p>This will restore all settings to their default values.</p>
                     <div className="p-3 bg-green-bg border border-green/30 rounded-md">
                       <p className="text-xs text-t1">
-                        <strong className="text-green">✓ API Keys Will Be Preserved:</strong>
+                        <strong className="text-green">✓ API Keys Will Be Preserved</strong>
                       </p>
                       <ul className="text-xs text-t2 mt-2 space-y-1 ml-4 list-disc">
                         <li>Gemini & Anthropic API keys</li>
-                        <li>Google Cloud API credentials</li>
-                        <li>eBay API credentials</li>
-                        <li>Notion & Supabase keys</li>
-                        <li>All other API integrations</li>
+                        <li>Google Cloud & eBay credentials</li>
+                        <li>Notion, Supabase & n8n keys</li>
                       </ul>
                     </div>
                     <div className="p-3 bg-amber/10 border border-amber/30 rounded-md">
                       <p className="text-xs text-t1">
-                        <strong className="text-amber">⚠ Settings That Will Reset:</strong>
+                        <strong className="text-amber">⚠ Will Reset:</strong>
                       </p>
                       <ul className="text-xs text-t2 mt-2 space-y-1 ml-4 list-disc">
-                        <li>Feature toggles (voice, auto-capture, etc.)</li>
-                        <li>Theme mode (reset to Auto)</li>
-                        <li>Business rules (profit margin, fees, etc.)</li>
+                        <li>Feature toggles, theme, image quality</li>
+                        <li>Business rules (profit margins, fees)</li>
                         <li>AI model preference</li>
-                        <li>Image quality settings</li>
                       </ul>
                     </div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction 
+                  <AlertDialogAction
                     onClick={handleResetSettings}
                     className="bg-b1 hover:bg-b2 text-t1"
                   >
@@ -1364,16 +1240,43 @@ export function SettingsScreen({ settings, onUpdate, onBack }: SettingsScreenPro
               Restore default settings while keeping your API keys
             </p>
 
-            <Separator className="bg-s2" />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full text-red hover:bg-red hover:text-t1 border-s2 hover:border-red"
+                >
+                  Clear All App Data
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-md">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-lg text-red">
+                    ⚠️ Clear All App Data?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-3 text-sm">
+                    <p>This will reset <strong>everything</strong> — all settings, API keys, and stored preferences.</p>
+                    <div className="p-3 bg-red/10 border border-red/30 rounded-md">
+                      <p className="text-xs text-t1">
+                        <strong className="text-red">This cannot be undone.</strong> You will need to re-enter all API keys and reconfigure your settings.
+                      </p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleClearAllData}
+                    className="bg-red hover:bg-red/80 text-t1"
+                  >
+                    Clear Everything
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
-            <Button 
-              variant="outline" 
-              className="w-full text-red hover:bg-red hover:text-t1 border-s2 hover:border-red"
-            >
-              Clear All App Data
-            </Button>
             <p className="text-xs text-t2 text-center">
-              This will reset all settings and stored data
+              This will reset all settings, API keys, and stored data
             </p>
           </div>
         </div>

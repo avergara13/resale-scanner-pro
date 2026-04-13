@@ -1,6 +1,8 @@
-export type Screen = 'session' | 'session-detail' | 'agent' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
+export type Screen = 'session' | 'session-detail' | 'agent' | 'scan-result' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
 
 export type SoldShippingStatus = '🔴 Need Label' | '🟡 Label Ready' | '📦 Packed' | '✅ Shipped'
+
+export type SoldDelistStatus = '⏳ Pending Delist' | '✅ Delisted — All Platforms' | '⚠️ Manual Delist Needed'
 
 export interface ShippingRateQuote {
   id: string
@@ -22,10 +24,18 @@ export interface SoldItem {
   imageUrl?: string | null
   platform: string
   salePrice?: number | null
+  /** Platform fee (commission) extracted from sale email by WF-01 */
+  platformFee?: number | null
+  /** Computed: salePrice − platformFee − labelCost (server-side) */
+  netIncome?: number | null
   saleDate?: string | null
   shippingStatus: SoldShippingStatus
+  /** Cross-platform delist tracking — populated by WF-01 / WF-09 */
+  delistStatus?: string | null
   trackingNumber?: string | null
   labelProvider?: string | null
+  /** What was paid for the postage label (dollar string) */
+  labelCost?: string | null
   labelUrl?: string | null
   buyerZip?: string | null
   buyerInfo?: string | null
@@ -35,18 +45,43 @@ export interface SoldItem {
   orderNumber?: string | null
   rawEmailSnippet?: string | null
   inventoryStatus?: string | null
-  metadataSource: 'inventory' | 'scan' | 'sale'
+  metadataSource: 'inventory' | 'scan' | 'sale' | 'manual'
+  /** True when the item was logged via the manual fallback (no Notion/API) */
+  isManualEntry?: boolean
 }
 
 export interface SoldShippingUpdateInput {
   shippingStatus: SoldShippingStatus
   trackingNumber?: string
   labelProvider?: string
+  labelCost?: string
   labelUrl?: string
   shipFromZip?: string
   packageDims?: string
   itemWeightLbs?: string
   shipNotes?: string
+  delistStatus?: SoldDelistStatus
+}
+
+/** Manual sale entry — used when email-parsing automation isn't running (offline / API down) */
+export interface ManualSaleEntry {
+  id: string
+  createdAt: number
+  title: string
+  platform: string
+  salePrice: number
+  platformFee?: number
+  orderNumber?: string
+  buyerInfo?: string
+  buyerZip?: string
+  saleDate?: string
+  itemWeightLbs?: string
+  packageDims?: string
+  shippingStatus: SoldShippingStatus
+  trackingNumber?: string
+  labelProvider?: string
+  labelCost?: string
+  notes?: string
 }
 
 export interface SoldFeedResponse {
@@ -57,6 +92,7 @@ export interface SoldFeedResponse {
 
 export type ResalePlatform = 'ebay' | 'mercari' | 'poshmark' | 'whatnot' | 'facebook'
 
+/** @deprecated Platform-specific listing generation moved to n8n downstream pipeline. RSP is data collection only. */
 export interface PlatformListing {
   title: string
   description: string
@@ -131,10 +167,14 @@ export interface ScannedItem {
   imageData?: string
   imageThumbnail?: string
   imageOptimized?: string
+  additionalImages?: string[]       // thumbnails for photos 2–5; persisted with item
+  additionalImageData?: string[]    // full base64 for photos 2–5; in-memory only (stripped on KV save)
   purchasePrice: number
   productName?: string
   description?: string
   category?: string
+  condition?: string
+  preferredPlatform?: string
   tags?: string[]
   estimatedSellPrice?: number
   profitMargin?: number
@@ -154,6 +194,7 @@ export interface ScannedItem {
   notionPageId?: string
   notionUrl?: string
   sessionId?: string
+  scannedBy?: string  // operatorId of who performed this scan
   publishedDate?: number
   soldPrice?: number
   soldDate?: number
@@ -166,6 +207,7 @@ export interface ScannedItem {
   returnReason?: string
   delistedDate?: number
   actualShippingCost?: number
+  platformComparison?: import('../lib/platform-roi-service').PlatformROIResult[]
 }
 
 export interface OptimizedListing {
@@ -181,6 +223,7 @@ export interface OptimizedListing {
   seoScore: number
   recommendations: string[]
   optimizedAt: number
+  /** @deprecated Platform-specific listings moved to n8n. RSP is data collection only. */
   platformListings?: Partial<Record<ResalePlatform, PlatformListing>>
 }
 
@@ -272,8 +315,19 @@ export interface MarketData {
   barcodeProduct?: import('../lib/barcode-service').BarcodeProduct
 }
 
+export interface UserProfile {
+  operatorId: string       // slug: 'angel', 'wife', or custom
+  operatorName: string     // display: 'Angel', 'Wife'
+  operatorInitial: string  // badge: 'A', 'W'
+  color?: string           // badge accent: 'blue' | 'purple' | 'green' | 'amber'
+  focus?: string           // 'Electronics, Sneakers' — shown on session cards
+  aiContext?: string       // freeform notes injected into every AI prompt
+}
+
 export interface Session {
   id: string
+  /** Stable sequential number (1, 2, 3...) — used as default name (#001) and Notion session key */
+  sessionNumber?: number
   name?: string
   startTime: number
   endTime?: number
@@ -286,6 +340,10 @@ export interface Session {
   location?: ThriftStoreLocation
   sessionType?: 'business' | 'personal'
   deletedAt?: number
+  /** Operator who started this session — used for ownership guards + audit */
+  operatorId?: string
+  operatorName?: string
+  operatorInitial?: string
 }
 
 export interface ProfitGoal {
@@ -348,10 +406,13 @@ export interface AppSettings {
   minProfitMargin: number
   defaultShippingCost: number
   ebayFeePercent: number
-  paypalFeePercent: number
+  ebayAdFeePercent: number
+  shippingMaterialsCost: number
+  paypalFeePercent: number  // Deprecated — kept for backward compat, always 0
   imageQuality?: ImageQualitySettings
   enableLensInBatch?: boolean
   lensSkipConfidence?: number
+  userProfile?: UserProfile
 }
 
 export interface SharedTodo {

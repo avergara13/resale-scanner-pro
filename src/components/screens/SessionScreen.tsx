@@ -1,4 +1,4 @@
-import { Play, CheckCircle, XCircle, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, Clock, TrendUp, ArrowLeft } from '@phosphor-icons/react'
+import { Play, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, TrendUp, ArrowLeft } from '@phosphor-icons/react'
 import { useState, useCallback, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -6,16 +6,15 @@ import { cn } from '@/lib/utils'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
-import { AgentPanel } from '../AgentPanel'
 import { LocationInsights } from '../LocationInsights'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
-import { toast } from 'sonner'
-import type { Session, ScannedItem, ProfitGoal } from '@/types'
+import { useDeviceId } from '@/hooks/use-device-id'
+import type { Session, ScannedItem, ProfitGoal, Screen } from '@/types'
 
 function PastSessionCard({
-  session, items, buyCount, passCount, totalProfit, bestFind, duration, buyRate, formatDuration, onDelete, onViewDetail
+  session, items, buyCount, passCount, totalProfit, bestFind, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail, onOpenItem, onNavigateTo, isCurrentSession = false
 }: {
   session: Session
   items: ScannedItem[]
@@ -25,28 +24,56 @@ function PastSessionCard({
   bestFind: ScannedItem | null
   duration: number
   buyRate: number
+  listedCount: number
   formatDuration: (ms: number) => string
   onDelete: () => void
   onViewDetail: () => void
+  onOpenItem?: (item: ScannedItem) => void
+  onNavigateTo?: (screen: Screen) => void
+  isCurrentSession?: boolean
 })
  {
   const [expanded, setExpanded] = useState(false)
   const startDate = new Date(session.startTime)
+  const sessionStatus = isCurrentSession ? 'live' : session.active ? 'idle' : 'ended'
 
   return (
-    <Card className="border-s2 overflow-hidden">
+    <Card
+      className="border-s2/60 overflow-hidden"
+      style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+    >
       <button onClick={() => setExpanded(!expanded)} className="w-full p-3 text-left active:bg-s1/50 transition-colors">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Clock size={14} className={session.active ? 'text-green flex-shrink-0' : 'text-t3 flex-shrink-0'} />
+            {/* Status dot — mirrors Sold page card dots for visual consistency */}
+            <span className="relative flex-shrink-0" style={{ width: 10, height: 10 }}>
+              {sessionStatus === 'live' && (
+                <span className="absolute inset-0 rounded-full bg-green animate-ping opacity-60" />
+              )}
+              <span className={cn(
+                'relative block w-2.5 h-2.5 rounded-full',
+                sessionStatus === 'live' && 'bg-green',
+                sessionStatus === 'idle' && 'bg-amber',
+                sessionStatus === 'ended' && 'bg-t3/40'
+              )} />
+            </span>
             <span className="text-xs font-bold text-t1 truncate">
               {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </span>
-            {session.active && (
-              <span className="text-[8px] font-bold bg-green/15 text-green px-1.5 py-0.5 rounded-md uppercase">Open</span>
-            )}
+            {/* Status badge — Live / Idle / Ended on every card */}
+            <span className={cn(
+              'text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase flex-shrink-0',
+              sessionStatus === 'live' ? 'bg-green/15 text-green' :
+              sessionStatus === 'idle' ? 'bg-amber/15 text-amber' :
+              'bg-s2/60 text-t3'
+            )}>
+              {sessionStatus === 'live' ? 'Live' : sessionStatus === 'idle' ? 'Idle' : 'Ended'}
+            </span>
             {session.sessionType === 'personal' && (
-              <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase">Personal</span>
+              <span className="text-[8px] font-bold bg-purple-500/15 text-purple-500 px-1.5 py-0.5 rounded-md uppercase flex-shrink-0">Personal</span>
+            )}
+            {session.operatorInitial && (
+              <span className="text-[8px] font-bold bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md uppercase flex-shrink-0">{session.operatorInitial}</span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -60,39 +87,62 @@ function PastSessionCard({
           {startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
           {session.location && ` · ${session.location.name}`}
         </div>
-        <div className="flex gap-3 text-[10px] ml-6">
+        <div className="flex gap-3 text-[10px] ml-6 flex-wrap">
           <span className="text-t2">{session.itemsScanned} scans</span>
           <span className="text-green font-bold">{buyCount} BUY</span>
           <span className="text-red font-bold">{passCount} PASS</span>
           <span className="text-green font-mono font-bold">${totalProfit.toFixed(2)}</span>
           <span className="text-b1 font-bold">{buyRate}%</span>
+          {listedCount > 0 && (
+            <span className="text-b1 font-bold">{listedCount} listed</span>
+          )}
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-s2 px-3 py-2 space-y-2">
+        <div className="border-t border-s2/60 px-3 py-2 space-y-2">
           {/* Micro-analytics */}
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="p-2 bg-s1 rounded-lg">
+            <div
+              onClick={() => onNavigateTo?.('cost-tracking')}
+              className={cn(
+                'p-2 rounded-lg border border-s2/40 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+              style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}
+            >
               <p className="text-[9px] text-t3 uppercase">Avg Profit</p>
               <p className="text-xs font-bold text-t1 font-mono">
                 ${buyCount > 0 ? (totalProfit / buyCount).toFixed(2) : '0.00'}
               </p>
             </div>
-            <div className="p-2 bg-s1 rounded-lg">
+            <div
+              onClick={() => onNavigateTo?.('queue')}
+              className={cn(
+                'p-2 rounded-lg border border-s2/40 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+              style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}
+            >
               <p className="text-[9px] text-t3 uppercase">Revenue</p>
               <p className="text-xs font-bold text-t1 font-mono">
                 ${items.filter(i => i.decision === 'BUY').reduce((s, i) => s + (i.estimatedSellPrice || 0), 0).toFixed(2)}
               </p>
             </div>
-            <div className="p-2 bg-s1 rounded-lg">
+            <div className="p-2 rounded-lg border border-s2/40" style={{ background: 'color-mix(in oklch, var(--s1) 70%, transparent)' }}>
               <p className="text-[9px] text-t3 uppercase">BUY Rate</p>
               <p className="text-xs font-bold text-b1">{buyRate}%</p>
             </div>
           </div>
 
           {bestFind && (
-            <div className="flex items-center gap-2 p-2 bg-green/5 border border-green/20 rounded-lg">
+            <div
+              onClick={() => bestFind && onOpenItem?.(bestFind)}
+              className={cn(
+                'flex items-center gap-2 p-2 bg-green/5 border border-green/20 rounded-lg',
+                bestFind && onOpenItem && 'cursor-pointer hover:bg-green/10 active:bg-green/15 transition-colors'
+              )}
+            >
               <TrendUp size={14} className="text-green flex-shrink-0" />
               <span className="text-[10px] text-t2 truncate">Best: <span className="font-bold text-t1">{bestFind.productName}</span> ({bestFind.profitMargin?.toFixed(0)}%)</span>
             </div>
@@ -102,7 +152,15 @@ function PastSessionCard({
           {items.length > 0 && (
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {items.map(item => (
-                <div key={item.id} className="flex items-center justify-between py-1.5 px-2 bg-bg rounded text-[10px]">
+                <div
+                  key={item.id}
+                  onClick={() => onOpenItem?.(item)}
+                  className={cn(
+                    'flex items-center justify-between py-1.5 px-2 rounded text-[10px] transition-colors',
+                    onOpenItem && 'cursor-pointer hover:bg-b1/10 active:bg-b1/15'
+                  )}
+                  style={{ background: 'color-mix(in oklch, var(--bg) 90%, transparent)' }}
+                >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <Badge variant="secondary" className={`text-[8px] px-1 py-0 flex-shrink-0 ${item.decision === 'BUY' ? 'bg-green/10 text-green' : item.decision === 'PASS' ? 'bg-red/10 text-red' : 'bg-amber/10 text-amber'}`}>
                       {item.decision}
@@ -147,9 +205,11 @@ interface SessionScreenProps {
   onPermanentDeleteSession?: (sessionId: string) => void
   queueItems?: ScannedItem[]
   scanHistory?: ScannedItem[]
+  onOpenItem?: (item: ScannedItem) => void
+  onNavigateTo?: (screen: Screen) => void
 }
 
-export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp }: SessionScreenProps) {
+export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp, onOpenItem, onNavigateTo }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   // Use props from App.tsx (single source of truth) instead of local useKV
   // This ensures deletes/updates propagate immediately
@@ -168,6 +228,8 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
     })
   }, [queue, scanHistory])
   const [goals] = useKV<ProfitGoal[]>('profit-goals', [])
+  const deviceId = useDeviceId()
+  const [currentDeviceSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
 
   const personalSessionIds = useMemo(() => {
     const ids = new Set<string>()
@@ -200,14 +262,10 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
   })
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      id="scr-session" 
-      className="flex flex-col h-full overflow-y-auto scrollable-content"
-      style={{
-        paddingTop: isPulling ? `${pullDistance}px` : isRefreshing ? '60px' : '0px',
-        transition: isPulling ? 'none' : 'padding-top 0.2s ease-out'
-      }}
+      id="scr-session"
+      className="h-full overflow-y-auto scrollable-content overscroll-y-contain"
     >
       <PullToRefreshIndicator
         isPulling={isPulling}
@@ -217,10 +275,21 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
         shouldTrigger={shouldTrigger}
       />
 
+      {/* Content wrapper: GPU-composited transform instead of paddingTop reflow */}
+      <div
+        style={{
+          transform: `translateY(${isPulling ? pullDistance : isRefreshing ? 60 : 0}px)`,
+          transition: isPulling ? 'none' : 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          willChange: isPulling || isRefreshing ? 'transform' : 'auto',
+        }}
+      >
+
       <div className="px-4 pt-3 pb-6">
 
       {showTrends ? (
-        <div className="flex-1 overflow-y-auto pb-24">
+        <div
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
+        >
           {/* Back button */}
           <button
             onClick={onCloseTrends}
@@ -288,7 +357,10 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
           )}
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto space-y-4 pb-24">
+        <div
+          className="flex-1 overflow-y-auto space-y-4"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
+        >
           {/* Date */}
           <p className="text-[11px] text-t3 font-medium uppercase tracking-wider">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
@@ -307,12 +379,6 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
               <p className="text-[11px] text-t3">Begin tracking scans and profits</p>
             </div>
           </button>
-
-          {/* Agent panel — collapsed by default */}
-          <AgentPanel
-            onSendMessage={onAgentMessage}
-            isProcessing={isAgentProcessing}
-          />
 
           {/* Recently deleted — recoverable within 60s */}
           {deletedSessions.length > 0 && (
@@ -352,6 +418,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
                     const buyItems = sessionItems.filter(i => i.decision === 'BUY')
                     const passItems = sessionItems.filter(i => i.decision === 'PASS')
+                    const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
                     const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
                     const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
                     const duration = (s.endTime || Date.now()) - s.startTime
@@ -363,13 +430,17 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         items={sessionItems}
                         buyCount={buyItems.length}
                         passCount={passItems.length}
+                        listedCount={listedItems.length}
                         totalProfit={totalProfit}
                         bestFind={bestFind}
                         duration={duration}
                         buyRate={buyRate}
                         formatDuration={formatDuration}
-                        onDelete={() => onDeleteSession?.(s.id)}
-                        onViewDetail={() => onResumeSession?.(s.id)}
+                        onDelete={() => { onDeleteSession?.(s.id) }}
+                        onViewDetail={() => { onResumeSession?.(s.id) }}
+                        onOpenItem={onOpenItem}
+                        onNavigateTo={onNavigateTo}
+                        isCurrentSession={s.id === currentDeviceSession?.id}
                       />
                     )
                   })}
@@ -390,6 +461,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
                     const buyItems = sessionItems.filter(i => i.decision === 'BUY')
                     const passItems = sessionItems.filter(i => i.decision === 'PASS')
+                    const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
                     const totalProfit = buyItems.reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
                     const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
                     const duration = (s.endTime || Date.now()) - s.startTime
@@ -401,13 +473,17 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
                         items={sessionItems}
                         buyCount={buyItems.length}
                         passCount={passItems.length}
+                        listedCount={listedItems.length}
                         totalProfit={totalProfit}
                         bestFind={bestFind}
                         duration={duration}
                         buyRate={buyRate}
                         formatDuration={formatDuration}
-                        onDelete={() => onDeleteSession?.(s.id)}
-                        onViewDetail={() => onViewSessionDetail?.(s.id)}
+                        onDelete={() => { onDeleteSession?.(s.id) }}
+                        onViewDetail={() => { onViewSessionDetail?.(s.id) }}
+                        onOpenItem={onOpenItem}
+                        onNavigateTo={onNavigateTo}
+                        isCurrentSession={s.id === currentDeviceSession?.id}
                       />
                     )
                   })}
@@ -418,6 +494,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
         </div>
       )}
       </div>
+      </div> {/* end content transform wrapper */}
     </div>
   )
 }

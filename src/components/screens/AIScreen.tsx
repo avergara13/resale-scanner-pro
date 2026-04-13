@@ -1,10 +1,24 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Robot, Plus, Microphone, Scan, FloppyDisk, PaperPlaneRight, Sparkle, CaretDown, ChartBar, Image, ListChecks, Check, Trash, ArrowClockwise, ArrowCounterClockwise, XCircle, ShoppingCart } from '@phosphor-icons/react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import {
+  Microphone,
+  CaretDown,
+  ChartBar,
+  Image,
+  ArrowClockwise,
+  ArrowCounterClockwise,
+  XCircle,
+  BookmarkSimple,
+  ShoppingCart,
+  Scan,
+  FloppyDisk,
+  CheckCircle,
+  ClipboardText,
+  Camera,
+} from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { callLLM, researchProduct, parseResearchPrice } from '@/lib/llm-service'
-import { useKV } from '@github/spark/hooks'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Card } from '@/components/ui/card'
@@ -16,40 +30,50 @@ import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useCollapsePreference } from '@/hooks/use-collapse-preference'
-import { useTabPreference } from '@/hooks/use-tab-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
-import { toast } from 'sonner'
-import type { ScannedItem, PipelineStep, AppSettings, ChatMessage, SharedTodo } from '@/types'
-import type { GeminiService } from '@/lib/gemini-service'
+import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CONDITIONS = ['New', 'Like New', 'Very Good', 'Good', 'Acceptable', 'For Parts'] as const
+
+const PLATFORMS = [
+  { id: 'ebay', label: 'eBay' },
+  { id: 'mercari', label: 'Mercari' },
+  { id: 'poshmark', label: 'Poshmark' },
+  { id: 'facebook', label: 'FB Mkt' },
+  { id: 'whatnot', label: 'Whatnot' },
+] as const
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ListingDraftOverrides {
+  productName?: string
+  category?: string
+  condition?: string
+  description?: string
+  estimatedSellPrice?: number
+  shippingCost?: number
+  platform?: string
+}
 
 interface AIScreenProps {
   currentItem?: ScannedItem
   pipeline: PipelineStep[]
   settings?: AppSettings
-  queueItems?: ScannedItem[]
   onSaveDraft: (price: number, notes: string) => void
-  onCreateListing: (price: number, notes: string) => void
+  onCreateListing: (price: number, notes: string, draft: ListingDraftOverrides) => void
   onPassItem: (price: number, notes: string) => void
-  onRecalculate?: (price: number) => void
+  onMaybeItem?: (price: number, notes: string) => void
+  onRecalculate?: (buyPrice: number, sellPrice?: number, shippingCost?: number) => void
   onRescan?: () => void
   onOpenCamera?: () => void
-  pendingMessage?: string | null
-  onPendingMessageHandled?: () => void
-  geminiService?: GeminiService | null
-  onUpdateItem?: (itemId: string, updates: Partial<ScannedItem>) => void
+  onAddPhoto?: () => void
+  onDeletePhoto?: (index: number) => void
+  onDeletePrimaryPhoto?: () => void
 }
 
-function buildUpdateSummary(updates: Partial<ScannedItem>, prev: ScannedItem): string {
-  const lines: string[] = ['✅ Updated the item with what I found:']
-  if (updates.productName)        lines.push(`  • Name: "${updates.productName}"`)
-  if (updates.category && updates.category !== prev.category)
-                                  lines.push(`  • Category: ${updates.category}`)
-  if (updates.estimatedSellPrice) lines.push(`  • Est. sell price: $${updates.estimatedSellPrice.toFixed(2)}`)
-  if (updates.description)        lines.push(`  • Description updated`)
-  if (lines.length === 1)         return "I couldn't extract enough details from the image. Try providing a clearer photo."
-  lines.push('\nReview in Edit if anything needs adjusting, or ask me to research the price.')
-  return lines.join('\n')
-}
+// ─── Celebration particles ────────────────────────────────────────────────────
 
 function CelebrationParticle({ delay, index }: { delay: number; index: number }) {
   const randomX = Math.random() * 200 - 100
@@ -58,35 +82,20 @@ function CelebrationParticle({ delay, index }: { delay: number; index: number })
   const color = colors[index % colors.length]
   const shapes = ['○', '●', '◆', '★', '✦', '✨']
   const shape = shapes[index % shapes.length]
-  
+
   return (
     <motion.div
       className="absolute font-bold text-2xl pointer-events-none"
-      style={{ 
-        left: '50%',
-        top: '50%',
-        color,
-        textShadow: `0 0 8px ${color}`,
-      }}
-      initial={{ 
-        opacity: 0,
-        x: 0,
-        y: 0,
-        scale: 0,
-        rotate: 0
-      }}
-      animate={{ 
+      style={{ left: '50%', top: '50%', color, textShadow: `0 0 8px ${color}` }}
+      initial={{ opacity: 0, x: 0, y: 0, scale: 0, rotate: 0 }}
+      animate={{
         opacity: [0, 1, 1, 0],
         x: randomX,
         y: [-80, -120, -160],
         scale: [0, 1.2, 1, 0.8],
-        rotate: randomRotation
+        rotate: randomRotation,
       }}
-      transition={{ 
-        duration: 1.2,
-        delay,
-        ease: 'easeOut'
-      }}
+      transition={{ duration: 1.2, delay, ease: 'easeOut' }}
     >
       {shape}
     </motion.div>
@@ -94,25 +103,20 @@ function CelebrationParticle({ delay, index }: { delay: number; index: number })
 }
 
 function CelebrationEffect() {
-  const particleCount = 20
-  
   return (
     <div className="absolute inset-0 pointer-events-none overflow-visible z-50">
-      {Array.from({ length: particleCount }).map((_, i) => (
-        <CelebrationParticle 
-          key={i} 
-          index={i} 
-          delay={i * 0.03}
-        />
+      {Array.from({ length: 20 }).map((_, i) => (
+        <CelebrationParticle key={i} index={i} delay={i * 0.03} />
       ))}
     </div>
   )
 }
 
+// ─── Overall progress bar ─────────────────────────────────────────────────────
+
 function OverallProgress({ steps }: { steps: PipelineStep[] }) {
   const overallProgress = useMemo(() => {
     if (steps.length === 0) return 0
-    
     let totalProgress = 0
     steps.forEach(step => {
       if (step.status === 'complete') {
@@ -121,7 +125,6 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
         totalProgress += (step.progress ?? 0)
       }
     })
-    
     return Math.round(totalProgress / steps.length)
   }, [steps])
 
@@ -131,10 +134,7 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
   const previousProgress = useRef(0)
 
   useEffect(() => {
-    const controls = animate(count, overallProgress, {
-      duration: 0.6,
-      ease: 'easeOut'
-    })
+    const controls = animate(count, overallProgress, { duration: 0.6, ease: 'easeOut' })
     return controls.stop
   }, [count, overallProgress])
 
@@ -153,26 +153,19 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
   if (steps.length === 0) return null
 
   return (
-    <div className="mb-4 space-y-2 relative">
+    <div className="space-y-1.5 relative">
       <div className="flex items-center justify-between">
-        <h3 className="text-[11px] font-bold uppercase tracking-wider text-t2">
-          OVERALL PROGRESS
-        </h3>
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-t2">OVERALL PROGRESS</h3>
         <motion.div className="text-lg font-mono font-black tabular-nums relative">
           <motion.span
             className={cn(
-              "transition-colors duration-300",
-              isComplete && "text-green",
-              isProcessing && "text-b1",
-              !isProcessing && !isComplete && "text-t2"
+              'transition-colors duration-300',
+              isComplete && 'text-green',
+              isProcessing && 'text-b1',
+              !isProcessing && !isComplete && 'text-t2',
             )}
-            animate={isComplete ? {
-              scale: [1, 1.15, 1],
-            } : {}}
-            transition={{
-              duration: 0.5,
-              ease: 'easeOut'
-            }}
+            animate={isComplete ? { scale: [1, 1.15, 1] } : {}}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
           >
             {rounded}
           </motion.span>
@@ -189,40 +182,36 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
           )}
         </motion.div>
       </div>
-      
+
       <div className="h-3 bg-s1 rounded-full overflow-hidden relative border border-s2">
         <motion.div
           className={cn(
-            "h-full relative",
-            isComplete && "bg-gradient-to-r from-green via-green to-green",
-            isProcessing && "bg-gradient-to-r from-b1 via-amber to-b1"
+            'h-full relative',
+            isComplete && 'bg-gradient-to-r from-green via-green to-green',
+            isProcessing && 'bg-gradient-to-r from-b1 via-amber to-b1',
           )}
           initial={{ width: '0%' }}
-          animate={{ 
+          animate={{
             width: `${overallProgress}%`,
-            backgroundPosition: isProcessing ? ['0% 50%', '100% 50%', '0% 50%'] : '0% 50%'
+            backgroundPosition: isProcessing ? ['0% 50%', '100% 50%', '0% 50%'] : '0% 50%',
           }}
           transition={{
             width: { duration: 0.6, ease: 'easeOut' },
-            backgroundPosition: isProcessing ? {
-              duration: 2,
-              ease: 'linear',
-              repeat: Infinity
-            } : { duration: 0 }
+            backgroundPosition: isProcessing
+              ? { duration: 2, ease: 'linear', repeat: Infinity }
+              : { duration: 0 },
           }}
           style={{ backgroundSize: '200% 100%' }}
         >
           {isProcessing && (
-            <div 
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-              style={{
-                animation: 'shimmer-sweep 1.5s ease-in-out infinite'
-              }}
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent"
+              style={{ animation: 'shimmer-sweep 1.5s ease-in-out infinite' }}
             />
           )}
           {isComplete && (
-            <motion.div 
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
               initial={{ x: '-100%' }}
               animate={{ x: '200%' }}
               transition={{ duration: 0.8, ease: 'easeInOut' }}
@@ -238,127 +227,126 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
   )
 }
 
-function QueueListingCard({ item, onDiscuss }: { item: ScannedItem; onDiscuss: (item: ScannedItem) => void }) {
-  const statusColor =
-    item.listingStatus === 'ready' ? 'text-green bg-green/10 border-green/30' :
-    item.listingStatus === 'optimizing' ? 'text-amber bg-amber/10 border-amber/30' :
-    item.listingStatus === 'published' ? 'text-b1 bg-b1/10 border-b1/30' :
-    'text-t3 bg-s1 border-s2'
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
-  const hasSellPrice = item.estimatedSellPrice != null && isFinite(item.estimatedSellPrice)
-  const profit = hasSellPrice ? item.estimatedSellPrice! - item.purchasePrice : null
-
-  return (
-    <Card className="p-3 bg-fg border-s2 flex gap-3 items-start">
-      {(item.imageThumbnail || item.imageData) && (
-        <img
-          src={item.imageThumbnail || item.imageData}
-          alt={item.productName || 'Item'}
-          className="w-14 h-14 rounded-lg object-cover border border-s2 flex-shrink-0"
-        />
-      )}
-      <div className="flex-1 min-w-0 space-y-1">
-        <p className="text-xs font-bold text-t1 truncate">{item.productName || 'Unnamed Item'}</p>
-        <div className="flex gap-2 text-[10px] font-mono text-t2 flex-wrap">
-          <span>Buy ${item.purchasePrice.toFixed(2)}</span>
-          <span>→</span>
-          <span>Sell ${item.estimatedSellPrice?.toFixed(2) ?? '--'}</span>
-          {profit != null && (
-            <span className={profit >= 0 ? 'text-green' : 'text-red'}>
-              ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
-            </span>
-          )}
-        </div>
-        {item.profitMargin != null && (
-          <p className={cn(
-            'text-[10px] font-bold',
-            item.profitMargin > 50 ? 'text-green' : item.profitMargin > 20 ? 'text-amber' : 'text-red'
-          )}>
-            {item.profitMargin.toFixed(1)}% margin
-          </p>
-        )}
-        <span className={cn('inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border', statusColor)}>
-          {item.listingStatus?.replace(/-/g, ' ') ?? 'not started'}
-        </span>
-      </div>
-      <button
-        onClick={() => onDiscuss(item)}
-        className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 bg-b1/10 hover:bg-b1/20 text-b1 rounded-lg text-[10px] font-bold transition-colors active:scale-95"
-      >
-        <Sparkle size={12} weight="duotone" />
-        Discuss
-      </button>
-    </Card>
-  )
-}
-
-export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDraft, onCreateListing, onPassItem, onRecalculate, onRescan, onOpenCamera, pendingMessage, onPendingMessageHandled, geminiService, onUpdateItem }: AIScreenProps) {
-  const [tab, setTab] = useTabPreference<'chat' | 'scans' | 'tasks'>('ai-screen-v2', 'chat')
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
-  const [chatInput, setChatInput] = useState('')
-  const [description, setDescription] = useState('')
+export function AIScreen({
+  currentItem,
+  pipeline,
+  settings,
+  onSaveDraft,
+  onCreateListing,
+  onPassItem,
+  onMaybeItem,
+  onRecalculate,
+  onRescan,
+  onOpenCamera,
+  onAddPhoto,
+  onDeletePhoto,
+  onDeletePrimaryPhoto,
+}: AIScreenProps) {
+  // ── Listing form state ──
   const [buyPrice, setBuyPrice] = useState('')
-  const [isSendingMessage, setIsSendingMessage] = useState(false)
-  const [summaryOpen, setSummaryOpen] = useCollapsePreference('ai-summary', true)
+  const [itemName, setItemName] = useState('')
+  const [category, setCategory] = useState('')
+  const [condition, setCondition] = useState('')
+  const [estSellPrice, setEstSellPrice] = useState('')
+  const [shippingCost, setShippingCost] = useState('')
+  const [description, setDescription] = useState('')
+  const [platform, setPlatform] = useState('ebay')
+  const [listingAdded, setListingAdded] = useState(false)
+
+  const [formOpen, setFormOpen] = useCollapsePreference('ai-listing-form', true)
+  const [summaryOpen, setSummaryOpen] = useCollapsePreference('ai-summary', false)
   const [imageOpen, setImageOpen] = useCollapsePreference('ai-image', false)
+  const [confirmPass, setConfirmPass] = useState(false)
   const { isListening, startListening, isSupported } = useVoiceInput()
-  const chatScrollRef = useRef<HTMLDivElement>(null)
 
-  const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', [])
-  const [taskInput, setTaskInput] = useState('')
-  const pendingTasks = (todos || []).filter(t => !t.completed)
-  const completedTasks = (todos || []).filter(t => t.completed)
-
+  // hasDecision: true only when we have a FINALIZED decision (BUY or PASS).
+  // PENDING is the initial value every new scan starts with — including it here
+  // causes panels to flash before the pipeline runs and the action bar to appear
+  // prematurely. PENDING is handled separately via pipelineComplete below.
   const hasDecision = pipeline.some(p => p.id === 'decision' && p.status === 'complete')
+    || (currentItem?.decision === 'BUY' || currentItem?.decision === 'PASS')
+
+  const isPipelineRunning = pipeline.length > 0 && pipeline.some(p => p.status === 'processing')
+
+  // pipelineComplete: true when the pipeline has finished ALL work (any decision,
+  // including PENDING) OR when viewing a reopened item (no active pipeline).
+  // This gates the Listing Draft and action bar so they appear once the AI is done.
+  const pipelineComplete = pipeline.length === 0
+    ? !!(currentItem)  // reopened item — always ready
+    : !isPipelineRunning && pipeline.every(p => p.status === 'complete' || p.status === 'error')
+
+  // hasPriceData: we have real market pricing to show in Quick Summary
+  const hasPriceData = !!(currentItem?.estimatedSellPrice && currentItem.estimatedSellPrice > 0)
+
   const decision = currentItem?.decision
-  const canSaveDraft = currentItem?.imageData || description.trim().length > 0
+  const canSaveDraft = !!(currentItem?.imageData || description.trim().length > 0)
+
+  // Derived floats for form-change detection (computed once, used in multiple places)
+  const buyPriceFloat = parseFloat(buyPrice)
+  const sellPriceFloat = parseFloat(estSellPrice)
+  const shipPriceFloat = parseFloat(shippingCost)
+
+  // formHasChanges: show Recalculate when ANY input differs from what's stored on the item.
+  // Covers: editing AI-provided sell price, adjusting shipping, changing buy price.
+  const formHasChanges =
+    (buyPrice !== '' && Number.isFinite(buyPriceFloat) && buyPriceFloat !== (currentItem?.purchasePrice ?? 0)) ||
+    (estSellPrice !== '' && Number.isFinite(sellPriceFloat) && sellPriceFloat > 0 && sellPriceFloat !== (currentItem?.estimatedSellPrice ?? 0)) ||
+    (shippingCost !== '' && Number.isFinite(shipPriceFloat) && shipPriceFloat >= 0 && shipPriceFloat !== (settings?.defaultShippingCost ?? 5.0))
 
   const handleRefresh = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, 600))
   }, [])
 
-  const handleAddTask = useCallback(() => {
-    const text = taskInput.trim()
-    if (!text) return
-    setTodos(prev => [...(prev || []), {
-      id: Date.now().toString(),
-      text,
-      completed: false,
-      createdBy: 'user' as const,
-      createdAt: Date.now(),
-    }])
-    setTaskInput('')
-  }, [taskInput, setTodos])
-
-  const handleToggleTask = useCallback((id: string) => {
-    setTodos(prev => (prev || []).map(t => t.id === id ? { ...t, completed: !t.completed } : t))
-  }, [setTodos])
-
-  const handleDeleteTask = useCallback((id: string) => {
-    setTodos(prev => (prev || []).filter(t => t.id !== id))
-  }, [setTodos])
-
-  const handleDiscussItem = useCallback((item: ScannedItem) => {
-    const listingLabel = item.listingStatus?.replace(/-/g, ' ') ?? 'not started'
-    const msg = `Let's work on ${item.productName || 'this item'} — buy price $${item.purchasePrice.toFixed(2)}, estimated sell $${item.estimatedSellPrice?.toFixed(2) ?? 'unknown'}, listing status: ${listingLabel}. Help me finalize the listing details.`
-    setChatInput(msg)
-    setTab('chat')
-  }, [setTab])
-
-  // Pre-fill buy price when currentItem changes (only if field is empty — never override user input)
+  // Reset all form fields when a new scan starts (currentItem.id changes)
   useEffect(() => {
-    if (currentItem?.purchasePrice != null && buyPrice === '') {
-      setBuyPrice(String(currentItem.purchasePrice))
+    setItemName('')
+    setCategory('')
+    setCondition('')
+    setBuyPrice('')
+    setEstSellPrice('')
+    setShippingCost('')
+    setDescription('')
+    setListingAdded(false)
+    setConfirmPass(false)
+  }, [currentItem?.id])
+
+  // Pre-fill form once the pipeline finishes (any decision, including PENDING)
+  // if-guards on each field prevent overwriting user edits after initial fill
+  useEffect(() => {
+    if (!pipelineComplete || !currentItem) return
+    if (itemName === '') setItemName(currentItem.productName || '')
+    if (category === '') setCategory(currentItem.category || '')
+    if (condition === '') setCondition('Good')
+    // Always pre-fill buy price so user can see and edit the assumed cost
+    // purchasePrice=0 → empty string (user sees "free / $0 assumed")
+    if (buyPrice === '') {
+      setBuyPrice(currentItem.purchasePrice > 0 ? String(currentItem.purchasePrice) : '')
     }
-  }, [currentItem?.purchasePrice, buyPrice])
+    if (estSellPrice === '' && currentItem.estimatedSellPrice) {
+      setEstSellPrice(currentItem.estimatedSellPrice.toFixed(2))
+    }
+    if (shippingCost === '' && settings?.defaultShippingCost) {
+      setShippingCost(String(settings.defaultShippingCost))
+    }
+    if (description === '' && currentItem.description) {
+      setDescription(currentItem.description)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelineComplete, currentItem?.id]) // minimal deps — if-guards prevent overwrites
 
-  // Receive messages sent from SessionScreen's AgentPanel and route them into chat
+  // Auto-scroll to decision/result when pipeline finishes (BUY, PASS, or PENDING "needs price")
+  const decisionRef = useRef<HTMLDivElement>(null)
+  const prevPipelineComplete = useRef(false)
   useEffect(() => {
-    if (!pendingMessage) return
-    setChatInput(pendingMessage)
-    setTab('chat')
-    onPendingMessageHandled?.()
-  }, [pendingMessage, onPendingMessageHandled, setTab])
+    if (pipelineComplete && !prevPipelineComplete.current) {
+      setTimeout(() => {
+        decisionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 400)
+    }
+    prevPipelineComplete.current = pipelineComplete
+  }, [pipelineComplete])
 
   const pullToRefresh = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -366,188 +354,18 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
     enabled: true,
   })
 
-  const prevAIChatCount = useRef(chatMessages.length)
-  const aiHasMounted = useRef(false)
-  useEffect(() => {
-    if (!aiHasMounted.current) {
-      aiHasMounted.current = true
-      prevAIChatCount.current = chatMessages.length
-      return
-    }
-    if (chatMessages.length > prevAIChatCount.current && chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
-    }
-    prevAIChatCount.current = chatMessages.length
-  }, [chatMessages])
-
-  const buildAIContext = useCallback(() => {
-    const buyItems = queueItems?.filter(i => i.decision === 'BUY' && i.inQueue) ?? []
-    const passItems = queueItems?.filter(i => i.decision === 'PASS') ?? []
-    const totalProfit = buyItems.reduce((sum, i) => {
-      if (i.estimatedSellPrice && i.purchasePrice) {
-        return sum + (i.estimatedSellPrice - i.purchasePrice)
-      }
-      return sum
-    }, 0)
-    const context = {
-      currentAnalysis: currentItem ? {
-        productName: currentItem.productName,
-        description: currentItem.description,
-        category: currentItem.category,
-        purchasePrice: currentItem.purchasePrice,
-        estimatedSellPrice: currentItem.estimatedSellPrice,
-        profitMargin: currentItem.profitMargin,
-        decision: currentItem.decision,
-        marketData: currentItem.marketData,
-      } : null,
-      queue: {
-        totalItems: queueItems?.length ?? 0,
-        buyCount: buyItems.length,
-        passCount: passItems.length,
-        estimatedProfit: totalProfit.toFixed(2),
-        recentItems: buyItems.slice(0, 5).map(i => ({
-          name: i.productName,
-          buyPrice: i.purchasePrice,
-          sellPrice: i.estimatedSellPrice,
-          margin: i.profitMargin,
-        }))
-      },
-      pipelineStatus: pipeline.map(p => ({
-        step: p.label,
-        status: p.status,
-        data: p.data
-      })),
-      settings: {
-        minProfitMargin: settings?.minProfitMargin,
-        defaultShippingCost: settings?.defaultShippingCost,
-        ebayFeePercent: settings?.ebayFeePercent,
-        preferredAiModel: settings?.preferredAiModel
-      }
-    }
-    return JSON.stringify(context, null, 2)
-  }, [currentItem, pipeline, settings, queueItems])
-
-  const handleSendMessage = useCallback(async () => {
-    if (!chatInput.trim() || isSendingMessage) return
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: chatInput,
-      timestamp: Date.now()
-    }
-
-    setChatMessages(prev => [...prev, userMessage])
-    setChatInput('')
-    setIsSendingMessage(true)
-
-    try {
-      const contextData = buildAIContext()
-      const lowerInput = chatInput.toLowerCase()
-      let response: string
-
-      // Detect intent to identify / update the current item agentically
-      const isUpdateIntent =
-        lowerInput.includes('fill in') || lowerInput.includes('fill it in') ||
-        lowerInput.includes('find them') || lowerInput.includes('find it') ||
-        lowerInput.includes('identify') || lowerInput.includes('what is this') ||
-        lowerInput.includes('what are these') || lowerInput.includes('what is it') ||
-        lowerInput.includes('fix the details') ||
-        lowerInput.includes('analyze this') || lowerInput.includes('re-analyze') ||
-        (currentItem?.productName === 'Unknown Product' && lowerInput.includes('name'))
-
-      if (isUpdateIntent && currentItem) {
-        const imageSource = currentItem.imageData || currentItem.imageThumbnail
-        if (!settings?.geminiApiKey) {
-          response = 'To identify items automatically, add your Gemini API key in ⚙️ Settings → API Keys. Once set, I can analyze images and update the product name, category, and sell price for you.'
-        } else if (!imageSource) {
-          response = "This item has no image attached. Tap Rescan to capture it with the camera, then ask me again — I'll identify it and fill in all the details."
-        } else if (!geminiService) {
-          response = 'Gemini service is not available. Please check your API key in Settings.'
-        } else {
-          // Immediate feedback while working
-          setChatMessages(prev => [...prev, {
-            id: Date.now().toString(),
-            role: 'assistant',
-            content: '🔍 Analyzing the image...',
-            timestamp: Date.now()
-          }])
-          try {
-            const visionResult = await geminiService.analyzeProductImage(imageSource, {}, currentItem.purchasePrice)
-            const updates: Partial<ScannedItem> = {}
-            if (visionResult.productName && visionResult.productName !== 'Unknown Product') {
-              updates.productName = visionResult.productName
-            }
-            if (visionResult.description) updates.description = visionResult.description
-            // Skip generic "General" fallback when the item already has a specific category
-            const nextCategory = visionResult.category
-            const hasExistingCategory = !!currentItem.category
-            if (nextCategory && (nextCategory !== 'General' || !hasExistingCategory)) {
-              updates.category = nextCategory
-            }
-
-            // Best-effort market research for price
-            if (updates.productName && settings.geminiApiKey) {
-              try {
-                const research = await researchProduct(
-                  updates.productName,
-                  { purchasePrice: currentItem.purchasePrice, category: updates.category },
-                  settings.geminiApiKey
-                )
-                const price = parseResearchPrice(research)
-                if (price > 0) updates.estimatedSellPrice = price
-              } catch { /* price is best-effort */ }
-            }
-            onUpdateItem?.(currentItem.id, updates)
-            response = buildUpdateSummary(updates, currentItem)
-          } catch {
-            response = "I wasn't able to identify the product from the image. Try a clearer photo (tap Rescan), or type the product name and ask me to research its value."
-          }
-        }
-      } else {
-        // Detect research/price questions and use web-grounded search
-        const isResearchQuery = lowerInput.includes('price') || lowerInput.includes('worth') ||
-          lowerInput.includes('value') || lowerInput.includes('research') ||
-          lowerInput.includes('sell for') || lowerInput.includes('market') || lowerInput.includes('how much')
-
-        if (isResearchQuery && currentItem?.productName && settings?.geminiApiKey) {
-          response = await researchProduct(
-            currentItem.productName,
-            { purchasePrice: currentItem.purchasePrice, category: currentItem.category },
-            settings.geminiApiKey
-          )
-        } else {
-          const promptText = `You are an AI assistant for resale business analysis. Context:\n\n${contextData}\n\nUser: ${chatInput}\n\nProvide a helpful, concise response. Reference the scanned item's data. If the user asks about pricing or market value and you don't have data, suggest they tap "Research Item" in the Agent tab for live marketplace search.`
-          response = await callLLM(promptText, {
-            task: 'chat',
-            geminiApiKey: settings?.geminiApiKey,
-          })
-        }
-      }
-
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response,
-        timestamp: Date.now()
-      }
-
-      setChatMessages(prev => [...prev, aiMessage])
-    } catch (error) {
-      console.error('AI chat error:', error)
-      toast.error('Failed to get AI response')
-      
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'I apologize, but I encountered an error processing your request. Please try again.',
-        timestamp: Date.now()
-      }
-      setChatMessages(prev => [...prev, errorMessage])
-    } finally {
-      setIsSendingMessage(false)
-    }
-  }, [chatInput, isSendingMessage, buildAIContext, settings?.geminiApiKey, currentItem, geminiService, onUpdateItem])
+  const handleAddToQueue = useCallback(() => {
+    onCreateListing(parseFloat(buyPrice) || 0, description, {
+      productName: itemName || undefined,
+      category: category || undefined,
+      condition: condition || undefined,
+      description: description || undefined,
+      estimatedSellPrice: parseFloat(estSellPrice) > 0 ? parseFloat(estSellPrice) : undefined,
+      shippingCost: parseFloat(shippingCost) > 0 ? parseFloat(shippingCost) : undefined,
+      platform,
+    })
+    setListingAdded(true)
+  }, [buyPrice, description, itemName, category, condition, estSellPrice, shippingCost, platform, onCreateListing])
 
   return (
     <div className="flex flex-col w-full h-full bg-bg">
@@ -558,471 +376,657 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
         progress={pullToRefresh.progress}
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
-      <div className="flex-shrink-0 p-3 sm:p-4 border-b border-s2 bg-fg sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-b1 to-amber text-white rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
-              <Robot size={18} weight="fill" className="sm:w-5 sm:h-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-bold text-sm sm:text-base text-t1 truncate">AI Command Center</h2>
-              <p className="text-[9px] sm:text-[10px] text-t3 font-medium tracking-wide truncate">Powered by {settings?.preferredAiModel || 'Gemini'}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <ApiStatusIndicator settings={settings} compact liveUpdates={true} />
-          </div>
-        </div>
-        <div className="tab-bar">
-          <button
-            onClick={() => setTab('chat')}
-            className={cn('tab-btn', tab === 'chat' && 'active')}
-          >
-            <span>💬 CHAT</span>
-          </button>
-          <button
-            onClick={() => setTab('scans')}
-            className={cn('tab-btn', tab === 'scans' && 'active')}
-          >
-            <span>📊 SCANS</span>
-          </button>
-          <button
-            onClick={() => setTab('tasks')}
-            className={cn('tab-btn', tab === 'tasks' && 'active')}
-          >
-            <span>✅ TASKS{pendingTasks.length > 0 && ` (${pendingTasks.length})`}</span>
-          </button>
-        </div>
-      </div>
 
+      {/* ── Overall Progress — persistent strip between header and scroll ── */}
+      {pipeline.length > 0 && (
+        <div className="flex-shrink-0 px-3 pt-2.5 pb-2 border-b border-s2 bg-fg">
+          <OverallProgress steps={pipeline} />
+        </div>
+      )}
+
+      {/* ── Scrollable content ── */}
       <div className="flex-1 overflow-y-auto" ref={pullToRefresh.containerRef}>
-        {tab === 'scans' && (
-          <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-4">
-            {pipeline.length === 0 ? (
-              <div className="space-y-4 sm:space-y-6">
-                <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-3 sm:mb-4">
-                    <Scan size={32} strokeWidth={1.5} className="text-b1 sm:w-10 sm:h-10" />
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold text-t1 mb-1.5 sm:mb-2">Ready to Analyze</h3>
-                  <p className="text-xs sm:text-sm text-t3 max-w-xs mb-4">Tap the camera button to scan an item and start AI analysis</p>
-                  {onOpenCamera && (
-                    <button
-                      onClick={onOpenCamera}
-                      className="flex items-center gap-2 px-4 py-2 bg-b1 text-white rounded-xl text-sm font-bold shadow-md active:scale-95 transition-transform"
-                    >
-                      <Scan size={16} weight="bold" />
-                      Scan an Item
-                    </button>
-                  )}
-                </div>
-                <div className="px-2 sm:px-4">
-                  <ApiStatusIndicator settings={settings} />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3 sm:space-y-4">
-                {currentItem?.productName === 'Unknown Product' && (
-                  <button
-                    onClick={() => { setTab('chat'); setChatInput('Identify this item and fill in the details for me') }}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber/10 border border-amber/30 text-left"
-                  >
-                    <span className="text-amber text-lg">🔍</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-amber">Product not identified</p>
-                      <p className="text-[11px] text-t2">Tap to ask AI to identify and fill in the details</p>
-                    </div>
-                  </button>
-                )}
-                <OverallProgress steps={pipeline} />
-                <PipelinePanel steps={pipeline} />
-                
-                {hasDecision && decision && (
-                  <div className="mt-3 sm:mt-4">
-                    <DecisionSignal decision={decision} item={currentItem} />
-                  </div>
-                )}
+        <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-6">
+          {(!currentItem && pipeline.length === 0) ? null : (
+            /* Scan result — shown as soon as currentItem exists OR pipeline is running */
+            <div className="space-y-3 sm:space-y-4">
+              {/* Pipeline steps — only visible during an active scan */}
+              {pipeline.length > 0 && <PipelinePanel steps={pipeline} />}
 
-                {hasDecision && currentItem && (
-                  <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
-                    <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
-                      <CollapsibleTrigger className="w-full">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2">
-                            <ChartBar size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
-                            <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">QUICK SUMMARY</h3>
-                          </div>
-                          <CaretDown
-                            size={18}
-                            weight="bold"
-                            className={cn(
-                              "text-t3 transition-transform duration-200 flex-shrink-0",
-                              summaryOpen && "rotate-180"
-                            )}
-                          />
-                        </div>
-                      </CollapsibleTrigger>
-                      
-                      <CollapsibleContent>
-                        <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
-                          <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Buy Price</p>
-                            <p className="text-base sm:text-lg font-mono font-bold text-t1">${currentItem.purchasePrice.toFixed(2)}</p>
-                          </div>
-                          <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Sell Price</p>
-                            <p className="text-base sm:text-lg font-mono font-bold text-t1">${currentItem.estimatedSellPrice?.toFixed(2) || '--'}</p>
-                          </div>
-                          <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
-                            <p className={cn(
-                              "text-base sm:text-lg font-mono font-bold",
-                              (currentItem.profitMargin || 0) > 50 ? "text-green" :
-                              (currentItem.profitMargin || 0) > 20 ? "text-amber" : "text-red"
-                            )}>
-                              {currentItem.profitMargin?.toFixed(1) || '--'}%
-                            </p>
-                          </div>
-                          <div className="p-2.5 sm:p-3 bg-bg rounded-lg border border-s2">
-                            <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
-                            <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                              ${((currentItem.estimatedSellPrice || 0) - currentItem.purchasePrice).toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                      </CollapsibleContent>
-                    </Card>
-                  </Collapsible>
-                )}
-                
-                {currentItem?.lensAnalysis && (
-                  <GoogleLensResults lensAnalysis={currentItem.lensAnalysis} />
-                )}
-                
-                {currentItem?.marketData && (
-                  <MarketDataPanel marketData={currentItem.marketData} />
-                )}
-                
-                {currentItem?.imageData && (
-                  <Collapsible open={imageOpen} onOpenChange={setImageOpen}>
-                    <Card className="mt-3 sm:mt-4 p-3 sm:p-4 bg-fg border-s2 overflow-hidden">
-                      <CollapsibleTrigger className="w-full">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Image size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
-                            <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">SCANNED IMAGE</h3>
-                          </div>
-                          <CaretDown
-                            size={18}
-                            weight="bold"
-                            className={cn(
-                              "text-t3 transition-transform duration-200 flex-shrink-0",
-                              imageOpen && "rotate-180"
-                            )}
-                          />
-                        </div>
-                      </CollapsibleTrigger>
-                      
-                      <CollapsibleContent className="mt-3">
-                        <img
-                          src={currentItem.imageData}
-                          alt="Scanned item"
-                          className="w-full rounded-lg sm:rounded-xl border-2 border-s2 shadow-md"
-                        />
-                      </CollapsibleContent>
-                    </Card>
-                  </Collapsible>
-                )}
-              </div>
-            )}
-            {/* Listing Queue section */}
-            {(() => {
-              const listingItems = (queueItems || []).filter(i => i.decision === 'BUY' && i.inQueue)
-              if (!listingItems.length) return null
-              return (
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center gap-2 py-2 border-t border-s2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-t2">Listing Queue</span>
-                    <span className="text-[10px] text-t3 bg-s1 px-1.5 py-0.5 rounded font-bold">{listingItems.length}</span>
+              {/* Market velocity "still searching" banner */}
+              {pipeline.length > 0 && isPipelineRunning && (() => {
+                const marketStep = pipeline.find(p => p.id === 'market')
+                const isMarketStuck =
+                  marketStep?.status === 'processing' && (marketStep.progress ?? 0) >= 90
+                if (!isMarketStuck) return null
+                return (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber/10 border border-amber/30 text-amber text-xs font-medium">
+                    <span className="animate-pulse">⏳</span>
+                    Fetching live market data — this can take up to 30s…
                   </div>
-                  {listingItems.map(item => (
-                    <QueueListingCard key={item.id} item={item} onDiscuss={handleDiscussItem} />
-                  ))}
+                )
+              })()}
+
+              {/* Decision signal — show once pipeline is done, including PENDING "needs price" */}
+              {pipelineComplete && decision && (
+                <div className="mt-3 sm:mt-4" ref={decisionRef}>
+                  <DecisionSignal decision={decision} item={currentItem} />
                 </div>
-              )
-            })()}
-          </div>
-        )}
-        {tab === 'chat' && (
-          <div className="flex flex-col min-h-full">
-            <div className="flex-1 p-3 sm:p-4 space-y-3 sm:space-y-4" ref={(el) => {
-              if (el) (chatScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el?.closest('.overflow-y-auto') as HTMLDivElement ?? el
-            }}>
-              {chatMessages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-3 sm:mb-4">
-                    <Sparkle size={32} weight="duotone" className="text-b1 sm:w-10 sm:h-10" />
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold text-t1 mb-1.5 sm:mb-2">AI Assistant Ready</h3>
-                  <p className="text-xs sm:text-sm text-t3 max-w-xs mb-3 sm:mb-4">Ask questions about the current analysis, get insights, or request market advice</p>
-                  <div className="space-y-2 w-full max-w-xs">
-                    <button
-                      onClick={() => setChatInput("What's the profit potential for this item?")}
-                      className="w-full p-2.5 sm:p-3 bg-fg border border-s2 rounded-lg text-left text-[11px] sm:text-xs text-t2 hover:border-b1 hover:bg-t4 transition-colors"
-                    >
-                      💰 What's the profit potential?
-                    </button>
-                    <button
-                      onClick={() => setChatInput("Should I negotiate the price down?")}
-                      className="w-full p-2.5 sm:p-3 bg-fg border border-s2 rounded-lg text-left text-[11px] sm:text-xs text-t2 hover:border-b1 hover:bg-t4 transition-colors"
-                    >
-                      🤝 Should I negotiate?
-                    </button>
-                    <button
-                      onClick={() => setChatInput("What are similar items selling for?")}
-                      className="w-full p-2.5 sm:p-3 bg-fg border border-s2 rounded-lg text-left text-[11px] sm:text-xs text-t2 hover:border-b1 hover:bg-t4 transition-colors"
-                    >
-                      📊 What are market prices?
-                    </button>
+              )}
+
+              {/* ── Platform ROI Comparison — BUY only, 3 platforms ── */}
+              {pipelineComplete && decision === 'BUY' && currentItem?.platformComparison && currentItem.platformComparison.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[10px] font-semibold text-t3 uppercase tracking-widest mb-1.5 px-0.5">Alt Platform Comparison</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {currentItem.platformComparison.map(p => {
+                      const isPos = p.netProfit >= 0
+                      return (
+                        <div
+                          key={p.platform}
+                          className={cn(
+                            'relative rounded-xl px-2 py-2 border text-left',
+                            p.recommended
+                              ? 'border-green/30 bg-green/5'
+                              : 'border-s2/60 bg-fg/5'
+                          )}
+                          style={{ backdropFilter: 'blur(8px)' }}
+                        >
+                          {p.recommended && (
+                            <span className="absolute top-1 right-1 text-[7px] font-black text-green tracking-wide uppercase">BEST</span>
+                          )}
+                          <p className="text-[9px] font-bold text-t2 truncate mb-1">{p.platform}</p>
+                          <p className={cn('text-sm font-bold font-mono leading-none', isPos ? 'text-green' : 'text-red')}>
+                            {isPos ? '+' : ''}{p.netProfit.toFixed(2)}
+                          </p>
+                          <p className={cn('text-[9px] font-mono mt-0.5', isPos ? 'text-green/80' : 'text-red/80')}>
+                            {p.profitMargin.toFixed(0)}% margin
+                          </p>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-              ) : (
-                chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={cn(
-                      "max-w-[85%] rounded-xl p-2.5 sm:p-3 shadow-sm",
-                      msg.role === 'user'
-                        ? "ml-auto bg-gradient-to-br from-b1 to-b2 text-white"
-                        : "bg-fg border border-s2 text-t1"
-                    )}
+              )}
+
+              {/* ── 1. Quick Summary — only when we have real pricing data ── */}
+              {hasDecision && currentItem && hasPriceData && (
+                <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
+                  <Card
+                    className="mt-3 sm:mt-4 p-3 sm:p-4 border-s2/60 overflow-hidden"
+                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
                   >
-                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                    <p className={cn(
-                      "text-[10px] sm:text-xs mt-1 sm:mt-1.5",
-                      msg.role === 'user' ? "text-white/70" : "text-t3"
-                    )}>
-                      {new Date(msg.timestamp).toLocaleTimeString()}
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <ChartBar size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
+                          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">
+                            QUICK SUMMARY
+                          </h3>
+                        </div>
+                        <CaretDown
+                          size={18}
+                          weight="bold"
+                          className={cn(
+                            'text-t3 transition-transform duration-200 flex-shrink-0',
+                            summaryOpen && 'rotate-180',
+                          )}
+                        />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
+                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
+                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
+                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Buy Price</p>
+                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
+                            ${currentItem.purchasePrice.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
+                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
+                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Sell Price</p>
+                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
+                            ${currentItem.estimatedSellPrice?.toFixed(2) || '--'}
+                          </p>
+                        </div>
+                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
+                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
+                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
+                          <p
+                            className={cn(
+                              'text-base sm:text-lg font-mono font-bold',
+                              (currentItem.profitMargin || 0) > 50
+                                ? 'text-green'
+                                : (currentItem.profitMargin || 0) > 20
+                                  ? 'text-amber'
+                                  : 'text-red',
+                            )}
+                          >
+                            {currentItem.profitMargin?.toFixed(1) || '--'}%
+                          </p>
+                        </div>
+                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
+                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
+                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
+                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
+                            {currentItem.profitMargin != null && currentItem.estimatedSellPrice
+                              ? `$${((currentItem.estimatedSellPrice * currentItem.profitMargin) / 100).toFixed(2)}`
+                              : '--'}
+                          </p>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {/* ── 2. Listing draft form — always visible once pipeline is done ── */}
+              {pipelineComplete && !listingAdded && (
+                <Collapsible open={formOpen} onOpenChange={setFormOpen}>
+                  <Card
+                    className="mt-3 p-3 sm:p-4 border-s2/60"
+                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+                  >
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <ClipboardText size={18} weight="bold" className="text-b1" />
+                          <h3 className="text-xs font-bold uppercase tracking-wide text-t1">
+                            LISTING DRAFT
+                          </h3>
+                        </div>
+                        <CaretDown
+                          size={16}
+                          weight="bold"
+                          className={cn(
+                            'text-t3 transition-transform duration-200 flex-shrink-0',
+                            formOpen && 'rotate-180',
+                          )}
+                        />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="space-y-2.5 mt-2">
+                        {/* Item name */}
+                        <div>
+                          <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                            Item Name
+                          </label>
+                          <Input
+                            value={itemName}
+                            onChange={e => setItemName(e.target.value)}
+                            placeholder="e.g. Nike Air Max 90 White/Black"
+                            className="h-9 bg-bg border-s2 text-sm"
+                          />
+                        </div>
+
+                        {/* Category + Condition */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Category
+                            </label>
+                            <Input
+                              value={category}
+                              onChange={e => setCategory(e.target.value)}
+                              placeholder="e.g. Sneakers"
+                              className="h-9 bg-bg border-s2 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Condition
+                            </label>
+                            <select
+                              value={condition}
+                              onChange={e => setCondition(e.target.value)}
+                              className="w-full h-9 rounded-md border border-s2 bg-bg px-2 text-sm text-t1 focus:outline-none focus:ring-2 focus:ring-b1/50"
+                            >
+                              <option value="">Select…</option>
+                              {CONDITIONS.map(c => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Price row */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Buy $
+                            </label>
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={buyPrice}
+                              onChange={e => setBuyPrice(e.target.value)}
+                              className="h-9 bg-bg border-s2 text-sm font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Sell $
+                            </label>
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={estSellPrice}
+                              onChange={e => setEstSellPrice(e.target.value)}
+                              className="h-9 bg-bg border-s2 text-sm font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 block">
+                              Ship $
+                            </label>
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={shippingCost}
+                              onChange={e => setShippingCost(e.target.value)}
+                              className="h-9 bg-bg border-s2 text-sm font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* ── Price range pills — tap to fill Sell $ from market data ── */}
+                        {(currentItem?.lensAnalysis?.priceRange || currentItem?.estimatedSellPrice || currentItem?.marketData?.ebayPriceRange) && (
+                          <div className="flex items-center gap-1.5 flex-wrap -mt-0.5">
+                            <span className="text-[9px] text-t3 font-medium uppercase tracking-wide shrink-0">
+                              Range:
+                            </span>
+                            {/* eBay min / max */}
+                            {currentItem?.marketData?.ebayPriceRange && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.marketData!.ebayPriceRange!.min.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  Low ${currentItem.marketData.ebayPriceRange.min.toFixed(0)}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.marketData!.ebayPriceRange!.max.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  High ${currentItem.marketData.ebayPriceRange.max.toFixed(0)}
+                                </button>
+                              </>
+                            )}
+                            {/* Lens avg (only when no eBay range to avoid duplicates) */}
+                            {currentItem?.lensAnalysis?.priceRange && !currentItem?.marketData?.ebayPriceRange && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.min.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  Low ${currentItem.lensAnalysis.priceRange.min.toFixed(0)}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.average.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1/80 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  Avg ${currentItem.lensAnalysis.priceRange.average.toFixed(0)}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.max.toFixed(2))}
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                >
+                                  High ${currentItem.lensAnalysis.priceRange.max.toFixed(0)}
+                                </button>
+                              </>
+                            )}
+                            {/* AI suggested price — always shown when available */}
+                            {currentItem?.estimatedSellPrice && (
+                              <button
+                                type="button"
+                                onClick={() => setEstSellPrice(currentItem!.estimatedSellPrice!.toFixed(2))}
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-b1/15 text-b1 active:bg-b1/25 transition-colors"
+                              >
+                                AI ${currentItem.estimatedSellPrice.toFixed(0)}
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Description */}
+                        <div>
+                          <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1 flex items-center justify-between">
+                            <span>Description / Notes</span>
+                            {isSupported && (
+                              <button
+                                onClick={() =>
+                                  startListening(text =>
+                                    setDescription(prev => (prev ? prev + ' ' + text : text)),
+                                  )
+                                }
+                                className={cn(
+                                  'w-6 h-6 flex items-center justify-center rounded-md transition-colors',
+                                  isListening
+                                    ? 'text-red animate-pulse'
+                                    : 'text-t3 hover:text-t1',
+                                )}
+                              >
+                                <Microphone size={13} weight="bold" />
+                              </button>
+                            )}
+                          </label>
+                          <Textarea
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            placeholder="Brand, model, size, color, notable features, flaws…"
+                            rows={3}
+                            className="bg-bg border-s2 text-sm resize-none"
+                          />
+                        </div>
+
+                        {/* Platform selector */}
+                        <div>
+                          <label className="text-[10px] font-semibold text-t3 uppercase tracking-wide mb-1.5 block">
+                            List On
+                          </label>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {PLATFORMS.map(p => (
+                              <button
+                                key={p.id}
+                                onClick={() => setPlatform(p.id)}
+                                className={cn(
+                                  'px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors',
+                                  platform === p.id
+                                    ? 'bg-b1 text-white border-b1'
+                                    : 'bg-bg text-t2 border-s2 hover:border-b1/50',
+                                )}
+                              >
+                                {p.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {/* Added-to-queue success banner */}
+              {listingAdded && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-green/10 border border-green/30"
+                >
+                  <CheckCircle size={20} weight="fill" className="text-green flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-green">Added to Queue</p>
+                    <p className="text-[10px] text-t3 mt-0.5">
+                      AI is optimizing the listing in the background
                     </p>
                   </div>
-                ))
+                </motion.div>
               )}
-              {isSendingMessage && (
-                <div className="max-w-[85%] rounded-xl p-2.5 sm:p-3 bg-fg border border-s2">
-                  <div className="flex items-center gap-2 text-t3">
-                    <div className="loading-spinner" />
-                    <span className="text-xs sm:text-sm">AI is thinking...</span>
-                  </div>
-                </div>
+
+              {/* ── 3. Photos — collapsible multi-photo strip ── */}
+              {(currentItem?.imageData || currentItem?.imageThumbnail) && (
+                <Collapsible open={imageOpen} onOpenChange={setImageOpen}>
+                  <Card
+                    className="mt-3 sm:mt-4 p-3 sm:p-4 border-s2/60 overflow-hidden"
+                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+                  >
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Image size={18} weight="bold" className="text-b1 sm:w-5 sm:h-5" />
+                          <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wide text-t1">
+                            PHOTOS
+                          </h3>
+                          <span className="text-[10px] text-t3 font-medium">
+                            {1 + (currentItem?.additionalImages?.length || 0)}/5
+                          </span>
+                        </div>
+                        <CaretDown
+                          size={18}
+                          weight="bold"
+                          className={cn(
+                            'text-t3 transition-transform duration-200 flex-shrink-0',
+                            imageOpen && 'rotate-180',
+                          )}
+                        />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-3">
+                      <div className="flex items-start gap-2 overflow-x-auto pb-1">
+                        {/* Primary photo */}
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={currentItem.imageData || currentItem.imageThumbnail}
+                            alt="Primary photo"
+                            className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover border-2 border-b1/30"
+                          />
+                          <span className="absolute bottom-1 left-1 text-[8px] font-bold text-white bg-b1/80 px-1.5 py-0.5 rounded-full leading-tight">
+                            Main
+                          </span>
+                          <button
+                            onClick={() => onDeletePrimaryPhoto?.()}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                            style={{ touchAction: 'manipulation' }}
+                          >
+                            <XCircle size={12} weight="fill" className="text-white" />
+                          </button>
+                        </div>
+
+                        {/* Additional photos */}
+                        {(currentItem.additionalImages || []).map((thumb, idx) => (
+                          <div key={idx} className="relative flex-shrink-0">
+                            <img
+                              src={thumb}
+                              alt={`Photo ${idx + 2}`}
+                              className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-s2"
+                            />
+                            <button
+                              onClick={() => onDeletePhoto?.(idx)}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                              style={{ touchAction: 'manipulation' }}
+                            >
+                              <XCircle size={12} weight="fill" className="text-white" />
+                            </button>
+                          </div>
+                        ))}
+
+                        {/* Add photo button — hidden when at max 5 */}
+                        {(1 + (currentItem.additionalImages?.length || 0)) < 5 && (
+                          <button
+                            onClick={() => onAddPhoto?.()}
+                            className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl border-2 border-dashed border-s2 flex flex-col items-center justify-center gap-1 hover:bg-s1 transition-colors active:scale-[0.97]"
+                            style={{ touchAction: 'manipulation' }}
+                          >
+                            <Camera size={18} className="text-t3" />
+                            <span className="text-[9px] text-t3 font-medium">Add Photo</span>
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-t3 mt-2 leading-tight opacity-70">
+                        Add photos then tap Re-analyze to scan all {1 + (currentItem?.additionalImages?.length || 0)} together
+                      </p>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {/* Google Lens results */}
+              {currentItem?.lensAnalysis && (
+                <GoogleLensResults lensAnalysis={currentItem.lensAnalysis} />
+              )}
+
+              {/* Market data */}
+              {currentItem?.marketData && (
+                <MarketDataPanel marketData={currentItem.marketData} />
               )}
             </div>
-          </div>
-        )}
-        {tab === 'tasks' && (
-          <div className="flex flex-col min-h-full">
-            <div className="flex-1 p-3 sm:p-4">
-              {(todos || []).length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center py-8 sm:py-12 px-4">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-b1/10 to-amber/10 flex items-center justify-center mb-3 sm:mb-4">
-                    <ListChecks size={32} weight="duotone" className="text-b1 sm:w-10 sm:h-10" />
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold text-t1 mb-1.5 sm:mb-2">No Tasks Yet</h3>
-                  <p className="text-xs sm:text-sm text-t3 max-w-xs">Add tasks below, or ask the AI to create tasks for you in the Chat tab.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-s1">
-                  {pendingTasks.map(todo => (
-                    <div key={todo.id} className="flex items-center gap-2.5 py-2.5 group">
-                      <button
-                        onClick={() => handleToggleTask(todo.id)}
-                        className="flex-shrink-0 w-5 h-5 rounded-md border border-s2 hover:border-b1 hover:bg-b1/10 transition-colors cursor-pointer"
-                      />
-                      <span className="flex-1 text-xs sm:text-sm text-t1 leading-snug">{todo.text}</span>
-                      <span className={cn(
-                        'text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded',
-                        todo.createdBy === 'agent' ? 'text-b1 bg-b1/10' : 'text-t3 bg-s1'
-                      )}>
-                        {todo.createdBy}
-                      </span>
-                      <button
-                        onClick={() => handleDeleteTask(todo.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red p-1"
-                      >
-                        <Trash size={14} />
-                      </button>
-                    </div>
-                  ))}
-                  {completedTasks.length > 0 && (
-                    <div className="pt-3 pb-1">
-                      <p className="text-[10px] text-t3 font-bold uppercase tracking-wide">Completed ({completedTasks.length})</p>
-                    </div>
-                  )}
-                  {completedTasks.map(todo => (
-                    <div key={todo.id} className="flex items-center gap-2.5 py-2.5 group opacity-50">
-                      <button
-                        onClick={() => handleToggleTask(todo.id)}
-                        className="flex-shrink-0 w-5 h-5 rounded-md bg-green/15 border border-green/40 flex items-center justify-center"
-                      >
-                        <Check size={12} weight="bold" className="text-green" />
-                      </button>
-                      <span className="flex-1 text-xs sm:text-sm text-t2 leading-snug line-through">{todo.text}</span>
-                      <button
-                        onClick={() => handleDeleteTask(todo.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red p-1"
-                      >
-                        <Trash size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
+      {/* ── Bottom action bar ── */}
       <div className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md safe-bottom">
-
-        {tab === 'chat' && (
-          <div className="p-2.5 sm:p-3">
-            <div className="flex gap-2">
-              <Input
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSendMessage()
-                  }
-                }}
-                placeholder="Ask AI anything..."
-                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-sm"
-                disabled={isSendingMessage}
-              />
+        {pipelineComplete ? (
+          listingAdded ? (
+            /* Success state — offer to scan another item (new photo via camera) */
+            <div className="p-2.5 sm:p-3">
               <Button
-                onClick={handleSendMessage}
-                disabled={!chatInput.trim() || isSendingMessage}
-                className="bg-b1 hover:bg-b2 text-white h-10 sm:h-11 w-10 sm:w-11 p-0 flex-shrink-0"
+                onClick={() => onOpenCamera?.()}
+                className="w-full h-11 rounded-xl bg-b1 hover:bg-b2 text-white font-semibold text-sm active:scale-[0.97] transition-all"
               >
-                <PaperPlaneRight size={18} weight="bold" className="sm:w-5 sm:h-5" />
+                <Scan size={15} weight="bold" className="mr-1.5" />
+                Scan Another Item
               </Button>
             </div>
-          </div>
-        )}
+          ) : (
+            /* Pipeline done (BUY / PASS / PENDING) — show all actions */
+            <div className="p-2.5 sm:p-3 space-y-2">
+              {/* Recalculate — shown when ANY of buy, sell, or shipping differ from stored values */}
+              {formHasChanges && (
+                <Button
+                  onClick={() => {
+                    onRecalculate?.(
+                      Number.isFinite(buyPriceFloat) ? buyPriceFloat : 0,
+                      Number.isFinite(sellPriceFloat) && sellPriceFloat > 0 ? sellPriceFloat : undefined,
+                      Number.isFinite(shipPriceFloat) && shipPriceFloat >= 0 ? shipPriceFloat : undefined,
+                    )
+                  }}
+                  className="w-full rounded-xl bg-amber hover:opacity-90 text-white h-10 font-semibold text-sm active:scale-[0.97] transition-all"
+                >
+                  <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
+                  Recalculate ROI
+                </Button>
+              )}
 
-        {tab === 'scans' && hasDecision && (
-          /* Post-pipeline CTA bar: Recalculate / Rescan / Pass / Create Listing */
-          <div className="p-2.5 sm:p-3 space-y-2">
-            {/* Price + Notes row */}
-            <div className="flex gap-2">
-              <Input
-                id="ai-price"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="Buy $"
-                value={buyPrice}
-                onChange={(e) => setBuyPrice(e.target.value)}
-                className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
-              />
-              <div className="flex-1 relative">
-                <Input
-                  id="ai-describe"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Notes..."
-                  className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
-                />
-                {isSupported && (
-                  <button
-                    onClick={() => startListening((text) => setDescription(text))}
-                    className={cn(
-                      "absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-colors",
-                      isListening
-                        ? "bg-red text-white animate-pulse"
-                        : "bg-s1 hover:bg-s2 text-t3 hover:text-t1"
-                    )}
+              {/* Row 1: secondary actions */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => onRescan?.()}
+                  variant="outline"
+                  className="flex-shrink-0 h-10 px-3 rounded-xl border border-s2 text-t2 hover:text-t1 hover:bg-s1 font-semibold text-xs active:scale-[0.97] transition-all"
+                >
+                  <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
+                  Re-analyze
+                </Button>
+                {/* Pass — 2-step confirm to prevent accidental dismissal */}
+                {confirmPass ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmPass(false)}
+                      className="flex-1 h-10 rounded-xl text-xs text-t3 border border-s2 hover:bg-s1 active:scale-[0.97] transition-all"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => { onPassItem(parseFloat(buyPrice) || 0, description); setConfirmPass(false) }}
+                      className="flex-1 h-10 rounded-xl text-xs font-bold bg-red hover:opacity-90 text-white border-0 active:scale-[0.97] transition-all"
+                    >
+                      Confirm Pass
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => setConfirmPass(true)}
+                    disabled={!canSaveDraft}
+                    variant="outline"
+                    className="flex-1 h-10 rounded-xl border border-red/40 text-red hover:bg-red/10 font-semibold text-xs sm:text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
                   >
-                    <Microphone size={14} weight="bold" className="sm:w-4 sm:h-4" />
-                  </button>
+                    <XCircle size={15} weight="bold" className="mr-1" />
+                    Pass
+                  </Button>
+                )}
+                {!confirmPass && onMaybeItem && (
+                  <Button
+                    onClick={() => onMaybeItem(parseFloat(buyPrice) || 0, description)}
+                    disabled={!canSaveDraft}
+                    variant="outline"
+                    className="flex-1 h-10 rounded-xl border border-amber-400/50 text-amber-500 hover:bg-amber-400/10 font-semibold text-xs sm:text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
+                  >
+                    <BookmarkSimple size={15} weight="bold" className="mr-1" />
+                    Maybe
+                  </Button>
                 )}
               </div>
+              {/* Row 2: camera + primary CTA — CTA locked when PENDING */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onOpenCamera?.()}
+                  className="w-11 h-11 flex-shrink-0 rounded-xl border border-s2 text-t2 hover:text-t1 hover:bg-s1 flex items-center justify-center active:scale-[0.97] transition-all"
+                  style={{ touchAction: 'manipulation' }}
+                  title="Open camera"
+                >
+                  <Camera size={18} weight="bold" />
+                </button>
+                <Button
+                  onClick={handleAddToQueue}
+                  disabled={!canSaveDraft || decision === 'PENDING'}
+                  className="flex-1 h-11 rounded-xl text-white font-bold shadow-sm shadow-green/20 disabled:opacity-40 disabled:cursor-not-allowed text-sm active:scale-[0.97] transition-all"
+                  style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                >
+                  <ShoppingCart size={16} weight="bold" className="mr-2" />
+                  Add to Queue
+                </Button>
+              </div>
+              {decision === 'PENDING' && (
+                <p className="text-center text-[10px] text-t3 -mt-1 leading-tight">
+                  Enter a sell price and tap Recalculate to unlock
+                </p>
+              )}
             </div>
-
-            {/* Recalculate — only visible when buy price changed */}
-            {buyPrice !== '' && parseFloat(buyPrice) !== currentItem?.purchasePrice && (
-              <Button
-                onClick={() => onRecalculate?.(parseFloat(buyPrice))}
-                className="w-full bg-amber hover:opacity-90 text-white h-9 sm:h-10 font-semibold text-xs sm:text-sm"
-              >
-                <ArrowClockwise size={15} weight="bold" className="mr-1.5" />
-                ♻️ Recalculate with new price
-              </Button>
-            )}
-
-            {/* Rescan / Pass / Create Listing */}
-            <div className="flex gap-2">
-              <Button
-                onClick={() => onRescan?.()}
-                variant="outline"
-                className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
-              >
-                <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
-                Rescan
-              </Button>
-              <Button
-                onClick={() => onPassItem(parseFloat(buyPrice), description)}
-                disabled={!canSaveDraft}
-                variant="outline"
-                className="flex-1 h-9 sm:h-10 border-red/40 text-red hover:bg-red/10 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
-              >
-                <XCircle size={15} weight="bold" className="mr-1" />
-                Pass
-              </Button>
-              <Button
-                onClick={() => onCreateListing(parseFloat(buyPrice), description)}
-                disabled={!canSaveDraft}
-                className="flex-1 h-9 sm:h-10 bg-green hover:opacity-90 text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold"
-              >
-                <ShoppingCart size={15} weight="bold" className="mr-1" />
-                Create Listing
-              </Button>
-            </div>
+          )
+        ) : isPipelineRunning ? (
+          /* Pipeline in progress */
+          <div className="flex items-center justify-center gap-2 h-12 text-xs text-t3 font-medium">
+            <span className="w-2 h-2 rounded-full bg-b1 animate-pulse" />
+            Analyzing… decision coming
           </div>
-        )}
-
-        {tab === 'scans' && !hasDecision && (
-          /* Pre-pipeline or in-progress: Save Draft */
+        ) : (
+          /* No pipeline yet — quick draft capture */
           <div className="p-2.5 sm:p-3 space-y-2">
             <div className="flex gap-2">
               <Input
-                id="ai-price"
                 type="number"
                 inputMode="decimal"
                 min="0"
                 step="0.01"
                 placeholder="Buy $"
                 value={buyPrice}
-                onChange={(e) => setBuyPrice(e.target.value)}
+                onChange={e => setBuyPrice(e.target.value)}
                 className="w-20 sm:w-24 h-9 sm:h-10 font-mono bg-bg border-s2 text-sm"
               />
               <div className="flex-1 relative">
                 <Input
-                  id="ai-describe"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={e => setDescription(e.target.value)}
                   placeholder="Add notes or description..."
                   className="h-9 sm:h-10 pr-10 bg-bg border-s2 text-sm"
                 />
                 {isSupported && (
                   <button
-                    onClick={() => startListening((text) => setDescription(text))}
+                    onClick={() => startListening(text => setDescription(text))}
                     className={cn(
-                      "absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-colors",
+                      'absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 rounded-md flex items-center justify-center transition-colors',
                       isListening
-                        ? "bg-red text-white animate-pulse"
-                        : "bg-s1 hover:bg-s2 text-t3 hover:text-t1"
+                        ? 'bg-red text-white animate-pulse'
+                        : 'bg-s1 hover:bg-s2 text-t3 hover:text-t1',
                     )}
                   >
                     <Microphone size={14} weight="bold" className="sm:w-4 sm:h-4" />
@@ -1031,44 +1035,23 @@ export function AIScreen({ currentItem, pipeline, settings, queueItems, onSaveDr
               </div>
             </div>
             <div className="flex gap-2">
-              {currentItem && (
+              {onRescan && (
                 <Button
-                  onClick={() => onRescan?.()}
+                  onClick={() => onRescan()}
                   variant="outline"
-                  className="flex-shrink-0 h-9 sm:h-10 px-3 border-s2 text-t2 hover:text-t1 hover:bg-s1 text-xs"
+                  className="flex-shrink-0 h-10 px-3 rounded-xl border border-s2 text-t2 hover:text-t1 hover:bg-s1 font-semibold text-xs active:scale-[0.97] transition-all"
                 >
                   <ArrowCounterClockwise size={14} weight="bold" className="mr-1" />
-                  Rescan
+                  Re-analyze
                 </Button>
               )}
               <Button
                 onClick={() => onSaveDraft(parseFloat(buyPrice), description)}
                 disabled={!canSaveDraft}
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-9 sm:h-10 font-medium disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm"
+                className="flex-1 rounded-xl bg-b1 hover:bg-b2 text-white h-10 font-semibold disabled:opacity-40 disabled:cursor-not-allowed text-sm active:scale-[0.97] transition-all"
               >
                 <FloppyDisk size={16} weight="bold" className="mr-1.5 sm:mr-2" />
-                SAVE DRAFT TO QUEUE
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {tab === 'tasks' && (
-          <div className="p-2.5 sm:p-3">
-            <div className="flex gap-2">
-              <Input
-                value={taskInput}
-                onChange={(e) => setTaskInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleAddTask() }}
-                placeholder="Add a task..."
-                className="flex-1 h-10 sm:h-11 bg-bg border-s2 text-sm"
-              />
-              <Button
-                onClick={handleAddTask}
-                disabled={!taskInput.trim()}
-                className="bg-b1 hover:bg-b2 text-white h-10 sm:h-11 w-10 sm:w-11 p-0 flex-shrink-0 disabled:opacity-40"
-              >
-                <Plus size={18} weight="bold" />
+                Save Draft to Queue
               </Button>
             </div>
           </div>

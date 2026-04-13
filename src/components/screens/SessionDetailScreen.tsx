@@ -1,29 +1,45 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CheckCircle, XCircle, TrendUp, Target, Package, PencilSimple, Check, X, MapPin } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, TrendUp, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { AgentPanel } from '../AgentPanel'
-import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
-import type { Session, ScannedItem, ThriftStoreLocation } from '@/types'
+import type { Session, ScannedItem, ThriftStoreLocation, Screen } from '@/types'
 
 interface SessionDetailScreenProps {
   sessionId: string
   onBack: () => void
   onDeleteSession?: (sessionId: string) => void
   onEndSession?: () => void
+  onReopenSession?: (sessionId: string) => void
   allSessions?: Session[]
   onUpdateSessions?: (updater: (prev: Session[]) => Session[]) => void
   queueItems?: ScannedItem[]
   scanHistory?: ScannedItem[]
+  onOpenItem?: (item: ScannedItem) => void
+  onOpenChat?: () => void
+  onNavigateTo?: (screen: Screen) => void
+  /** Current device operator — used for ownership guards on End/Delete/Reopen */
+  currentOperatorId?: string
 }
 
-export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp }: SessionDetailScreenProps) {
+export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo, currentOperatorId }: SessionDetailScreenProps) {
   const [allSessionsFallback, setAllSessionsFallback] = useKV<Session[]>('all-sessions', [])
   const allSessions = allSessionsProp ?? allSessionsFallback
   const setAllSessions = onUpdateSessions ?? setAllSessionsFallback
@@ -73,7 +89,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     const trimmed = editName.trim()
     if (trimmed) {
       updateSession({ name: trimmed })
-      toast.success('Session name updated')
+      logActivity('Session name updated')
     }
     setEditingName(false)
   }, [editName, updateSession])
@@ -88,7 +104,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
         type: editLocationType,
       }
       updateSession({ location })
-      toast.success('Location updated')
+      logActivity('Location updated')
     }
     setEditingLocation(false)
   }, [editLocationName, editLocationAddress, editLocationType, session, updateSession])
@@ -97,7 +113,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     const amount = parseFloat(editGoalAmount)
     if (amount > 0) {
       updateSession({ profitGoal: amount })
-      toast.success('Profit goal updated')
+      logActivity('Profit goal updated')
     }
     setEditingGoal(false)
   }, [editGoalAmount, updateSession])
@@ -132,7 +148,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   const [geoLoading, setGeoLoading] = useState(false)
   const handleAutoLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      toast.error('Location not supported on this device')
+      logActivity('Location not supported on this device', 'info')
       return
     }
     setGeoLoading(true)
@@ -141,13 +157,13 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
         setGeoLoading(false)
         setEditLocationAddress(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`)
         setEditingLocation(true)
-        toast.success('Location detected — pick a store')
+        logActivity('Location detected — pick a store')
       },
       () => {
         setGeoLoading(false)
         // Fallback: just open the location editor
         startEditLocation()
-        toast.info('Could not detect location — enter manually')
+        logActivity('Could not detect location — enter manually', 'info')
       },
       { enableHighAccuracy: true, timeout: 8000 }
     )
@@ -161,6 +177,10 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     )
   }
 
+  // Ownership: only the operator who started the session can end/delete/reopen it
+  // Sessions without operatorId (pre-feature) are unguarded — all actions available
+  const isSessionOwner = !session.operatorId || session.operatorId === currentOperatorId
+
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
     const hours = Math.floor(minutes / 60)
@@ -169,7 +189,16 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
 
   const duration = (session.endTime || Date.now()) - session.startTime
   const startDate = new Date(session.startTime)
-  const buyRate = session.itemsScanned > 0 ? Math.round((session.buyCount / session.itemsScanned) * 100) : 0
+
+  // Derive all counts from live item data — session metadata counters can lag
+  const buyItems = sessionItems.filter(i => i.decision === 'BUY')
+  const passItems = sessionItems.filter(i => i.decision === 'PASS')
+  const maybeCount = sessionItems.filter(i => i.decision === 'PENDING').length
+  const liveBuyCount = buyItems.length
+  const livePassCount = passItems.length
+  const totalScans = sessionItems.length
+  const buyRate = totalScans > 0 ? Math.round((liveBuyCount / totalScans) * 100) : 0
+  const estimatedProfit = buyItems.reduce((s, i) => s + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
@@ -191,81 +220,109 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     <div className="h-full flex flex-col bg-bg">
       <div className="flex-1 overflow-y-auto pb-28">
         <div className="px-4 pt-3 pb-6">
-          {/* Header — session name + compact action buttons */}
+          {/* Header — session name on its own row, emoji action pills underneath */}
           <div className="mb-4">
-            <div className="flex items-center justify-between mb-1">
-              {editingName ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="h-8 text-lg font-black"
-                    placeholder="Session name"
-                    autoFocus
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setEditName('') } }}
-                  />
-                  <button onClick={handleSaveName} className="text-green p-2"><Check size={18} /></button>
-                  <button onClick={() => { setEditingName(false); setEditName('') }} className="text-red p-2"><X size={18} /></button>
-                </div>
-              ) : (
-                <button onClick={startEditName} className="flex items-center gap-2 active:opacity-70 transition-opacity">
-                  <h1 className="text-lg font-black tracking-tight text-t1">
-                    {session.name || startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </h1>
-                  <PencilSimple size={14} className="text-t3" />
-                </button>
-              )}
+            {editingName ? (
+              <div className="flex items-center gap-2 mb-2">
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="h-9 text-lg font-black flex-1"
+                  placeholder="Session name"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setEditingName(false); setEditName('') } }}
+                />
+                <button onClick={handleSaveName} aria-label="Save name" className="w-10 h-10 flex items-center justify-center text-green active:scale-95 transition-transform"><Check size={20} weight="bold" /></button>
+                <button onClick={() => { setEditingName(false); setEditName('') }} aria-label="Cancel edit" className="w-10 h-10 flex items-center justify-center text-red active:scale-95 transition-transform"><X size={20} weight="bold" /></button>
+              </div>
+            ) : (
+              <button
+                onClick={startEditName}
+                className="flex items-center gap-2 mb-1 active:opacity-70 transition-opacity w-full text-left"
+                aria-label="Edit session name"
+              >
+                <h1 className="text-2xl font-black tracking-tight text-t1 truncate">
+                  {session.name || `#${String(session.sessionNumber ?? 1).padStart(3, '0')}`}
+                </h1>
+                <span className="w-8 h-8 flex items-center justify-center rounded-full bg-s1/60 text-t2 flex-shrink-0">
+                  <PencilSimple size={14} weight="bold" />
+                </span>
+              </button>
+            )}
 
-              {/* Compact action buttons: type, location, goal */}
-              {!editingName && (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => {
-                      const next = session.sessionType === 'personal' ? 'business' : 'personal'
-                      updateSession({ sessionType: next })
-                    }}
-                    className={cn(
-                      'w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all active:scale-95',
-                      session.sessionType === 'personal' ? 'bg-purple-500/10' : 'bg-b1/10'
-                    )}
-                  >
-                    {session.sessionType === 'personal' ? '👤' : '💼'}
-                  </button>
-                  <button
-                    onClick={handleAutoLocation}
-                    disabled={geoLoading}
-                    className={cn(
-                      'h-8 flex items-center justify-center gap-1 px-2 rounded-lg text-[10px] font-bold transition-all active:scale-95',
-                      session.location ? 'bg-green/10 text-green' : 'bg-s1 text-t3'
-                    )}
-                  >
-                    <MapPin size={14} weight={session.location ? 'fill' : 'regular'} />
-                    <span>{geoLoading ? '...' : session.location?.name?.split(' ')[0] || 'Location'}</span>
-                  </button>
-                  <button
-                    onClick={startEditGoal}
-                    className={cn(
-                      'h-8 flex items-center justify-center gap-1 px-2 rounded-lg text-[10px] font-bold transition-all active:scale-95',
-                      session.profitGoal ? 'bg-amber/10 text-amber' : 'bg-s1 text-t3'
-                    )}
-                  >
-                    <Target size={14} weight={session.profitGoal ? 'fill' : 'regular'} />
-                    <span>{session.profitGoal ? `$${session.profitGoal}` : 'Goal'}</span>
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-t3 font-medium uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-[11px] text-t3 font-medium uppercase tracking-wider mb-3">
               <span>{startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
               <span>·</span>
               <span>{startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+              {session.operatorName && (
+                <>
+                  <span>·</span>
+                  <span className="truncate">{session.operatorName}</span>
+                </>
+              )}
               {session.location && (
                 <>
                   <span>·</span>
-                  <span>{session.location.name}</span>
+                  <span className="truncate">{session.location.name}</span>
                 </>
               )}
             </div>
+
+            {/* Emoji action pills — Apple native feel, uniform height, proper spacing */}
+            {!editingName && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    const next = session.sessionType === 'personal' ? 'business' : 'personal'
+                    updateSession({ sessionType: next })
+                    logActivity(next === 'personal' ? '👤 Personal session' : '💼 Business session')
+                  }}
+                  aria-label={`Toggle to ${session.sessionType === 'personal' ? 'business' : 'personal'}`}
+                  className={cn(
+                    'h-9 flex items-center justify-center gap-1.5 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95',
+                    session.sessionType === 'personal'
+                      ? 'bg-purple-500/10 text-purple-500'
+                      : 'bg-b1/10 text-b1'
+                  )}
+                >
+                  <span className="text-base leading-none">{session.sessionType === 'personal' ? '👤' : '💼'}</span>
+                  <span>{session.sessionType === 'personal' ? 'Personal' : 'Business'}</span>
+                </button>
+                <button
+                  onClick={handleAutoLocation}
+                  disabled={geoLoading}
+                  aria-label="Set location"
+                  className={cn(
+                    'h-9 flex items-center justify-center gap-1.5 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95 disabled:opacity-60',
+                    session.location ? 'bg-green/10 text-green' : 'bg-s1 text-t3'
+                  )}
+                >
+                  <span className="text-base leading-none">📍</span>
+                  <span>{geoLoading ? '...' : session.location?.name?.split(' ')[0] || 'Location'}</span>
+                </button>
+                <button
+                  onClick={startEditGoal}
+                  aria-label="Set profit goal"
+                  className={cn(
+                    'h-9 flex items-center justify-center gap-1.5 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95',
+                    session.profitGoal ? 'bg-amber/10 text-amber' : 'bg-s1 text-t3'
+                  )}
+                >
+                  <span className="text-base leading-none">🎯</span>
+                  <span>{session.profitGoal ? `$${session.profitGoal}` : 'Goal'}</span>
+                </button>
+                {onOpenChat && (
+                  <button
+                    onClick={onOpenChat}
+                    aria-label="Open session chat"
+                    className="h-9 flex items-center justify-center gap-1.5 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95 bg-b1/10 text-b1"
+                  >
+                    <ChatCircle size={14} weight="bold" />
+                    <span>Chat</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Expandable location editor */}
@@ -325,14 +382,26 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
 
           {/* Stats row — matches active session layout */}
           <div className="flex gap-2 mb-4">
-            <div className="stat-card flex-1 p-3">
+            <div
+              onClick={() => onNavigateTo?.('cost-tracking')}
+              className={cn(
+                'stat-card flex-1 p-3 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+            >
               <div className="text-base font-bold text-green leading-tight">
-                ${session.totalPotentialProfit.toFixed(2)}
+                ${estimatedProfit.toFixed(2)}
               </div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Est. Profit</div>
             </div>
-            <div className="stat-card flex-1 p-3">
-              <div className="text-base font-bold text-t1 leading-tight">{session.itemsScanned}</div>
+            <div
+              onClick={() => onNavigateTo?.('scan-history')}
+              className={cn(
+                'stat-card flex-1 p-3 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+            >
+              <div className="text-base font-bold text-t1 leading-tight">{totalScans}</div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
             <div className="stat-card flex-1 p-3">
@@ -344,24 +413,38 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
           {/* BUY / PASS card — matches active session */}
           <Card className="p-6 mb-4">
             <div className="flex items-center justify-between mb-4">
-              <Badge variant="secondary" className="bg-t3 text-white px-3 py-1 uppercase text-xs font-bold">
-                Completed
-              </Badge>
+              {session.active ? (
+                <Badge variant="secondary" className="bg-green/15 text-green border border-green/30 px-3 py-1 uppercase text-xs font-bold flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
+                  In Session
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="bg-s2/60 text-t3 border border-s2 px-3 py-1 uppercase text-xs font-bold">
+                  Ended
+                </Badge>
+              )}
               <span className="text-sm mono text-t3">{formatDuration(duration)}</span>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold mono text-green">{session.buyCount}</p>
+                  <p className="text-2xl font-bold mono text-green">{liveBuyCount}</p>
                   <CheckCircle size={20} weight="fill" className="text-green" />
                 </div>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">PASS</p>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold mono text-red">{session.passCount}</p>
+                  <p className="text-2xl font-bold mono text-red">{livePassCount}</p>
                   <XCircle size={20} weight="fill" className="text-red" />
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">MAYBE</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-2xl font-bold mono text-amber">{maybeCount}</p>
+                  <Question size={20} weight="fill" className="text-amber" />
                 </div>
               </div>
             </div>
@@ -371,13 +454,13 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
           <Card className="p-6 mb-4">
             <h3 className="text-sm font-semibold text-t3 uppercase tracking-wide mb-3">Potential Profit</h3>
             <p className="text-4xl font-bold mono text-t1">
-              ${session.totalPotentialProfit.toFixed(2)}
+              ${estimatedProfit.toFixed(2)}
             </p>
             <p className="text-sm text-t3 mt-2">
-              From {session.buyCount} items{' '}
-              {session.buyCount > 0 && (
+              From {liveBuyCount} items{' '}
+              {liveBuyCount > 0 && (
                 <span className="mono">
-                  (${(session.totalPotentialProfit / session.buyCount).toFixed(2)} avg)
+                  (${(estimatedProfit / liveBuyCount).toFixed(2)} avg)
                 </span>
               )}
             </p>
@@ -409,7 +492,15 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
 
               <div className="space-y-1.5">
                 {filteredItems.map(item => (
-                  <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-s1 rounded-lg">
+                  <div
+                    key={item.id}
+                    onClick={() => onOpenItem?.(item)}
+                    className={cn(
+                      'flex items-center justify-between py-2 px-3 rounded-lg border border-s2/40 transition-colors',
+                      onOpenItem && 'cursor-pointer hover:border-b1/30 hover:bg-b1/5 active:bg-b1/10'
+                    )}
+                    style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}
+                  >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Badge
                         variant="secondary"
@@ -432,6 +523,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                           <span className="text-[10px] font-mono text-green">${item.estimatedSellPrice.toFixed(2)}</span>
                         </>
                       )}
+                      {onOpenItem && <CaretRight size={10} className="text-t3 flex-shrink-0 ml-1" />}
                     </div>
                   </div>
                 ))}
@@ -439,11 +531,8 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </div>
           )}
 
-          {/* Profit Goals */}
-          <AgentPanel sessionId={sessionId} />
-
-          {/* End Session — only when active */}
-          {session.active && onEndSession && (
+          {/* End Session — only when active, owner only */}
+          {session.active && onEndSession && isSessionOwner && (
             <Button
               onClick={() => { onEndSession(); onBack() }}
               variant="outline"
@@ -451,6 +540,50 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             >
               End Session
             </Button>
+          )}
+
+          {/* Reopen Session — only for past (ended) sessions, owner only */}
+          {!session.active && onReopenSession && isSessionOwner && (
+            <Button
+              onClick={() => { onReopenSession(sessionId); onBack() }}
+              variant="outline"
+              className="w-full h-12 border-b1 text-b1 hover:bg-b1/10 font-medium mt-4 flex items-center gap-2"
+            >
+              <ArrowCounterClockwise size={16} weight="bold" />
+              Reopen Session
+            </Button>
+          )}
+
+          {/* Delete Session — 2-step confirmation, owner only */}
+          {onDeleteSession && isSessionOwner && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full h-10 text-red/60 hover:text-red hover:bg-red/5 text-xs font-medium mt-2"
+                >
+                  Delete Session
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-sm">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-base font-bold">Delete this session?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-sm text-t2">
+                    <strong>{session.name || `Session #${String(session.sessionNumber ?? 1).padStart(3, '0')}`}</strong> and all its session data will be deleted.
+                    You'll have 60 seconds to undo from the Session tab.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => { onDeleteSession(sessionId); onBack() }}
+                    className="bg-red text-white hover:bg-red/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>

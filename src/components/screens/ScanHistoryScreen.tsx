@@ -1,10 +1,12 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { Trash, FloppyDisk, CheckSquare, Square, ArrowLeft, Clock, Package, Funnel } from '@phosphor-icons/react'
+import { Trash, FloppyDisk, CheckSquare, Square, Clock, Package } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import type { ScannedItem } from '@/types'
 
 interface ScanHistoryScreenProps {
@@ -55,28 +57,30 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
+  const handlePullRefresh = useCallback(async () => {
+    // ScanHistory is local KV — just a brief delay for tactile feedback
+    await new Promise(resolve => setTimeout(resolve, 500))
+  }, [])
+
+  const {
+    containerRef,
+    isPulling,
+    isRefreshing,
+    pullDistance,
+    progress,
+    shouldTrigger,
+  } = usePullToRefresh({
+    onRefresh: handlePullRefresh,
+    threshold: 80,
+    maxPullDistance: 150,
+    enabled: true,
+  })
+
   return (
     <div className="flex flex-col h-full bg-bg">
       <div className="px-4 pt-3 pb-3 border-b border-s2 bg-fg">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-s1 transition-colors">
-              <ArrowLeft size={20} weight="bold" className="text-t1" />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-t1">Scan History</h1>
-              <p className="text-[10px] text-t3 uppercase tracking-wider">{(scanHistory || []).length} total scans</p>
-            </div>
-          </div>
-          {(scanHistory || []).length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearAll} className="text-red text-xs">
-              Clear All
-            </Button>
-          )}
-        </div>
-
-        {/* Filter tabs */}
-        <div className="flex gap-1.5">
+        {/* Filter tabs + Clear All */}
+        <div className="flex items-center gap-1.5">
           {(['all', 'BUY', 'PASS', 'PENDING'] as const).map(f => (
             <button
               key={f}
@@ -89,6 +93,11 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
               {f === 'all' ? `All (${(scanHistory || []).length})` : f}
             </button>
           ))}
+          {(scanHistory || []).length > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearAll} className="text-red text-[10px] px-2 h-7 flex-shrink-0">
+              Clear
+            </Button>
+          )}
         </div>
       </div>
 
@@ -107,98 +116,124 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
         </div>
       )}
 
-      {/* History list */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 pb-24">
-        {filteredHistory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Clock size={40} weight="duotone" className="text-t3 mb-3" />
-            <h3 className="text-base font-semibold text-t1 mb-1">No scan history</h3>
-            <p className="text-xs text-t3 max-w-xs">Scans will appear here as you use the AI camera</p>
-          </div>
-        ) : (
-          filteredHistory.map(item => {
-            const isSelected = selectedIds.has(item.id)
-            return (
-              <Card
-                key={item.id}
-                className={cn(
-                  'p-3 border transition-all',
-                  isSelected ? 'border-b1 bg-b1/5' : 'border-s2'
-                )}
-              >
-                <div className="flex items-start gap-3">
-                  <button onClick={() => toggleSelect(item.id)} className="mt-0.5 flex-shrink-0">
-                    {isSelected
-                      ? <CheckSquare size={18} weight="fill" className="text-b1" />
-                      : <Square size={18} className="text-t3" />
-                    }
-                  </button>
-
-                  {item.imageThumbnail || item.imageData ? (
-                    <img
-                      src={item.imageThumbnail || item.imageData}
-                      alt={item.productName || 'Scan'}
-                      className="w-12 h-12 rounded-lg object-cover bg-s1 flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-lg bg-s1 flex items-center justify-center flex-shrink-0">
-                      <Package size={20} className="text-t3" />
-                    </div>
+      {/* History list — PTR-enabled */}
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-y-auto scrollable-content overscroll-y-contain"
+      >
+        <PullToRefreshIndicator
+          isPulling={isPulling}
+          isRefreshing={isRefreshing}
+          pullDistance={pullDistance}
+          progress={progress}
+          shouldTrigger={shouldTrigger}
+        />
+        <div
+          className="px-3 py-3 space-y-2 pb-24"
+          style={{
+            transform: `translateY(${isPulling ? pullDistance : isRefreshing ? 60 : 0}px)`,
+            transition: isPulling ? 'none' : 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            willChange: isPulling || isRefreshing ? 'transform' : 'auto',
+          }}
+        >
+          {filteredHistory.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[55vh] text-center px-6">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1/20 to-b2/10 border border-b1/20 flex items-center justify-center mb-5">
+                <Clock size={36} weight="duotone" className="text-b1" />
+              </div>
+              <h3 className="text-lg font-bold text-t1 mb-2">No scan history</h3>
+              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">Scans will appear here as you use the AI camera</p>
+            </div>
+          ) : (
+            filteredHistory.map(item => {
+              const isSelected = selectedIds.has(item.id)
+              return (
+                <Card
+                  key={item.id}
+                  className={cn(
+                    'p-3 border transition-all',
+                    isSelected ? 'border-b1' : 'border-s2/60'
                   )}
+                  style={
+                    isSelected
+                      ? { background: 'color-mix(in oklch, var(--b1) 8%, var(--fg))' }
+                      : { background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }
+                  }
+                >
+                  <div className="flex items-start gap-3">
+                    <button onClick={() => toggleSelect(item.id)} className="mt-0.5 flex-shrink-0">
+                      {isSelected
+                        ? <CheckSquare size={18} weight="fill" className="text-b1" />
+                        : <Square size={18} className="text-t3" />
+                      }
+                    </button>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-t1 truncate">{item.productName || 'Unknown Item'}</p>
-                        <p className="text-[10px] text-t3 mt-0.5">{formatTime(item.timestamp)}</p>
+                    {item.imageThumbnail || item.imageData ? (
+                      <img
+                        src={item.imageThumbnail || item.imageData}
+                        alt={item.productName || 'Scan'}
+                        className="w-12 h-12 rounded-xl object-cover bg-s1 flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-s1 flex items-center justify-center flex-shrink-0">
+                        <Package size={20} className="text-t3" />
                       </div>
-                      <Badge
-                        variant="secondary"
-                        className={cn(
-                          'text-[9px] font-bold flex-shrink-0',
-                          item.decision === 'BUY' ? 'bg-green/10 text-green' :
-                          item.decision === 'PASS' ? 'bg-red/10 text-red' :
-                          'bg-amber/10 text-amber'
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-t1 truncate">{item.productName || 'Unknown Item'}</p>
+                          <p className="text-[10px] text-t3 mt-0.5">{formatTime(item.timestamp)}</p>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            'text-[9px] font-bold flex-shrink-0',
+                            item.decision === 'BUY' ? 'bg-green/10 text-green border border-green/20' :
+                            item.decision === 'PASS' ? 'bg-red/10 text-red border border-red/20' :
+                            'bg-amber/10 text-amber border border-amber/20'
+                          )}
+                        >
+                          {item.decision}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <span className="text-[10px] text-t2 font-mono">Buy: ${item.purchasePrice.toFixed(2)}</span>
+                        {item.estimatedSellPrice !== undefined && item.estimatedSellPrice > 0 && (
+                          <span className="text-[10px] text-t2 font-mono">Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
                         )}
-                      >
-                        {item.decision}
-                      </Badge>
-                    </div>
+                        {item.profitMargin != null && isFinite(item.profitMargin) && (
+                          <span className={cn(
+                            'text-[10px] font-mono font-bold',
+                            item.profitMargin > 0 ? 'text-green' : 'text-red'
+                          )}>
+                            {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
+                          </span>
+                        )}
+                      </div>
 
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-[10px] text-t2 font-mono">Buy: ${item.purchasePrice.toFixed(2)}</span>
-                      {item.estimatedSellPrice !== undefined && item.estimatedSellPrice > 0 && (
-                        <span className="text-[10px] text-t2 font-mono">Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
+                      {!item.inQueue && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onSaveAsDraft(item)}
+                          className="mt-2 h-7 text-[10px] border-b1/30 text-b1"
+                        >
+                          <FloppyDisk size={12} className="mr-1" /> Save as Draft
+                        </Button>
                       )}
-                      {item.profitMargin != null && isFinite(item.profitMargin) && (
-                        <span className={cn(
-                          'text-[10px] font-mono font-bold',
-                          item.profitMargin > 0 ? 'text-green' : 'text-red'
-                        )}>
-                          {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
-                        </span>
+                      {item.inQueue && (
+                        <span className="text-[9px] text-green font-bold mt-1.5 block">In Queue</span>
                       )}
                     </div>
-
-                    {!item.inQueue && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onSaveAsDraft(item)}
-                        className="mt-2 h-7 text-[10px] border-b1/30 text-b1"
-                      >
-                        <FloppyDisk size={12} className="mr-1" /> Save as Draft
-                      </Button>
-                    )}
-                    {item.inQueue && (
-                      <span className="text-[9px] text-green font-bold mt-1.5 block">In Queue</span>
-                    )}
                   </div>
-                </div>
-              </Card>
-            )
-          })
-        )}
+                </Card>
+              )
+            })
+          )}
+        </div>
       </div>
     </div>
   )

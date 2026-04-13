@@ -4,7 +4,7 @@ import { Barcode, X, Sparkle, QrCode, Clock, ArrowRight, LinkSimple, Copy, Check
 import { Button } from './ui/button'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import type { BarcodeProduct } from '@/lib/barcode-service'
 
 interface BarcodeScannerProps {
@@ -187,7 +187,7 @@ export function BarcodeScanner({ isActive, onBarcodeDetected, onClose, onLookupP
     if (qrData) {
       navigator.clipboard.writeText(qrData.raw).then(() => {
         setCopied(true)
-        toast.success('Copied to clipboard')
+        logActivity('Copied to clipboard')
         setTimeout(() => setCopied(false), 2000)
       })
     }

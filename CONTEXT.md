@@ -52,7 +52,7 @@ Scan item → AI researches pricing → Generate listing → Push to eBay.
 | Database | Supabase |
 | Deploy | Railway — auto-deploy on merge to main |
 | Repo | [github.com/avergara13/resale-scanner-pro](http://github.com/avergara13/resale-scanner-pro) |
-| Listings | Vendoo (multi-platform sync) |
+| Listings | Manual cross-listing management across platform dashboards |
 | eBay API | eBay Sell API — CORS fallback until App ID approved |
 
 ---

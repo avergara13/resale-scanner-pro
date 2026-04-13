@@ -15,6 +15,67 @@ import { retryFetch } from './retry-service'
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages'
 
+// Hard upper bound on any single LLM HTTP call — prevents the UI from hanging
+// forever if the provider hangs the socket without responding.
+const LLM_FETCH_TIMEOUT_MS = 45_000
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number = LLM_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController()
+  // Chain onto any caller-supplied signal so external aborts still propagate
+  const callerSignal = init.signal
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort(callerSignal.reason)
+    else callerSignal.addEventListener('abort', () => controller.abort(callerSignal.reason), { once: true })
+  }
+  const timeoutId = setTimeout(
+    () => controller.abort(new DOMException(`Request timed out after ${timeoutMs}ms`, 'TimeoutError')),
+    timeoutMs,
+  )
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// ------- In-memory research cache -------
+// Prevents duplicate API calls when the same product is scanned multiple times
+// in a session (common at thrift stores). TTLs mirror retry-config.ts definitions.
+
+interface CacheEntry { result: string; expiresAt: number }
+const researchCache = new Map<string, CacheEntry>()
+
+const CACHE_TTL_MS = {
+  research: 10 * 60 * 1000,  // 10 min — balance between API cost and price freshness
+  vision:   5  * 60 * 1000,  // 5 min  — same image, same result
+} as const
+
+function cacheKey(...parts: (string | undefined)[]): string {
+  // Sentinel-separated so "nike|air max" and "nike air|max" don't collide.
+  // `\x1f` (ASCII unit separator) never appears in product names.
+  return parts.map(p => (p ?? '').toLowerCase().trim()).join('\x1f')
+}
+
+function cacheGet(key: string): string | null {
+  const entry = researchCache.get(key)
+  if (!entry) return null
+  if (Date.now() > entry.expiresAt) { researchCache.delete(key); return null }
+  return entry.result
+}
+
+function cacheSet(key: string, result: string, ttl: number): void {
+  // Keep cache bounded — evict oldest entries when over 100 items
+  if (researchCache.size >= 100) {
+    const oldest = [...researchCache.entries()].sort((a, b) => a[1].expiresAt - b[1].expiresAt)[0]
+    if (oldest) researchCache.delete(oldest[0])
+  }
+  researchCache.set(key, { result, expiresAt: Date.now() + ttl })
+}
+
 // ------- Gemini (primary) -------
 
 async function callGemini(
@@ -41,11 +102,19 @@ async function callGemini(
     body.systemInstruction = { parts: [{ text: systemInstruction }] }
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  let response: Response
+  try {
+    response = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new Error(`Gemini request timed out after ${LLM_FETCH_TIMEOUT_MS / 1000}s — network or provider issue`)
+    }
+    throw err
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '')
@@ -184,7 +253,7 @@ export function parseResearchPrice(text: string): number {
   let m: RegExpExecArray | null
   while ((m = dollarRe.exec(text)) !== null) {
     const v = parseFloat(m[1].replace(/,/g, ''))
-    if (v >= 2 && v <= 2000) amounts.push(v)  // filter out retail-tag noise & extremely high values
+    if (v >= 2 && v <= 50000) amounts.push(v)  // filter out noise but keep high-value resale items
   }
   if (amounts.length > 0) {
     amounts.sort((a, b) => a - b)
@@ -238,6 +307,14 @@ export async function researchProduct(
   context: { purchasePrice?: number; category?: string; brand?: string },
   geminiApiKey: string
 ): Promise<string> {
+  // Cache hit — same product + category within the last 30 min, skip the API call
+  const key = cacheKey(productName, context.category, context.brand)
+  const cached = cacheGet(key)
+  if (cached) {
+    console.info(`[llm-cache] HIT — ${productName} (${context.category ?? 'general'})`)
+    return cached
+  }
+
   const specialtyStores = getCategorySpecificStores(context.category || '', context.brand)
   const isFreeItem = context.purchasePrice === 0
 
@@ -246,49 +323,72 @@ ${context.category ? `Category: ${context.category}` : ''}
 ${context.brand ? `Brand: ${context.brand}` : ''}
 ${context.purchasePrice != null ? (isFreeItem ? `This item was acquired FREE (purchase price: $0).` : `Purchase price paid: $${context.purchasePrice.toFixed(2)}`) : ''}
 
-MANDATORY — search ALL of these sources RIGHT NOW before responding:
+Seller ships from Orlando, FL 32806. eBay is the primary platform.
 
-RESALE PLATFORMS (search SOLD/COMPLETED listings + count active listings for sell-through):
-• eBay completed/sold listings — ebay.com (most important: count sold vs active to estimate sell-through)
+## CRITICAL ANTI-HALLUCINATION RULES
+- ONLY report prices you actually found in search results. If you cannot find sold data, say "No sold data found" — do NOT invent prices.
+- If fewer than 3 sold comps exist, flag the data as LOW CONFIDENCE and widen the price range.
+- NEVER exaggerate sell-through rates. If you are unsure, default to MEDIUM (40-70%) and explain why.
+- Distinguish clearly between ASKING prices (what sellers list) and SOLD prices (what actually sold). Base your recommendation on SOLD prices only.
+- Do NOT use retail/MSRP as a basis for resale pricing — use actual completed sale data from resale platforms.
+
+## MANDATORY SOURCES — search ALL of these before responding:
+
+RESALE PLATFORMS (search SOLD/COMPLETED listings + count active listings):
+• eBay completed/sold listings — ebay.com (MOST IMPORTANT: how many sold recently, what prices, how many active right now)
 • Mercari — mercari.com (sold listings)
-• Poshmark — poshmark.com
+• Poshmark — poshmark.com (sold listings)
 • Whatnot — whatnot.com (auction results)
-• Facebook Marketplace — facebook.com/marketplace (local comps)
 
-RETAIL / BIG BOX (for MSRP anchor and discount context):
+RETAIL PRICE CHECK (for market value context only — NOT for setting resale price):
 • Amazon — amazon.com
 • Walmart — walmart.com
-• Best Buy — bestbuy.com
-• Target — target.com
-• Ollie's Bargain Outlet — ollies.us
+• Google Shopping — shopping.google.com (general market overview)
 ${specialtyStores.length > 0 ? `• Specialty: ${specialtyStores.join(', ')}` : ''}
 
-PROVIDE ALL OF THE FOLLOWING:
+## PROVIDE ALL OF THE FOLLOWING:
 
-1. **Resale value range** (from actual SOLD listings): Low: $X | Avg: $X | High: $X
-2. **Retail / MSRP price** (new): $X — establishes the discount % buyers expect
-3. **Sell-through rate**: Estimate what % of listed items SELL within 30 days on eBay.
-   - Count or estimate: ~X sold/week, ~Y active listings → Z% sell-through rate
+1. **Resale value range** (from actual SOLD listings ONLY — not asking prices):
+   Low: $X | Avg: $X | High: $X
+   Data confidence: HIGH (10+ sold comps) / MEDIUM (3-9 comps) / LOW (<3 comps)
+
+2. **Retail / MSRP price** (new): $X — for context only, NOT for pricing
+
+3. **Sell-through analysis** (eBay focus):
+   - Active listings right now: ~Y listings
+   - Recently sold (last 30-90 days): ~X sold
+   - Sell-through rate: Z% (sold / (sold + active))
    - Rate tier: HIGH (>70%) / MEDIUM (40–70%) / LOW (<40%)
    - Sell velocity: "~X sold per week on eBay"
-4. **Platform pricing breakdown** (with fees deducted from your take-home):
-   - eBay: List $X → you keep ~$X after 12.9% fee + ~$5 shipping
-   - Mercari: List $X → you keep ~$X after 10% fee
-   - Poshmark: List $X → you keep ~$X after 20% fee (items >$15)
-   - Whatnot: List $X → auction starting bid suggestion
-   - Facebook Marketplace: List $X → you keep $X (0% fee, local pickup)
-5. **Demand signal**: HIGH / MEDIUM / LOW — justify with search data
-6. **Best platform recommendation**: [Platform] — because [reason: volume/margin/velocity]
-${context.purchasePrice != null ? `7. **Verdict**: ${isFreeItem ? 'Which platform maximizes net profit for this FREE item (avoid platforms where fees exceed likely sale price)?' : `BUY or PASS at $${context.purchasePrice.toFixed(2)}? Show: sell price - fees - shipping - purchase price = net profit and margin`}` : ''}
+   - If data is uncertain, state "estimated" and explain your reasoning
 
-Be specific with real dollar amounts from your search. Cite actual data found.
+4. **Platform pricing breakdown** (net take-home after ALL fees):
+   - eBay: List $X → net ~$X after 12.9% FVF + 3% ad fee + $0.30/order + ~$5 shipping + $0.75 materials
+   - Mercari: List $X → net ~$X after 10% fee
+   - Poshmark: List $X → net ~$X after 20% fee (items >$15)
+   - Whatnot: Auction starting bid suggestion: $X
+
+5. **Demand signal**: HIGH / MEDIUM / LOW — justify with specific search data
+
+6. **Best platform recommendation**: [Platform] — because [reason]
+
+${context.purchasePrice != null ? `7. **BUY/PASS Verdict**: ${isFreeItem ? 'Which platform maximizes net profit for this FREE item?' : `At $${context.purchasePrice.toFixed(2)} purchase price, show the math:
+   Sell price - eBay fee (12.9%) - ad fee (3%) - $0.30 order fee - shipping (~$5) - materials ($0.75) - purchase price = net profit
+   Margin = net profit / sell price × 100
+   Verdict: BUY (if margin ≥ 30%) or PASS (if margin < 30%)`}` : ''}
+
+## PRICING STRATEGY
+Recommend a "middle-high" listing price: above the average sold price but below the highest sold price. This maximizes margin while maintaining reasonable sell-through. The seller can always reduce later.
 
 END your response with EXACTLY these three lines (no extra text on those lines):
 RECOMMENDED_SELL_PRICE: $XX.XX
 SELL_THROUGH_RATE: XX%
 BEST_PLATFORM: [platform name]`
 
-  return callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 2048 })
+  const result = await callGeminiGrounded(prompt, geminiApiKey, { maxTokens: 2048 })
+  cacheSet(key, result, CACHE_TTL_MS.research)
+  console.info(`[llm-cache] STORE — ${productName} (expires in 10 min)`)
+  return result
 }
 
 // ------- Anthropic Claude (secondary — complex tasks only) -------
@@ -300,21 +400,33 @@ async function callClaude(
 ): Promise<string> {
   const { model = 'claude-haiku-4-5-20251001', maxTokens = 1024, systemPrompt } = options
 
-  const response = await fetch(ANTHROPIC_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      ...(systemPrompt && systemPrompt.trim().length > 10 ? { system: systemPrompt } : {}),
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  })
+  let response: Response
+  try {
+    response = await fetchWithTimeout(ANTHROPIC_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        // SECURITY: This header enables direct browser→Anthropic calls which exposes
+        // the API key to the client. Acceptable here because the key is a user-supplied
+        // BYO-key stored only in local device settings (not a server secret).
+        // Never ship this with a shared/tenant key.
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        ...(systemPrompt && systemPrompt.trim().length > 10 ? { system: systemPrompt } : {}),
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    })
+  } catch (err) {
+    if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new Error(`Claude request timed out after ${LLM_FETCH_TIMEOUT_MS / 1000}s — network or provider issue`)
+    }
+    throw err
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '')
@@ -379,17 +491,36 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
 
   // All other tasks (and Claude fallback) → Gemini Flash
   if (geminiApiKey && geminiApiKey.length >= 10) {
-    return callGemini(prompt, geminiApiKey, {
-      model: model || 'gemini-2.5-flash',
-      jsonMode,
-      maxTokens: maxTokens || (task === 'listing' ? 2048 : 1024),
-      temperature: temperature ?? (task === 'chat' ? 0.7 : 0.4),
-      systemInstruction: systemPrompt,
+    try {
+      return await callGemini(prompt, geminiApiKey, {
+        model: model || 'gemini-2.5-flash',
+        jsonMode,
+        maxTokens: maxTokens || (task === 'listing' ? 2048 : 1024),
+        temperature: temperature ?? (task === 'chat' ? 0.7 : 0.4),
+        systemInstruction: systemPrompt,
+      })
+    } catch (geminiError) {
+      // If Claude key is available and Gemini just failed, try Claude as last resort
+      if (anthropicApiKey && anthropicApiKey.length >= 10 && task !== 'complex') {
+        console.warn('[LLM] Gemini failed, falling back to Claude:', geminiError)
+        return callClaude(prompt, anthropicApiKey, {
+          model: model || 'claude-haiku-4-5-20251001',
+          maxTokens: maxTokens || 1024,
+          systemPrompt,
+        })
+      }
+      throw geminiError
+    }
+  }
+
+  // No Gemini key — try Claude directly for any task type
+  if (anthropicApiKey && anthropicApiKey.length >= 10) {
+    return callClaude(prompt, anthropicApiKey, {
+      model: model || 'claude-haiku-4-5-20251001',
+      maxTokens: maxTokens || 1024,
+      systemPrompt,
     })
   }
 
-  const tried: string[] = []
-  if (task === 'complex' && anthropicApiKey) tried.push('Claude (failed)')
-  if (!geminiApiKey || geminiApiKey.length < 10) tried.push('Gemini (no API key)')
-  throw new Error(`AI unavailable${tried.length ? ` — ${tried.join(', ')}` : ''} — configure API keys in Settings`)
+  throw new Error('AI unavailable — configure a Gemini or Claude API key in Settings')
 }

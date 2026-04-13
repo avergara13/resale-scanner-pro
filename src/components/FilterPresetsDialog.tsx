@@ -7,10 +7,24 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import { useFilterPresets, type FilterPreset } from '@/hooks/use-filter-presets'
 import type { AdvancedFilterOptions } from './AdvancedFilters'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
+
+// Guards against `RangeError: Invalid time value` from date-fns when a
+// preset's persisted dateRange is missing start/end or contains NaN.
+function safeFormat(ts: unknown, fmt: string): string | null {
+  if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return null
+  try {
+    return format(d, fmt)
+  } catch {
+    return null
+  }
+}
 
 interface FilterPresetsDialogProps {
   currentFilters: AdvancedFilterOptions
@@ -40,7 +54,7 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
     }
 
     savePreset(newPresetName.trim(), currentFilters)
-    toast.success(`Preset "${newPresetName.trim()}" saved`)
+    logActivity(`Preset "${newPresetName.trim()}" saved`)
     setNewPresetName('')
   }
 
@@ -49,13 +63,13 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
     if (filters) {
       onApplyPreset(filters)
       setIsOpen(false)
-      toast.success('Preset applied')
+      logActivity('Preset applied')
     }
   }
 
   const handleDeletePreset = (id: string, name: string) => {
     deletePreset(id)
-    toast.success(`Preset "${name}" deleted`)
+    logActivity(`Preset "${name}" deleted`)
   }
 
   const handleStartEdit = (preset: FilterPreset) => {
@@ -68,7 +82,7 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
       renamePreset(editingId, editingName.trim())
       setEditingId(null)
       setEditingName('')
-      toast.success('Preset renamed')
+      logActivity('Preset renamed')
     }
   }
 
@@ -80,7 +94,7 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
   const handleDuplicatePreset = (preset: FilterPreset) => {
     const newPreset = duplicatePreset(preset.id)
     if (newPreset) {
-      toast.success(`Preset "${preset.name}" duplicated`)
+      logActivity(`Preset "${preset.name}" duplicated`)
     }
   }
 
@@ -88,7 +102,7 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
     setCustomizingId(preset.id)
     onApplyPreset(preset.filters)
     setIsOpen(false)
-    toast.info(`Customize "${preset.name}" and save as new preset`)
+    logActivity(`Customize "${preset.name}" and save as new preset`, 'info')
   }
 
   const getFilterSummary = (filters: AdvancedFilterOptions): string[] => {
@@ -101,7 +115,10 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
       summary.push(`Margin: ${filters.profitMarginRange.min}%-${filters.profitMarginRange.max}%`)
     }
     if (filters.dateRange) {
-      summary.push(`Date: ${format(filters.dateRange.start, 'MMM d')} - ${format(filters.dateRange.end, 'MMM d')}`)
+      const s = safeFormat(filters.dateRange.start, 'MMM d')
+      const e = safeFormat(filters.dateRange.end, 'MMM d')
+      if (s && e) summary.push(`Date: ${s} - ${e}`)
+      else if (s || e) summary.push(`Date: ${s || e}`)
     }
     if (filters.categories && filters.categories.length > 0) {
       summary.push(`${filters.categories.length} categories`)
@@ -225,11 +242,14 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
                                   </Badge>
                                 )}
                               </div>
-                              {preset.lastUsed && (
-                                <p className="text-[10px] text-t3 font-medium">
-                                  Last used {format(preset.lastUsed, 'MMM d, h:mm a')}
-                                </p>
-                              )}
+                              {(() => {
+                                const lastUsedLabel = safeFormat(preset.lastUsed, 'MMM d, h:mm a')
+                                return lastUsedLabel ? (
+                                  <p className="text-[10px] text-t3 font-medium">
+                                    Last used {lastUsedLabel}
+                                  </p>
+                                ) : null
+                              })()}
                             </div>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>

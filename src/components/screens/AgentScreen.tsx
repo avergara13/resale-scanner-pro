@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useKV } from '@github/spark/hooks'
+import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import {
   Robot,
   Sparkle,
@@ -23,14 +25,18 @@ import {
   Warning,
   ListChecks,
   ChatCircle,
+  Camera,
+  ShoppingCart,
+  ArrowSquareOut,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
+import { useDeviceId } from '@/hooks/use-device-id'
 import { cn } from '@/lib/utils'
 import { getNetProfit } from '@/lib/profit-utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
@@ -48,7 +54,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, AgentToolCall } from '@/types'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, AgentToolCall, SoldItem } from '@/types'
 
 interface QuickAction {
   emoji: string
@@ -58,24 +64,24 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
+    emoji: '📸',
+    label: 'Scan Item',
+    prompt: 'open camera to scan a new item',
+  },
+  {
     emoji: '🚀',
     label: 'Full Pipeline',
-    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion'
+    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion',
   },
   {
-    emoji: '📦',
-    label: 'Create Listings',
-    prompt: 'Create optimized eBay listings for all BUY items in my queue'
-  },
-  {
-    emoji: '🔎',
-    label: 'Research Item',
-    prompt: 'Research the market value of my most recent item'
+    emoji: '📬',
+    label: 'Need Shipping',
+    prompt: 'Which sold items need shipping labels right now? Show me overdue items first, then the best carrier and estimated cost for each.',
   },
   {
     emoji: '📊',
-    label: 'Session Status',
-    prompt: 'What\'s my current session status? Show me all stats, goals, and recent items.'
+    label: 'Session Stats',
+    prompt: "What's my current session status? Show stats, profit goal progress, and recent items.",
   },
 ]
 
@@ -218,6 +224,7 @@ function CollapsibleMessage({ message, maxLines = 4 }: { message: string; maxLin
 interface AgentScreenProps {
   queueItems?: ScannedItem[]
   soldItems?: ScannedItem[]
+  liveSoldItems?: SoldItem[]
   settings?: AppSettings
   /** Message injected from external widget (e.g. AgentChatWidget on Session screen) */
   pendingMessage?: string | null
@@ -232,6 +239,8 @@ interface AgentScreenProps {
   onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
   onMarkShipped?: (itemId: string, trackingNumber: string, shippingCarrier: string) => void
   onNavigateToQueue?: () => void
+  /** Open a specific queue item in the scan analysis screen (loads it as currentItem) */
+  onOpenScanItem?: (item: ScannedItem) => void
   onOpenCamera?: () => void
   onStartSession?: () => void
   onEndSession?: () => void
@@ -239,18 +248,24 @@ interface AgentScreenProps {
   allSessions?: Session[]
   scanHistory?: ScannedItem[]
   profitGoals?: ProfitGoal[]
+  /** False when the app has navigated to another tab — triggers pill exit animation */
+  isCurrentScreen?: boolean
 }
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
-  const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
+export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true }: AgentScreenProps) {
+  const deviceId = useDeviceId()
+  const [currentSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const sessionId = currentSession?.id
+  // bannerCollapsed state is now managed inside SessionLiveBanner (shared KV key)
   const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])
   const activeKey = useMemo(() => sessionId ? `active-chat-session-${sessionId}` : 'active-chat-session-global', [sessionId])
   const [chatSessions, setChatSessions] = useKV<ChatSession[]>(chatKey, EMPTY_CHAT_SESSIONS)
   const [activeSessionId, setActiveSessionId] = useKV<string | null>(activeKey, null)
-  const [todos, setTodos] = useKV<SharedTodo[]>('shared-todos', EMPTY_TODOS)
+  const todosKey = useMemo(() => sessionId ? `shared-todos-${sessionId}` : 'shared-todos-global', [sessionId])
+  const [todos, setTodos] = useKV<SharedTodo[]>(todosKey, EMPTY_TODOS)
+  const [activeTab, setActiveTab] = useKV<'chat' | 'scans' | 'tasks'>('agent-active-tab', 'chat')
   const [viewMode, setViewMode] = useState<'list' | 'chat'>('list')
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -260,8 +275,21 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   const [taskInput, setTaskInput] = useState('')
   const [showTaskInput, setShowTaskInput] = useState(false)
   const [pendingToolCalls, setPendingToolCalls] = useState<AgentToolCall[] | null>(null)
+  // Direct KV access for scan history mutations in the Scans tab
+  const [scanHistoryKV, setScanHistoryKV] = useKV<ScannedItem[]>('scan-history', [])
+  const [, setQueueKV] = useKV<ScannedItem[]>('queue', [])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Tracks whether the component is still mounted so long-running async
+  // handlers (multi-step pipeline, research, optimizer) can bail out on
+  // unmount instead of dispatching state updates into a dead tree.
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
   const pendingTodos = useMemo(() => (todos || []).filter(t => !t.completed), [todos])
   const completedTodos = useMemo(() => (todos || []).filter(t => t.completed), [todos])
 
@@ -285,19 +313,49 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   }, [queueItems, currentSession?.id])
 
   const queueStats = useMemo(() => {
-    const total = sessionItems.length
-    const buy = sessionItems.filter(item => item.decision === 'BUY').length
-    const pass = sessionItems.filter(item => item.decision === 'PASS').length
-    const pending = sessionItems.filter(item => item.decision === 'PENDING').length
-    const totalProfit = sessionItems
-      .filter(item => item.decision === 'BUY' && item.profitMargin)
-      .reduce((sum, item) => {
-        const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
-        return sum + profit
-      }, 0)
+    // Combine queue items + scan history for this session, deduplicated by ID
+    // so BUY/PASS/MAYBE counts reflect ALL scans, not just items still in queue
+    const combined = [...sessionItems, ...(scanHistoryKV || []).filter(i =>
+      currentSession?.id ? i.sessionId === currentSession.id : true
+    )]
+    const seen = new Set<string>()
+    const unique = combined.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true })
 
-    return { total, buy, pass, pending, totalProfit }
-  }, [sessionItems])
+    const buy = unique.filter(i => i.decision === 'BUY').length
+    const pass = unique.filter(i => i.decision === 'PASS').length
+    const maybe = unique.filter(i => i.decision === 'PENDING').length
+    // Queue count: items currently sitting in the listing queue (inQueue flag)
+    const queueCount = sessionItems.filter(i => i.inQueue).length
+    const totalProfit = unique
+      .filter(i => i.decision === 'BUY')
+      .reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
+
+    // Keep legacy total/pending for LLM context compatibility
+    return { total: unique.length, buy, pass, pending: maybe, maybe, queueCount, totalProfit }
+  }, [sessionItems, scanHistoryKV, currentSession?.id])
+
+  // Session-scoped scan cards (most recent first) for the Scans tab
+  const sessionScans = useMemo(() => {
+    const items = scanHistoryKV || []
+    const filtered = currentSession?.id
+      ? items.filter(i => i.sessionId === currentSession.id)
+      : items
+    return [...filtered].sort((a, b) => b.timestamp - a.timestamp).slice(0, 100)
+  }, [scanHistoryKV, currentSession?.id])
+
+  const handleDeleteScan = useCallback((itemId: string) => {
+    setScanHistoryKV(prev => (prev || []).filter(i => i.id !== itemId))
+  }, [setScanHistoryKV])
+
+  const handlePromoteToQueue = useCallback((item: ScannedItem) => {
+    const queueItem: ScannedItem = { ...item, inQueue: true, decision: 'BUY' as const }
+    setQueueKV(prev => {
+      const current = prev || []
+      if (current.some(i => i.id === queueItem.id)) return current
+      return [...current, queueItem]
+    })
+    logActivity(`${item.productName || 'Item'} added to queue`)
+  }, [setQueueKV])
 
   const prevMessageCount = useRef(chatMessages.length)
   const agentHasMounted = useRef(false)
@@ -349,22 +407,25 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
   }, [pendingToolCalls, onRerunPipeline, onOptimizeItem, onEditItem, onBatchAnalyze, setTodos])
 
   const handleCreateSession = useCallback(() => {
-    const name = `Session ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+    // One-session model: open the existing session if it exists
+    const existing = chatSessions?.[0]
+    if (existing) {
+      setActiveSessionId(existing.id)
+      setViewMode('chat')
+      return
+    }
     const newSession: ChatSession = {
       id: Date.now().toString(),
-      name,
+      name: 'Chat',
       createdAt: Date.now(),
       lastMessageAt: Date.now(),
       messages: [],
       isActive: true,
     }
-    setChatSessions((prev) => {
-      const updated = (prev || []).map(s => ({ ...s, isActive: false }))
-      return [newSession, ...updated]
-    })
+    setChatSessions([newSession])
     setActiveSessionId(newSession.id)
     setViewMode('chat')
-  }, [setChatSessions, setActiveSessionId])
+  }, [chatSessions, setChatSessions, setActiveSessionId])
 
   const handleDeleteSession = useCallback((sessionId: string) => {
     setChatSessions((prev) => (prev || []).filter(s => s.id !== sessionId))
@@ -604,7 +665,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
         }
 
         addMsg(`🏁 **Pipeline complete!** Check your Queue to review results. You can manually edit any listing before final publishing.`)
-        toast.success('Full pipeline complete')
+        logActivity('Full pipeline complete')
         setIsProcessing(false)
         return
       }
@@ -668,7 +729,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
           )
         )
         
-        toast.success(`Optimized ${buyItems.length} listings`)
+        logActivity(`Optimized ${buyItems.length} listings`)
         setIsProcessing(false)
         return
       }
@@ -738,7 +799,56 @@ export function AgentScreen({ queueItems = [], soldItems = [], settings, pending
           )
         )
         
-        toast.success(`Pushed ${successCount} listings to Notion`)
+        logActivity(`Pushed ${successCount} listings to Notion`)
+        setIsProcessing(false)
+        return
+      }
+
+      // Show tasks command — list pending todos inline without hitting the LLM
+      if (/\b(show tasks?|view tasks?|my tasks?|task list|what.*tasks?|tasks? left)\b/i.test(lowerText)) {
+        if (pendingTodos.length === 0) {
+          addMsg('✅ No pending tasks — your list is clear! Tap the **Task** tab to add one, or say "add task: [description]".')
+        } else {
+          const taskLines = pendingTodos.slice(0, 10).map((t, i) => `${i + 1}. ${t.text}`).join('\n')
+          addMsg(`You have **${pendingTodos.length} pending task${pendingTodos.length !== 1 ? 's' : ''}**:\n\n${taskLines}\n\nSwitch to the **Task** tab to check them off or add more.`)
+        }
+        setIsProcessing(false)
+        return
+      }
+
+      // Shipping status — serve from live sold data already in context, no LLM needed
+      if (/\b(shipping|ship|need labels?|need to ship|overdue|what.*ship|labels? needed)\b/i.test(lowerText)) {
+        if (liveSoldItems.length === 0) {
+          addMsg('📬 No sold items found in your Notion Sales DB yet. Once items sell and WF-01 parses the confirmation emails they\'ll appear here automatically. You can also tap **+ Log Sale** on the Sold tab to add them manually.')
+        } else {
+          const { needsLabelCount, overdueCount, readyCount, shippedCount, urgentItems, totalPotentialShippingCost } = (() => {
+            // Import is at top of file — use the already-imported analyzeSoldBatch
+            const a = { needsLabelCount: 0, overdueCount: 0, readyCount: 0, shippedCount: 0, urgentItems: [] as Array<{title:string;hoursOverdue:number;platform:string}>, totalPotentialShippingCost: 0 }
+            for (const item of liveSoldItems) {
+              if (item.shippingStatus === '✅ Shipped') a.shippedCount++
+              else if (item.shippingStatus === '🔴 Need Label') a.needsLabelCount++
+              else if (item.shippingStatus === '🟡 Label Ready' || item.shippingStatus === '📦 Packed') a.readyCount++
+              if (item.shippingStatus !== '✅ Shipped' && item.saleDate) {
+                const hours = Math.round((Date.now() - new Date(item.saleDate).getTime()) / 3_600_000)
+                if (hours >= 48) { a.overdueCount++; a.urgentItems.push({ title: item.title, hoursOverdue: Math.max(0, hours - 24), platform: item.platform }) }
+              }
+            }
+            a.urgentItems.sort((x, y) => y.hoursOverdue - x.hoursOverdue)
+            return a
+          })()
+
+          const lines: string[] = [`📬 **Shipping Status — ${liveSoldItems.length} sold item${liveSoldItems.length !== 1 ? 's' : ''}**\n`]
+          if (overdueCount > 0) lines.push(`🔴 **${overdueCount} overdue** (>48h since sale — ship today!)`)
+          if (needsLabelCount > 0) lines.push(`🟡 **${needsLabelCount} need a label**`)
+          if (readyCount > 0) lines.push(`📦 **${readyCount} packed / label ready**`)
+          if (shippedCount > 0) lines.push(`✅ **${shippedCount} shipped**`)
+          if (urgentItems.length > 0) {
+            lines.push('\n**Overdue items:**')
+            urgentItems.slice(0, 5).forEach(u => lines.push(`• ${u.title} — ${u.hoursOverdue}h overdue (${u.platform})`))
+          }
+          lines.push('\nGo to the **Sold** tab to print labels and update statuses.')
+          addMsg(lines.join('\n'))
+        }
         setIsProcessing(false)
         return
       }
@@ -978,13 +1088,35 @@ ${activeGoalsSummary || 'None'}
 ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' '}] (${t.id}) ${t.text} [${t.createdBy}]`).join('\n') : 'No tasks yet.'}
 
 ### Settings
-- Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%`
+- Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%${settings?.userProfile?.aiContext ? `
+
+### Operator Context
+${settings.userProfile.aiContext}` : ''}`
 
       // Include last 4 messages for conversational continuity
       const recentHistory = chatMessages.slice(-4).map(m =>
         `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 300)}`
       ).join('\n\n')
       const historyBlock = recentHistory ? `\n\n## Recent Conversation\n${recentHistory}` : ''
+
+      // Guard: ensure at least one API key is configured before hitting callLLM
+      // (callLLM throws on missing keys but the error message may not reach the user clearly)
+      if (!settings?.geminiApiKey && !settings?.anthropicApiKey) {
+        const noKeyMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: '⚙️ No AI API key configured. Go to **Settings → AI Configuration** and add your Gemini or Claude API key to start chatting.',
+          timestamp: Date.now(),
+        }
+        setChatSessions((prev) =>
+          (prev || []).map(s =>
+            s.id === sessionId
+              ? { ...s, messages: [...s.messages, noKeyMsg], lastMessageAt: Date.now() }
+              : s
+          )
+        )
+        return
+      }
 
       // Static instructions → Gemini systemInstruction (cached across requests)
       // Dynamic context + history + user message → contents (billed per-request)
@@ -1031,6 +1163,9 @@ ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' 
         )
       )
     } catch (error) {
+      // Bail out silently if the user navigated away mid-flight — no point
+      // dispatching state updates or toasts into an unmounted tree.
+      if (!isMountedRef.current) return
       const msg = error instanceof Error ? error.message : 'Unknown error'
       console.error('Agent AI error:', msg)
       // Only show error toast for actionable issues (API key missing, safety block)
@@ -1056,7 +1191,9 @@ ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' 
         )
       }
     } finally {
-      setIsProcessing(false)
+      // Safe to always run — React 18 no-ops state updates on unmounted components,
+      // but short-circuit here as well to avoid the dev-mode warning.
+      if (isMountedRef.current) setIsProcessing(false)
     }
   }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals, queueItems])
 
@@ -1064,6 +1201,15 @@ ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' 
   useEffect(() => {
     onProcessingChange?.(isProcessing)
   }, [isProcessing, onProcessingChange])
+
+  // Auto-enter chat on mount whenever a session exists (persists for life of session)
+  useEffect(() => {
+    const existing = chatSessions?.[0]
+    if (existing) {
+      setActiveSessionId(existing.id)
+      setViewMode('chat')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle messages injected from external widgets (e.g. AgentChatWidget)
   useEffect(() => {
@@ -1075,70 +1221,227 @@ ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' 
   }, [pendingMessage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleQuickAction = useCallback((prompt: string) => {
-    setInput(prompt)
-    inputRef.current?.focus()
-  }, [])
+    // Send immediately — don't pre-fill the floating input bar (which lives in App.tsx
+    // and has its own state, so setInput here would never reach the send button)
+    handleSendMessage(prompt)
+  }, [handleSendMessage])
+
+  // Clear messages and start a fresh chat within the same session
+  const handleNewChat = useCallback(() => {
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      name: 'Chat',
+      createdAt: Date.now(),
+      lastMessageAt: Date.now(),
+      messages: [],
+      isActive: true,
+    }
+    setChatSessions([newSession])
+    setActiveSessionId(newSession.id)
+    setViewMode('chat')
+  }, [setChatSessions, setActiveSessionId])
 
   // Shared stats bar used in both views
   const statsBar = (
-    <div className="px-4 py-2 bg-s1/30 border-b border-s1">
-      {currentSession?.active && (
-        <div className="text-[9px] font-bold text-b1 mb-1.5 uppercase tracking-wide">
-          {currentSession.name || 'Active Session'}
-        </div>
-      )}
-      <div className="grid grid-cols-4 gap-1.5">
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Queue</div>
-          <div className="text-base font-black text-t1">{queueStats.total}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-green font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-            <CheckCircle size={10} weight="fill" /> BUY
-          </div>
-          <div className="text-base font-black text-green">{queueStats.buy}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-red font-semibold uppercase tracking-wide mb-0.5 flex items-center gap-0.5">
-            <Warning size={10} weight="fill" /> PASS
-          </div>
-          <div className="text-base font-black text-red">{queueStats.pass}</div>
-        </Card>
-        <Card className="p-2 flex flex-col items-center justify-center">
-          <div className="text-[9px] text-t3 font-semibold uppercase tracking-wide mb-0.5">Profit</div>
-          <div className="text-xs font-black text-green">${queueStats.totalProfit.toFixed(0)}</div>
-        </Card>
+    <div
+      className="px-3 border-b border-s1/50"
+      style={{ background: 'color-mix(in oklch, var(--fg) 90%, transparent)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)', height: '36px', display: 'flex', alignItems: 'center' }}
+    >
+      <div className="flex items-center gap-3 flex-1 overflow-x-auto scrollbar-none">
+        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
+          <span className="text-green font-bold text-[11px]">{queueStats.buy}</span> buy
+        </span>
+        <span className="text-[9px] text-s2 flex-shrink-0">·</span>
+        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
+          <span className="text-red font-bold text-[11px]">{queueStats.pass}</span> pass
+        </span>
+        <span className="text-[9px] text-s2 flex-shrink-0">·</span>
+        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
+          <span className="text-amber font-bold text-[11px]">{queueStats.maybe}</span> maybe
+        </span>
+        <span className="text-[9px] text-s2 flex-shrink-0">·</span>
+        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
+          <span className="text-t1 font-bold text-[11px]">{queueStats.queueCount}</span> queue
+        </span>
+        {queueStats.totalProfit > 0 && (
+          <>
+            <span className="text-[9px] text-s2 flex-shrink-0">·</span>
+            <span className="text-[10px] text-t3 font-medium flex-shrink-0">
+              <span className="text-green font-bold text-[11px]">${queueStats.totalProfit.toFixed(0)}</span> profit
+            </span>
+          </>
+        )}
       </div>
+      {activeTab === 'chat' && viewMode === 'chat' && chatMessages.length > 0 && (
+        <button
+          onClick={handleNewChat}
+          className="flex items-center gap-1 text-[10px] font-semibold text-t3 hover:text-t1 transition-colors active:opacity-50 flex-shrink-0 px-2 py-1 rounded-lg hover:bg-s1"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        >
+          New Chat
+        </button>
+      )}
     </div>
   )
 
-  // Shared input bar used in both views
+  // Shared input bar — floating glass pill, sits just above the bottom nav
   const inputBar = (
-    <div className="p-4 bg-fg border-t border-s1 safe-bottom">
+    <motion.div
+      key="chat-pill"
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 80, opacity: 0, transition: { duration: 0.15, ease: [0.32, 0, 0.67, 0] } }}
+      transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.8 }}
+      style={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        // Viewport-relative (portal renders outside will-change containing block)
+        // 54px nav height + 8px gap + safe area
+        bottom: 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
+        zIndex: 50,
+        padding: '0 12px',
+        pointerEvents: 'none',
+      }}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault()
           handleSendMessage()
         }}
-        className="flex gap-2"
+        className="flex items-center gap-2"
+        style={{
+          pointerEvents: 'auto',
+          background: 'var(--glass-bg)',
+          backdropFilter: 'saturate(180%) blur(24px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(24px)',
+          border: '0.5px solid var(--glass-border)',
+          boxShadow: 'var(--glass-shadow)',
+          borderRadius: '22px',
+          padding: '6px 6px 6px 16px',
+        }}
       >
-        <Input
+        <input
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask me anything about your resale business..."
+          placeholder="Message Agent..."
           disabled={isProcessing}
-          className="flex-1"
+          style={{
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            fontSize: '15px',
+            color: 'var(--t1)',
+            minWidth: 0,
+          }}
         />
-        <Button
+        <button
           type="submit"
           disabled={!input.trim() || isProcessing}
-          className="w-10 h-10 flex items-center justify-center p-0"
+          style={{
+            width: '36px',
+            height: '36px',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '18px',
+            background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
+            boxShadow: !input.trim() || isProcessing ? 'none' : 'var(--send-glow)',
+            border: 'none',
+            cursor: 'pointer',
+            opacity: !input.trim() || isProcessing ? 0.4 : 1,
+            transition: 'opacity 0.15s, transform 0.1s, box-shadow 0.15s',
+            WebkitTapHighlightColor: 'transparent',
+          }}
         >
-          <PaperPlaneRight size={18} weight="bold" />
-        </Button>
+          <PaperPlaneRight size={16} weight="bold" className="text-white" />
+        </button>
       </form>
-    </div>
+    </motion.div>
+  )
+
+  // Task pill — same fixed position and spring animation as inputBar
+  const taskBar = (
+    <motion.div
+      key="task-pill"
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 80, opacity: 0, transition: { duration: 0.15, ease: [0.32, 0, 0.67, 0] } }}
+      transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.8 }}
+      style={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
+        zIndex: 50,
+        padding: '0 12px',
+        pointerEvents: 'none',
+      }}
+    >
+      <form
+        onSubmit={e => {
+          e.preventDefault()
+          const text = taskInput.trim()
+          if (!text) return
+          setTodos(prev => [
+            ...(prev || []),
+            { id: Date.now().toString(), text, completed: false, createdBy: 'user' as const, createdAt: Date.now() },
+          ])
+          setTaskInput('')
+        }}
+        className="flex items-center gap-2"
+        style={{
+          pointerEvents: 'auto',
+          background: 'var(--glass-bg)',
+          backdropFilter: 'saturate(180%) blur(24px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(24px)',
+          border: '0.5px solid var(--glass-border)',
+          boxShadow: 'var(--glass-shadow)',
+          borderRadius: '22px',
+          padding: '6px 6px 6px 16px',
+        }}
+      >
+        <input
+          value={taskInput}
+          onChange={e => setTaskInput(e.target.value)}
+          placeholder="Add a task..."
+          style={{
+            flex: 1,
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            fontSize: '15px',
+            color: 'var(--t1)',
+            minWidth: 0,
+          }}
+        />
+        <button
+          type="submit"
+          disabled={!taskInput.trim()}
+          style={{
+            width: '36px',
+            height: '36px',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '18px',
+            background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
+            boxShadow: taskInput.trim() ? 'var(--send-glow)' : 'none',
+            border: 'none',
+            cursor: 'pointer',
+            opacity: taskInput.trim() ? 1 : 0.4,
+            transition: 'opacity 0.15s, box-shadow 0.15s',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Plus size={16} weight="bold" className="text-white" />
+        </button>
+      </form>
+    </motion.div>
   )
 
   const sortedSessions = useMemo(() =>
@@ -1146,7 +1449,7 @@ ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' 
   [chatSessions])
 
   return (
-    <div className="flex flex-col h-full bg-bg">
+    <div className="flex flex-col h-full bg-bg overflow-hidden">
       <PullToRefreshIndicator
         isPulling={pullToRefresh.isPulling}
         isRefreshing={pullToRefresh.isRefreshing}
@@ -1155,216 +1458,174 @@ ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' 
         shouldTrigger={pullToRefresh.shouldTrigger}
       />
 
+      {/* ── Chrome: tab bar + stats bar — flex-shrink-0 keeps it out of scroll ── */}
+      <div className="flex-shrink-0 z-20 bg-fg">
+        {/* Premium live session banner — shared component, self-contained */}
+        <SessionLiveBanner />
+        <div className="pt-2 pb-2 border-b border-s1">
+          <div className="tab-bar px-3">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={cn('tab-btn', activeTab === 'chat' && 'active')}
+            >
+              <span>💬 CHAT</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('scans')}
+              className={cn('tab-btn', activeTab === 'scans' && 'active')}
+            >
+              <span>
+                📸 SCANS{sessionScans.length > 0 && ` (${sessionScans.length})`}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('tasks')}
+              className={cn('tab-btn', activeTab === 'tasks' && 'active')}
+            >
+              <span>
+                ✅ TASKS{pendingTodos.length > 0 && ` (${pendingTodos.length})`}
+              </span>
+            </button>
+          </div>
+        </div>
+        {statsBar}
+      </div>
+
+      {/* ── Chat tab ── */}
+      {activeTab === 'chat' && (
       <AnimatePresence mode="wait">
         {viewMode === 'list' ? (
           <motion.div
             key="agent-list"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="flex flex-col flex-1 min-h-0"
+            className="flex flex-col flex-1 min-h-0 overflow-y-auto"
           >
-            {/* List header */}
-            <div className="flex items-center justify-between px-4 py-4 bg-fg border-b border-s1">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-b1 to-b2 rounded-xl">
-                  <Robot size={24} weight="bold" className="text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-t1">Agent</h1>
-                  <p className="text-xs text-t3">AI Research & Automation</p>
-                </div>
+            {/* First-run welcome — identical layout to the empty chat state */}
+            <div className="flex flex-col items-center text-center px-5 pt-10 pb-6">
+              <div
+                className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-xl"
+                style={{ boxShadow: 'var(--send-glow)' }}
+              >
+                <Robot size={38} weight="duotone" className="text-white" />
               </div>
-              <Button size="sm" onClick={handleCreateSession} className="h-8 px-3 text-xs">
-                <Plus size={14} weight="bold" className="mr-1" /> New Chat
-              </Button>
+              <h2 className="text-[22px] font-black text-t1 mb-2 tracking-tight">Session Assistant</h2>
+              <p className="text-sm text-t3 leading-relaxed max-w-[220px]">
+                I know your queue, scans, sessions, and goals.
+              </p>
             </div>
-
-            {statsBar}
-
-            <ScrollArea className="flex-1">
-              <div ref={pullToRefresh.containerRef} className="py-4 px-4 space-y-5">
-                {/* Quick Actions — always visible */}
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">Quick Actions</div>
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                    {QUICK_ACTIONS.map(action => (
-                      <button
-                        key={action.label}
-                        onClick={() => handleQuickAction(action.prompt)}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-fg border border-s1 rounded-xl text-xs font-bold text-t1 active:scale-95 transition-all"
-                      >
-                        <span>{action.emoji}</span>
-                        <span>{action.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Tasks */}
-                {(pendingTodos.length > 0 || showTaskInput) && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <ListChecks size={14} className="text-t3" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-t3">Tasks</span>
-                        {pendingTodos.length > 0 && (
-                          <span className="text-[8px] bg-b1/15 text-b1 px-1.5 py-0.5 rounded-md font-bold">{pendingTodos.length}</span>
-                        )}
-                      </div>
-                      <button onClick={() => setShowTaskInput(!showTaskInput)} className="text-[10px] text-b1 font-bold">
-                        {showTaskInput ? 'Done' : '+ Add'}
-                      </button>
-                    </div>
-                    {showTaskInput && (
-                      <form onSubmit={(e) => { e.preventDefault(); if (taskInput.trim()) { setTodos(prev => [...(prev || []), { id: Date.now().toString(), text: taskInput.trim(), completed: false, createdBy: 'user' as const, createdAt: Date.now() }]); setTaskInput('') } }} className="flex gap-2 mb-2">
-                        <Input value={taskInput} onChange={e => setTaskInput(e.target.value)} placeholder="Add a task..." className="flex-1 h-8 text-xs" autoFocus />
-                        <Button type="submit" size="sm" disabled={!taskInput.trim()} className="h-8 px-3 text-xs">Add</Button>
-                      </form>
-                    )}
-                    <div className="space-y-1">
-                      {pendingTodos.map(t => (
-                        <div key={t.id} className="flex items-center gap-2 py-1.5 px-2 bg-fg rounded-lg border border-s1 group">
-                          <button onClick={() => setTodos(prev => (prev || []).map(x => x.id === t.id ? { ...x, completed: true } : x))} className="w-4 h-4 rounded border border-s2 flex items-center justify-center flex-shrink-0 hover:border-b1">
-                          </button>
-                          <span className="text-xs text-t1 flex-1 truncate">{t.text}</span>
-                          <span className="text-[8px] text-t3 uppercase">{t.createdBy}</span>
-                          <button onClick={() => setTodos(prev => (prev || []).filter(x => x.id !== t.id))} className="text-t3 hover:text-red opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash size={12} />
-                          </button>
-                        </div>
-                      ))}
-                      {completedTodos.length > 0 && (
-                        <div className="text-[10px] text-t3 px-2 pt-1">{completedTodos.length} completed</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {pendingTodos.length === 0 && !showTaskInput && (
-                  <button onClick={() => setShowTaskInput(true)} className="flex items-center gap-1.5 text-[10px] text-t3 font-bold">
-                    <ListChecks size={12} /> Add a task
-                  </button>
-                )}
-
-                {/* Conversation List */}
-                {sortedSessions.length === 0 ? (
-                  <div className="text-center py-10">
-                    <button
-                      onClick={() => inputRef.current?.focus()}
-                      className="inline-flex p-4 bg-gradient-to-br from-b1 to-b2 rounded-2xl mb-4 active:scale-95 transition-transform"
-                    >
-                      <Sparkle size={32} weight="fill" className="text-white" />
-                    </button>
-                    <h2 className="text-xl font-bold text-t1 mb-2">Welcome to Agent</h2>
-                    <p className="text-sm text-t3 max-w-xs mx-auto">Start a conversation below</p>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-t3 mb-2">
-                      <ChatCircle size={12} className="inline mr-1" />
-                      Conversations
-                    </div>
-                    <div className="space-y-2">
-                      {sortedSessions.map(session => (
-                        <button
-                          key={session.id}
-                          onClick={() => handleSwitchSession(session.id)}
-                          className="w-full p-3 bg-fg border border-s1 rounded-xl text-left active:scale-[0.98] transition-all group"
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <span className="text-sm font-bold text-t1 truncate">{session.name}</span>
-                            <span className="text-[9px] text-t3 flex-shrink-0">{relativeTime(session.lastMessageAt)}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[11px] text-t3 truncate flex-1">{lastMessagePreview(session)}</p>
-                            <span className="text-[9px] text-t3 flex-shrink-0">{session.messages.length} msg{session.messages.length !== 1 ? 's' : ''}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-
-            {inputBar}
+            <div className="px-4 pb-24 grid grid-cols-2 gap-3">
+              {QUICK_ACTIONS.map(action => (
+                <button
+                  key={action.label}
+                  onClick={() => handleQuickAction(action.prompt)}
+                  className="flex flex-col items-start gap-2.5 p-4 bg-s1 border border-s2 rounded-2xl text-left active:scale-95 active:opacity-70 transition-transform"
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <span className="text-2xl leading-none">{action.emoji}</span>
+                  <span className="text-[12px] font-bold text-t1 leading-snug">{action.label}</span>
+                </button>
+              ))}
+            </div>
           </motion.div>
         ) : (
           <motion.div
             key="agent-chat"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="flex flex-col flex-1 min-h-0"
+            className="flex flex-col flex-1 min-h-0 overflow-hidden"
           >
-            {/* Chat header with back button */}
-            <div className="flex items-center gap-3 px-4 py-3 bg-fg border-b border-s1">
-              <button onClick={() => setViewMode('list')} className="p-1.5 -ml-1 rounded-lg active:bg-s1 transition-colors">
-                <ArrowLeft size={20} weight="bold" className="text-t1" />
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-t1 truncate">{activeSession?.name || 'Chat'}</div>
-                <div className="text-[10px] text-t3">{chatMessages.length} message{chatMessages.length !== 1 ? 's' : ''}</div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-1.5 rounded-lg hover:bg-s1 transition-colors">
-                    <DotsThreeVertical size={20} weight="bold" className="text-t3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => activeSessionId && handleOpenRenameDialog(activeSessionId)}>
-                    <PencilSimple size={16} className="mr-2" /> Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => activeSessionId && handleDeleteSession(activeSessionId)}
-                    className="text-red"
+            {/* Empty state: no messages yet — show agent identity + quick actions */}
+            {chatMessages.length === 0 && (
+              <div className="flex-1 flex flex-col overflow-y-auto">
+                <div className="flex flex-col items-center text-center px-5 pt-10 pb-6">
+                  <div
+                    className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-xl"
+                    style={{ boxShadow: 'var(--send-glow)' }}
                   >
-                    <Trash size={16} className="mr-2" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {statsBar}
-
-            {/* Messages */}
-            <ScrollArea className="flex-1 px-4">
-              <div ref={pullToRefresh.containerRef} className="py-4 space-y-4">
-                {chatMessages.map((msg, index) => (
-                  <motion.div
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.02 }}
-                    className={cn(
-                      "flex gap-3",
-                      msg.role === 'user' ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    {msg.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
-                        <Robot size={18} weight="bold" className="text-white" />
-                      </div>
-                    )}
-                    <div
-                      className={cn(
-                        "max-w-[80%] rounded-2xl px-4 py-3",
-                        msg.role === 'user'
-                          ? "bg-gradient-to-br from-b1 to-b2 text-white"
-                          : "bg-s1 border border-s2 text-t1"
-                      )}
+                    <Robot size={38} weight="duotone" className="text-white" />
+                  </div>
+                  <h2 className="text-[22px] font-black text-t1 mb-2 tracking-tight">Session Assistant</h2>
+                  <p className="text-sm text-t3 leading-relaxed max-w-[220px]">
+                    I know your queue, scans, sessions, and goals.
+                  </p>
+                </div>
+                <div className="px-4 pb-24 grid grid-cols-2 gap-3">
+                  {QUICK_ACTIONS.map(action => (
+                    <button
+                      key={action.label}
+                      onClick={() => handleQuickAction(action.prompt)}
+                      className="flex flex-col items-start gap-2.5 p-4 bg-s1 border border-s2 rounded-2xl text-left active:scale-95 active:opacity-70 transition-transform"
+                      style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                     >
-                      {msg.role === 'user' ? (
-                        <p className="text-sm leading-relaxed">{msg.content}</p>
-                      ) : (
-                        <CollapsibleMessage message={msg.content} />
+                      <span className="text-2xl leading-none">{action.emoji}</span>
+                      <span className="text-[12px] font-bold text-t1 leading-snug">{action.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Messages — pb clears the floating input bar */}
+            {chatMessages.length > 0 && (
+            <div ref={pullToRefresh.containerRef} className="flex-1 min-h-0 overflow-y-auto">
+              <div className="px-4 py-5 space-y-3" style={{ paddingBottom: '88px' }}>
+                {chatMessages.map((msg, index) => {
+                  const ts = new Date(msg.timestamp)
+                  const timeStr = ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                  const showTime = index === 0 || msg.timestamp - chatMessages[index - 1].timestamp > 5 * 60 * 1000
+
+                  return (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                      className="flex flex-col"
+                    >
+                      {showTime && (
+                        <p className={cn(
+                          "text-[10px] text-t3 mb-1.5 font-medium",
+                          msg.role === 'user' ? "text-right" : "text-left pl-11"
+                        )}>
+                          {timeStr}
+                        </p>
                       )}
-                    </div>
-                  </motion.div>
-                ))}
+                      <div className={cn(
+                        "flex gap-2.5 items-end",
+                        msg.role === 'user' ? "justify-end" : "justify-start"
+                      )}>
+                        {msg.role === 'assistant' && (
+                          <div
+                            className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0 mb-0.5"
+                            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                          >
+                            <Robot size={16} weight="bold" className="text-white" />
+                          </div>
+                        )}
+                        <div
+                          className={cn(
+                            "max-w-[78%] rounded-[20px] px-4 py-3",
+                            msg.role === 'user'
+                              ? "rounded-br-md bg-gradient-to-br from-b1 to-b2 text-white"
+                              : "rounded-bl-md bg-s1 border border-s2 text-t1"
+                          )}
+                          style={msg.role === 'user' ? { boxShadow: '0 2px 12px rgba(var(--b1-rgb), 0.3)' } : undefined}
+                        >
+                          {msg.role === 'user' ? (
+                            <p className="text-[14px] leading-relaxed">{msg.content}</p>
+                          ) : (
+                            <CollapsibleMessage message={msg.content} />
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
 
                 {/* Pending tool call confirmation card */}
                 {pendingToolCalls && pendingToolCalls.length > 0 && !isProcessing && (
@@ -1412,18 +1673,22 @@ ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' 
 
                 {isProcessing && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex gap-3 justify-start"
+                    transition={{ duration: 0.2 }}
+                    className="flex gap-2.5 items-end justify-start"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
-                      <Robot size={18} weight="bold" className="text-white" />
+                    <div
+                      className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0"
+                      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                    >
+                      <Robot size={16} weight="bold" className="text-white" />
                     </div>
-                    <div className="bg-s1 border border-s2 rounded-2xl px-4 py-3">
-                      <div className="flex gap-1">
+                    <div className="bg-s1 border border-s2 rounded-[20px] rounded-bl-md px-4 py-3.5">
+                      <div className="flex gap-1.5 items-center">
                         <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '160ms' }} />
+                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '320ms' }} />
                       </div>
                     </div>
                   </motion.div>
@@ -1431,12 +1696,252 @@ ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' 
 
                 <div ref={messagesEndRef} />
               </div>
-            </ScrollArea>
+            </div>
+            )}
 
-            {inputBar}
           </motion.div>
         )}
       </AnimatePresence>
+      )} {/* end chat tab */}
+
+      {/* ── Scans tab ── */}
+      {activeTab === 'scans' && (
+        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 overflow-y-auto scrollable-content overscroll-y-contain">
+          <div className="p-4 space-y-3 pb-6">
+            {sessionScans.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-12 px-4">
+                <button
+                  onClick={onOpenCamera}
+                  className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg active:scale-95 transition-transform"
+                  style={{ boxShadow: 'var(--send-glow)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <Camera size={48} weight="duotone" className="text-white" />
+                </button>
+                <p className="text-base font-semibold text-t1 mb-1">No Scans Yet</p>
+                <p className="text-xs text-t3 max-w-[200px] leading-relaxed">
+                  {currentSession?.active
+                    ? 'Tap the icon to start scanning items.'
+                    : 'Start a session and tap the icon to scan items.'}
+                </p>
+              </div>
+            ) : (
+              sessionScans.map(item => {
+                const alreadyQueued = queueItems.some(q => q.id === item.id)
+                const profit =
+                  item.estimatedSellPrice != null
+                    ? item.estimatedSellPrice - item.purchasePrice
+                    : null
+                const decisionColor =
+                  item.decision === 'BUY'
+                    ? 'text-green bg-green/10 border-green/30'
+                    : item.decision === 'PASS'
+                      ? 'text-red bg-red/10 border-red/30'
+                      : 'text-amber bg-amber/10 border-amber/30'
+
+                return (
+                  <Card
+                    key={item.id}
+                    className="border-s2/60 flex flex-col gap-0 overflow-hidden"
+                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+                  >
+                    {/* ── Info row ── */}
+                    <div className="p-3 flex gap-3 items-start">
+                      {(item.imageThumbnail || item.imageData) && (
+                        <img
+                          src={item.imageThumbnail || item.imageData}
+                          alt={item.productName || 'Item'}
+                          className="w-14 h-14 rounded-xl object-cover border border-s2/60 flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <p className="text-xs font-bold text-t1 truncate">
+                          {item.productName || 'Unknown Item'}
+                        </p>
+                        <div className="flex gap-2 text-[10px] font-mono text-t2 flex-wrap">
+                          <span>Buy ${item.purchasePrice.toFixed(2)}</span>
+                          {item.estimatedSellPrice != null && (
+                            <>
+                              <span>→</span>
+                              <span>Sell ${item.estimatedSellPrice.toFixed(2)}</span>
+                            </>
+                          )}
+                          {profit != null && (
+                            <span className={profit >= 0 ? 'text-green' : 'text-red'}>
+                              ({profit >= 0 ? '+' : ''}{profit.toFixed(2)})
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={cn(
+                              'inline-block text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border',
+                              decisionColor,
+                            )}
+                          >
+                            {item.decision}
+                          </span>
+                          {item.category && (
+                            <span className="text-[9px] text-t3 truncate">{item.category}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── Action row ── */}
+                    <div className="border-t border-s2/60 flex items-center">
+                      {/* Reopen — go back to scan analysis */}
+                      <button
+                        onClick={() => onOpenScanItem?.(item)}
+                        className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-t2 hover:text-t1 hover:bg-s1 active:opacity-60 transition-colors"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <ArrowSquareOut size={13} weight="bold" />
+                        Reopen
+                      </button>
+                      <div className="w-px h-5 bg-s2 flex-shrink-0" />
+                      {/* Add to Queue / already-queued indicator */}
+                      {alreadyQueued ? (
+                        <div className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-green">
+                          <Check size={13} weight="bold" />
+                          In Queue
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handlePromoteToQueue(item)}
+                          className="flex-1 h-8 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-xl mx-1.5"
+                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                        >
+                          <ShoppingCart size={13} weight="bold" />
+                          Add to Queue
+                        </button>
+                      )}
+                      <div className="w-px h-5 bg-s2 flex-shrink-0" />
+                      {/* Delete */}
+                      <button
+                        onClick={() => handleDeleteScan(item.id)}
+                        className="w-12 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
+                        title="Remove from scan history"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <Trash size={14} weight="bold" />
+                      </button>
+                    </div>
+                  </Card>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tasks tab ── */}
+      {activeTab === 'tasks' && (
+        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 overflow-y-auto scrollable-content overscroll-y-contain">
+          <div className="flex-1">
+            <div className="p-4 space-y-1">
+              {(todos || []).length === 0 && (
+                <div className="flex flex-col items-center justify-center text-center py-12 px-4">
+                  <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg" style={{ boxShadow: 'var(--send-glow)' }}>
+                    <ListChecks size={48} weight="duotone" className="text-white" />
+                  </div>
+                  <p className="text-base font-semibold text-t1 mb-1">No Tasks Yet</p>
+                  <p className="text-xs text-t3 max-w-[200px] leading-relaxed">
+                    Add tasks below, or ask the Agent in Chat to create tasks for you.
+                  </p>
+                </div>
+              )}
+              {pendingTodos.map(t => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-2.5 py-2.5 px-1 group border-b border-s1 last:border-0"
+                >
+                  <button
+                    onClick={() =>
+                      setTodos(prev =>
+                        (prev || []).map(x =>
+                          x.id === t.id ? { ...x, completed: true } : x,
+                        ),
+                      )
+                    }
+                    className="flex-shrink-0 w-5 h-5 rounded-md border border-s2 hover:border-b1 hover:bg-b1/10 transition-colors"
+                  />
+                  <span className="flex-1 text-sm text-t1 leading-snug">{t.text}</span>
+                  <span
+                    className={cn(
+                      'text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded flex-shrink-0',
+                      t.createdBy === 'agent' ? 'text-b1 bg-b1/10' : 'text-t3 bg-s1',
+                    )}
+                  >
+                    {t.createdBy}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setTodos(prev => (prev || []).filter(x => x.id !== t.id))
+                    }
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red p-1"
+                  >
+                    <Trash size={14} />
+                  </button>
+                </div>
+              ))}
+              {completedTodos.length > 0 && (
+                <>
+                  <div className="pt-3 pb-1">
+                    <p className="text-[10px] text-t3 font-bold uppercase tracking-wide">
+                      Completed ({completedTodos.length})
+                    </p>
+                  </div>
+                  {completedTodos.map(t => (
+                    <div
+                      key={t.id}
+                      className="flex items-center gap-2.5 py-2.5 px-1 group border-b border-s1 last:border-0 opacity-50"
+                    >
+                      <button
+                        onClick={() =>
+                          setTodos(prev =>
+                            (prev || []).map(x =>
+                              x.id === t.id ? { ...x, completed: false } : x,
+                            ),
+                          )
+                        }
+                        className="flex-shrink-0 w-5 h-5 rounded-md bg-green/15 border border-green/40 flex items-center justify-center"
+                      >
+                        <Check size={12} weight="bold" className="text-green" />
+                      </button>
+                      <span className="flex-1 text-sm text-t2 leading-snug line-through">{t.text}</span>
+                      <button
+                        onClick={() =>
+                          setTodos(prev => (prev || []).filter(x => x.id !== t.id))
+                        }
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-t3 hover:text-red p-1"
+                      >
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+          {/* Task pill is portalled — see taskBar below */}
+        </div>
+      )}
+
+      {/* Chat pill — portalled to body to escape will-change containing block */}
+      {createPortal(
+        <AnimatePresence>
+          {isCurrentScreen && activeTab === 'chat' && viewMode === 'chat' && inputBar}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* Task pill — same fixed position as chat pill, slides in/out with tab changes */}
+      {createPortal(
+        <AnimatePresence>
+          {isCurrentScreen && activeTab === 'tasks' && taskBar}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Rename dialog */}
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>

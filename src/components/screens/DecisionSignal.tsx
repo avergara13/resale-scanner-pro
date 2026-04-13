@@ -29,9 +29,12 @@ export function DecisionSignal({ decision, item }: DecisionSignalProps) {
         <div className="flex items-center gap-3 py-1 px-2">
           <span className="text-2xl">📊</span>
           <div className="text-left">
-            <p className="text-base font-black tracking-wide leading-tight">NEEDS PRICE</p>
+            <p className="text-base font-black tracking-wide leading-tight">NEEDS SELL PRICE</p>
             <p className="text-[11px] font-medium opacity-70 leading-tight">
-              Enter buy price → Recalculate, or ask AI in Chat
+              Enter a sell price in the draft below → tap Recalculate
+            </p>
+            <p className="text-[10px] font-medium opacity-50 leading-tight mt-0.5">
+              Buy price defaults to $0 (free) if left blank
             </p>
           </div>
         </div>

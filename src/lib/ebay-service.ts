@@ -306,13 +306,16 @@ export class EbayService {
     recommendedSellPrice: number,
     shippingCost: number = 5.0,
     ebayFeePercent: number = 12.9,
-    paypalFeePercent: number = 0,        // Deprecated — eBay uses Managed Payments. Keep param for backward compat.
-    perOrderFee: number = 0.30           // eBay fixed per-order fee
+    paypalFeePercent: number = 0,        // Deprecated — always 0. Kept for backward compat.
+    perOrderFee: number = 0.30,          // eBay fixed per-order fee
+    adFeePercent: number = 3.0,          // eBay Promoted Listings ad fee (3% default)
+    materialsCost: number = 0.75         // Shipping materials (box, tape, poly mailer)
   ) {
     const ebayFee = recommendedSellPrice * (ebayFeePercent / 100)
-    const paymentFee = recommendedSellPrice * (paypalFeePercent / 100)  // 0 by default
-    const totalFees = ebayFee + paymentFee + perOrderFee
-    const netProfit = recommendedSellPrice - purchasePrice - shippingCost - totalFees
+    const adFee = recommendedSellPrice * (adFeePercent / 100)
+    const totalFees = ebayFee + adFee + perOrderFee
+    const totalCosts = purchasePrice + shippingCost + materialsCost + totalFees
+    const netProfit = recommendedSellPrice - totalCosts
     const profitMargin = recommendedSellPrice > 0
       ? (netProfit / recommendedSellPrice) * 100
       : 0
@@ -321,10 +324,10 @@ export class EbayService {
       : 0
 
     // Break-even: minimum sell price to cover all costs with $0 profit
-    // Solve: breakEven - purchasePrice - shippingCost - (breakEven * feeRate) - perOrderFee = 0
-    const feeRate = (ebayFeePercent + paypalFeePercent) / 100
+    // Solve: breakEven - purchasePrice - shippingCost - materialsCost - (breakEven * feeRate) - perOrderFee = 0
+    const feeRate = (ebayFeePercent + adFeePercent) / 100
     const breakEven = feeRate < 1
-      ? (purchasePrice + shippingCost + perOrderFee) / (1 - feeRate)
+      ? (purchasePrice + shippingCost + materialsCost + perOrderFee) / (1 - feeRate)
       : 0
 
     return {
@@ -333,12 +336,14 @@ export class EbayService {
       roi,
       totalFees,
       ebayFee,
-      paypalFee: paymentFee,
+      adFee,
+      paypalFee: 0,
       perOrderFee,
+      materialsCost,
       breakEven,
       recommendedSellPrice,
       // Legacy alias kept for any code that still references grossProfit
-      grossProfit: recommendedSellPrice - purchasePrice - shippingCost,
+      grossProfit: recommendedSellPrice - purchasePrice - shippingCost - materialsCost,
     }
   }
 }
@@ -353,11 +358,14 @@ export function calculateProfitFallback(
   sellPrice: number,
   shippingCost: number = 5.0,
   ebayFeePercent: number = 12.9,
-  perOrderFee: number = 0.30
+  perOrderFee: number = 0.30,
+  adFeePercent: number = 3.0,
+  materialsCost: number = 0.75
 ) {
   const ebayFee = sellPrice * (ebayFeePercent / 100)
-  const totalFees = ebayFee + perOrderFee
-  const netProfit = sellPrice - purchasePrice - shippingCost - totalFees
+  const adFee = sellPrice * (adFeePercent / 100)
+  const totalFees = ebayFee + adFee + perOrderFee
+  const netProfit = sellPrice - purchasePrice - shippingCost - materialsCost - totalFees
   const profitMargin = sellPrice > 0 ? (netProfit / sellPrice) * 100 : 0
   const roi = purchasePrice > 0 ? (netProfit / purchasePrice) * 100 : 0
   return { netProfit, profitMargin, roi, totalFees }

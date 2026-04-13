@@ -1,4 +1,4 @@
-import { retryFetch, aggressiveRetry } from './retry-service'
+import { retryFetch } from './retry-service'
 
 export interface GeminiVisionResponse {
   productName: string
@@ -40,25 +40,35 @@ export class GeminiService {
   async analyzeProductImage(
     imageData: string,
     options: GeminiAnalysisOptions = {},
-    purchasePrice?: number
+    purchasePrice?: number,
+    additionalImages?: string[]    // optional photos 2-5 for richer context
   ): Promise<GeminiVisionResponse> {
-    const base64Data = imageData.includes('base64,') 
-      ? imageData.split('base64,')[1] 
+    const base64Data = imageData.includes('base64,')
+      ? imageData.split('base64,')[1]
       : imageData
 
-    const prompt = this.buildVisionPrompt(options, purchasePrice)
+    const imageParts = [
+      { inline_data: { mime_type: 'image/jpeg', data: base64Data } },
+      ...(additionalImages || []).map(img => ({
+        inline_data: {
+          mime_type: 'image/jpeg',
+          data: img.includes('base64,') ? img.split('base64,')[1] : img,
+        }
+      }))
+    ]
+
+    const multiImageNote = (additionalImages?.length)
+      ? `\nYou have received ${additionalImages.length + 1} photos of the same item from different angles. Analyze all photos together for the most accurate product identification, pricing, and condition assessment.`
+      : ''
+
+    const prompt = this.buildVisionPrompt(options, purchasePrice) + multiImageNote
 
     const requestBody = {
       contents: [
         {
           parts: [
             { text: prompt },
-            {
-              inline_data: {
-                mime_type: 'image/jpeg',
-                data: base64Data,
-              },
-            },
+            ...imageParts,
           ],
         },
       ],
@@ -91,7 +101,35 @@ export class GeminiService {
       })
 
       const textContent = this.extractResponseText(data)
-      const result = JSON.parse(textContent) as GeminiVisionResponse
+
+      // Gemini may return markdown-fenced JSON or malformed output —
+      // strip fences before parsing and fall back to regex extraction.
+      let result: GeminiVisionResponse
+      try {
+        const cleaned = textContent.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+        result = JSON.parse(cleaned) as GeminiVisionResponse
+      } catch {
+        // Attempt to extract key fields from the raw text as a fallback
+        console.warn('Gemini returned non-JSON vision response, attempting regex extraction')
+        const nameMatch = textContent.match(/"productName"\s*:\s*"([^"]+)"/)
+        const descMatch = textContent.match(/"description"\s*:\s*"([^"]+)"/)
+        const catMatch = textContent.match(/"category"\s*:\s*"([^"]+)"/)
+        const condMatch = textContent.match(/"condition"\s*:\s*"([^"]+)"/)
+        const brandMatch = textContent.match(/"brand"\s*:\s*"([^"]+)"/)
+        const confMatch = textContent.match(/"confidence"\s*:\s*([\d.]+)/)
+        result = {
+          productName: nameMatch?.[1] || 'Unknown Product',
+          description: descMatch?.[1] || '',
+          category: catMatch?.[1] || 'General',
+          condition: condMatch?.[1] || 'Used',
+          brand: brandMatch?.[1] || undefined,
+          model: undefined,
+          keyFeatures: [],
+          searchTerms: [],
+          confidence: confMatch ? parseFloat(confMatch[1]) : 0.3,
+          suggestedTags: [],
+        } as GeminiVisionResponse
+      }
 
       return {
         productName: result.productName || 'Unknown Product',

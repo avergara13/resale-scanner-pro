@@ -1,21 +1,14 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, Eye, Lightning, DownloadSimple, CheckSquare, Square, ArrowsDownUp, PencilSimple, MagnifyingGlass, X, BookmarkSimple, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
+import { Trash, Eye, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus, DotsThreeVertical } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { toast } from 'sonner'
+import { logActivity } from '@/lib/activity-log'
 import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
@@ -65,9 +58,10 @@ interface QueueScreenProps {
   personalSessionIds?: Set<string>
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
+  onBuyItem?: (id: string) => void
 }
 
-type FilterOption = 'ALL' | 'BUY' | 'PASS' | 'PENDING'
+type FilterOption = 'ALL' | 'ITEMS' | 'LISTED'
 type SortOption = 'profit-desc' | 'profit-asc' | 'date-desc' | 'date-asc' | 'category-asc' | 'category-desc' | 'tag-count-desc' | 'tag-count-asc' | 'tag-name-asc' | 'tag-name-desc' | 'manual'
 
 interface SortableItemProps {
@@ -84,6 +78,7 @@ interface SortableItemProps {
   onDelist?: (itemId: string) => void
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
+  onBuyItem?: (id: string) => void
 }
 
 function SortableItem({
@@ -100,6 +95,7 @@ function SortableItem({
   onDelist,
   onReanalyze,
   onOpenDetail,
+  onBuyItem,
 }: SortableItemProps) {
   const {
     attributes,
@@ -110,10 +106,30 @@ function SortableItem({
     isDragging,
   } = useSortable({ id: item.id })
 
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  // Listing completion — 6 fields required before an item is ready to push
+  // productName + price (40 pts core) + category + condition + description + AI optimization (60 pts)
+  const completionPct = (() => {
+    if (item.decision !== 'BUY' || item.listingStatus === 'published') return null
+    const fields = [
+      { filled: !!item.productName,          pts: 20 },
+      { filled: !!item.estimatedSellPrice,   pts: 20 },
+      { filled: !!item.category,             pts: 15 },
+      { filled: !!item.condition,            pts: 15 },
+      { filled: !!item.description,          pts: 15 },
+      { filled: !!item.optimizedListing,     pts: 15 },
+    ]
+    return fields.reduce((sum, f) => sum + (f.filled ? f.pts : 0), 0)
+  })()
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    background: 'color-mix(in oklch, var(--fg) 88%, transparent)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
   }
 
   return (
@@ -121,12 +137,34 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-2 sm:p-3 md:p-3.5 border transition-colors",
-        isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
+        // Reset Card defaults (gap-6, py-6, bg-card) and apply scan-card DNA
+        "border overflow-hidden flex flex-col gap-0 p-0 py-0 transition-colors",
+        isSelected ? 'border-b1' : 'border-s2/60'
       )}
     >
-      <div className="flex gap-2 sm:gap-2.5 md:gap-3">
-        {/* Narrow control column: drag handle + checkbox */}
+      {/* ── Listing completion bar — top of card, only for BUY items not yet published ── */}
+      {completionPct !== null && (
+        <div className="relative w-full h-1.5 flex-shrink-0" style={{ background: 'color-mix(in oklch, var(--s2) 40%, transparent)' }}>
+          <div
+            className="h-full transition-all duration-500"
+            style={{
+              width: `${completionPct}%`,
+              background: completionPct === 100
+                ? 'var(--green)'
+                : completionPct >= 60
+                ? 'var(--amber)'
+                : 'var(--red)',
+            }}
+          />
+        </div>
+      )}
+
+      {/* ── Info row ── */}
+      <div className={cn(
+        "p-3 flex gap-2.5 items-start",
+        isSelected && "bg-accent-3/15"
+      )}>
+        {/* Control column: drag handle + checkbox */}
         <div className="flex flex-col gap-1 items-center justify-start pt-0.5 flex-shrink-0">
           <div
             {...attributes}
@@ -134,59 +172,96 @@ function SortableItem({
             className="cursor-grab active:cursor-grabbing touch-none p-0.5 hover:bg-s1 rounded transition-colors"
             aria-label="Drag to reorder"
           >
-            <DotsSixVertical size={14} weight="bold" className="text-s3" />
+            <DotsSixVertical size={12} weight="bold" className="text-s3" />
           </div>
-          <Checkbox
-            id={`select-${item.id}`}
-            checked={isSelected}
-            onCheckedChange={() => onToggleSelect(item.id)}
-            className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
-          />
+          <label
+            htmlFor={`select-${item.id}`}
+            className="flex items-center justify-center w-8 h-8 -m-1.5 cursor-pointer"
+          >
+            <Checkbox
+              id={`select-${item.id}`}
+              checked={isSelected}
+              onCheckedChange={() => onToggleSelect(item.id)}
+              className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+            />
+          </label>
         </div>
-        {/* Thumbnail column */}
-        {(item.imageThumbnail || item.imageData) && (
+
+        {/* Thumbnail — rounded-lg to match scan cards */}
+        {(item.imageThumbnail || item.imageData) ? (
           <img
             src={item.imageThumbnail || item.imageData}
             alt={item.productName || 'Item'}
-            className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+            className="w-14 h-14 object-cover object-center rounded-xl border border-s2/60 flex-shrink-0 self-start"
           />
+        ) : (
+          <div className="w-14 h-14 rounded-xl border border-s2/60 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
+            <Package size={20} weight="duotone" className="text-s3" />
+          </div>
         )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-1 sm:gap-1.5 md:gap-2 mb-1 sm:mb-1.5 md:mb-2">
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 space-y-1">
+          {/* Title + margin badge */}
+          <div className="flex items-start justify-between gap-1.5">
             <div className="flex items-center gap-1.5 min-w-0">
-              <h3 className="font-semibold text-t1 text-xs sm:text-sm md:text-base line-clamp-2 leading-tight">
+              <h3 className="font-bold text-t1 text-[11px] line-clamp-2 leading-snug tracking-tight">
                 {item.productName || 'Unknown Item'}
               </h3>
               {isPersonal && (
                 <span className="text-[7px] font-bold bg-purple-500/15 text-purple-500 px-1 py-0.5 rounded flex-shrink-0 uppercase">Personal</span>
               )}
             </div>
-            {item.profitMargin != null && isFinite(item.profitMargin) && (
-              <Badge
-                variant="secondary"
-                className={cn(
-                  "flex-shrink-0 font-mono font-bold text-[9px] sm:text-[10px] h-4 sm:h-5 px-1 sm:px-1.5",
-                  item.profitMargin > 50
-                    ? 'bg-green/20 text-green'
-                    : item.profitMargin > 20
-                    ? 'bg-amber/20 text-amber'
-                    : 'bg-red/20 text-red'
-                )}
-              >
-                {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
-              </Badge>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {completionPct !== null && (
+                <span className={cn(
+                  "font-mono font-bold text-[8px] px-1 py-0.5 rounded",
+                  completionPct === 100 ? 'text-green' : completionPct >= 60 ? 'text-amber' : 'text-red'
+                )}>
+                  {completionPct}%
+                </span>
+              )}
+              {item.profitMargin != null && isFinite(item.profitMargin) && (
+                <span className={cn(
+                  "font-mono font-bold text-[9px] px-1.5 py-0.5 rounded border",
+                  item.profitMargin > 40
+                    ? 'bg-green/10 text-green border-green/30'
+                    : item.profitMargin > 25
+                    ? 'bg-amber/10 text-amber border-amber/30'
+                    : 'bg-red/10 text-red border-red/30'
+                )}>
+                  {item.profitMargin >= 0 ? '+' : ''}{item.profitMargin.toFixed(0)}%
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Prices */}
+          <div className="flex items-center gap-2 text-[10px] font-mono text-t2">
+            <span>Cost ${item.purchasePrice.toFixed(2)}</span>
+            {item.estimatedSellPrice != null && item.estimatedSellPrice > 0 ? (
+              <>
+                <span className="text-s3">→</span>
+                <span>Sell ${item.estimatedSellPrice.toFixed(2)}</span>
+              </>
+            ) : (
+              <span className="text-s3">Sell —</span>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 text-[10px] sm:text-[11px] md:text-xs font-mono text-t3 mb-1.5 sm:mb-2 md:mb-2.5">
-            <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
-            {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
-              ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
-              : <span className="text-s3">Sell: —</span>
-            }
-          </div>
+
+          {/* Listing status pill — only LIVE badge; "OPTIMIZED" is redundant with the completion bar + READY TO LIST CTA */}
+          {item.listingStatus === 'published' && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border bg-green/10 text-green border-green/30">
+                LIVE
+              </span>
+            </div>
+          )}
+
+          {/* Tags */}
           {item.tags && item.tags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 mb-2 sm:mb-2.5">
-              <Tag size={10} weight="bold" className="text-s4 flex-shrink-0 sm:w-[11px] sm:h-[11px]" />
+            <div className="flex flex-wrap items-center gap-0.5">
+              <Tag size={10} weight="bold" className="text-s4 flex-shrink-0" />
               {item.tags.map((tagId) => {
                 const tag = (allTags || []).find(t => t.id === tagId)
                 if (!tag) return null
@@ -194,7 +269,7 @@ function SortableItem({
                   <Badge
                     key={tagId}
                     variant="outline"
-                    className="text-[8px] sm:text-[9px] h-[16px] sm:h-[18px] pl-1 sm:pl-1.5 pr-0.5 font-medium border flex items-center gap-0.5 group hover:opacity-80 transition-opacity"
+                    className="text-[8px] h-[16px] pl-1 pr-0.5 font-medium border flex items-center gap-0.5 hover:opacity-80 transition-opacity"
                     style={{
                       borderColor: tag.color,
                       backgroundColor: `${tag.color}15`,
@@ -207,111 +282,170 @@ function SortableItem({
                         e.stopPropagation()
                         const updatedTags = item.tags?.filter(t => t !== tagId) || []
                         onEditTags(item.id, updatedTags)
-                        toast.success(`Removed tag: ${tag.name}`)
+                        logActivity(`Removed tag: ${tag.name}`)
                       }}
                       className="flex items-center justify-center hover:opacity-70 transition-opacity p-0.5"
                       aria-label={`Remove ${tag.name} tag`}
                     >
-                      <X size={8} weight="bold" className="sm:w-[9px] sm:h-[9px]" />
+                      <X size={8} weight="bold" />
                     </button>
                   </Badge>
                 )
               })}
             </div>
           )}
-          <div className="flex gap-1 flex-wrap items-center mt-1 md:mt-1.5">
-            {/* Edit — icon only */}
-            <Button
-              size="sm"
-              onClick={() => onEdit(item)}
-              variant="outline"
-              title="Edit"
-              aria-label="Edit item"
-              className="h-6 w-6 md:h-7 md:w-7 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
-            >
-              <PencilSimple size={11} weight="bold" aria-hidden />
-            </Button>
-            {/* Detail — icon only */}
-            {onOpenDetail && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onOpenDetail(item)}
-                title="View detail"
-                aria-label="View detail"
-                className="h-6 w-6 md:h-7 md:w-7 p-0 text-b1 hover:bg-b1/10"
-              >
-                <Eye size={11} weight="bold" aria-hidden />
-              </Button>
-            )}
-            {/* Re-analyze — icon only (PENDING, failed analysis, or missing sell price) */}
-            {(item.decision === 'PENDING' || item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onReanalyze(item.id)}
-                title="Re-analyze"
-                aria-label="Re-analyze item"
-                className="h-6 w-6 md:h-7 md:w-7 p-0 border-amber/40 text-amber hover:bg-amber/10"
-              >
-                <ArrowCounterClockwise size={11} weight="bold" aria-hidden />
-              </Button>
-            )}
-            {item.listingStatus === 'published' && onOpenSoldDialog ? (
-              <>
-                {/* Mark Sold — text, important action */}
-                <Button
-                  size="sm"
-                  onClick={() => onOpenSoldDialog(item)}
-                  aria-label="Mark as sold"
-                  className="flex-1 bg-green hover:bg-green/90 text-white h-6 md:h-7 text-[10px] md:text-xs font-medium px-2"
-                >
-                  Sold
-                </Button>
-                {/* Delist — icon only */}
-                {onDelist && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onDelist(item.id)}
-                    title="Delist"
-                    aria-label="Delist item"
-                    className="h-6 w-6 md:h-7 md:w-7 p-0 text-t3 hover:text-red hover:bg-red/10"
-                  >
-                    <X size={11} weight="bold" aria-hidden />
-                  </Button>
-                )}
-              </>
-            ) : (
-              /* List — text only, important action */
-              <Button
-                size="sm"
-                onClick={() => onCreateListing(item.id)}
-                aria-label="Create listing"
-                className="flex-1 bg-b1 hover:bg-b2 text-white h-6 md:h-7 text-[10px] md:text-xs font-semibold px-2"
-              >
-                List
-              </Button>
-            )}
-            {/* Delete — icon only */}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onRemove(item.id)}
-              title="Remove"
-              aria-label="Remove item"
-              className="h-6 w-6 md:h-7 md:w-7 p-0 text-t2 hover:text-red hover:bg-red/10"
-            >
-              <Trash size={11} weight="bold" aria-hidden />
-            </Button>
-          </div>
         </div>
       </div>
+
+      {/* ── Action bar — same pattern as scan cards, queue-specific CTAs ── */}
+      <div className={cn(
+        "border-t border-s2/60 flex items-center",
+        isSelected && "bg-accent-3/10"
+      )}>
+        {/* Edit */}
+        <button
+          onClick={() => onEdit(item)}
+          title="Edit"
+          aria-label="Edit item"
+          className="w-11 h-10 flex items-center justify-center text-t2 hover:bg-s1 hover:text-t1 active:opacity-60 transition-colors"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <PencilSimple size={13} weight="bold" />
+        </button>
+
+        {/* View detail */}
+        {onOpenDetail && (
+          <>
+            <div className="w-px h-5 bg-s2 flex-shrink-0" />
+            <button
+              onClick={() => onOpenDetail(item)}
+              title="View detail"
+              aria-label="View detail"
+              className="w-11 h-10 flex items-center justify-center text-b1 hover:bg-b1/10 active:opacity-60 transition-colors"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <Eye size={13} weight="bold" />
+            </button>
+          </>
+        )}
+
+        {/* Re-analyze (conditional) */}
+        {(item.decision === 'PENDING' || item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
+          <>
+            <div className="w-px h-5 bg-s2 flex-shrink-0" />
+            <button
+              onClick={() => onReanalyze(item.id)}
+              title="Re-analyze"
+              aria-label="Re-analyze item"
+              className="w-11 h-10 flex items-center justify-center text-amber hover:bg-amber/10 active:opacity-60 transition-colors"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <ArrowCounterClockwise size={13} weight="bold" />
+            </button>
+          </>
+        )}
+
+        {/* Primary CTA — fills remaining width */}
+        <div className="w-px h-5 bg-s2 flex-shrink-0" />
+        {item.listingStatus === 'published' && onOpenSoldDialog ? (
+          <>
+            <button
+              onClick={() => onOpenSoldDialog(item)}
+              aria-label="Mark as sold"
+              className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-none"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+            >
+              Sold
+            </button>
+            {onDelist && (
+              <>
+                <div className="w-px h-5 bg-white/20 flex-shrink-0" />
+                <button
+                  onClick={() => onDelist(item.id)}
+                  title="Delist"
+                  aria-label="Delist item"
+                  className="w-11 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <X size={13} weight="bold" />
+                </button>
+              </>
+            )}
+          </>
+        ) : item.decision === 'BUY' ? (
+          !item.optimizedListing ? (
+            <button
+              onClick={() => onCreateListing(item.id)}
+              aria-label="Optimize listing"
+              className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-b1 hover:bg-b2 active:opacity-80 transition-colors"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <Lightning size={13} weight="bold" />
+              Optimize
+            </button>
+          ) : (
+            // Optimized but not yet live — show a quiet "ready" state
+            <div className="flex-1 h-10 flex items-center justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-b1/10 text-b1 border border-b1/20">
+                Ready to List
+              </span>
+            </div>
+          )
+        ) : onBuyItem ? (
+          <button
+            onClick={() => onBuyItem(item.id)}
+            aria-label="Buy this item"
+            className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-none"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+          >
+            Buy ✅
+          </button>
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        {/* Overflow menu — tap to reveal delete confirmation (prevents accidental removal) */}
+        <div className="w-px h-5 bg-s2 flex-shrink-0" />
+        <button
+          onClick={() => setConfirmDelete(v => !v)}
+          title="More options"
+          aria-label="More options"
+          className={cn(
+            'w-11 h-10 flex items-center justify-center transition-colors',
+            confirmDelete ? 'text-red bg-red/10' : 'text-t3 hover:text-t1 hover:bg-s1'
+          )}
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <DotsThreeVertical size={15} weight="bold" />
+        </button>
+      </div>
+      {/* Delete confirmation row — only visible after tapping ⋮ */}
+      {confirmDelete && (
+        <div className="px-3 pb-3 pt-2 border-t border-s2/60 flex items-center justify-between gap-2">
+          <p className="text-[10px] text-t3 leading-tight">Remove this item from your queue?</p>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="text-[10px] font-semibold text-t3 hover:text-t1 px-2 py-1 rounded transition-colors"
+              style={{ touchAction: 'manipulation' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { onRemove(item.id); setConfirmDelete(false) }}
+              className="text-[10px] font-bold text-red px-2 py-1 rounded bg-red/10 hover:bg-red/20 transition-colors"
+              style={{ touchAction: 'manipulation' }}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -336,7 +470,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [soldMarketplace, setSoldMarketplace] = useState<'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'>('ebay')
   const [showTrendIndicator, setShowTrendIndicator] = useState(false)
   const [locationInsightsOpen, setLocationInsightsOpen] = useState(false)
-  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -387,7 +520,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     }
     
     if (preset.filters?.decision && preset.filters.decision.length === 1) {
-      const validFilters: FilterOption[] = ['ALL', 'BUY', 'PASS', 'PENDING']
+      const validFilters: FilterOption[] = ['ALL', 'ITEMS', 'LISTED']
       const val = preset.filters.decision[0]
       setFilter(validFilters.includes(val as FilterOption) ? (val as FilterOption) : 'ALL')
     } else {
@@ -444,9 +577,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
 
     const matchesFilter =
       filter === 'ALL' ||
-      (filter === 'BUY' && item.decision === 'BUY' && !isPromoted) ||
-      (filter === 'PASS' && item.decision === 'PASS') ||
-      (filter === 'PENDING' && item.decision === 'PENDING')
+      (filter === 'ITEMS' && item.decision === 'BUY' && item.listingStatus !== 'published') ||
+      (filter === 'LISTED' && item.listingStatus === 'published')
     
     if (!matchesFilter) return false
 
@@ -538,9 +670,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   })
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
   
-  const buyCount = queueItems.filter(item => item.decision === 'BUY' && !['optimizing', 'ready', 'published'].includes(item.listingStatus ?? '')).length
-  const passCount = queueItems.filter(item => item.decision === 'PASS').length
-  const pendingCount = queueItems.filter(item => item.decision === 'PENDING').length
+  const itemsCount = queueItems.filter(item =>
+    item.decision === 'BUY' && item.listingStatus !== 'published'
+  ).length
+  const listedCount = queueItems.filter(item =>
+    item.listingStatus === 'published'
+  ).length
   const hasActiveAdvancedFilters =
     (advancedFilters.tags?.length ?? 0) > 0 ||
     (advancedFilters.locations?.length ?? 0) > 0 ||
@@ -579,13 +714,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       onRemove(id)
     })
     
-    toast.success(`Removed ${selectedIds.size} item${selectedIds.size !== 1 ? 's' : ''}`)
+    logActivity(`Removed ${selectedIds.size} item${selectedIds.size !== 1 ? 's' : ''}`)
     setSelectedIds(new Set())
   }
 
   const handleExportCSV = () => {
     if (selectedIds.size === 0) {
-      toast.error('No items selected')
       return
     }
 
@@ -618,7 +752,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     
-    toast.success(`Exported ${selectedIds.size} item${selectedIds.size !== 1 ? 's' : ''} to CSV`)
+    logActivity(`Exported ${selectedIds.size} item${selectedIds.size !== 1 ? 's' : ''} to CSV`)
   }
 
   const allFilteredSelected = filteredItems.length > 0 && selectedIds.size === filteredItems.length
@@ -634,15 +768,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         const itemText = diffAmount !== 1 ? 's' : ''
         
         if (diff > 0) {
-          toast.success(`📈 Showing ${diffAmount} more item${itemText}`, {
-            duration: 2000,
-            className: 'bg-green/10 border-green/30 text-green',
-          })
+          logActivity(`📈 Showing ${diffAmount} more item${itemText}`)
         } else {
-          toast.info(`📉 Showing ${diffAmount} fewer item${itemText}`, {
-            duration: 2000,
-            className: 'bg-amber/10 border-amber/30 text-amber',
-          })
+          logActivity(`📉 Showing ${diffAmount} fewer item${itemText}`, 'info')
         }
       }
     }
@@ -756,15 +884,15 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   })
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      id="scr-queue" 
-      className="flex flex-col h-full w-full overflow-y-auto overflow-x-hidden scrollable-content"
-      style={{ 
-        paddingTop: isPulling || isRefreshing ? `${Math.max(pullDistance, 60)}px` : '0px',
-        transition: isPulling ? 'none' : 'padding-top 0.3s ease-out'
-      }}
+      id="scr-queue"
+      className="h-full w-full overflow-y-auto overflow-x-hidden scrollable-content overscroll-y-contain"
     >
+      {/* Live session banner — sticky at top of scroll container */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 20 }}>
+        <SessionLiveBanner />
+      </div>
       <PullToRefreshIndicator
         isPulling={isPulling}
         isRefreshing={isRefreshing}
@@ -772,6 +900,14 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         progress={progress}
         shouldTrigger={shouldTrigger}
       />
+      {/* GPU-composited transform wrapper — replaces paddingTop reflow */}
+      <div
+        style={{
+          transform: `translateY(${isPulling ? pullDistance : isRefreshing ? 60 : 0}px)`,
+          transition: isPulling ? 'none' : 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          willChange: isPulling || isRefreshing ? 'transform' : 'auto',
+        }}
+      >
       <ItemEditDialog
         item={editingItem}
         isOpen={editingItem !== null}
@@ -829,7 +965,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
             </div>
             <div className="flex gap-2 pt-1">
               <Button
-                className="flex-1 bg-green hover:bg-green/90 text-white h-10"
+                className="flex-1 text-white h-10 font-bold active:scale-[0.98] transition-all"
+                style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                 onClick={() => {
                   if (soldDialogItemId && onMarkAsSold) {
                     const price = parseFloat(soldPrice) || 0
@@ -928,85 +1065,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           </div>
         </DialogContent>
       </Dialog>
-      <div className="px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 pb-3 sm:pb-4 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
-        <div className="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-4">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <p className="text-[10px] sm:text-[11px] text-t3 font-medium uppercase tracking-wider">
-                  {queueItems.length} Items Total
-                </p>
-                {sortedItems.length !== queueItems.length && (
-                  (() => {
-                    const percentage = Math.round((sortedItems.length / queueItems.length) * 100)
-                    const isHighVisibility = percentage >= 80
-                    const isMediumVisibility = percentage >= 50 && percentage < 80
-                    const isLowVisibility = percentage < 50
-                    
-                    const trendDirection = previousFilteredCount !== null 
-                      ? sortedItems.length > previousFilteredCount 
-                        ? 'up' 
-                        : sortedItems.length < previousFilteredCount 
-                          ? 'down' 
-                          : 'same'
-                      : 'same'
-                    
-                    const getTrendColor = () => {
-                      if (!showTrendIndicator || trendDirection === 'same') {
-                        if (isHighVisibility) return { bg: 'bg-green/15', text: 'text-green', border: 'border-green/30' }
-                        if (isMediumVisibility) return { bg: 'bg-amber/15', text: 'text-amber', border: 'border-amber/30' }
-                        return { bg: 'bg-red/15', text: 'text-red', border: 'border-red/30' }
-                      }
-                      
-                      if (trendDirection === 'up') {
-                        return { bg: 'bg-green/20', text: 'text-green', border: 'border-green/40' }
-                      }
-                      
-                      return { bg: 'bg-red/20', text: 'text-red', border: 'border-red/40' }
-                    }
-                    
-                    const colors = getTrendColor()
-                    
-                    return (
-                      <Badge 
-                        variant="secondary" 
-                        className={cn(
-                          "h-5 px-2 text-[10px] font-bold border transition-all duration-300",
-                          colors.bg,
-                          colors.text,
-                          colors.border,
-                          showTrendIndicator && "animate-pulse shadow-sm",
-                          showTrendIndicator && trendDirection === 'up' && "trend-indicator-up",
-                          showTrendIndicator && trendDirection === 'down' && "trend-indicator-down"
-                        )}
-                      >
-                        <span className="flex items-center gap-1">
-                          {sortedItems.length} visible ({percentage}%)
-                          {showTrendIndicator && trendDirection === 'up' && (
-                            <TrendUp size={12} weight="bold" className="animate-bounce" />
-                          )}
-                          {showTrendIndicator && trendDirection === 'down' && (
-                            <TrendDown size={12} weight="bold" className="animate-bounce" />
-                          )}
-                          {showTrendIndicator && trendDirection === 'same' && (
-                            <Minus size={12} weight="bold" className="opacity-60" />
-                          )}
-                        </span>
-                      </Badge>
-                    )
-                  })()
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+      <div className="px-3 sm:px-4 md:px-5 pt-2 pb-0 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
+        {/* Action buttons — only rendered when at least one is visible */}
+        {((onNavigateToLocationInsights && queueItems.some(item => item.location)) ||
+          (onNavigateToTagAnalytics && (allTags || []).length > 0) ||
+          unanalyzedItems.length > 0) && (
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-2">
             {onNavigateToLocationInsights && queueItems.some(item => item.location) && (
               <Button
                 onClick={onNavigateToLocationInsights}
                 variant="outline"
-                className="h-8 sm:h-9 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
+                className="h-8 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
               >
-                <MapPin size={14} weight="bold" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <MapPin size={14} weight="bold" className="mr-1" />
                 Locations
               </Button>
             )}
@@ -1014,20 +1085,19 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <Button
                 onClick={onNavigateToTagAnalytics}
                 variant="outline"
-                className="h-8 sm:h-9 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
+                className="h-8 px-2 sm:px-3 border-s2 hover:bg-s1 text-t2 font-bold text-[10px] sm:text-xs transition-all flex-shrink-0"
               >
-                <ChartBar size={14} weight="bold" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <ChartBar size={14} weight="bold" className="mr-1" />
                 Tag ROI
               </Button>
             )}
-            {/* Single unanalyzed item needs onReanalyze; multiple need onBatchAnalyze — never render if handler absent */}
             {unanalyzedItems.length === 1 && onReanalyze && (
               <Button
                 onClick={() => onReanalyze(unanalyzedItems[0].id)}
                 disabled={isBatchAnalyzing}
-                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
               >
-                <Lightning size={14} weight="fill" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <Lightning size={14} weight="fill" className="mr-1" />
                 {isBatchAnalyzing ? 'Analyzing...' : 'Analyze 1'}
               </Button>
             )}
@@ -1035,183 +1105,79 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               <Button
                 onClick={onBatchAnalyze}
                 disabled={isBatchAnalyzing}
-                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 sm:h-9 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
+                className="bg-gradient-to-br from-b1 to-amber hover:opacity-90 text-white font-bold text-[10px] sm:text-xs h-8 px-2 sm:px-3 shadow-lg active:scale-95 transition-all flex-shrink-0"
               >
-                <Lightning size={14} weight="fill" className="mr-1 sm:mr-1.5 sm:w-4 sm:h-4" />
+                <Lightning size={14} weight="fill" className="mr-1" />
                 {isBatchAnalyzing ? 'Analyzing...' : `Analyze ${unanalyzedItems.length}`}
               </Button>
             )}
           </div>
-        </div>
-        
-        <div className="px-0 mb-4">
-          <div className="tab-bar queue-tab-bar">
-            <button 
+        )}
+
+        <div className="px-0 mb-2">
+          <div className="tab-bar">
+            <button
               onClick={() => setFilter('ALL')}
               className={cn('tab-btn', filter === 'ALL' && 'active')}
             >
-              ALL
+              <span>All</span>
             </button>
-            <button 
-              onClick={() => setFilter('BUY')}
-              className={cn('tab-btn', filter === 'BUY' && 'active')}
+            <button
+              onClick={() => setFilter('ITEMS')}
+              className={cn('tab-btn', filter === 'ITEMS' && 'active')}
             >
-              BUY {buyCount > 0 && `(${buyCount})`}
+              <span>Items{itemsCount > 0 && ` (${itemsCount})`}</span>
             </button>
-            <button 
-              onClick={() => setFilter('PASS')}
-              className={cn('tab-btn', filter === 'PASS' && 'active')}
+            <button
+              onClick={() => setFilter('LISTED')}
+              className={cn('tab-btn', filter === 'LISTED' && 'active')}
             >
-              PASS {passCount > 0 && `(${passCount})`}
-            </button>
-            <button 
-              onClick={() => setFilter('PENDING')}
-              className={cn('tab-btn', filter === 'PENDING' && 'active')}
-            >
-              PENDING {pendingCount > 0 && `(${pendingCount})`}
+              <span>Listed{listedCount > 0 && ` (${listedCount})`}</span>
             </button>
           </div>
         </div>
         
-        {/* Collapsible search / sort / filter panel */}
-        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <CollapsibleTrigger asChild>
-            <button className="flex items-center justify-between w-full h-9 px-3 mb-2 rounded-lg bg-s1 hover:bg-s2 transition-colors text-left">
-              <div className="flex items-center gap-2">
-                <MagnifyingGlass size={14} weight="bold" className="text-t3" />
-                <span className="text-xs font-semibold text-t2">Search &amp; Filters</span>
-                {hasActiveFilters && (
-                  <span className="w-2 h-2 rounded-full bg-b1 flex-shrink-0" />
-                )}
-              </div>
-              <CaretDown
-                size={14}
-                weight="bold"
-                className={cn('text-t3 transition-transform duration-200', filtersOpen && 'rotate-180')}
-              />
+        {/* Single action strip — Filters + Presets (left), Select All (right) */}
+        <div
+          className="border-b border-s1/60"
+          style={{
+            background: 'color-mix(in oklch, var(--fg) 85%, transparent)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            height: '38px',
+            display: 'flex',
+            alignItems: 'center',
+            overflow: 'hidden',
+            paddingLeft: '12px',
+            paddingRight: '12px',
+          }}
+        >
+          <div className="flex items-center gap-2 flex-1">
+            <AdvancedFilters
+              filters={advancedFilters}
+              onFiltersChange={setAdvancedFilters}
+              availableCategories={availableCategories}
+              priceMin={priceRange.min}
+              priceMax={priceRange.max}
+              showPresets={false}
+              className="h-auto px-0 text-[9px] font-bold text-t1 uppercase tracking-wide border-0 bg-transparent shadow-none rounded-md hover:bg-transparent hover:text-t1 hover:opacity-70"
+            />
+            <button
+              onClick={() => setPresetsOpen(true)}
+              className="text-[9px] font-bold text-t1 uppercase tracking-wide transition-opacity active:opacity-50 flex-shrink-0 hover:opacity-70"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            >
+              Presets
             </button>
-          </CollapsibleTrigger>
-
-          <CollapsibleContent className="space-y-2.5 pb-3">
-            {/* Search */}
-            <div className="relative">
-              <MagnifyingGlass size={16} weight="bold" className="absolute left-3 top-1/2 -translate-y-1/2 text-s3 pointer-events-none" />
-              <Input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, description, category..."
-                className="h-9 pl-9 pr-9 bg-bg border-s2 text-t1 placeholder:text-t3 text-sm"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-t3 hover:text-t1 transition-colors"
-                >
-                  <X size={14} weight="bold" />
-                </button>
-              )}
-            </div>
-
-            {/* Location filter */}
-            {availableLocations.length > 0 && (
-              <div className="flex items-center gap-2">
-                <MapPin size={14} weight="bold" className="text-s4 flex-shrink-0" />
-                <Select
-                  value={advancedFilters.locations?.[0] || 'all'}
-                  onValueChange={(value) => setAdvancedFilters({ ...advancedFilters, locations: value === 'all' ? undefined : [value] })}
-                >
-                  <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                    <SelectValue placeholder="All Locations" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-xs">All Locations</SelectItem>
-                    {availableLocations.map(loc => (
-                      <SelectItem key={loc.id} value={loc.id} className="text-xs">{loc.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Tag filter */}
-            {(allTags || []).length > 0 && (
-              <div className="flex items-center gap-2">
-                <Tag size={14} weight="bold" className="text-s4 flex-shrink-0" />
-                <Select
-                  value={advancedFilters.tags?.[0] || 'all'}
-                  onValueChange={(value) => setAdvancedFilters({ ...advancedFilters, tags: value === 'all' ? undefined : [value] })}
-                >
-                  <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                    <SelectValue placeholder="All Tags" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-xs">All Tags</SelectItem>
-                    {(allTags || []).map(tag => (
-                      <SelectItem key={tag.id} value={tag.id} className="text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
-                          <span>{tag.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Sort */}
-            <div className="flex items-center gap-2">
-              <ArrowsDownUp size={14} weight="bold" className="text-s4 flex-shrink-0" />
-              <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-                <SelectTrigger className="h-9 text-xs font-medium border-s2 bg-fg text-t1 flex-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual" className="text-xs">Manual Order</SelectItem>
-                  <SelectItem value="profit-desc" className="text-xs">Profit ↓</SelectItem>
-                  <SelectItem value="profit-asc" className="text-xs">Profit ↑</SelectItem>
-                  <SelectItem value="date-desc" className="text-xs">Newest First</SelectItem>
-                  <SelectItem value="date-asc" className="text-xs">Oldest First</SelectItem>
-                  <SelectItem value="category-asc" className="text-xs">Category A→Z</SelectItem>
-                  <SelectItem value="category-desc" className="text-xs">Category Z→A</SelectItem>
-                  <SelectItem value="tag-count-desc" className="text-xs">Most Tags First</SelectItem>
-                  <SelectItem value="tag-count-asc" className="text-xs">Fewest Tags First</SelectItem>
-                  <SelectItem value="tag-name-asc" className="text-xs">Tag Name A→Z</SelectItem>
-                  <SelectItem value="tag-name-desc" className="text-xs">Tag Name Z→A</SelectItem>
-                </SelectContent>
-              </Select>
-              {sortBy !== 'manual' && (
-                <Button
-                  onClick={() => setSortBy('manual')}
-                  size="sm" variant="ghost"
-                  className="h-9 px-2 text-xs text-t3 hover:text-t1 flex-shrink-0"
-                >
-                  <X size={13} weight="bold" />
-                </Button>
-              )}
-            </div>
-
-            {/* Advanced filters + presets */}
-            <div className="flex items-center gap-2">
-              <AdvancedFilters
-                filters={advancedFilters}
-                onFiltersChange={setAdvancedFilters}
-                availableCategories={availableCategories}
-                priceMin={priceRange.min}
-                priceMax={priceRange.max}
-              />
-              <Button
-                onClick={() => setPresetsOpen(true)}
-                size="sm" variant="outline"
-                className="h-9 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1 flex-1"
-              >
-                <BookmarkSimple size={14} weight="bold" className="mr-1.5" />
-                Presets
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
+          <button
+            onClick={handleSelectAll}
+            className="text-[9px] font-bold text-t1 uppercase tracking-wide transition-opacity active:opacity-50 flex-shrink-0"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {allFilteredSelected ? 'Deselect All' : 'Select All'}
+          </button>
+        </div>
 
         <FilterPresetsManager
           isOpen={presetsOpen}
@@ -1224,61 +1190,39 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           onRemoveFilter={handleRemoveFilter}
           className="mb-3"
         />
-        
-        {filteredItems.length > 0 && (
-          <div className="flex items-center gap-2">
+
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-s1/60">
+            <span className="text-xs font-medium text-b1 flex-shrink-0">
+              {selectedIds.size} selected
+            </span>
             <Button
-              onClick={handleSelectAll}
+              onClick={() => setBulkTagDialogOpen(true)}
               size="sm"
               variant="outline"
-              className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+              className="h-7 px-2.5 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
             >
-              {allFilteredSelected ? (
-                <>
-                  <CheckSquare size={14} weight="fill" className="mr-1" />
-                  Deselect All
-                </>
-              ) : (
-                <>
-                  <Square size={14} weight="bold" className="mr-1" />
-                  Select All
-                </>
-              )}
+              <Tag size={12} weight="bold" className="mr-1" />
+              Tags
             </Button>
-            {selectedIds.size > 0 && (
-              <div className="flex items-center gap-2 flex-1">
-                <span className="text-xs font-medium text-b1">
-                  {selectedIds.size} selected
-                </span>
-                <Button
-                  onClick={() => setBulkTagDialogOpen(true)}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
-                >
-                  <Tag size={14} weight="bold" className="mr-1" />
-                  Tags
-                </Button>
-                <Button
-                  onClick={handleExportCSV}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
-                >
-                  <DownloadSimple size={14} weight="bold" className="mr-1" />
-                  Export
-                </Button>
-                <Button
-                  onClick={handleBulkRemove}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 text-xs font-medium border border-red/30 bg-transparent text-red hover:bg-red/10 hover:text-red"
-                >
-                  <Trash size={14} weight="bold" className="mr-1" />
-                  Remove
-                </Button>
-              </div>
-            )}
+            <Button
+              onClick={handleExportCSV}
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 text-xs font-medium border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+            >
+              <DownloadSimple size={12} weight="bold" className="mr-1" />
+              Export
+            </Button>
+            <Button
+              onClick={handleBulkRemove}
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 text-xs font-medium border border-red/30 bg-transparent text-red hover:bg-red/10 hover:text-red"
+            >
+              <Trash size={12} weight="bold" className="mr-1" />
+              Remove
+            </Button>
           </div>
         )}
         
@@ -1293,49 +1237,60 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       </div>
 
       {filteredItems.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
+        <div className="flex flex-col items-center justify-center min-h-[58vh] px-6 text-center">
           {queueItems.length === 0 && onAddManualItem ? (
-            <button
-              onClick={() => setShowAddDialog(true)}
-              className="w-24 h-24 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-4 shadow-lg active:scale-95 transition-all"
-            >
-              <Package size={40} weight="duotone" className="text-white" />
-            </button>
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-s1 flex items-center justify-center mb-4">
-              <p className="text-3xl">
-                {searchQuery ? '🔍' : filter === 'BUY' ? '✅' : filter === 'PASS' ? '❌' : filter === 'PENDING' ? '⏳' : '📦'}
+            <>
+              <button
+                onClick={() => setShowAddDialog(true)}
+                className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg active:scale-95 transition-all"
+                style={{ boxShadow: 'var(--send-glow)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <Package size={44} weight="duotone" className="text-white" />
+              </button>
+              <h2 className="text-xl font-bold text-t1 mb-2">Queue is empty</h2>
+              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">
+                Tap the icon above to add an item manually, or use the camera to scan one
               </p>
-            </div>
-          )}
-          <h2 className="text-lg font-semibold text-t1 mb-2">
-            {searchQuery
-              ? 'No items found'
-              : queueItems.length === 0
-                ? 'Queue is empty'
-                : `No ${filter} items`
-            }
-          </h2>
-          <p className="text-sm text-t2 max-w-xs">
-            {searchQuery
-              ? `No items match "${searchQuery}". Try a different search term.`
-              : queueItems.length === 0
-                ? 'Tap the icon above to add an item manually, or scan with the camera'
-                : `Try selecting a different filter to view items`
-            }
-          </p>
-          {searchQuery && (
-            <Button
-              onClick={() => setSearchQuery('')}
-              variant="outline"
-              className="mt-4 border-s2 text-t2 hover:bg-s1 hover:text-t1"
-            >
-              Clear Search
-            </Button>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 rounded-3xl bg-s1 flex items-center justify-center mb-5">
+                <p className="text-3xl">
+                  {searchQuery ? '🔍' : filter === 'LISTED' ? '✅' : '📦'}
+                </p>
+              </div>
+              <h2 className="text-xl font-bold text-t1 mb-2">
+                {searchQuery
+                  ? 'No items found'
+                  : filter === 'LISTED'
+                    ? 'Nothing listed yet'
+                    : 'No items to list'
+                }
+              </h2>
+              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">
+                {searchQuery
+                  ? `No items match "${searchQuery}". Try a different search term.`
+                  : filter === 'LISTED'
+                    ? 'Items will appear here once pushed to eBay or Notion'
+                    : 'Try selecting a different filter to view items'}
+              </p>
+              {searchQuery && (
+                <Button
+                  onClick={() => setSearchQuery('')}
+                  variant="outline"
+                  className="mt-4 border-s2 text-t2 hover:bg-s1 hover:text-t1"
+                >
+                  Clear Search
+                </Button>
+              )}
+            </>
           )}
         </div>
       ) : (
-        <ScrollArea className="flex-1 px-3 sm:px-4 md:px-5 py-3 sm:py-4">
+        <div
+          className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-5 pt-3 sm:pt-4"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }}
+        >
           {onReorder ? (
             <DndContext
               sensors={sensors}
@@ -1367,6 +1322,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onDelist={onDelist}
                       onReanalyze={onReanalyze}
                       onOpenDetail={onOpenDetail}
+                      onBuyItem={onBuyItem}
                     />
                   ))}
                 </div>
@@ -1380,29 +1336,34 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                   <Card
                     key={item.id}
                     className={cn(
-                      "p-3 sm:p-3.5 md:p-4 border transition-colors",
+                      "p-2 sm:p-3 md:p-4 border transition-colors",
                       isSelected ? 'border-b1 bg-accent-3/40' : 'border-s2'
                     )}
                   >
-                    <div className="flex gap-2.5 sm:gap-3 md:gap-3.5">
+                    <div className="flex gap-1.5 sm:gap-3 md:gap-3.5">
                       <div className="flex flex-col gap-2 items-center justify-start pt-0.5 flex-shrink-0">
-                        <Checkbox
-                          id={`select-${item.id}`}
-                          checked={isSelected}
-                          onCheckedChange={() => handleToggleSelect(item.id)}
-                          className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
-                        />
+                        <label
+                          htmlFor={`select-bulk-${item.id}`}
+                          className="flex items-center justify-center w-8 h-8 -m-1.5 cursor-pointer"
+                        >
+                          <Checkbox
+                            id={`select-bulk-${item.id}`}
+                            checked={isSelected}
+                            onCheckedChange={() => handleToggleSelect(item.id)}
+                            className="w-3 h-3 border data-[state=checked]:bg-b1 data-[state=checked]:border-b1"
+                          />
+                        </label>
                       </div>
                       {(item.imageThumbnail || item.imageData) && (
                         <img
                           src={item.imageThumbnail || item.imageData}
                           alt={item.productName || 'Item'}
-                          className="w-16 h-16 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+                          className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-2 md:mb-2.5">
-                          <h3 className="font-semibold text-t1 text-sm md:text-base line-clamp-2">
+                        <div className="flex items-start justify-between gap-2 mb-0.5 md:mb-2.5">
+                          <h3 className="font-bold text-t1 text-[11px] sm:text-sm md:text-base line-clamp-2 leading-snug tracking-tight">
                             {item.productName || 'Unknown Item'}
                           </h3>
                           {item.profitMargin != null && isFinite(item.profitMargin) && (
@@ -1420,7 +1381,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-xs font-mono text-s4 mb-2">
+                        <div className="flex items-center gap-1.5 sm:gap-4 text-[10px] sm:text-xs font-mono text-s4 mb-1 sm:mb-2">
                           <span>Cost: ${item.purchasePrice.toFixed(2)}</span>
                           {item.estimatedSellPrice != null && item.estimatedSellPrice > 0
                             ? <span>Sell: ${item.estimatedSellPrice.toFixed(2)}</span>
@@ -1450,7 +1411,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                                       e.stopPropagation()
                                       const updatedTags = item.tags?.filter(t => t !== tagId) || []
                                       onEdit(item.id, { tags: updatedTags })
-                                      toast.success(`Removed tag: ${tag.name}`)
+                                      logActivity(`Removed tag: ${tag.name}`)
                                     }}
                                     className="flex items-center justify-center hover:opacity-70 transition-opacity"
                                     aria-label={`Remove ${tag.name} tag`}
@@ -1473,14 +1434,28 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           >
                             <PencilSimple size={13} weight="bold" aria-hidden />
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => onCreateListing(item.id)}
-                            aria-label="Create listing"
-                            className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
-                          >
-                            List
-                          </Button>
+                          {item.decision === 'BUY' ? (
+                            !item.optimizedListing && (
+                              <Button
+                                size="sm"
+                                onClick={() => onCreateListing(item.id)}
+                                aria-label="Optimize listing"
+                                className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
+                              >
+                                Optimize
+                              </Button>
+                            )
+                          ) : onBuyItem ? (
+                            <Button
+                              size="sm"
+                              onClick={() => onBuyItem(item.id)}
+                              aria-label="Buy this item"
+                              className="flex-1 text-white h-7 md:h-8 text-[11px] md:text-xs font-bold active:scale-[0.98] transition-all"
+                              style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                            >
+                              Buy ✅
+                            </Button>
+                          ) : null}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -1558,8 +1533,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               </Collapsible>
             )
           })()}
-        </ScrollArea>
+        </div>
       )}
+      </div> {/* end transform wrapper */}
     </div>
   )
 }

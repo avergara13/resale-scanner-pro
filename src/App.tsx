@@ -1,6 +1,8 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
+import { logActivity, ACTIVITY_LOG_KEY, MAX_ACTIVITY_ENTRIES, type ActivityEntry } from './lib/activity-log'
+import { logDebug, DEBUG_LOG_KEY, MAX_DEBUG_ENTRIES, type DebugEntry } from './lib/debug-log'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BottomNav } from './components/BottomNav'
 import { AppHeader } from './components/AppHeader'
@@ -8,6 +10,7 @@ import { CameraOverlay } from './components/CameraOverlay'
 import { BatchAnalysisProgress } from './components/BatchAnalysisProgress'
 import { RetryStatusIndicator } from './components/RetryStatusIndicator'
 import { AIScreen } from './components/screens/AIScreen'
+import { AgentScreen } from './components/screens/AgentScreen'
 import { SessionScreen } from './components/screens/SessionScreen'
 import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
@@ -21,7 +24,8 @@ import { ListingDetailScreen } from './components/screens/ListingDetailScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { retryOperation } from './lib/retry-service'
 import { getRetryOptions } from './lib/retry-config'
-import { callLLM, researchProduct, parseResearchPrice } from './lib/llm-service'
+import { callLLM, researchProduct, parseResearchPrice, parseSellThroughRate } from './lib/llm-service'
+import { calculatePlatformROI } from './lib/platform-roi-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
@@ -35,8 +39,9 @@ import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { BarcodeProduct } from './lib/barcode-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform, SoldItem, SoldShippingUpdateInput } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, SoldItem, SoldShippingUpdateInput, UserProfile, ResalePlatform } from './types'
 import { cn } from './lib/utils'
+import { useDeviceId } from './hooks/use-device-id'
 
 /** Pure helper — determines BUY/PASS/PENDING from profit metrics */
 function makeDecision(
@@ -57,8 +62,12 @@ function App() {
   const [showSessionTrends, setShowSessionTrends] = useState(false)
   const [agentPendingMessage, setAgentPendingMessage] = useState<string | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraMode, setCameraMode] = useState<'new-scan' | 'add-photo' | 'replace-primary'>('new-scan')
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
+  // Tracks whether the current scan-result was opened from the Agent Scans tab (Reopen)
+  // vs a fresh camera scan. Used to show "← Scans" back label in the header.
+  const [openedFromScans, setOpenedFromScans] = useState(false)
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
@@ -69,13 +78,26 @@ function App() {
   const [soldSyncedAt, setSoldSyncedAt] = useState<number | null>(null)
 
   
+  const deviceId = useDeviceId()
+
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
+  // Ref mirror of `queue` — used by pipeline handlers to escape stale closures
+  // when the Agent runs multi-step flows (batch-analyze → optimize → push) and
+  // subsequent handlers need the latest queue state, not the pre-pipeline snapshot.
+  const queueRef = useRef(queue)
+  useEffect(() => { queueRef.current = queue }, [queue])
   const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
-  const [session, setSession] = useKV<Session | undefined>('currentSession', undefined)
+  // Device-scoped: each device has its own active session — prevents cross-device collisions
+  const [session, setSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
-  const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
+  const [allTags] = useKV<ItemTag[]>('all-tags', [])
   const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
-  const [settings, setSettings] = useKV<AppSettings>('settings', {
+  const [, setActivityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
+  const [, setDebugLog] = useKV<DebugEntry[]>(DEBUG_LOG_KEY, [])
+  // Global profile — not device-scoped so operator identity syncs across all devices
+  const [globalProfile, setGlobalProfile] = useKV<UserProfile | undefined>('user-profile', undefined)
+  // Device-scoped: each device has its own settings (thresholds, API keys, profile)
+  const [settings, setSettings] = useKV<AppSettings>(`device-settings-${deviceId}`, {
     voiceEnabled: true,
     autoCapture: true,
     agenticMode: true,
@@ -87,9 +109,11 @@ function App() {
     minProfitMargin: 30,
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
-    paypalFeePercent: 3.49,
+    ebayAdFeePercent: 3.0,
+    shippingMaterialsCost: 0.75,
+    paypalFeePercent: 0,
     preferredAiModel: 'gemini-2.5-flash',
-    notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
+    notionDatabaseId: '3318ed3e138545d39a6063a628eeefff',
     imageQuality: { preset: 'balanced' },
     // Pre-populated from Railway env vars — both users get keys automatically.
     // Overridable per-device in Settings if needed.
@@ -103,10 +127,10 @@ function App() {
   })
   
   const { captureState, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset } = useCaptureState()
-  const { theme, themeMode, setTheme, useAmbientLight, toggleAmbientLight } = useTheme()
+  const { themeMode, setTheme, toggleAmbientLight } = useTheme()
   const imageQualityPreset = settings?.imageQuality?.preset || 'balanced'
-  const { optimizeAndCache, isOptimizing: isOptimizingImage } = useImageOptimization(imageQualityPreset)
-  const { state: retryState, startRetry, updateRetry, completeRetry } = useRetryTracker()
+  const { optimizeAndCache } = useImageOptimization(imageQualityPreset)
+  const { state: retryState } = useRetryTracker()
 
   const ebayService = useMemo(() => {
     return createEbayService(
@@ -161,7 +185,7 @@ function App() {
     setAllSessions((prev) => (prev || []).map(s =>
       s.id === sessionId ? { ...s, deletedAt: undefined } : s
     ))
-    toast.success('Session restored')
+    logActivity('Session restored')
   }, [setAllSessions])
 
   const handlePermanentDeleteSession = useCallback((sessionId: string) => {
@@ -199,30 +223,54 @@ function App() {
     ))
   }, [])
 
-  const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
+  const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct, existingItem?: ScannedItem) => {
+    // Route to add-photo handler — append this image to the current item without a new pipeline run
+    if (cameraMode === 'add-photo') {
+      setCameraMode('new-scan')
+      setCameraOpen(false)
+      await handleAddPhotoToCurrentItem(imageData)
+      return
+    }
+
+    // Replace-primary mode — treat currentItem as the existing item so ID is preserved
+    const effectiveExistingItem =
+      cameraMode === 'replace-primary' && currentItem ? currentItem : existingItem
+    if (cameraMode === 'replace-primary') setCameraMode('new-scan')
+
     triggerCapture()
     setCameraOpen(false)
 
     try {
       const optimized = await optimizeAndCache(imageData)
-    
-    const newItem: ScannedItem = {
-      id: Date.now().toString(),
-      timestamp: Date.now(),
-      imageData: optimized.original,
-      imageThumbnail: optimized.thumbnail,
-      imageOptimized: optimized.original,
-      purchasePrice: price,
-      decision: 'PENDING',
-      inQueue: false,
-      location,
-      sessionId: session?.id,
-      // Pre-seed from barcode lookup; Gemini vision will overwrite with better data if available
-      productName: barcodeProduct?.title || undefined,
-    }
+
+    // If re-analyzing an existing item, preserve its ID and metadata so we don't
+    // create a duplicate card in scan history. Otherwise create a fresh item.
+    const newItem: ScannedItem = effectiveExistingItem
+      ? {
+          ...effectiveExistingItem,
+          imageData: optimized.original,
+          imageThumbnail: optimized.thumbnail,
+          imageOptimized: optimized.original,
+          decision: 'PENDING' as const,   // reset for clean pipeline run
+        }
+      : {
+          id: Date.now().toString(),
+          timestamp: Date.now(),
+          imageData: optimized.original,
+          imageThumbnail: optimized.thumbnail,
+          imageOptimized: optimized.original,
+          purchasePrice: price,
+          decision: 'PENDING',
+          inQueue: false,
+          location,
+          sessionId: session?.id,
+          scannedBy: settings?.userProfile?.operatorId,
+          // Pre-seed from barcode lookup; Gemini vision will overwrite with better data if available
+          productName: barcodeProduct?.title || undefined,
+        }
     setCurrentItem(newItem)
-    setScreen('agent')
-    
+    setScreen('scan-result')
+
     const steps: PipelineStep[] = [
       { id: 'vision', label: 'Vision Analysis', status: 'processing', progress: 0 },
       { id: 'lens', label: 'Google Lens', status: 'pending', progress: 0 },
@@ -233,17 +281,23 @@ function App() {
     setPipeline(steps)
     
     startAnalyzing()
-    
+    logDebug('Scan pipeline started', 'info', 'scan', { price, hasGemini: !!geminiService, hasLens: !!googleLensService })
+
     try {
       let visionResult: GeminiVisionResponse | undefined
       // Fall back to barcode title if Gemini vision is unavailable
       let mockProductName = barcodeProduct?.title || 'Unknown Product'
-      
+
       simulateProgress(0, 3000)
       
       if (geminiService) {
         try {
-          visionResult = await geminiService.analyzeProductImage(imageData, {}, price)
+          visionResult = await geminiService.analyzeProductImage(
+            imageData,
+            {},
+            price,
+            newItem.additionalImageData?.length ? newItem.additionalImageData : undefined,
+          )
           mockProductName = visionResult.productName
           
           setPipeline(prev => prev.map((s, i) =>
@@ -296,11 +350,8 @@ function App() {
         try {
           lensAnalysis = await googleLensService.searchByImage(imageData, visionResult?.productName || mockProductName)
           
-          const resultCount = lensAnalysis.results.length
-          const priceInfo = lensAnalysis.priceRange 
-            ? `$${lensAnalysis.priceRange.min.toFixed(2)}-$${lensAnalysis.priceRange.max.toFixed(2)}` 
-            : 'No prices'
-          
+          completeStep(1)
+          await new Promise(resolve => setTimeout(resolve, 100))
           setPipeline(prev => prev.map((s, i) =>
             i === 1 ? {
               ...s,
@@ -400,11 +451,10 @@ function App() {
             i === 2 ? { ...s, data: 'Using estimated pricing (eBay API unavailable)' } : s
           ))
         })
-        setPipeline(prev => prev.map((s, i) =>
-          i === 2 ? { ...s, status: 'complete' as const, progress: 100 } : s
-        ))
-      } else {
-        // No eBay API — use Gemini Google Search grounding to get real market comps
+      }
+
+      // Run Gemini market research if: no eBay service was available, OR eBay returned no usable price
+      if (!ebayService || ebayAvgPrice === 0) {
         const geminiKey = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
         if (geminiKey) {
           setPipeline(prev => prev.map((s, i) =>
@@ -418,6 +468,11 @@ function App() {
             )
             // Store for listing detail agent context
             marketData = { ...(marketData || {}), researchSummary: researchText }
+            // Parse and store sell-through rate from research text
+            const researchSellThrough = parseSellThroughRate(researchText)
+            if (researchSellThrough > 0) {
+              marketData = { ...marketData, sellThroughRate: researchSellThrough }
+            }
             // Parse recommended sell price from research text
             const researchPrice = parseResearchPrice(researchText)
             if (researchPrice > 0) {
@@ -443,7 +498,7 @@ function App() {
                     i === 2 ? { ...s, data: `Est. market value ~$${directPrice.toFixed(2)}` } : s
                   ))
                 }
-              } catch { /* fall through to Tier 3 */ }
+              } catch (e) { console.warn('[Scan] Tier 2 LLM pricing failed:', e) }
 
               if (!gotPrice) {
                 // Tier 3: Claude deep research fallback (task: 'complex' tries Anthropic first)
@@ -464,7 +519,8 @@ function App() {
                       i === 2 ? { ...s, data: 'Market data unavailable — enter price above' } : s
                     ))
                   }
-                } catch {
+                } catch (e) {
+                  console.warn('[Scan] Tier 3 Claude research failed:', e)
                   setPipeline(prev => prev.map((s, i) =>
                     i === 2 ? { ...s, data: 'Market data unavailable — enter price above' } : s
                   ))
@@ -490,7 +546,7 @@ function App() {
                   i === 2 ? { ...s, data: `Est. value ~$${fallbackPrice.toFixed(2)} (Claude research)` } : s
                 ))
               }
-            } catch { /* both failed */ }
+            } catch (e) { console.warn('[Scan] Outer LLM fallback failed:', e) }
             if (!recovered) {
               setPipeline(prev => prev.map((s, i) =>
                 i === 2 ? { ...s, data: 'Search unavailable' } : s
@@ -502,10 +558,9 @@ function App() {
             i === 2 ? { ...s, data: 'Add Gemini API key in Settings for live market search' } : s
           ))
         }
-        setPipeline(prev => prev.map((s, i) =>
-          i === 2 ? { ...s, status: 'complete' as const, progress: 100 } : s
-        ))
       }
+      completeStep(2)
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       // Sell price fallback chain: eBay/Gemini research → Google Lens average → 4.5× markup (only if price > 0)
       if (ebayAvgPrice <= 0) {
@@ -532,18 +587,35 @@ function App() {
       const profitMetrics = ebayService?.calculateProfitMetrics(
         price,
         sellPrice,
-        settings?.defaultShippingCost || 5.0,
-        settings?.ebayFeePercent || 12.9,
-        settings?.paypalFeePercent || 3.49
+        settings?.defaultShippingCost ?? 5.0,
+        settings?.ebayFeePercent ?? 12.9,
+        0,                                          // paypalFeePercent (deprecated)
+        0.30,                                       // perOrderFee (eBay fixed)
+        settings?.ebayAdFeePercent ?? 3.0,          // ad/promoted listings fee from Business Rules
+        settings?.shippingMaterialsCost ?? 0.75     // packaging materials cost from Business Rules
       ) || calculateProfitFallback(
         price,
         sellPrice,
-        settings?.defaultShippingCost || 5.0,
-        settings?.ebayFeePercent || 12.9
+        settings?.defaultShippingCost ?? 5.0,
+        settings?.ebayFeePercent ?? 12.9,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       )
 
       const minMargin = settings?.minProfitMargin || 30
       const decision = makeDecision(ebayAvgPrice, price, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
+
+      // Multi-platform ROI comparison (Mercari / Poshmark / Whatnot — eBay is primary, FB excluded)
+      const platformComparison = sellPrice > 0 ? calculatePlatformROI(
+        price,
+        sellPrice,
+        settings?.defaultShippingCost ?? 5.0,
+        settings?.shippingMaterialsCost ?? 0.75,
+        settings?.ebayFeePercent ?? 12.9,
+        settings?.ebayAdFeePercent ?? 3.0
+      ) : []
+      const bestAlt = platformComparison.find(p => p.recommended)
 
       // Free item on standard platforms: if fees eat all profit, recommend fee-free local platform
       const freeItemPlatformHint =
@@ -556,23 +628,21 @@ function App() {
       } else {
         triggerFail()
       }
-      
+
+      completeStep(3)
+      await new Promise(resolve => setTimeout(resolve, 100))
       setPipeline(prev => prev.map((s, i) =>
         i === 3 ? {
           ...s,
-          status: 'complete' as const,
-          progress: 100,
-          data: `Margin: ${profitMetrics.profitMargin.toFixed(1)}%, ROI: ${profitMetrics.roi.toFixed(0)}%`
+          data: bestAlt && sellPrice > 0
+            ? `eBay: ${profitMetrics.profitMargin.toFixed(1)}% margin · Best alt: ${bestAlt.platform} ${bestAlt.profitMargin.toFixed(1)}%`
+            : `Margin: ${profitMetrics.profitMargin.toFixed(1)}%, ROI: ${profitMetrics.roi.toFixed(0)}%`
         } : s
       ))
 
-      setPipeline(prev => prev.map((s, i) =>
-        i === 4 ? { ...s, status: 'processing' as const, progress: 0 } : s
-      ))
-      simulateProgress(4, 500)
       await new Promise(resolve => setTimeout(resolve, 500))
       completeStep(4)
-      
+
       const updatedItem: ScannedItem = {
         ...newItem,
         productName: visionResult?.productName || barcodeProduct?.title || mockProductName,
@@ -583,6 +653,7 @@ function App() {
         decision,
         lensAnalysis,
         lensResults: lensAnalysis?.results,
+        platformComparison: platformComparison.length > 0 ? platformComparison : undefined,
         marketData: {
           ...marketData,
           // Preserve barcode lookup data for listing generation context
@@ -606,7 +677,11 @@ function App() {
           setQueue(prev => (prev || []).map(i =>
             i.id === itemId ? { ...i, marketData: { ...i.marketData, researchSummary: researchText } } : i
           ))
-        }).catch(() => {/* silent — non-blocking enrichment */})
+        }).catch((err: unknown) => {
+          // Non-blocking enrichment — log for ops visibility but never surface to UI
+          const msg = err instanceof Error ? err.message : String(err)
+          console.warn('[research] Non-blocking enrichment failed for', newItem.id, '—', msg)
+        })
       }
 
       const tagSuggestions = tagSuggestionService.suggestTags(updatedItem)
@@ -620,7 +695,16 @@ function App() {
       const persistableItem = { ...updatedItem }
       delete persistableItem.imageData
       delete persistableItem.imageOptimized
-      setScanHistory(prev => [persistableItem, ...(prev || []).slice(0, 499)])
+      delete persistableItem.additionalImageData  // strip full base64; keep additionalImages thumbnails
+      setScanHistory(prev => {
+        const existing = prev || []
+        if (effectiveExistingItem) {
+          // Re-analyze path: replace the existing scan history entry in-place (no new card)
+          const idx = existing.findIndex(i => i.id === effectiveExistingItem.id)
+          if (idx !== -1) return existing.map((i, j) => j === idx ? persistableItem : i)
+        }
+        return [persistableItem, ...existing.slice(0, 499)]
+      })
 
       if (session?.active) {
         setSession((prev) => {
@@ -634,12 +718,20 @@ function App() {
           }
         })
       }
-      
-      toast.success(decision === 'BUY' ? '✅ BUY Decision!' : '❌ PASS Decision')
+
+      logActivity(decision === 'BUY' ? '✅ Analysis complete — it\'s a BUY!' : '❌ Analysis done — PASS')
+      logDebug(`Scan complete — ${decision}`, 'info', 'scan', {
+        product: updatedItem.productName,
+        buyPrice: updatedItem.purchasePrice,
+        sellPrice: updatedItem.estimatedSellPrice,
+        margin: updatedItem.profitMargin,
+      })
+      setScreen('scan-result')
     } catch (error) {
       console.error('Pipeline error:', error)
-      setPipeline(prev => prev.map(s => ({ 
-        ...s, 
+      reset() // Clear stuck 'analyzing' captureState
+      setPipeline(prev => prev.map(s => ({
+        ...s,
         status: s.status === 'processing' ? 'error' : s.status,
         error: 'Analysis failed'
       })))
@@ -647,11 +739,12 @@ function App() {
       }
     } catch (outerError) {
       // Catch errors from optimizeAndCache or any unhandled rejection
+      reset() // Clear stuck 'analyzing' captureState
       const msg = outerError instanceof Error ? outerError.message : 'Unknown error'
       console.error('Capture failed:', msg)
       toast.error(msg.toLowerCase().includes('quota') ? 'Storage full — clearing cache and retrying. Please try again.' : `Capture failed: ${msg}`)
     }
-  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, simulateProgress, completeStep, tagSuggestionService, setScanHistory])
+  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset, simulateProgress, completeStep, tagSuggestionService, setScanHistory])
 
   const handleRemoveFromQueue = useCallback((id: string) => {
     setQueue((prev) => (prev || []).filter(item => item.id !== id))
@@ -659,16 +752,25 @@ function App() {
   }, [setQueue])
 
   const handleStartSession = useCallback(() => {
-    const now = new Date()
-    const hour = now.getHours()
-    const timeOfDay = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening'
-    const dayName = now.toLocaleDateString('en-US', { weekday: 'short' })
-    const monthDay = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const name = `${dayName} ${timeOfDay} — ${monthDay}`
+    // Per-operator session counter — derived from allSessions, never conflicts between devices.
+    // Uses max(sessionNumber) across ALL sessions (including soft-deleted) to guarantee
+    // unique IDs even after deletions. Matching by operatorId handles multi-operator teams;
+    // sessions without operatorId (pre-profile or no-profile) are grouped together.
+    // Prefer device-scoped profile; fall back to global profile (set by any device)
+    const profile = settings?.userProfile ?? globalProfile
+    const operatorId = profile?.operatorId
+    const operatorAllSessions = (allSessions || []).filter(s =>
+      operatorId ? s.operatorId === operatorId : !s.operatorId
+    )
+    const sessionNumber = operatorAllSessions.reduce((max, s) => Math.max(max, s.sessionNumber || 0), 0) + 1
+    const initial = profile?.operatorInitial || ''
+    const prefix = initial ? `${initial}-` : '#'
+    const name = `${prefix}${String(sessionNumber).padStart(3, '0')}`
     const id = Date.now().toString()
     const newSession: Session = {
       id,
       name,
+      sessionNumber,
       startTime: Date.now(),
       itemsScanned: 0,
       buyCount: 0,
@@ -676,13 +778,17 @@ function App() {
       totalPotentialProfit: 0,
       active: true,
       sessionType: 'business',
+      operatorId: profile?.operatorId,
+      operatorName: profile?.operatorName,
+      operatorInitial: profile?.operatorInitial,
     }
     setAllSessions((prev) => [...(prev || []), newSession])
     setSession(newSession)
     setSelectedSessionId(id)
     setScreen('session-detail')
-    toast.success('Session started')
-  }, [setSession, setAllSessions, setSelectedSessionId, setScreen])
+    logActivity(`Session started${profile?.operatorName ? ` by ${profile.operatorName}` : ''}`)
+    logDebug('Session started', 'info', 'session', { id, operatorId, sessionNumber })
+  }, [allSessions, settings?.userProfile, globalProfile, setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -711,7 +817,7 @@ function App() {
           setAllSessions((prev) => (prev || []).map(s =>
             s.id === sessionId ? { ...s, deletedAt: undefined } : s
           ))
-          toast.success('Session restored')
+          logActivity('Session restored')
         },
       },
       duration: 10000,
@@ -744,9 +850,18 @@ function App() {
         (prev || []).map(s => s.id === session.id ? endedSession : s)
       )
       setSession(undefined)
-      toast.success('Session ended')
+      logActivity('Session ended')
     }
   }, [session, setSession, setAllSessions, setQueue])
+
+  const handleReopenSession = useCallback((sessionId: string) => {
+    const sess = (allSessions || []).find(s => s.id === sessionId)
+    if (!sess) return
+    const reopened: Session = { ...sess, active: true, endTime: undefined }
+    setAllSessions((prev) => (prev || []).map(s => s.id === sessionId ? reopened : s))
+    setSession(reopened)
+    logActivity('Session reopened')
+  }, [allSessions, setAllSessions, setSession])
 
   // Keep allSessions in sync with the current active session (scan counts, profit, etc.)
   // Only sync if the session still exists in allSessions (hasn't been deleted)
@@ -775,6 +890,10 @@ function App() {
   }, [session, setSession, setAllSessions])
 
   const handleUpdateSettings = useCallback((updates: Partial<AppSettings>) => {
+    // Sync userProfile to global key so all devices share operator identity
+    if (updates.userProfile) {
+      setGlobalProfile(updates.userProfile)
+    }
     setSettings((prev) => {
       const defaults: AppSettings = {
         voiceEnabled: true,
@@ -787,7 +906,9 @@ function App() {
         minProfitMargin: 30,
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
-        paypalFeePercent: 3.49,
+        ebayAdFeePercent: 0,
+        shippingMaterialsCost: 0,
+        paypalFeePercent: 0,
         preferredAiModel: 'gemini-2.5-flash',
       }
       const newSettings = { ...(prev || defaults), ...updates }
@@ -809,10 +930,12 @@ function App() {
       
       return newSettings
     })
-  }, [setSettings, setTheme, toggleAmbientLight])
+  }, [setSettings, setGlobalProfile, setTheme, toggleAmbientLight])
 
   const handleOptimizeItem = useCallback(async (itemId: string) => {
-    const item = (queue || []).find(i => i.id === itemId)
+    // Read fresh queue via ref to avoid stale closure when agent pipeline
+    // chains batch-analyze → optimize (items that just flipped PENDING→BUY)
+    const item = (queueRef.current || []).find(i => i.id === itemId)
     if (!item || item.decision !== 'BUY' || item.optimizedListing) return
     const optimized = await listingOptimizationService.generateOptimizedListing({
       item,
@@ -828,20 +951,39 @@ function App() {
         ? { ...i, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
         : i
     ))
-  }, [queue, setQueue, listingOptimizationService])
+  }, [setQueue, listingOptimizationService])
 
   const handlePushToNotion = useCallback(async (itemId: string) => {
     if (!notionService) {
       toast.error('Configure Notion API key and Database ID in Settings')
       return
     }
-    const item = (queue || []).find(i => i.id === itemId)
+    // Read fresh queue via ref — pipeline just optimized this item, stale
+    // closure would still show optimizedListing as undefined.
+    const item = (queueRef.current || []).find(i => i.id === itemId)
     if (!item || item.notionPageId || !item.optimizedListing) return
 
     const listing = item.optimizedListing
     const profit = listing
       ? listing.price - item.purchasePrice
       : (item.estimatedSellPrice || 0) - item.purchasePrice
+
+    // Resolve session context for traceability — item carries the session UUID,
+    // look it up in allSessions to get the human-readable name ('AV-001') and number.
+    const linkedSession = (allSessions || []).find(s => s.id === item.sessionId)
+    const expenseType = linkedSession?.sessionType === 'business'
+      ? '💼 Business' as const
+      : linkedSession?.sessionType === 'personal'
+      ? '🏡 Personal' as const
+      : undefined
+
+    // Build platform ROI summary string to append to Market Notes
+    const platformROINote = item.platformComparison?.length
+      ? 'Platform ROI — ' + item.platformComparison
+          .map(p => `${p.platform}: $${p.netProfit.toFixed(2)} (${p.profitMargin.toFixed(0)}%)`)
+          .join(' | ')
+      : undefined
+    const combinedNotes = [item.notes, platformROINote].filter(Boolean).join('\n')
 
     const result = await notionService.pushListing({
       title: listing?.title || item.productName || 'Unknown Item',
@@ -858,7 +1000,13 @@ function App() {
       itemId: item.id,
       timestamp: item.timestamp,
       location: item.location?.name,
-      notes: item.notes,
+      notes: combinedNotes || undefined,
+      // Session + operator traceability
+      sessionId: linkedSession?.name,
+      sessionNumber: linkedSession?.sessionNumber,
+      scannedBy: item.scannedBy,
+      operatorName: linkedSession?.operatorName || settings?.userProfile?.operatorName,
+      expenseType,
     })
 
     if (result.success) {
@@ -871,11 +1019,11 @@ function App() {
       if (result.pageId && notionService) {
         notionService.updateListingStatus(result.pageId, { status: 'published' }).catch(e => console.warn('Notion status update failed:', e))
       }
-      toast.success('Pushed to Notion ✓')
+      logActivity('Pushed to Notion ✓')
     } else {
       toast.error(`Notion error: ${result.error}`)
     }
-  }, [queue, setQueue, notionService])
+  }, [setQueue, notionService, allSessions, settings])
 
   const handleMarkAsSold = useCallback((
     itemId: string,
@@ -890,7 +1038,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'sold', soldPrice, soldOn, soldDate }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item marked as sold')
+    logActivity('Item marked as sold')
   }, [setQueue, queue, notionService])
 
   const loadLiveSoldItems = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -914,7 +1062,7 @@ function App() {
     try {
       await updateSoldItemShipping(pageId, update)
       await loadLiveSoldItems({ silent: true })
-      toast.success('Shipping details saved')
+      logActivity('Shipping details saved')
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to save shipping details'
       toast.error(message)
@@ -931,7 +1079,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'shipped', trackingNumber, shippingCarrier, shippedDate }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item marked as shipped')
+    logActivity('Item marked as shipped')
   }, [setQueue, queue, notionService])
 
   const handleMarkCompleted = useCallback((itemId: string) => {
@@ -942,7 +1090,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'completed' }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Transaction completed')
+    logActivity('Transaction completed')
   }, [setQueue, queue, notionService])
 
   const handleMarkReturned = useCallback((itemId: string, reason?: string) => {
@@ -954,7 +1102,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'returned', returnedDate, returnReason: reason }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item marked as returned')
+    logActivity('Item marked as returned')
   }, [setQueue, queue, notionService])
 
   const handleDelist = useCallback((itemId: string) => {
@@ -966,7 +1114,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'delisted', delistedDate }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item delisted')
+    logActivity('Item delisted')
   }, [setQueue, queue, notionService])
 
   const handleRelistItem = useCallback((itemId: string) => {
@@ -992,7 +1140,7 @@ function App() {
     if (item?.notionPageId && notionService) {
       notionService.updateListingStatus(item.notionPageId, { status: 'ready' }).catch(e => console.warn('Notion sync failed:', e))
     }
-    toast.success('Item re-listed')
+    logActivity('Item re-listed')
   }, [setQueue, queue, notionService])
 
   const handleSaveDraft = useCallback((price: number, notes: string) => {
@@ -1014,31 +1162,138 @@ function App() {
       if (current.some(i => i.id === draftItem.id)) return current
       return [...current, draftItem]
     })
-    toast.success('Draft saved to queue')
-    setScreen('queue')
-  }, [currentItem, setQueue])
-
-  const handleRescan = useCallback(() => {
     setCurrentItem(undefined)
     setPipeline([])
+    setScreen('agent')
+    logActivity('Draft saved to queue')
+  }, [currentItem, setQueue, setScreen])
+
+  // Opens a specific ScannedItem (from session/history) directly into the scan-result screen
+  const handleOpenItemFromSession = useCallback((item: ScannedItem) => {
+    setCurrentItem(item)
+    setScreen('scan-result')
+  }, [setCurrentItem, setScreen])
+
+  const handleReanalyzeCurrentItem = useCallback(() => {
+    // Use the best available image — full base64 first, then optimized/thumbnail fallbacks.
+    // Re-analyze NEVER opens the camera; that's the camera button's job.
+    const imageToUse = currentItem?.imageData || currentItem?.imageOptimized || currentItem?.imageThumbnail
+    if (!imageToUse || !currentItem) {
+      toast.error('No image in memory to re-analyze. Use the camera button to add a new photo.')
+      return
+    }
+    // Re-run the full AI pipeline on the existing photo, preserving the item ID.
+    // This lets the user retry a failed scan or get a second opinion without creating a duplicate card.
+    handleCapture(
+      imageToUse,
+      currentItem.purchasePrice,
+      currentItem.location,
+      undefined,
+      currentItem,   // existingItem → pipeline updates in place, scan history entry replaced
+    )
+  }, [currentItem, handleCapture])
+
+  // ─── Multi-photo handlers ──────────────────────────────────────────────────
+
+  // Appends a new photo to the current item without triggering a new pipeline run.
+  // Called when cameraMode === 'add-photo' routes back from handleCapture.
+  const handleAddPhotoToCurrentItem = useCallback(async (imageData: string) => {
+    if (!currentItem) return
+    const totalPhotos = 1 + (currentItem.additionalImages?.length || 0)
+    if (totalPhotos >= 5) {
+      toast.error('Maximum 5 photos per item reached')
+      return
+    }
+    const optimized = await optimizeAndCache(imageData)
+    setCurrentItem(prev => prev ? {
+      ...prev,
+      additionalImages: [...(prev.additionalImages || []), optimized.thumbnail],
+      additionalImageData: [...(prev.additionalImageData || []), optimized.original],
+    } : prev)
+    toast('Photo added — tap Re-analyze to scan with all photos')
+  }, [currentItem, optimizeAndCache])
+
+  const handleDeleteAdditionalPhoto = useCallback((index: number) => {
+    setCurrentItem(prev => {
+      if (!prev) return prev
+      const imgs = [...(prev.additionalImages || [])]
+      const data = [...(prev.additionalImageData || [])]
+      imgs.splice(index, 1)
+      data.splice(index, 1)
+      return { ...prev, additionalImages: imgs, additionalImageData: data }
+    })
+  }, [])
+
+  const handleDeletePrimaryPhoto = useCallback(() => {
+    if (!currentItem) return
+    const additional = currentItem.additionalImages || []
+    const additionalData = currentItem.additionalImageData || []
+    if (additional.length > 0) {
+      // Promote first additional image to primary
+      setCurrentItem(prev => prev ? {
+        ...prev,
+        imageThumbnail: additional[0],
+        imageData: additionalData[0] || prev.imageData,
+        additionalImages: additional.slice(1),
+        additionalImageData: additionalData.slice(1),
+      } : prev)
+      toast('Primary photo updated')
+    } else {
+      // No alternatives — open camera to take a replacement primary photo
+      setCameraMode('replace-primary')
+      setCameraOpen(true)
+    }
+  }, [currentItem])
+
+  const openCameraForAddPhoto = useCallback(() => {
+    setCameraMode('add-photo')
     setCameraOpen(true)
   }, [])
 
-  const handleRecalculate = useCallback((newPrice: number) => {
+  const handleRecalculate = useCallback((newPrice: number, newSellPrice?: number, newShipping?: number) => {
     if (!Number.isFinite(newPrice) || newPrice < 0) {
       toast.error('Enter a valid price (0 or more)')
       return
     }
-    if (!currentItem?.estimatedSellPrice) {
-      toast.error('No sell price found — tap Rescan to re-analyze, or ask AI in Chat')
+
+    // Use form-provided sell price first; fall back to existing item value.
+    // This unblocks PENDING items where the AI found no market price — the
+    // user can manually enter both buy and sell prices and get a real decision.
+    const effectiveSellPrice = (newSellPrice && newSellPrice > 0)
+      ? newSellPrice
+      : currentItem?.estimatedSellPrice
+
+    if (!effectiveSellPrice || effectiveSellPrice <= 0) {
+      toast.error('Enter a sell price in the Listing Draft to recalculate')
       return
     }
-    const shipping = settings?.defaultShippingCost || 5.0
-    const feePercent = settings?.ebayFeePercent || 12.9
-    const minMargin = settings?.minProfitMargin || 30
-    const profitMetrics = calculateProfitFallback(newPrice, currentItem.estimatedSellPrice, shipping, feePercent)
 
-    const decision = makeDecision(currentItem.estimatedSellPrice, newPrice, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
+    // Use form-provided shipping if valid; fall back to settings default.
+    const effectiveShipping = (newShipping != null && Number.isFinite(newShipping) && newShipping >= 0)
+      ? newShipping
+      : (settings?.defaultShippingCost || 5.0)
+
+    const feePercent = settings?.ebayFeePercent || 12.9
+    const adFeePercent = settings?.ebayAdFeePercent || 3.0
+    const minMargin = settings?.minProfitMargin || 30
+
+    const profitMetrics = calculateProfitFallback(
+      newPrice,
+      effectiveSellPrice,
+      effectiveShipping,
+      feePercent,
+      0.30,                                     // per-order fee
+      adFeePercent,
+      settings?.shippingMaterialsCost ?? 0.75,  // packaging materials from Business Rules
+    )
+
+    const decision = makeDecision(
+      effectiveSellPrice,
+      newPrice,
+      profitMetrics.profitMargin,
+      profitMetrics.netProfit,
+      minMargin,
+    )
 
     const freeItemPlatformHint =
       newPrice === 0 && decision === 'PASS'
@@ -1052,13 +1307,16 @@ function App() {
     }
 
     const updatedMarketData = {
-      ...currentItem.marketData,
+      ...currentItem?.marketData,
       ...(freeItemPlatformHint ? { recommendedPlatform: freeItemPlatformHint } : { recommendedPlatform: undefined }),
     }
 
     setCurrentItem(prev => prev ? {
       ...prev,
       purchasePrice: newPrice,
+      // Persist the sell price so Quick Summary and Queue card both reflect
+      // the user-entered value, not a stale 0 from the failed AI lookup.
+      estimatedSellPrice: effectiveSellPrice,
       profitMargin: profitMetrics.profitMargin,
       decision,
       marketData: updatedMarketData,
@@ -1070,10 +1328,22 @@ function App() {
       return s
     }))
 
-    toast.success(`Recalculated: ${decision} — ${profitMetrics.profitMargin.toFixed(1)}% margin`)
+    logActivity(`Recalculated: ${decision} — buy $${newPrice.toFixed(2)} sell $${effectiveSellPrice.toFixed(2)} → ${profitMetrics.profitMargin.toFixed(1)}% margin`)
   }, [currentItem, settings, triggerSuccess, triggerFail])
 
-  const handleCreateListingFromScan = useCallback(async (price: number, notes: string) => {
+  const handleCreateListingFromScan = useCallback(async (
+    price: number,
+    notes: string,
+    draft?: {
+      productName?: string
+      category?: string
+      condition?: string
+      description?: string
+      estimatedSellPrice?: number
+      shippingCost?: number
+      platform?: string
+    },
+  ) => {
     if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
       toast.error('No image to save')
       return
@@ -1081,25 +1351,45 @@ function App() {
     const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
     // NaN means the field was left empty — fall back to the analyzed price
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
-    // If the user changed the buy price without tapping Recalculate, recompute metrics inline
-    // so stored profitMargin/decision are never stale relative to purchasePrice
+    const effectiveSellPrice =
+      draft?.estimatedSellPrice && draft.estimatedSellPrice > 0
+        ? draft.estimatedSellPrice
+        : currentItem!.estimatedSellPrice
+    // Recompute profitMargin/decision whenever buy price, sell price, OR shipping differs
+    // from the analyzed values — any of these changes makes the stored metrics stale
+    const effectiveShipping = draft?.shippingCost ?? settings?.defaultShippingCost ?? 5.0
+    const buyPriceChanged = effectivePrice !== currentItem!.purchasePrice
+    const sellPriceChanged =
+      effectiveSellPrice != null && effectiveSellPrice !== currentItem!.estimatedSellPrice
+    const shippingChanged =
+      draft?.shippingCost != null && draft.shippingCost !== (settings?.defaultShippingCost ?? 5.0)
     let resolvedMargin = currentItem!.profitMargin
-    let resolvedDecision: 'BUY' | 'PASS' | 'PENDING' = currentItem!.decision as 'BUY' | 'PASS' | 'PENDING' ?? 'BUY'
-    if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
+    let resolvedDecision = currentItem!.decision
+    if ((buyPriceChanged || sellPriceChanged || shippingChanged) && effectiveSellPrice) {
       const freshMetrics = calculateProfitFallback(
-        effectivePrice, currentItem!.estimatedSellPrice,
-        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+        effectivePrice, effectiveSellPrice,
+        effectiveShipping,
+        settings?.ebayFeePercent ?? 12.9,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
-      resolvedDecision = makeDecision(currentItem!.estimatedSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
+      resolvedDecision = makeDecision(effectiveSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
     }
     const listingItem: ScannedItem = {
       ...lightweight,
       purchasePrice: effectivePrice,
       profitMargin: resolvedMargin,
-      decision: resolvedDecision === 'PASS' ? 'BUY' : resolvedDecision, // user chose Create Listing — treat as BUY intent
+      decision: resolvedDecision === 'PASS' ? 'BUY' : resolvedDecision, // user chose Add to Queue — treat as BUY intent
       notes: notes || currentItem!.notes,
       inQueue: true,
+      ...(draft?.productName && { productName: draft.productName }),
+      ...(draft?.category && { category: draft.category }),
+      ...(draft?.condition && { condition: draft.condition }),
+      ...(draft?.description && { description: draft.description }),
+      ...(draft?.platform && { preferredPlatform: draft.platform }),
+      ...(effectiveSellPrice !== currentItem!.estimatedSellPrice && { estimatedSellPrice: effectiveSellPrice }),
     }
     setQueue(prev => {
       const current = prev || []
@@ -1108,9 +1398,10 @@ function App() {
       }
       return [...current, listingItem]
     })
-    setDetailItemId(listingItem.id)
+    // Navigate to queue immediately — optimization runs in the background
+    setCurrentItem(undefined)
+    setPipeline([])
     setScreen('queue')
-    const toastId = toast.loading('Creating listing...')
     // Optimize directly with listingItem — avoids stale queue closure read
     // (handleOptimizeItem looks up the item from queue, which hasn't committed yet)
     try {
@@ -1127,20 +1418,18 @@ function App() {
           ? { ...i, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
           : i
       ))
-      toast.dismiss(toastId)
-      toast.success('Listing created')
+      logActivity('Added to queue — listing optimized')
     } catch {
-      toast.dismiss(toastId)
-      toast.error('Listing optimization failed — you can edit it manually')
+      toast.error('Optimization failed — item saved, edit manually in Queue')
     }
-  }, [currentItem, setQueue, listingOptimizationService])
+  }, [currentItem, setQueue, listingOptimizationService, settings])
 
   const handlePassFromScan = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
       toast.error('No image to save')
       return
     }
-    // Keep imageThumbnail for queue display; strip heavy blobs
+    // Strip heavy blobs — keep thumbnail for scan history display
     const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     // Recompute metrics if price changed — keeps stored profitMargin accurate
@@ -1148,29 +1437,66 @@ function App() {
     if (effectivePrice !== currentItem!.purchasePrice && currentItem!.estimatedSellPrice) {
       const freshMetrics = calculateProfitFallback(
         effectivePrice, currentItem!.estimatedSellPrice,
-        settings?.defaultShippingCost || 5.0, settings?.ebayFeePercent || 12.9
+        settings?.defaultShippingCost ?? 5.0,
+        settings?.ebayFeePercent ?? 12.9,
+        0.30,
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
     }
+    // PASS items go to scan history only — NOT the listing queue.
+    // The listing queue is reserved exclusively for items the buyer intends to purchase.
     const passItem: ScannedItem = {
       ...lightweight,
       purchasePrice: effectivePrice,
       profitMargin: resolvedMargin,
       notes: notes || currentItem!.notes,
-      inQueue: true,
+      inQueue: false,
       decision: 'PASS',
     }
-    setQueue(prev => {
-      const current = prev || []
-      if (current.some(i => i.id === passItem.id)) {
-        return current.map(i => i.id === passItem.id ? passItem : i)
-      }
-      return [...current, passItem]
+    // Update the scan history entry (first written during handleCapture) with final prices/notes
+    setScanHistory(prev => {
+      const existing = prev || []
+      const idx = existing.findIndex(i => i.id === passItem.id)
+      if (idx !== -1) return existing.map((i, j) => j === idx ? passItem : i)
+      return [passItem, ...existing.slice(0, 499)]  // fallback: prepend if somehow missing
     })
     setCurrentItem(undefined)
     setPipeline([])
-    toast.success('Passed — heavy image data will be removed at session end')
-  }, [currentItem, setQueue])
+    setScreen('session')
+    logActivity('Passed — logged to scan history')
+  }, [currentItem, setScanHistory, settings, setScreen])
+
+  const handleMaybeFromScan = useCallback((price: number, notes: string) => {
+    if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
+      toast.error('No image to save')
+      return
+    }
+    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
+    // Maybe items go to scan history only — NOT the listing queue.
+    // The buyer can reopen from Scan History to continue researching before deciding.
+    const maybeItem: ScannedItem = {
+      ...lightweight,
+      purchasePrice: effectivePrice,
+      notes: notes || currentItem!.notes,
+      inQueue: false,
+      decision: 'PENDING',
+    }
+    // Update the scan history entry with the current prices/notes
+    setScanHistory(prev => {
+      const existing = prev || []
+      const idx = existing.findIndex(i => i.id === maybeItem.id)
+      if (idx !== -1) return existing.map((i, j) => j === idx ? maybeItem : i)
+      return [maybeItem, ...existing.slice(0, 499)]
+    })
+    setCurrentItem(undefined)
+    setPipeline([])
+    setScreen('agent')
+    toast('Saved to Scans — tap it to continue researching')
+    logActivity('Saved for later research — not added to queue')
+  }, [currentItem, setScanHistory, setScreen])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
@@ -1224,19 +1550,21 @@ function App() {
     )
     
     if (unanalyzedItems.length === 0) {
-      toast.info('No quick drafts to analyze')
+      logActivity('No quick drafts to analyze', 'info')
       return
     }
 
     setIsBatchAnalyzing(true)
     setBatchProgress({ current: 0, total: unanalyzedItems.length, currentItemName: '' })
-    toast.info(`Analyzing ${unanalyzedItems.length} item${unanalyzedItems.length !== 1 ? 's' : ''}...`)
+    logActivity(`Analyzing ${unanalyzedItems.length} item${unanalyzedItems.length !== 1 ? 's' : ''}...`, 'info')
 
     let processedCount = 0
     let buyCount = 0
     let passCount = 0
     let totalNewProfit = 0
-    const failedItems: string[] = []
+    // Capture root cause for each failure so we can give the user a specific
+    // diagnosis instead of a blind "X items failed" count.
+    const failedItems: Array<{ id: string; reason: string }> = []
     const skippedItems: string[] = []
     const updatedItemsMap = new Map<string, ScannedItem>()
 
@@ -1317,14 +1645,20 @@ function App() {
         const profitMetrics = ebayService?.calculateProfitMetrics(
           item.purchasePrice,
           sellPrice,
-          settings?.defaultShippingCost || 5.0,
-          settings?.ebayFeePercent || 12.9,
-          settings?.paypalFeePercent || 3.49
+          settings?.defaultShippingCost ?? 5.0,
+          settings?.ebayFeePercent ?? 12.9,
+          0,
+          0.30,
+          settings?.ebayAdFeePercent ?? 3.0,
+          settings?.shippingMaterialsCost ?? 0.75
         ) || calculateProfitFallback(
           item.purchasePrice,
           sellPrice,
-          settings?.defaultShippingCost || 5.0,
-          settings?.ebayFeePercent || 12.9
+          settings?.defaultShippingCost ?? 5.0,
+          settings?.ebayFeePercent ?? 12.9,
+          0.30,
+          settings?.ebayAdFeePercent ?? 3.0,
+          settings?.shippingMaterialsCost ?? 0.75
         )
 
         const minMargin = settings?.minProfitMargin || 30
@@ -1354,8 +1688,9 @@ function App() {
 
         await new Promise(resolve => setTimeout(resolve, 500))
       } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
         console.error('Failed to analyze item:', item.id, error)
-        failedItems.push(item.id)
+        failedItems.push({ id: item.id, reason: reason.slice(0, 200) })
       }
     }
 
@@ -1383,12 +1718,22 @@ function App() {
     setBatchProgress({ current: 0, total: 0, currentItemName: '' })
 
     if (failedItems.length > 0) {
-      toast.warning(`${failedItems.length} item(s) failed analysis`)
+      // Surface the dominant failure reason so the user knows *why* batch failed
+      // (API key missing, rate limit, timeout, etc.) rather than just a count.
+      const reasonCounts = new Map<string, number>()
+      for (const f of failedItems) {
+        reasonCounts.set(f.reason, (reasonCounts.get(f.reason) || 0) + 1)
+      }
+      const [topReason] = [...reasonCounts.entries()].sort((a, b) => b[1] - a[1])
+      toast.warning(
+        `${failedItems.length} item(s) failed analysis`,
+        topReason ? { description: topReason[0] } : undefined,
+      )
     }
     if (skippedItems.length > 0) {
-      toast.info(`${skippedItems.length} item(s) skipped (no image)`)
+      logActivity(`${skippedItems.length} item(s) skipped (no image)`, 'info')
     }
-    toast.success(`Analyzed ${processedCount} items: ${buyCount} BUY, ${passCount} PASS`)
+    logActivity(`Analyzed ${processedCount} items: ${buyCount} BUY, ${passCount} PASS`)
   }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
 
   const handleUpdateCurrentItem = useCallback((itemId: string, updates: Partial<ScannedItem>) => {
@@ -1406,18 +1751,18 @@ function App() {
 
     const imageSource = item.imageData || item.imageThumbnail
     if (!imageSource) {
-      // No image — navigate to agent with item pre-loaded so user can see it
+      // No image — navigate to scan-result with item pre-loaded so user can see it
       setCurrentItem(item)
       setPipeline([])
-      setScreen('agent')
+      setScreen('scan-result')
       toast('No image available — re-scan with camera to re-analyze', { duration: 3000 })
       return
     }
 
-    // Navigate to agent first, then trigger pipeline — only remove from queue on success
+    // Navigate to scan-result first, then trigger pipeline — only remove from queue on success
     setCurrentItem(undefined)
     setPipeline([])
-    setScreen('agent')
+    setScreen('scan-result')
     try {
       await handleCapture(imageSource, item.purchasePrice, item.location)
       setQueue(prev => (prev || []).filter(i => i.id !== itemId))
@@ -1525,6 +1870,10 @@ function App() {
   useEffect(() => {
     if (screen === 'sold') {
       loadLiveSoldItems()
+    } else if (screen === 'agent') {
+      // Agent needs live sold data for intelligence/reporting, but should never
+      // surface a toast — errors here would leak onto unrelated tabs.
+      loadLiveSoldItems({ silent: true })
     }
   }, [screen, loadLiveSoldItems])
 
@@ -1554,10 +1903,122 @@ function App() {
     }
   }, [])
 
-  // Always start on the session list — clear currentSession view on app load
+  // Auto-redirect: if there's an active session on launch, jump to its dashboard
+  const hasAutoNavigated = useRef(false)
   useEffect(() => {
-    setSession(undefined)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (hasAutoNavigated.current) return
+    if (session?.active && screen === 'session') {
+      hasAutoNavigated.current = true
+      setSelectedSessionId(session.id)
+      setScreen('session-detail')
+    }
+  }, [session?.active, screen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // One-time settings migration: copy global → device-scoped on first load
+  const [legacySettings] = useKV<AppSettings | undefined>('settings', undefined)
+  const hasMigratedRef = useRef(false)
+  useEffect(() => {
+    if (hasMigratedRef.current) return
+    // Migrate if any meaningful legacy setting exists and the device slot is still empty.
+    // Checking only geminiApiKey misses users whose legacy settings had Notion keys,
+    // thresholds, or a user profile but no Gemini key.
+    const hasLegacy = !!(legacySettings?.geminiApiKey || legacySettings?.notionApiKey || legacySettings?.userProfile)
+    const hasDevice = !!(settings?.geminiApiKey || settings?.notionApiKey || settings?.userProfile)
+    if (hasLegacy && !hasDevice) {
+      hasMigratedRef.current = true
+      setSettings((prev: AppSettings) => ({ ...prev, ...legacySettings }))
+      logDebug('Settings auto-migrated from global to device scope', 'info', 'migration')
+    }
+  }, [legacySettings, settings]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Backfill global profile from device settings if device has a profile but global doesn't.
+  // This runs once per device load — ensures existing users' profiles propagate globally.
+  const hasBackfilledProfileRef = useRef(false)
+  useEffect(() => {
+    if (hasBackfilledProfileRef.current) return
+    if (settings?.userProfile && !globalProfile) {
+      hasBackfilledProfileRef.current = true
+      setGlobalProfile(settings.userProfile)
+      logDebug('User profile backfilled to global key from device settings', 'info', 'migration')
+    }
+  }, [settings, globalProfile, setGlobalProfile]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Activity log listener — persists silent activity events to KV
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const entry = (e as CustomEvent<ActivityEntry>).detail
+      setActivityLog(prev => [entry, ...(prev || []).slice(0, MAX_ACTIVITY_ENTRIES - 1)])
+    }
+    window.addEventListener('rsp:activity', handler)
+    return () => window.removeEventListener('rsp:activity', handler)
+  }, [setActivityLog])
+
+  // Debug log listener — persists rsp:debug events dispatched by logDebug() to KV
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const entry = (e as CustomEvent<DebugEntry>).detail
+      setDebugLog(prev => [entry, ...(prev || []).slice(0, MAX_DEBUG_ENTRIES - 1)])
+    }
+    window.addEventListener('rsp:debug', handler)
+    return () => window.removeEventListener('rsp:debug', handler)
+  }, [setDebugLog])
+
+  // Capture console.error + console.warn into the debug console
+  useEffect(() => {
+    let capturing = false // prevent recursion
+    const origError = console.error.bind(console)
+    const origWarn = console.warn.bind(console)
+    console.error = (...args: unknown[]) => {
+      origError(...args)
+      if (!capturing) {
+        capturing = true
+        logDebug(args.map(a => a instanceof Error ? a.message : String(a)).join(' ').slice(0, 300), 'error', 'console')
+        capturing = false
+      }
+    }
+    console.warn = (...args: unknown[]) => {
+      origWarn(...args)
+      if (!capturing) {
+        capturing = true
+        logDebug(args.map(a => String(a)).join(' ').slice(0, 300), 'warn', 'console')
+        capturing = false
+      }
+    }
+    return () => {
+      console.error = origError
+      console.warn = origWarn
+    }
+  }, [])
+
+  // Intercept fetch to log Gemini + eBay + Google API calls and errors
+  useEffect(() => {
+    const origFetch = window.fetch.bind(window)
+    window.fetch = async (...args: Parameters<typeof fetch>) => {
+      const url = typeof args[0] === 'string' ? args[0]
+        : args[0] instanceof URL ? args[0].href
+        : (args[0] as Request).url || ''
+      const isGemini = url.includes('generativelanguage.googleapis.com')
+      const isEbay = url.includes('api.ebay.com')
+      const isLens = url.includes('customsearch.googleapis.com') || url.includes('lens.google')
+      const service = isGemini ? 'gemini' : isEbay ? 'ebay' : isLens ? 'google-lens' : null
+      if (service) {
+        logDebug(`${service} request`, 'debug', service, { url: url.slice(0, 120) })
+      }
+      try {
+        const res = await origFetch(...args)
+        if (service && !res.ok) {
+          logDebug(`${service} HTTP ${res.status}`, 'error', service, { status: res.status, url: url.slice(0, 120) })
+        }
+        return res
+      } catch (err) {
+        if (service) {
+          logDebug(`${service} fetch failed`, 'error', service, { error: String(err) })
+        }
+        throw err
+      }
+    }
+    return () => { window.fetch = origFetch }
+  }, [])
 
   // Migrate legacy GO → BUY decision labels
   useEffect(() => {
@@ -1581,10 +2042,61 @@ function App() {
     }
   }, []) // intentionally empty deps — runs once on mount
 
+  // Track the last non-settings screen so the settings back button always
+  // returns to where the user came from, regardless of the navigation path.
+  useEffect(() => {
+    if (screen !== 'settings') {
+      settingsReturnScreen.current = screen
+    }
+  }, [screen])
+
+  // Directional slide transitions —————————————————————————————————————————
+  // Tab screens have a fixed left-to-right order.  Secondary/push screens
+  // (settings, session-detail, scan-result, …) always push in from the right
+  // and pop back to the left.  The direction is computed once per screen
+  // change (synchronously, before JSX evaluates) so framer-motion's
+  // `custom` prop receives the correct value for both the entering and the
+  // exiting motion.div.
+  const SCREEN_TAB_ORDER: Partial<Record<Screen, number>> = {
+    session: 0,
+    agent: 1,
+    'scan-result': 1.5, // lives between agent and queue
+    queue: 2,
+    sold: 3,
+  }
+
+  const prevScreenRef = useRef<Screen>(screen)
+  const slideDir = useRef<'left' | 'right' | 'none'>('none')
+  // Remembers where the user was before opening Settings so back returns there
+  const settingsReturnScreen = useRef<Screen>('session')
+  // Remembers where the user came from before opening any secondary screen
+  // (cost-tracking, scan-history) so back returns to the originating screen
+  const secondaryReturnScreen = useRef<Screen>('session')
+
+  if (prevScreenRef.current !== screen) {
+    const prevIdx = SCREEN_TAB_ORDER[prevScreenRef.current]
+    const nextIdx = SCREEN_TAB_ORDER[screen]
+    if (prevIdx !== undefined && nextIdx !== undefined) {
+      slideDir.current = nextIdx > prevIdx ? 'right' : nextIdx < prevIdx ? 'left' : 'none'
+    } else if (nextIdx === undefined) {
+      slideDir.current = 'right'   // pushing into a secondary screen
+    } else {
+      slideDir.current = 'left'    // returning from a secondary screen to a tab
+    }
+    prevScreenRef.current = screen
+  }
+
+  type SlideDir = 'left' | 'right' | 'none'
   const screenVariants = {
-    initial: { opacity: 0, y: 8 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -8 },
+    initial: (dir: SlideDir) => ({
+      opacity: 0,
+      x: dir === 'right' ? 22 : dir === 'left' ? -22 : 0,
+    }),
+    animate: { opacity: 1, x: 0 },
+    exit: (dir: SlideDir) => ({
+      opacity: 0,
+      x: dir === 'right' ? -22 : dir === 'left' ? 22 : 0,
+    }),
   }
 
   useEffect(() => {
@@ -1602,6 +2114,15 @@ function App() {
     const timer = setTimeout(resetScroll, 200)
     return () => clearTimeout(timer)
   }, [screen])
+
+  // Guard: if scan-result is shown with no item (e.g. deep-link or state cleared),
+  // redirect to agent. Must be an effect — not inline in JSX — to avoid
+  // calling setScreen during render (React render purity violation).
+  useEffect(() => {
+    if (screen === 'scan-result' && !currentItem) {
+      setScreen('agent')
+    }
+  }, [screen, currentItem])
 
   return (
     <div 
@@ -1625,34 +2146,37 @@ function App() {
         onNavigateToSettings={() => setScreen('settings')}
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
+        backLabel={screen === 'scan-result' && openedFromScans ? 'Scans' : undefined}
         onBack={
-          screen === 'settings' || screen === 'session-detail' || screen === 'scan-history'
+          screen === 'scan-result'
+            ? () => { setOpenedFromScans(false); setScreen('agent') }
+            : screen === 'settings'
+            ? () => setScreen(settingsReturnScreen.current)
+            : screen === 'session-detail'
             ? () => setScreen('session')
+            : screen === 'scan-history' || screen === 'cost-tracking'
+            ? () => setScreen(secondaryReturnScreen.current)
             : screen === 'tag-analytics' || screen === 'location-insights'
             ? () => setScreen('queue')
-            : screen === 'cost-tracking'
-            ? () => setScreen('settings')
             : undefined
         }
       />
 
       <div
-        className="flex-1 relative w-full pb-24"
-        style={{
-          minHeight: 'calc(100vh - 96px)',
-        }}
+        className="flex-1 relative w-full overflow-hidden"
       >
         <AnimatePresence mode="wait">
           {screen === 'session' && (
             <motion.div
               key="session"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <SessionScreen
                 showTrends={showSessionTrends}
@@ -1671,48 +2195,95 @@ function App() {
                 onPermanentDeleteSession={handlePermanentDeleteSession}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
+                onOpenItem={handleOpenItemFromSession}
+                onNavigateTo={(s) => { secondaryReturnScreen.current = screen; setScreen(s) }}
               />
             </motion.div>
           )}
+
           {screen === 'agent' && (
             <motion.div
               key="agent"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0 overflow-hidden"
+            >
+              <AgentScreen
+                isCurrentScreen={screen === 'agent' && !cameraOpen}
+                queueItems={queue || []}
+                soldItems={(queue || []).filter(i => i.listingStatus === 'sold')}
+                settings={settings}
+                pendingMessage={agentPendingMessage}
+                onPendingMessageHandled={() => setAgentPendingMessage(null)}
+                onCreateListing={handleOptimizeItem}
+                onOptimizeItem={handleOptimizeItem}
+                onPushToNotion={handlePushToNotion}
+                onBatchAnalyze={handleBatchAnalyze}
+                onEditItem={handleEditQueueItem}
+                onMarkAsSold={handleMarkAsSold}
+                onMarkShipped={handleMarkShipped}
+                onNavigateToQueue={() => setScreen('queue')}
+                onOpenCamera={() => setCameraOpen(true)}
+                onStartSession={handleStartSession}
+                onEndSession={handleEndSession}
+                onEditSession={handleEditSession}
+                allSessions={allSessions || []}
+                scanHistory={scanHistory || []}
+                profitGoals={profitGoals || []}
+                onOpenScanItem={(item) => {
+                  setCurrentItem(item)
+                  setPipeline([])
+                  setOpenedFromScans(true)
+                  setScreen('scan-result')
+                }}
+              />
+            </motion.div>
+          )}
+          {screen === 'scan-result' && currentItem && (
+            <motion.div
+              key="scan-result"
+              custom={slideDir.current}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
+              className="absolute inset-0"
             >
               <AIScreen
                 currentItem={currentItem}
                 pipeline={pipeline}
                 settings={settings}
-                queueItems={queue || []}
                 onSaveDraft={handleSaveDraft}
                 onCreateListing={handleCreateListingFromScan}
                 onPassItem={handlePassFromScan}
+                onMaybeItem={handleMaybeFromScan}
                 onRecalculate={handleRecalculate}
-                onRescan={handleRescan}
-                onOpenCamera={() => setCameraOpen(true)}
-                pendingMessage={agentPendingMessage}
-                onPendingMessageHandled={() => setAgentPendingMessage(null)}
-                geminiService={geminiService}
-                onUpdateItem={handleUpdateCurrentItem}
+                onRescan={handleReanalyzeCurrentItem}
+                onOpenCamera={openCameraForAddPhoto}
+                onAddPhoto={openCameraForAddPhoto}
+                onDeletePhoto={handleDeleteAdditionalPhoto}
+                onDeletePrimaryPhoto={handleDeletePrimaryPhoto}
               />
             </motion.div>
           )}
           {screen === 'queue' && (
             <motion.div
               key="queue"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <QueueScreen
                 queueItems={queue || []}
@@ -1750,7 +2321,6 @@ function App() {
                 item={detailItem}
                 onClose={() => setDetailItemId(null)}
                 onOptimize={handleOptimizeItem}
-                onOptimizeForPlatform={handleOptimizeForPlatform}
                 settings={settings}
                 onEdit={handleEditQueueItem}
               />
@@ -1759,13 +2329,14 @@ function App() {
           {screen === 'sold' && (
             <motion.div
               key="sold"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <SoldScreen
                 soldItems={liveSoldItems}
@@ -1781,13 +2352,14 @@ function App() {
           {screen === 'settings' && settings && (
             <motion.div
               key="settings"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0 overflow-hidden"
             >
               <SettingsScreen
                 settings={settings}
@@ -1799,13 +2371,14 @@ function App() {
           {screen === 'tag-analytics' && (
             <motion.div
               key="tag-analytics"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <TagAnalyticsScreen
                 items={queue || []}
@@ -1817,13 +2390,14 @@ function App() {
           {screen === 'location-insights' && (
             <motion.div
               key="location-insights"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <LocationInsightsScreen
                 items={queue || []}
@@ -1834,29 +2408,33 @@ function App() {
           {screen === 'cost-tracking' && (
             <motion.div
               key="cost-tracking"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <CostTrackingScreen
                 onBack={() => setScreen('settings')}
+                queueItems={queue || []}
+                scanHistory={scanHistory || []}
               />
             </motion.div>
           )}
           {screen === 'scan-history' && (
             <motion.div
               key="scan-history"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <ScanHistoryScreen
                 onBack={() => setScreen('session')}
@@ -1873,36 +2451,60 @@ function App() {
           {screen === 'session-detail' && selectedSessionId && (
             <motion.div
               key="session-detail"
+              custom={slideDir.current}
               variants={screenVariants}
               initial="initial"
               animate="animate"
               exit="exit"
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
               style={{ willChange: 'opacity, transform' }}
-              className="w-full h-full"
+              className="absolute inset-0"
             >
               <SessionDetailScreen
                 sessionId={selectedSessionId}
                 onBack={() => setScreen('session')}
                 onDeleteSession={handleDeleteSession}
                 onEndSession={handleEndSession}
+                onReopenSession={handleReopenSession}
                 allSessions={visibleSessions}
                 onUpdateSessions={setAllSessions}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
+                onOpenItem={handleOpenItemFromSession}
+                onOpenChat={() => setScreen('agent')}
+                onNavigateTo={(s) => { secondaryReturnScreen.current = screen; setScreen(s) }}
+                currentOperatorId={settings?.userProfile?.operatorId}
               />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      <div className="h-[80px] sm:h-[88px] flex-shrink-0" />
+      {/* Spacer exactly matches BottomNav height: h-[52px] grid + max(safe-area-inset-bottom, 4px) */}
+      <div className="flex-shrink-0" style={{ height: 'max(56px, calc(52px + env(safe-area-inset-bottom, 0px)))' }} />
 
       <BottomNav
         currentScreen={screen}
-        onNavigate={setScreen}
-        onCameraOpen={() => setCameraOpen(true)}
+        onNavigate={(s) => {
+          // Session tab while a session is active → go straight to the session dashboard
+          if (s === 'session' && session?.active) {
+            setSelectedSessionId(session.id)
+            setScreen('session-detail')
+          } else {
+            setScreen(s)
+          }
+        }}
+        onCameraOpen={() => {
+          // If no session is open, auto-start one so the scan is always session-scoped.
+          // handleStartSession sets the KV session and navigates to session-detail;
+          // the camera overlay opens on top of it so the first scan lands in the new session.
+          if (!session?.active) {
+            handleStartSession()
+          }
+          setCameraOpen(true)
+        }}
         captureState={captureState}
+        sessionMode={!session?.active}
       />
 
       <CameraOverlay

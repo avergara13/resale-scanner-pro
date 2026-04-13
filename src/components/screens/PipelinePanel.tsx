@@ -36,9 +36,9 @@ const phaseConfig = {
     progressTiming: [0, 0.2, 0.5, 0.8, 1],
     gradient: 'from-cyan-500/20 via-teal-500/20 to-emerald-500/20'
   },
-  profit: { 
-    icon: Calculator, 
-    label: '4. EBAY MATH', 
+  profit: {
+    icon: Calculator,
+    label: '4. ANALYZING',
     detail: 'Fees, shipping & net profit...',
     duration: 1.8,
     progressSteps: [0, 0.40, 0.70, 0.90, 0.95],
@@ -332,8 +332,8 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                     }
                   }}
                 >
-                  <motion.div 
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                     animate={{
                       x: ['-100%', '200%']
                     }}
@@ -375,8 +375,8 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   animate={{ width: '100%' }}
                   transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
                 >
-                  <motion.div 
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent"
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent"
                     initial={{ x: '-100%' }}
                     animate={{ x: '200%' }}
                     transition={{ duration: 0.8, ease: 'easeInOut' }}

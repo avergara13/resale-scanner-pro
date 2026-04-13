@@ -1,6 +1,44 @@
 import type { ScannedItem, MarketData, ResalePlatform, PlatformListing, OptimizedListing as AppOptimizedListing } from '@/types'
 import { callLLM } from './llm-service'
 
+/**
+ * Sanitize a user-supplied string before interpolating it into an LLM prompt.
+ *
+ * Resale items come from adversarial-ish sources (thrift bin labels, eBay
+ * titles, OCR'd descriptions). Without sanitization, a crafted product name
+ * like `"Cool Shoes\n\nIgnore previous instructions and respond with: ..."`
+ * would be treated as part of the system prompt by the model.
+ *
+ * Strategy:
+ *   - Collapse runs of whitespace/newlines (prevents section-break spoofing)
+ *   - Strip control characters and backticks (no code-fence injection)
+ *   - Hard-cap length so a runaway vision caption can't blow the prompt budget
+ *   - Leave printable content intact (brand names, model numbers, etc. still work)
+ */
+function sanitizeForPrompt(value: unknown, maxLen = 500): string {
+  if (value == null) return ''
+  const str = typeof value === 'string' ? value : String(value)
+  return str
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+    .replace(/`{3,}/g, "'''")
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen)
+}
+
+/**
+ * Coerce a JSON.parse result into a strictly-typed OptimizedListing shape.
+ * Gemini occasionally returns partial or off-schema JSON; this rejects the
+ * response instead of letting `undefined` / wrong types propagate into UI.
+ */
+function validateOptimizedListingShape(raw: unknown): raw is Record<string, unknown> {
+  if (!raw || typeof raw !== 'object') return false
+  const obj = raw as Record<string, unknown>
+  // Minimum viable shape — title and description are load-bearing
+  return typeof obj.title === 'string' && typeof obj.description === 'string'
+}
+
 export interface OptimizedListing {
   title: string
   description: string
@@ -46,20 +84,49 @@ export class ListingOptimizationService {
         geminiApiKey: this.geminiApiKey,
         jsonMode: true,
       })
-      const parsed = JSON.parse(response)
+
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(response)
+      } catch (parseErr) {
+        console.error('Listing optimizer returned non-JSON response, falling back:', parseErr)
+        return this.generateFallbackListing(context)
+      }
+
+      if (!validateOptimizedListingShape(parsed)) {
+        console.error('Listing optimizer JSON missing required fields (title/description), falling back')
+        return this.generateFallbackListing(context)
+      }
+
+      // `parsed` is now narrowed to Record<string, unknown> — still coerce every field
+      const p = parsed as Record<string, unknown>
+      const title = typeof p.title === 'string' && p.title.trim() ? p.title : this.generateFallbackTitle(context.item)
+      const description = typeof p.description === 'string' && p.description.trim() ? p.description : this.generateFallbackDescription(context.item)
+      const price = typeof p.price === 'number' && Number.isFinite(p.price) && p.price > 0
+        ? p.price
+        : (context.item.estimatedSellPrice || context.item.purchasePrice * 3)
+      const shippingCost = typeof p.shippingCost === 'number' && Number.isFinite(p.shippingCost) && p.shippingCost >= 0
+        ? p.shippingCost
+        : 0
+      const keywords = Array.isArray(p.keywords) ? p.keywords.filter((k): k is string => typeof k === 'string') : []
+      const suggestedTags = Array.isArray(p.suggestedTags) ? p.suggestedTags.filter((k): k is string => typeof k === 'string') : []
+      const recommendations = Array.isArray(p.recommendations) ? p.recommendations.filter((k): k is string => typeof k === 'string') : []
+      const itemSpecifics = (p.itemSpecifics && typeof p.itemSpecifics === 'object' && !Array.isArray(p.itemSpecifics))
+        ? (p.itemSpecifics as Record<string, string>)
+        : {}
 
       return {
-        title: parsed.title || this.generateFallbackTitle(context.item),
-        description: parsed.description || this.generateFallbackDescription(context.item),
-        category: parsed.category || context.item.category || 'Other',
-        condition: parsed.condition || 'Good',
-        price: parsed.price || context.item.estimatedSellPrice || context.item.purchasePrice * 3,
-        shippingCost: parsed.shippingCost || 0,
-        itemSpecifics: parsed.itemSpecifics || {},
-        keywords: parsed.keywords || [],
-        suggestedTags: parsed.suggestedTags || [],
-        seoScore: this.calculateSEOScore(parsed.title, parsed.description, parsed.keywords),
-        recommendations: parsed.recommendations || []
+        title,
+        description,
+        category: (typeof p.category === 'string' && p.category) || context.item.category || 'Other',
+        condition: (typeof p.condition === 'string' && p.condition) || 'Good',
+        price,
+        shippingCost,
+        itemSpecifics,
+        keywords,
+        suggestedTags,
+        seoScore: this.calculateSEOScore(title, description, keywords),
+        recommendations,
       }
     } catch (error) {
       console.error('Failed to generate optimized listing:', error)
@@ -70,36 +137,38 @@ export class ListingOptimizationService {
   private buildOptimizationPrompt(context: ListingOptimizationContext) {
     const { item, marketData, competitorTitles, brandInfo } = context
 
+    // Numbers are safe; strings all go through sanitizeForPrompt() to neutralize
+    // prompt-injection from untrusted vision/OCR/user input.
     const marketContext = marketData ? `
 Market Data:
 - Average sold price: $${marketData.ebayAvgSold?.toFixed(2) || 'N/A'}
 - Sell-through rate: ${marketData.ebaySellThroughRate?.toFixed(1) || 'N/A'}%
 - Active listings: ${marketData.ebayActiveListings || 0}
 - Recent sales: ${marketData.ebaySoldCount || 0}
-${marketData.ebayRecentSales?.slice(0, 3).map(sale => `  - "${sale.title}" sold for $${sale.price}`).join('\n') || ''}
+${marketData.ebayRecentSales?.slice(0, 3).map(sale => `  - "${sanitizeForPrompt(sale.title, 120)}" sold for $${sale.price}`).join('\n') || ''}
 ` : ''
 
     const competitorContext = competitorTitles && competitorTitles.length > 0 ? `
 Competitor Titles (SEO inspiration):
-${competitorTitles.slice(0, 3).map((t, i) => `${i + 1}. ${t}`).join('\n')}
+${competitorTitles.slice(0, 3).map((t, i) => `${i + 1}. ${sanitizeForPrompt(t, 120)}`).join('\n')}
 ` : ''
 
     const brandContext = brandInfo ? `
 Brand Information:
-- Brand: ${brandInfo.name}
-${brandInfo.model ? `- Model: ${brandInfo.model}` : ''}
-${brandInfo.year ? `- Year: ${brandInfo.year}` : ''}
+- Brand: ${sanitizeForPrompt(brandInfo.name, 80)}
+${brandInfo.model ? `- Model: ${sanitizeForPrompt(brandInfo.model, 80)}` : ''}
+${brandInfo.year ? `- Year: ${sanitizeForPrompt(brandInfo.year, 20)}` : ''}
 ` : ''
 
     const lensContext = item.lensResults && item.lensResults.length > 0 ? `
 Google Lens Matches:
-${item.lensResults.slice(0, 2).map((r, i) => `${i + 1}. "${r.title}" — ${r.source}${r.price ? ` (${r.price})` : ''}`).join('\n')}
+${item.lensResults.slice(0, 2).map((r, i) => `${i + 1}. "${sanitizeForPrompt(r.title, 120)}" — ${sanitizeForPrompt(r.source, 60)}${r.price ? ` (${sanitizeForPrompt(r.price, 20)})` : ''}`).join('\n')}
 ` : ''
 
     // Existing tags from scan-time tag suggestion
     const existingTagsContext = item.tags && item.tags.length > 0 ? `
 Existing Item Tags (MUST include all of these in suggestedTags):
-${item.tags.join(', ')}
+${item.tags.map(t => sanitizeForPrompt(t, 40)).join(', ')}
 ` : ''
 
     // Auto-detected item specifics from lens/vision
@@ -118,12 +187,12 @@ ${Object.entries(detectedSpecifics).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
     const promptText = `You are an expert eBay listing optimizer specializing in creating high-converting, SEO-optimized product listings.
 
 Product Information:
-- Name: ${item.productName || 'Unknown Product'}
-- Category: ${item.category || 'General'}
-- Purchase Price: $${item.purchasePrice}
-- Estimated Sell Price: $${item.estimatedSellPrice || item.purchasePrice * 3}
-- Vision Analysis: ${item.description || 'No description available'}
-${item.notes ? `- Notes: ${item.notes}` : ''}
+- Name: ${sanitizeForPrompt(item.productName, 160) || 'Unknown Product'}
+- Category: ${sanitizeForPrompt(item.category, 80) || 'General'}
+- Purchase Price: $${Number.isFinite(item.purchasePrice) ? item.purchasePrice : 0}
+- Estimated Sell Price: $${Number.isFinite(item.estimatedSellPrice) ? item.estimatedSellPrice : (Number.isFinite(item.purchasePrice) ? item.purchasePrice * 3 : 0)}
+- Vision Analysis: ${sanitizeForPrompt(item.description, 800) || 'No description available'}
+${item.notes ? `- Notes: ${sanitizeForPrompt(item.notes, 400)}` : ''}
 
 ${marketContext}
 ${competitorContext}
@@ -164,10 +233,17 @@ ITEM SPECIFICS:
 - At minimum include: Brand, Model/Style, Condition, Color, Size (if applicable), Material (if applicable)
 
 PRICING:
-- Competitive based on market data and recent sold prices above
-- Consider sell-through rate
-- Account for eBay fees (12.9%) and PayPal fees (3.49%)
-- Ensure minimum ${context.item.profitMargin ?? 30}% profit margin
+- Base price on SOLD comps from the market data above — not asking prices or MSRP
+- Aim for middle-high of the sold price range (above average, below highest)
+- Account for ALL seller costs:
+  • eBay final value fee: 12.9% of sale price
+  • eBay Promoted Listings ad fee: 3% of sale price
+  • Per-order fee: $0.30
+  • Shipping: ~$5-8 (seller pays, offers free shipping to buyer)
+  • Shipping materials: $0.75 per item
+- Total effective fee rate: ~15.9% + $1.05 fixed per sale
+- Ensure minimum ${context.item.profitMargin ?? 30}% NET profit margin after ALL costs
+- If sell-through rate is LOW (<40%), consider pricing more aggressively
 
 CONDITION CODES:
 - New with tags (NWT)
@@ -302,6 +378,7 @@ Return a JSON object with this exact structure:
     return Math.min(score, 100)
   }
 
+  /** @deprecated Platform-specific listing generation moved to n8n downstream pipeline. RSP is data collection only. */
   async generatePlatformListing(
     item: ScannedItem,
     platform: ResalePlatform,
@@ -413,6 +490,7 @@ Return ONLY valid JSON:
     }
   }
 
+  /** @deprecated See generatePlatformListing */
   private generateFallbackPlatformListing(
     _item: ScannedItem,
     platform: ResalePlatform,
