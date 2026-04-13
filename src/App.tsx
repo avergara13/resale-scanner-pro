@@ -246,33 +246,33 @@ function App() {
           visionResult = await geminiService.analyzeProductImage(imageData, {}, price)
           mockProductName = visionResult.productName
           
-          completeStep(0)
-          await new Promise(resolve => setTimeout(resolve, 100))
-          setPipeline(prev => prev.map((s, i) => 
-            i === 0 ? { 
-              ...s, 
-              data: `${visionResult?.productName || mockProductName} - ${visionResult?.brand || 'Generic'} (${visionResult ? Math.round(visionResult.confidence * 100) : 0}% confident)` 
+          setPipeline(prev => prev.map((s, i) =>
+            i === 0 ? {
+              ...s,
+              status: 'complete' as const,
+              progress: 100,
+              data: `${visionResult?.productName || mockProductName} - ${visionResult?.brand || 'Generic'} (${visionResult ? Math.round(visionResult.confidence * 100) : 0}% confident)`
             } : s
           ))
         } catch (error) {
           console.error('Gemini vision failed:', error)
-          completeStep(0)
-          await new Promise(resolve => setTimeout(resolve, 100))
-          setPipeline(prev => prev.map((s, i) => 
-            i === 0 ? { 
-              ...s, 
-              data: 'Vision analysis unavailable - configure Gemini API key in Settings' 
+          setPipeline(prev => prev.map((s, i) =>
+            i === 0 ? {
+              ...s,
+              status: 'complete' as const,
+              progress: 100,
+              data: 'Vision analysis unavailable - configure Gemini API key in Settings'
             } : s
           ))
         }
       } else {
         await new Promise(resolve => setTimeout(resolve, 1000))
-        completeStep(0)
-        await new Promise(resolve => setTimeout(resolve, 100))
-        setPipeline(prev => prev.map((s, i) => 
-          i === 0 ? { 
-            ...s, 
-            data: 'Configure Gemini API key in Settings for real vision analysis' 
+        setPipeline(prev => prev.map((s, i) =>
+          i === 0 ? {
+            ...s,
+            status: 'complete' as const,
+            progress: 100,
+            data: 'Configure Gemini API key in Settings for real vision analysis'
           } : s
         ))
       }
@@ -301,41 +301,46 @@ function App() {
             ? `$${lensAnalysis.priceRange.min.toFixed(2)}-$${lensAnalysis.priceRange.max.toFixed(2)}` 
             : 'No prices'
           
-          completeStep(1)
-          await new Promise(resolve => setTimeout(resolve, 100))
           setPipeline(prev => prev.map((s, i) =>
             i === 1 ? {
               ...s,
-              data: skipLens
-                ? `Skipped — Gemini ${Math.round(geminiConfidence * 100)}% confident (saves API call)`
-                : `Found ${lensAnalysis?.results.length || 0} matches. Range: ${lensAnalysis?.priceRange ? `$${lensAnalysis.priceRange.min.toFixed(2)}-$${lensAnalysis.priceRange.max.toFixed(2)}` : 'No prices'}`
+              status: 'complete' as const,
+              progress: 100,
+              data: `Found ${lensAnalysis?.results.length || 0} matches. Range: ${lensAnalysis?.priceRange ? `$${lensAnalysis.priceRange.min.toFixed(2)}-$${lensAnalysis.priceRange.max.toFixed(2)}` : 'No prices'}`
             } : s
           ))
         } catch (error) {
           console.error('Google Lens failed:', error)
-          completeStep(1)
-          await new Promise(resolve => setTimeout(resolve, 100))
           setPipeline(prev => prev.map((s, i) =>
             i === 1 ? {
               ...s,
+              status: 'complete' as const,
+              progress: 100,
               data: 'Google Lens unavailable — using Gemini only'
             } : s
           ))
         }
       } else if (!googleLensService) {
         await new Promise(resolve => setTimeout(resolve, 400))
-        completeStep(1)
-        await new Promise(resolve => setTimeout(resolve, 100))
         setPipeline(prev => prev.map((s, i) =>
           i === 1 ? {
             ...s,
+            status: 'complete' as const,
+            progress: 100,
             data: 'Configure Google API key in Settings for visual search'
           } : s
         ))
       } else {
         // skipLens = true (high confidence) — fast path
         await new Promise(resolve => setTimeout(resolve, 400))
-        completeStep(1)
+        setPipeline(prev => prev.map((s, i) =>
+          i === 1 ? {
+            ...s,
+            progress: 100,
+            status: 'complete' as const,
+            data: `Skipped — Gemini ${Math.round(geminiConfidence * 100)}% confident (saves API call)`
+          } : s
+        ))
       }
       
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -395,8 +400,9 @@ function App() {
             i === 2 ? { ...s, data: 'Using estimated pricing (eBay API unavailable)' } : s
           ))
         })
-        completeStep(2)
-        await new Promise(resolve => setTimeout(resolve, 100))
+        setPipeline(prev => prev.map((s, i) =>
+          i === 2 ? { ...s, status: 'complete' as const, progress: 100 } : s
+        ))
       } else {
         // No eBay API — use Gemini Google Search grounding to get real market comps
         const geminiKey = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
@@ -496,8 +502,9 @@ function App() {
             i === 2 ? { ...s, data: 'Add Gemini API key in Settings for live market search' } : s
           ))
         }
-        completeStep(2)
-        await new Promise(resolve => setTimeout(resolve, 100))
+        setPipeline(prev => prev.map((s, i) =>
+          i === 2 ? { ...s, status: 'complete' as const, progress: 100 } : s
+        ))
       }
 
       // Sell price fallback chain: eBay/Gemini research → Google Lens average → 4.5× markup (only if price > 0)
@@ -550,15 +557,19 @@ function App() {
         triggerFail()
       }
       
-      completeStep(3)
-      await new Promise(resolve => setTimeout(resolve, 100))
-      setPipeline(prev => prev.map((s, i) => 
-        i === 3 ? { 
-          ...s, 
+      setPipeline(prev => prev.map((s, i) =>
+        i === 3 ? {
+          ...s,
+          status: 'complete' as const,
+          progress: 100,
           data: `Margin: ${profitMetrics.profitMargin.toFixed(1)}%, ROI: ${profitMetrics.roi.toFixed(0)}%`
         } : s
       ))
-      
+
+      setPipeline(prev => prev.map((s, i) =>
+        i === 4 ? { ...s, status: 'processing' as const, progress: 0 } : s
+      ))
+      simulateProgress(4, 500)
       await new Promise(resolve => setTimeout(resolve, 500))
       completeStep(4)
       
@@ -1414,6 +1425,9 @@ function App() {
       // handleCapture already shows a toast; item stays in queue so no data is lost
     }
   }, [queue, setQueue, setCurrentItem, setPipeline, setScreen, handleCapture])
+
+  // Alias for agent tool dispatch — delegates to the existing reanalyze logic
+  const handleRerunPipeline = handleReanalyzeItem
 
   const handleOptimizeForPlatform = useCallback(async (itemId: string, platform: ResalePlatform) => {
     const item = (queue || []).find(i => i.id === itemId)

@@ -48,7 +48,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo } from '@/types'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, AgentToolCall } from '@/types'
 
 interface QuickAction {
   emoji: string
@@ -117,7 +117,24 @@ const AGENT_SYSTEM_INSTRUCTIONS = `You are a resale business AI agent with full 
 ## Rules
 - Answer from the app state below — never say you can't access it.
 - Reference items by name, price, margin, and category.
-- Be proactive: suggest goals, flag unanalyzed items, warn about overdue shipping.` as const
+- Be proactive: suggest goals, flag unanalyzed items, warn about overdue shipping.
+
+## Tool Calls
+When you need to take an action on behalf of the user, emit a tool call at the END of your response using this exact format:
+
+<tool_call>{"tool":"rerun_pipeline","itemId":"ITEM_ID"}</tool_call>
+<tool_call>{"tool":"create_listing","itemId":"ITEM_ID"}</tool_call>
+<tool_call>{"tool":"update_item","itemId":"ITEM_ID","updates":{"notes":"...","decision":"BUY"}}</tool_call>
+<tool_call>{"tool":"batch_analyze_queue"}</tool_call>
+<tool_call>{"tool":"add_task","taskText":"Buy bubble wrap for shipping"}</tool_call>
+<tool_call>{"tool":"complete_task","taskId":"TASK_ID"}</tool_call>
+<tool_call>{"tool":"clear_tasks"}</tool_call>
+
+Rules:
+- Only emit a tool call when the user explicitly asks for an action.
+- Always explain what you are doing in plain text BEFORE the tool_call tag.
+- itemId must be an exact ID from the app state below.
+- taskId must be an exact ID from the task list below.` as const
 
 function formatMessage(text: string): string {
   let formatted = text
@@ -196,6 +213,7 @@ interface AgentScreenProps {
   onPushToNotion?: (itemId: string) => Promise<void>
   onBatchAnalyze?: () => Promise<void>
   onEditItem?: (itemId: string, updates: Partial<ScannedItem>) => void
+  onRerunPipeline?: (itemId: string) => Promise<void>
   onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
   onMarkShipped?: (itemId: string, trackingNumber: string, shippingCarrier: string) => void
   onNavigateToQueue?: () => void
@@ -210,7 +228,7 @@ interface AgentScreenProps {
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [] }: AgentScreenProps) {
   const [currentSession] = useKV<Session | undefined>('currentSession', undefined)
   const sessionId = currentSession?.id
   const chatKey = useMemo(() => sessionId ? `chat-sessions-${sessionId}` : 'chat-sessions-global', [sessionId])
@@ -903,7 +921,7 @@ ${pastSessionsSummary || 'None'}
 ${activeGoalsSummary || 'None'}
 
 ### Tasks
-${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} (${t.createdBy})`).join('\n') : 'No pending tasks'}
+${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' '}] (${t.id}) ${t.text} [${t.createdBy}]`).join('\n') : 'No tasks yet.'}
 
 ### Settings
 - Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%`
@@ -924,10 +942,57 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
         systemPrompt: AGENT_SYSTEM_INSTRUCTIONS,
       })
 
+      // Parse and execute tool calls from LLM response
+      const TOOL_CALL_REGEX = /<tool_call>([\s\S]*?)<\/tool_call>/g
+      const parsedToolCalls: AgentToolCall[] = []
+      let displayText = response
+
+      let tcMatch
+      while ((tcMatch = TOOL_CALL_REGEX.exec(response)) !== null) {
+        try {
+          const call = JSON.parse(tcMatch[1].trim()) as AgentToolCall
+          parsedToolCalls.push(call)
+        } catch { /* malformed JSON — skip */ }
+      }
+      displayText = response.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim()
+
+      for (const call of parsedToolCalls) {
+        if (call.tool === 'rerun_pipeline' && call.itemId && onRerunPipeline) {
+          const item = queueItems?.find(i => i.id === call.itemId)
+          displayText += `\n\n✅ Re-running pipeline on **${item?.productName || call.itemId}**...`
+          onRerunPipeline(call.itemId).catch(() => {})
+        } else if (call.tool === 'create_listing' && call.itemId) {
+          const item = queueItems?.find(i => i.id === call.itemId)
+          displayText += `\n\n✅ Creating listing for **${item?.productName || call.itemId}**...`
+          onOptimizeItem?.(call.itemId).catch(() => {})
+        } else if (call.tool === 'update_item' && call.itemId && call.updates) {
+          onEditItem?.(call.itemId, call.updates)
+          displayText += `\n\n✅ Updated item data.`
+        } else if (call.tool === 'batch_analyze_queue') {
+          displayText += `\n\n✅ Starting batch queue analysis...`
+          onBatchAnalyze?.().catch(() => {})
+        } else if (call.tool === 'add_task' && call.taskText) {
+          setTodos(prev => [...(prev || []), {
+            id: Date.now().toString(),
+            text: call.taskText!,
+            completed: false,
+            createdBy: 'agent' as const,
+            createdAt: Date.now(),
+          }])
+          displayText += `\n\n✅ Added task: "${call.taskText}"`
+        } else if (call.tool === 'complete_task' && call.taskId) {
+          setTodos(prev => (prev || []).map(t => t.id === call.taskId ? { ...t, completed: true } : t))
+          displayText += `\n\n✅ Marked task complete.`
+        } else if (call.tool === 'clear_tasks') {
+          setTodos([])
+          displayText += `\n\n✅ Tasks cleared.`
+        }
+      }
+
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response,
+        content: displayText,
         timestamp: Date.now(),
       }
 
@@ -966,7 +1031,7 @@ ${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} 
     } finally {
       setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, setTodos, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, todos, setTodos, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals, queueItems])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {
