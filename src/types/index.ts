@@ -206,6 +206,7 @@ export interface ScannedItem {
   returnReason?: string
   delistedDate?: number
   actualShippingCost?: number
+  platformComparison?: import('../lib/platform-roi-service').PlatformROIResult[]
 }
 
 export interface OptimizedListing {

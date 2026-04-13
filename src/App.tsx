@@ -25,6 +25,7 @@ import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { retryOperation } from './lib/retry-service'
 import { getRetryOptions } from './lib/retry-config'
 import { callLLM, researchProduct, parseResearchPrice, parseSellThroughRate } from './lib/llm-service'
+import { calculatePlatformROI } from './lib/platform-roi-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
@@ -598,6 +599,17 @@ function App() {
       const minMargin = settings?.minProfitMargin || 30
       const decision = makeDecision(ebayAvgPrice, price, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
 
+      // Multi-platform ROI comparison (Mercari / Poshmark / Whatnot — eBay is primary, FB excluded)
+      const platformComparison = sellPrice > 0 ? calculatePlatformROI(
+        price,
+        sellPrice,
+        settings?.defaultShippingCost ?? 5.0,
+        settings?.shippingMaterialsCost ?? 0.75,
+        settings?.ebayFeePercent ?? 12.9,
+        settings?.ebayAdFeePercent ?? 3.0
+      ) : []
+      const bestAlt = platformComparison.find(p => p.recommended)
+
       // Free item on standard platforms: if fees eat all profit, recommend fee-free local platform
       const freeItemPlatformHint =
         price === 0 && decision === 'PASS'
@@ -609,19 +621,21 @@ function App() {
       } else {
         triggerFail()
       }
-      
+
       completeStep(3)
       await new Promise(resolve => setTimeout(resolve, 100))
-      setPipeline(prev => prev.map((s, i) => 
-        i === 3 ? { 
-          ...s, 
-          data: `Margin: ${profitMetrics.profitMargin.toFixed(1)}%, ROI: ${profitMetrics.roi.toFixed(0)}%`
+      setPipeline(prev => prev.map((s, i) =>
+        i === 3 ? {
+          ...s,
+          data: bestAlt && sellPrice > 0
+            ? `eBay: ${profitMetrics.profitMargin.toFixed(1)}% margin · Best alt: ${bestAlt.platform} ${bestAlt.profitMargin.toFixed(1)}%`
+            : `Margin: ${profitMetrics.profitMargin.toFixed(1)}%, ROI: ${profitMetrics.roi.toFixed(0)}%`
         } : s
       ))
-      
+
       await new Promise(resolve => setTimeout(resolve, 500))
       completeStep(4)
-      
+
       const updatedItem: ScannedItem = {
         ...newItem,
         productName: visionResult?.productName || barcodeProduct?.title || mockProductName,
@@ -632,6 +646,7 @@ function App() {
         decision,
         lensAnalysis,
         lensResults: lensAnalysis?.results,
+        platformComparison: platformComparison.length > 0 ? platformComparison : undefined,
         marketData: {
           ...marketData,
           // Preserve barcode lookup data for listing generation context
@@ -955,6 +970,14 @@ function App() {
       ? '🏡 Personal' as const
       : undefined
 
+    // Build platform ROI summary string to append to Market Notes
+    const platformROINote = item.platformComparison?.length
+      ? 'Platform ROI — ' + item.platformComparison
+          .map(p => `${p.platform}: $${p.netProfit.toFixed(2)} (${p.profitMargin.toFixed(0)}%)`)
+          .join(' | ')
+      : undefined
+    const combinedNotes = [item.notes, platformROINote].filter(Boolean).join('\n')
+
     const result = await notionService.pushListing({
       title: listing?.title || item.productName || 'Unknown Item',
       description: listing?.description || item.description || '',
@@ -970,7 +993,7 @@ function App() {
       itemId: item.id,
       timestamp: item.timestamp,
       location: item.location?.name,
-      notes: item.notes,
+      notes: combinedNotes || undefined,
       // Session + operator traceability
       sessionId: linkedSession?.name,
       sessionNumber: linkedSession?.sessionNumber,
