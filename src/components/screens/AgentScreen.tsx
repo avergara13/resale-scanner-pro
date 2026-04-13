@@ -54,7 +54,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, SoldItem } from '@/types'
+import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, AgentToolCall, SoldItem } from '@/types'
 
 interface QuickAction {
   emoji: string
@@ -106,6 +106,21 @@ function relativeTime(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+function describeToolCall(call: AgentToolCall, items?: ScannedItem[]): string {
+  const item = items?.find(i => i.id === call.itemId)
+  const name = item?.productName || call.itemId || ''
+  switch (call.tool) {
+    case 'rerun_pipeline': return `Re-run pipeline on ${name}`
+    case 'create_listing': return `Create listing for ${name}`
+    case 'update_item': return `Update item: ${name}`
+    case 'batch_analyze_queue': return 'Batch analyze entire queue'
+    case 'add_task': return `Add task: "${call.taskText}"`
+    case 'complete_task': return 'Mark task complete'
+    case 'clear_tasks': return 'Clear all tasks'
+    default: return call.tool
+  }
+}
+
 // Static system instructions — module-level constant, allocated once.
 // Gemini API caches identical prefixes across calls, so keeping this
 // stable and at the front of every prompt reduces per-request cost.
@@ -123,7 +138,24 @@ const AGENT_SYSTEM_INSTRUCTIONS = `You are a resale business AI agent with full 
 ## Rules
 - Answer from the app state below — never say you can't access it.
 - Reference items by name, price, margin, and category.
-- Be proactive: suggest goals, flag unanalyzed items, warn about overdue shipping.` as const
+- Be proactive: suggest goals, flag unanalyzed items, warn about overdue shipping.
+
+## Tool Calls
+When you need to take an action on behalf of the user, emit a tool call at the END of your response using this exact format:
+
+<tool_call>{"tool":"rerun_pipeline","itemId":"ITEM_ID"}</tool_call>
+<tool_call>{"tool":"create_listing","itemId":"ITEM_ID"}</tool_call>
+<tool_call>{"tool":"update_item","itemId":"ITEM_ID","updates":{"notes":"...","decision":"BUY"}}</tool_call>
+<tool_call>{"tool":"batch_analyze_queue"}</tool_call>
+<tool_call>{"tool":"add_task","taskText":"Buy bubble wrap for shipping"}</tool_call>
+<tool_call>{"tool":"complete_task","taskId":"TASK_ID"}</tool_call>
+<tool_call>{"tool":"clear_tasks"}</tool_call>
+
+Rules:
+- Only emit a tool call when the user explicitly asks for an action.
+- Always explain what you are doing in plain text BEFORE the tool_call tag.
+- itemId must be an exact ID from the app state below.
+- taskId must be an exact ID from the task list below.` as const
 
 function formatMessage(text: string): string {
   let formatted = text
@@ -203,6 +235,7 @@ interface AgentScreenProps {
   onPushToNotion?: (itemId: string) => Promise<void>
   onBatchAnalyze?: () => Promise<void>
   onEditItem?: (itemId: string, updates: Partial<ScannedItem>) => void
+  onRerunPipeline?: (itemId: string) => Promise<void>
   onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
   onMarkShipped?: (itemId: string, trackingNumber: string, shippingCarrier: string) => void
   onNavigateToQueue?: () => void
@@ -221,7 +254,7 @@ interface AgentScreenProps {
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true }: AgentScreenProps) {
   const deviceId = useDeviceId()
   const [currentSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const sessionId = currentSession?.id
@@ -241,6 +274,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const [renameValue, setRenameValue] = useState('')
   const [taskInput, setTaskInput] = useState('')
   const [showTaskInput, setShowTaskInput] = useState(false)
+  const [pendingToolCalls, setPendingToolCalls] = useState<AgentToolCall[] | null>(null)
   // Direct KV access for scan history mutations in the Scans tab
   const [scanHistoryKV, setScanHistoryKV] = useKV<ScannedItem[]>('scan-history', [])
   const [, setQueueKV] = useKV<ScannedItem[]>('queue', [])
@@ -337,6 +371,41 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     prevMessageCount.current = chatMessages.length
   }, [chatMessages])
 
+  // Clear pending tool calls whenever the user switches to a different chat session
+  useEffect(() => {
+    setPendingToolCalls(null)
+  }, [activeSessionId])
+
+  const handleConfirmToolCalls = useCallback(() => {
+    if (!pendingToolCalls) return
+    for (const call of pendingToolCalls) {
+      if (call.tool === 'rerun_pipeline' && call.itemId && onRerunPipeline) {
+        onRerunPipeline(call.itemId).catch(() => {})
+      } else if (call.tool === 'create_listing' && call.itemId) {
+        const optimizePromise = onOptimizeItem?.(call.itemId)
+        optimizePromise?.catch(() => {})
+      } else if (call.tool === 'update_item' && call.itemId && call.updates) {
+        onEditItem?.(call.itemId, call.updates)
+      } else if (call.tool === 'batch_analyze_queue') {
+        const batchAnalyzePromise = onBatchAnalyze?.()
+        batchAnalyzePromise?.catch(() => {})
+      } else if (call.tool === 'add_task' && call.taskText) {
+        setTodos(prev => [...(prev || []), {
+          id: Date.now().toString(),
+          text: call.taskText!,
+          completed: false,
+          createdBy: 'agent' as const,
+          createdAt: Date.now(),
+        }])
+      } else if (call.tool === 'complete_task' && call.taskId) {
+        setTodos(prev => (prev || []).map(t => t.id === call.taskId ? { ...t, completed: true } : t))
+      } else if (call.tool === 'clear_tasks') {
+        setTodos([])
+      }
+    }
+    setPendingToolCalls(null)
+  }, [pendingToolCalls, onRerunPipeline, onOptimizeItem, onEditItem, onBatchAnalyze, setTodos])
+
   const handleCreateSession = useCallback(() => {
     // One-session model: open the existing session if it exists
     const existing = chatSessions?.[0]
@@ -404,6 +473,9 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const handleSendMessage = useCallback(async (messageText?: string) => {
     const text = messageText || input.trim()
     if (!text || isProcessing) return
+
+    // Dismiss any pending tool calls when the user sends a new message
+    setPendingToolCalls(null)
 
     // Auto-create session if none exists, then continue sending in one tap
     let sessionId = activeSessionId
@@ -1013,7 +1085,7 @@ ${pastSessionsSummary || 'None'}
 ${activeGoalsSummary || 'None'}
 
 ### Tasks
-${pendingTodos.length > 0 ? pendingTodos.slice(0, 10).map(t => `- [ ] ${t.text} (${t.createdBy})`).join('\n') : 'No pending tasks'}
+${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' '}] (${t.id}) ${t.text} [${t.createdBy}]`).join('\n') : 'No tasks yet.'}
 
 ### Settings
 - Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%${settings?.userProfile?.aiContext ? `
@@ -1056,10 +1128,30 @@ ${settings.userProfile.aiContext}` : ''}`
         systemPrompt: AGENT_SYSTEM_INSTRUCTIONS,
       })
 
+      // Parse tool calls from LLM response — do NOT execute yet; queue for user confirmation
+      const TOOL_CALL_REGEX = /<tool_call>([\s\S]*?)<\/tool_call>/g
+      const parsedToolCalls: AgentToolCall[] = []
+      let displayText = response
+
+      let tcMatch
+      while ((tcMatch = TOOL_CALL_REGEX.exec(response)) !== null) {
+        try {
+          const call = JSON.parse(tcMatch[1].trim()) as AgentToolCall
+          parsedToolCalls.push(call)
+        } catch { /* malformed JSON — skip */ }
+      }
+      displayText = response.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim()
+
+      // Queue validated tool calls for explicit user confirmation before executing
+      if (parsedToolCalls.length > 0) {
+        setPendingToolCalls(parsedToolCalls)
+        displayText += `\n\n⚠️ I'd like to perform ${parsedToolCalls.length} action${parsedToolCalls.length > 1 ? 's' : ''} on your behalf — review and confirm below.`
+      }
+
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response,
+        content: displayText,
         timestamp: Date.now(),
       }
 
@@ -1103,7 +1195,7 @@ ${settings.userProfile.aiContext}` : ''}`
       // but short-circuit here as well to avoid the dev-mode warning.
       if (isMountedRef.current) setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, setTodos, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals, queueItems])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {
@@ -1534,6 +1626,50 @@ ${settings.userProfile.aiContext}` : ''}`
                     </motion.div>
                   )
                 })}
+
+                {/* Pending tool call confirmation card */}
+                {pendingToolCalls && pendingToolCalls.length > 0 && !isProcessing && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-3 justify-start"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0">
+                      <Robot size={18} weight="bold" className="text-white" />
+                    </div>
+                    <div className="bg-s1 border border-s2 rounded-2xl px-4 py-3 max-w-[80%]">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Warning size={14} weight="fill" className="text-t1" />
+                        <span className="text-xs font-bold text-t1">Confirm Actions</span>
+                      </div>
+                      <ul className="space-y-1 mb-3">
+                        {pendingToolCalls.map((call, i) => (
+                          <li key={i} className="text-xs text-t2 flex items-start gap-1.5">
+                            <span className="text-b1 mt-0.5 flex-shrink-0">•</span>
+                            <span>{describeToolCall(call, queueItems)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleConfirmToolCalls}
+                          className="h-7 px-3 text-xs"
+                        >
+                          Run
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setPendingToolCalls(null)}
+                          className="h-7 px-3 text-xs"
+                        >
+                          Dismiss
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 {isProcessing && (
                   <motion.div

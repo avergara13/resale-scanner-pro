@@ -572,6 +572,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       return false
     }
 
+    // Exclude promoted items (optimizing/ready/published) from BUY tab — they belong in the listing flow
+    const isPromoted = ['optimizing', 'ready', 'published'].includes(item.listingStatus ?? '')
+
     const matchesFilter =
       filter === 'ALL' ||
       (filter === 'ITEMS' && item.decision === 'BUY' && item.listingStatus !== 'published') ||
