@@ -34,7 +34,7 @@ export function SessionLiveBanner() {
   }
 
   return (
-    <div style={barStyle} className="flex items-center leading-none gap-1 sm:gap-2 px-2 sm:px-3 py-0 sm:py-1.5 h-4 sm:h-auto overflow-hidden">
+    <div style={barStyle} className="flex items-center leading-none gap-1 sm:gap-2 px-2 sm:px-3 py-0 sm:py-1.5 h-5 sm:h-auto overflow-hidden">
       {/* Sonar ping dot */}
       <span className="relative flex-shrink-0" style={{ width: 7, height: 7 }}>
         <span className="absolute inset-0 rounded-full bg-green animate-ping opacity-50" />
