@@ -59,6 +59,7 @@ interface QueueScreenProps {
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
+  onPushToNotion?: (itemId: string) => Promise<void>
 }
 
 type FilterOption = 'ALL' | 'ITEMS' | 'LISTED'
@@ -79,6 +80,7 @@ interface SortableItemProps {
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
+  onPushToNotion?: (itemId: string) => Promise<void>
 }
 
 function SortableItem({
@@ -96,6 +98,7 @@ function SortableItem({
   onReanalyze,
   onOpenDetail,
   onBuyItem,
+  onPushToNotion,
 }: SortableItemProps) {
   const {
     attributes,
@@ -384,12 +387,28 @@ function SortableItem({
               Optimize
             </button>
           ) : (
-            // Optimized but not yet live — show a quiet "ready" state
-            <div className="flex-1 h-10 flex items-center justify-center">
-              <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-b1/10 text-b1 border border-b1/20">
-                Ready to List
-              </span>
-            </div>
+            // Optimized — show Regen + List buttons
+            <>
+              <div className="w-px h-5 bg-s2 flex-shrink-0" />
+              <button
+                onClick={() => onCreateListing(item.id)}
+                aria-label="Regenerate listing"
+                className="w-11 h-10 flex items-center justify-center text-t2 hover:text-b1 hover:bg-b1/10 active:opacity-60 transition-colors"
+                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <ArrowCounterClockwise size={13} weight="bold" />
+              </button>
+              {onPushToNotion && (
+                <button
+                  onClick={() => onPushToNotion(item.id)}
+                  aria-label="List on Notion"
+                  className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all"
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                >
+                  List
+                </button>
+              )}
+            </>
           )
         ) : onBuyItem ? (
           <button
@@ -445,7 +464,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem, onPushToNotion }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -1132,7 +1151,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
               onClick={() => setFilter('LISTED')}
               className={cn('tab-btn', filter === 'LISTED' && 'active')}
             >
-              <span>Listed{listedCount > 0 && ` (${listedCount})`}</span>
+              <span>✅ Listed{listedCount > 0 && ` (${listedCount})`}</span>
             </button>
           </div>
         </div>
@@ -1323,6 +1342,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onReanalyze={onReanalyze}
                       onOpenDetail={onOpenDetail}
                       onBuyItem={onBuyItem}
+                      onPushToNotion={onPushToNotion}
                     />
                   ))}
                 </div>

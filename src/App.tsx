@@ -94,6 +94,7 @@ function App() {
   const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [, setActivityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
   const [, setDebugLog] = useKV<DebugEntry[]>(DEBUG_LOG_KEY, [])
+  const [, setAgentActiveTab] = useKV<'chat' | 'scans' | 'tasks'>('agent-active-tab', 'chat')
   // Global profile — not device-scoped so operator identity syncs across all devices
   const [globalProfile, setGlobalProfile] = useKV<UserProfile | undefined>('user-profile', undefined)
   // Device-scoped: each device has its own settings (thresholds, API keys, profile)
@@ -936,7 +937,7 @@ function App() {
     // Read fresh queue via ref to avoid stale closure when agent pipeline
     // chains batch-analyze → optimize (items that just flipped PENDING→BUY)
     const item = (queueRef.current || []).find(i => i.id === itemId)
-    if (!item || item.decision !== 'BUY' || item.optimizedListing) return
+    if (!item || item.decision !== 'BUY') return
     const optimized = await listingOptimizationService.generateOptimizedListing({
       item,
       marketData: item.marketData,
@@ -1398,6 +1399,8 @@ function App() {
       }
       return [...current, listingItem]
     })
+    // Erase from scan history — item has moved to the listing queue
+    setScanHistory(prev => (prev || []).filter(i => i.id !== listingItem.id))
     // Navigate to queue immediately — optimization runs in the background
     setCurrentItem(undefined)
     setPipeline([])
@@ -1493,10 +1496,11 @@ function App() {
     })
     setCurrentItem(undefined)
     setPipeline([])
+    setAgentActiveTab('scans')
     setScreen('agent')
-    toast('Saved to Scans — tap it to continue researching')
+    toast('Saved to Scan Queue — tap to continue researching')
     logActivity('Saved for later research — not added to queue')
-  }, [currentItem, setScanHistory, setScreen])
+  }, [currentItem, setScanHistory, setScreen, setAgentActiveTab])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
@@ -2310,6 +2314,7 @@ function App() {
                 personalSessionIds={personalSessionIds}
                 onReanalyze={handleReanalyzeItem}
                 onOpenDetail={(item) => setDetailItemId(item.id)}
+                onPushToNotion={handlePushToNotion}
               />
             </motion.div>
           )}
@@ -2323,6 +2328,7 @@ function App() {
                 onOptimize={handleOptimizeItem}
                 settings={settings}
                 onEdit={handleEditQueueItem}
+                onPushToNotion={handlePushToNotion}
               />
             ) : null
           })()}

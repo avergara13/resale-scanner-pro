@@ -334,12 +334,13 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     return { total: unique.length, buy, pass, pending: maybe, maybe, queueCount, totalProfit }
   }, [sessionItems, scanHistoryKV, currentSession?.id])
 
-  // Session-scoped scan cards (most recent first) for the Scans tab
+  // Session-scoped PENDING scan cards (most recent first) for the Scan Queue tab
+  // Only shows "Maybe" items — PASS items go to scan history only
   const sessionScans = useMemo(() => {
     const items = scanHistoryKV || []
     const filtered = currentSession?.id
-      ? items.filter(i => i.sessionId === currentSession.id)
-      : items
+      ? items.filter(i => i.sessionId === currentSession.id && i.decision === 'PENDING')
+      : items.filter(i => i.decision === 'PENDING')
     return [...filtered].sort((a, b) => b.timestamp - a.timestamp).slice(0, 100)
   }, [scanHistoryKV, currentSession?.id])
 
@@ -354,8 +355,10 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       if (current.some(i => i.id === queueItem.id)) return current
       return [...current, queueItem]
     })
+    // Erase from scan history — item has moved to the listing queue
+    setScanHistoryKV(prev => (prev || []).filter(i => i.id !== item.id))
     logActivity(`${item.productName || 'Item'} added to queue`)
-  }, [setQueueKV])
+  }, [setQueueKV, setScanHistoryKV])
 
   const prevMessageCount = useRef(chatMessages.length)
   const agentHasMounted = useRef(false)
@@ -1475,7 +1478,7 @@ ${settings.userProfile.aiContext}` : ''}`
               className={cn('tab-btn', activeTab === 'scans' && 'active')}
             >
               <span>
-                📸 SCANS{sessionScans.length > 0 && ` (${sessionScans.length})`}
+                📸 SCAN QUEUE{sessionScans.length > 0 && ` (${sessionScans.length})`}
               </span>
             </button>
             <button
