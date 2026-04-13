@@ -414,6 +414,41 @@ export function AIScreen({
                 </div>
               )}
 
+              {/* ── Platform ROI Comparison — BUY only, 3 platforms ── */}
+              {pipelineComplete && decision === 'BUY' && currentItem?.platformComparison && currentItem.platformComparison.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[10px] font-semibold text-t3 uppercase tracking-widest mb-1.5 px-0.5">Alt Platform Comparison</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {currentItem.platformComparison.map(p => {
+                      const isPos = p.netProfit >= 0
+                      return (
+                        <div
+                          key={p.platform}
+                          className={cn(
+                            'relative rounded-xl px-2 py-2 border text-left',
+                            p.recommended
+                              ? 'border-green/30 bg-green/5'
+                              : 'border-s2/60 bg-fg/5'
+                          )}
+                          style={{ backdropFilter: 'blur(8px)' }}
+                        >
+                          {p.recommended && (
+                            <span className="absolute top-1 right-1 text-[7px] font-black text-green tracking-wide uppercase">BEST</span>
+                          )}
+                          <p className="text-[9px] font-bold text-t2 truncate mb-1">{p.platform}</p>
+                          <p className={cn('text-sm font-bold font-mono leading-none', isPos ? 'text-green' : 'text-red')}>
+                            {isPos ? '+' : ''}{p.netProfit.toFixed(2)}
+                          </p>
+                          <p className={cn('text-[9px] font-mono mt-0.5', isPos ? 'text-green/80' : 'text-red/80')}>
+                            {p.profitMargin.toFixed(0)}% margin
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* ── 1. Quick Summary — only when we have real pricing data ── */}
               {hasDecision && currentItem && hasPriceData && (
                 <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>

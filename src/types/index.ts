@@ -92,6 +92,7 @@ export interface SoldFeedResponse {
 
 export type ResalePlatform = 'ebay' | 'mercari' | 'poshmark' | 'whatnot' | 'facebook'
 
+/** @deprecated Platform-specific listing generation moved to n8n downstream pipeline. RSP is data collection only. */
 export interface PlatformListing {
   title: string
   description: string
@@ -206,6 +207,7 @@ export interface ScannedItem {
   returnReason?: string
   delistedDate?: number
   actualShippingCost?: number
+  platformComparison?: import('../lib/platform-roi-service').PlatformROIResult[]
 }
 
 export interface OptimizedListing {
@@ -221,6 +223,7 @@ export interface OptimizedListing {
   seoScore: number
   recommendations: string[]
   optimizedAt: number
+  /** @deprecated Platform-specific listings moved to n8n. RSP is data collection only. */
   platformListings?: Partial<Record<ResalePlatform, PlatformListing>>
 }
 
