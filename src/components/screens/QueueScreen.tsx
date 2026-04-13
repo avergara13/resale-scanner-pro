@@ -255,9 +255,41 @@ function SortableItem({
           {/* Listing status pill */}
           {item.listingStatus === 'published' ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-green/10 text-green border-green/30">
-                LIVE
-              </span>
+              {item.notionUrl ? (
+                <a
+                  href={item.notionUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-green/10 text-green border-green/30 hover:bg-green/20 active:scale-95 transition-all"
+                >
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green" />
+                  </span>
+                  LISTED
+                </a>
+              ) : (
+                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-green/10 text-green border-green/30">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green" />
+                  </span>
+                  LISTED
+                </span>
+              )}
+              {item.publishedDate && (
+                <span className="text-[8px] text-t3 font-medium">
+                  {(() => {
+                    const mins = Math.floor((Date.now() - item.publishedDate) / 60000)
+                    if (mins < 1) return 'just now'
+                    if (mins < 60) return `${mins}m ago`
+                    const hrs = Math.floor(mins / 60)
+                    if (hrs < 24) return `${hrs}h ago`
+                    return `${Math.floor(hrs / 24)}d ago`
+                  })()}
+                </span>
+              )}
             </div>
           ) : item.optimizedListing ? (
             <div className="flex items-center gap-1.5">

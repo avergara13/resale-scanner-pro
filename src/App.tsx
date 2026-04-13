@@ -1516,6 +1516,15 @@ function App() {
   const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
     const optimized = await optimizeAndCache(imageData)
 
+    // Same auto-session guard as handleCapture — every item must be session-scoped
+    let activeSession = session
+    if (!activeSession?.active) {
+      activeSession = createSession()
+      setAllSessions(prev => [...(prev || []), activeSession!])
+      setSession(activeSession)
+      setSelectedSessionId(activeSession.id)
+    }
+
     const draftItem: ScannedItem = {
       id: Date.now().toString(),
       timestamp: Date.now(),
@@ -1526,14 +1535,14 @@ function App() {
       productName: barcodeProduct?.title || 'Quick Draft',
       description: barcodeProduct?.description || 'Captured in quick draft mode - analyze later',
       category: barcodeProduct?.category || undefined,
-      sessionId: session?.id,
+      sessionId: activeSession?.id,
       location,
       marketData: barcodeProduct ? { barcodeProduct } : undefined,
     }
 
     setQueue((prev) => [...(prev || []), draftItem])
 
-    if (session?.active) {
+    if (activeSession?.active) {
       setSession((prev) => {
         if (!prev) return prev
         return {
@@ -1542,7 +1551,7 @@ function App() {
         }
       })
     }
-  }, [session, setSession, setQueue, optimizeAndCache])
+  }, [session, setSession, setQueue, optimizeAndCache, createSession, setAllSessions, setSelectedSessionId])
 
 
 
@@ -1957,6 +1966,38 @@ function App() {
       logDebug('User profile backfilled to global key from device settings', 'info', 'migration')
     }
   }, [settings, globalProfile, setGlobalProfile]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // One-time backfill: assign sessionId to orphaned items that were created during a
+  // session's time window but didn't get tagged (pre-PR#115 race condition).
+  const hasBackfilledSessionIdsRef = useRef(false)
+  useEffect(() => {
+    if (hasBackfilledSessionIdsRef.current) return
+    const sessions = allSessions || []
+    if (sessions.length === 0) return
+    hasBackfilledSessionIdsRef.current = true
+
+    const assignSession = (item: ScannedItem): ScannedItem => {
+      if (item.sessionId) return item
+      // Find session whose time window contains this item's timestamp
+      const match = sessions.find(s => {
+        const end = s.endTime || Date.now()
+        return item.timestamp >= s.startTime && item.timestamp <= end
+      })
+      return match ? { ...item, sessionId: match.id } : item
+    }
+
+    const currentQueue = queue || []
+    const currentHistory = scanHistory || []
+    const fixedQueue = currentQueue.map(assignSession)
+    const fixedHistory = currentHistory.map(assignSession)
+    const queueChanged = fixedQueue.some((item, i) => item !== currentQueue[i])
+    const historyChanged = fixedHistory.some((item, i) => item !== currentHistory[i])
+    if (queueChanged) setQueue(fixedQueue)
+    if (historyChanged) setScanHistory(fixedHistory)
+    if (queueChanged || historyChanged) {
+      logDebug('Backfilled sessionId on orphaned items', 'info', 'migration')
+    }
+  }, [allSessions, queue, scanHistory]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Activity log listener — persists silent activity events to KV
   useEffect(() => {
