@@ -12,14 +12,15 @@ interface CostTrackingScreenProps {
   onBack: () => void
   queueItems?: ScannedItem[]
   scanHistory?: ScannedItem[]
+  sessionId?: string
 }
 
 type Period = 'today' | 'week' | 'month' | 'all'
 const PERIOD_LABELS: Record<Period, string> = { today: 'Today', week: 'Week', month: 'Month', all: 'All Time' }
 const PERIOD_MS: Record<Period, number> = { today: 86_400_000, week: 604_800_000, month: 2_592_000_000, all: Infinity }
 
-export function CostTrackingScreen({ onBack, queueItems, scanHistory }: CostTrackingScreenProps) {
-  const [period, setPeriod] = useState<Period>('month')
+export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId }: CostTrackingScreenProps) {
+  const [period, setPeriod] = useState<Period>('today')
   const [showApiCosts, setShowApiCosts] = useState(false)
   const { costData, isLoading, refreshData } = useCostTracking(period)
 
@@ -31,14 +32,17 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory }: CostTrac
     const all = [...(queueItems || []), ...(scanHistory || [])]
     const seen = new Set<string>()
     const unique = all.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true })
-    const periodItems = unique.filter(i => i.timestamp >= cutoff)
+    const periodItems = unique.filter(i => {
+      if (sessionId && i.sessionId !== sessionId) return false
+      return i.timestamp >= cutoff
+    })
     return {
       allPeriodItems: periodItems,
       buyItems: periodItems
         .filter(i => i.decision === 'BUY')
         .sort((a, b) => (b.profitMargin || 0) - (a.profitMargin || 0)),
     }
-  }, [queueItems, scanHistory, cutoff])
+  }, [queueItems, scanHistory, cutoff, sessionId])
 
   const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
   const totalRevenue = buyItems.reduce((s, i) => s + (i.estimatedSellPrice || 0), 0)

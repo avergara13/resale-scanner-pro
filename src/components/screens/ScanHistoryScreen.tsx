@@ -12,18 +12,29 @@ import type { ScannedItem } from '@/types'
 interface ScanHistoryScreenProps {
   onBack: () => void
   onSaveAsDraft: (item: ScannedItem) => void
+  sessionId?: string
+  scanHistory?: ScannedItem[]
 }
 
-export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenProps) {
-  const [scanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
+export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistory: scanHistoryProp }: ScanHistoryScreenProps) {
+  const [globalScanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState<'all' | 'BUY' | 'PASS' | 'PENDING'>('all')
 
+  // Use prop data when session-scoped, fall back to global KV
+  const effectiveHistory = scanHistoryProp ?? globalScanHistory
+
+  // Session-scoped base — used for "All (N)" count and Clear visibility
+  const sessionScopedHistory = useMemo(() => {
+    const items = effectiveHistory || []
+    return sessionId ? items.filter(i => i.sessionId === sessionId) : items
+  }, [effectiveHistory, sessionId])
+
   const filteredHistory = useMemo(() => {
-    const items = scanHistory || []
-    if (filter === 'all') return items.sort((a, b) => b.timestamp - a.timestamp)
-    return items.filter(i => i.decision === filter).sort((a, b) => b.timestamp - a.timestamp)
-  }, [scanHistory, filter])
+    let items = sessionScopedHistory
+    if (filter !== 'all') items = items.filter(i => i.decision === filter)
+    return items.sort((a, b) => b.timestamp - a.timestamp)
+  }, [sessionScopedHistory, filter])
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -90,10 +101,10 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft }: ScanHistoryScreenPr
                 filter === f ? 'bg-b1 text-white' : 'bg-s1 text-t3'
               )}
             >
-              {f === 'all' ? `All (${(scanHistory || []).length})` : f}
+              {f === 'all' ? `All (${sessionScopedHistory.length})` : f}
             </button>
           ))}
-          {(scanHistory || []).length > 0 && (
+          {sessionScopedHistory.length > 0 && (
             <Button variant="ghost" size="sm" onClick={clearAll} className="text-red text-[10px] px-2 h-7 flex-shrink-0">
               Clear
             </Button>
