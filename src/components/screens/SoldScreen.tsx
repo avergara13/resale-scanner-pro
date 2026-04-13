@@ -265,9 +265,9 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
 
   return (
     <div className="h-full flex flex-col bg-bg">
-      {/* ── Sticky Header — glass, tabs, stats ─────────────────────────── */}
+      {/* ── Sticky Header — glass, banner, tabs ─────────────────────────── */}
       <div
-        className="px-3 pt-2 pb-2 sticky top-0 z-10"
+        className="sticky top-0 z-10"
         style={{
           background: 'color-mix(in oklch, var(--fg) 85%, transparent)',
           backdropFilter: 'saturate(180%) blur(24px)',
@@ -275,27 +275,27 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           borderBottom: '0.5px solid color-mix(in oklch, var(--s2) 50%, transparent)',
         }}
       >
-        <div className="tab-bar">
-          {([
-            ['all', 'All'],
-            ['need-label', 'Sold'],
-            ['label-ready', 'Ready'],
-            ['shipped', 'Shipped'],
-          ] as Array<[FulfillmentFilter, string]>).map(([filter, label]) => (
-            <button
-              key={filter}
-              onClick={() => setFulfillmentFilter(filter)}
-              className={cn('tab-btn', fulfillmentFilter === filter && 'active')}
-            >
-              <span>{label}</span>
-            </button>
-          ))}
+        {/* Live session banner — above tab bar, matching Agent/Listings layout */}
+        <SessionLiveBanner />
+        <div className="px-3 pt-2 pb-2">
+          <div className="tab-bar">
+            {([
+              ['all', 'All'],
+              ['need-label', 'Sold'],
+              ['label-ready', 'Ready'],
+              ['shipped', 'Shipped'],
+            ] as Array<[FulfillmentFilter, string]>).map(([filter, label]) => (
+              <button
+                key={filter}
+                onClick={() => setFulfillmentFilter(filter)}
+                className={cn('tab-btn', fulfillmentFilter === filter && 'active')}
+              >
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
         </div>
-
       </div>
-
-      {/* Live session banner — slim, between tab bar and stats strip */}
-      <SessionLiveBanner />
 
       {/* ── Slim stats strip — matches Agent inline style ─────────────── */}
       <div

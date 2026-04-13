@@ -93,6 +93,8 @@ function App() {
   const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [, setActivityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
   const [, setDebugLog] = useKV<DebugEntry[]>(DEBUG_LOG_KEY, [])
+  // Global profile — not device-scoped so operator identity syncs across all devices
+  const [globalProfile, setGlobalProfile] = useKV<UserProfile | undefined>('user-profile', undefined)
   // Device-scoped: each device has its own settings (thresholds, API keys, profile)
   const [settings, setSettings] = useKV<AppSettings>(`device-settings-${deviceId}`, {
     voiceEnabled: true,
@@ -727,7 +729,8 @@ function App() {
     // Uses max(sessionNumber) across ALL sessions (including soft-deleted) to guarantee
     // unique IDs even after deletions. Matching by operatorId handles multi-operator teams;
     // sessions without operatorId (pre-profile or no-profile) are grouped together.
-    const profile = settings?.userProfile
+    // Prefer device-scoped profile; fall back to global profile (set by any device)
+    const profile = settings?.userProfile ?? globalProfile
     const operatorId = profile?.operatorId
     const operatorAllSessions = (allSessions || []).filter(s =>
       operatorId ? s.operatorId === operatorId : !s.operatorId
@@ -758,7 +761,7 @@ function App() {
     setScreen('session-detail')
     logActivity(`Session started${profile?.operatorName ? ` by ${profile.operatorName}` : ''}`)
     logDebug('Session started', 'info', 'session', { id, operatorId, sessionNumber })
-  }, [allSessions, settings?.userProfile, setSession, setAllSessions, setSelectedSessionId, setScreen])
+  }, [allSessions, settings?.userProfile, globalProfile, setSession, setAllSessions, setSelectedSessionId, setScreen])
 
   // Resume an existing open session — navigate to its detail screen
   const handleResumeSession = useCallback((sessionId: string) => {
@@ -860,6 +863,10 @@ function App() {
   }, [session, setSession, setAllSessions])
 
   const handleUpdateSettings = useCallback((updates: Partial<AppSettings>) => {
+    // Sync userProfile to global key so all devices share operator identity
+    if (updates.userProfile) {
+      setGlobalProfile(updates.userProfile)
+    }
     setSettings((prev) => {
       const defaults: AppSettings = {
         voiceEnabled: true,
@@ -896,7 +903,7 @@ function App() {
       
       return newSettings
     })
-  }, [setSettings, setTheme, toggleAmbientLight])
+  }, [setSettings, setGlobalProfile, setTheme, toggleAmbientLight])
 
   const handleOptimizeItem = useCallback(async (itemId: string) => {
     // Read fresh queue via ref to avoid stale closure when agent pipeline
@@ -1885,6 +1892,18 @@ function App() {
       logDebug('Settings auto-migrated from global to device scope', 'info', 'migration')
     }
   }, [legacySettings, settings]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Backfill global profile from device settings if device has a profile but global doesn't.
+  // This runs once per device load — ensures existing users' profiles propagate globally.
+  const hasBackfilledProfileRef = useRef(false)
+  useEffect(() => {
+    if (hasBackfilledProfileRef.current) return
+    if (settings?.userProfile && !globalProfile) {
+      hasBackfilledProfileRef.current = true
+      setGlobalProfile(settings.userProfile)
+      logDebug('User profile backfilled to global key from device settings', 'info', 'migration')
+    }
+  }, [settings, globalProfile, setGlobalProfile]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Activity log listener — persists silent activity events to KV
   useEffect(() => {
