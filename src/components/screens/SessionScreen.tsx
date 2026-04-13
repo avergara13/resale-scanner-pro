@@ -88,7 +88,7 @@ function PastSessionCard({
           {session.location && ` · ${session.location.name}`}
         </div>
         <div className="flex gap-3 text-[10px] ml-6 flex-wrap">
-          <span className="text-t2">{session.itemsScanned} scans</span>
+          <span className="text-t2">{items.length} scans</span>
           <span className="text-green font-bold">{buyCount} BUY</span>
           <span className="text-red font-bold">{passCount} PASS</span>
           <span className="text-green font-mono font-bold">${totalProfit.toFixed(2)}</span>
