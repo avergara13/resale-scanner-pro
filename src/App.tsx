@@ -24,7 +24,7 @@ import { ListingDetailScreen } from './components/screens/ListingDetailScreen'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { retryOperation } from './lib/retry-service'
 import { getRetryOptions } from './lib/retry-config'
-import { callLLM, researchProduct, parseResearchPrice } from './lib/llm-service'
+import { callLLM, researchProduct, parseResearchPrice, parseSellThroughRate } from './lib/llm-service'
 import { createGeminiService } from './lib/gemini-service'
 import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
@@ -38,7 +38,7 @@ import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { BarcodeProduct } from './lib/barcode-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, ResalePlatform, SoldItem, SoldShippingUpdateInput, UserProfile } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, SoldItem, SoldShippingUpdateInput, UserProfile } from './types'
 import { cn } from './lib/utils'
 import { useDeviceId } from './hooks/use-device-id'
 
@@ -112,7 +112,7 @@ function App() {
     shippingMaterialsCost: 0.75,
     paypalFeePercent: 0,
     preferredAiModel: 'gemini-2.5-flash',
-    notionDatabaseId: '7e49058fa8874889b9f6ae5a6c3bf8e7',
+    notionDatabaseId: '3318ed3e138545d39a6063a628eeefff',
     imageQuality: { preset: 'balanced' },
     // Pre-populated from Railway env vars — both users get keys automatically.
     // Overridable per-device in Settings if needed.
@@ -443,10 +443,10 @@ function App() {
             i === 2 ? { ...s, data: 'Using estimated pricing (eBay API unavailable)' } : s
           ))
         })
-        completeStep(2)
-        await new Promise(resolve => setTimeout(resolve, 100))
-      } else {
-        // No eBay API — use Gemini Google Search grounding to get real market comps
+      }
+
+      // Run Gemini market research if: no eBay service was available, OR eBay returned no usable price
+      if (!ebayService || ebayAvgPrice === 0) {
         const geminiKey = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
         if (geminiKey) {
           setPipeline(prev => prev.map((s, i) =>
@@ -460,6 +460,11 @@ function App() {
             )
             // Store for listing detail agent context
             marketData = { ...(marketData || {}), researchSummary: researchText }
+            // Parse and store sell-through rate from research text
+            const researchSellThrough = parseSellThroughRate(researchText)
+            if (researchSellThrough > 0) {
+              marketData = { ...marketData, sellThroughRate: researchSellThrough }
+            }
             // Parse recommended sell price from research text
             const researchPrice = parseResearchPrice(researchText)
             if (researchPrice > 0) {
@@ -545,9 +550,9 @@ function App() {
             i === 2 ? { ...s, data: 'Add Gemini API key in Settings for live market search' } : s
           ))
         }
-        completeStep(2)
-        await new Promise(resolve => setTimeout(resolve, 100))
       }
+      completeStep(2)
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       // Sell price fallback chain: eBay/Gemini research → Google Lens average → 4.5× markup (only if price > 0)
       if (ebayAvgPrice <= 0) {
@@ -1736,42 +1741,6 @@ function App() {
     }
   }, [queue, setQueue, setCurrentItem, setPipeline, setScreen, handleCapture])
 
-  const handleOptimizeForPlatform = useCallback(async (itemId: string, platform: ResalePlatform) => {
-    const item = (queue || []).find(i => i.id === itemId)
-    if (!item) return
-
-    // Ensure eBay listing exists first — generate it if not
-    if (!item.optimizedListing) {
-      await handleOptimizeItem(itemId)
-    }
-
-    const freshItem = (queue || []).find(i => i.id === itemId)
-    if (!freshItem?.optimizedListing || !listingOptimizationService) return
-
-    try {
-      const platformListing = await listingOptimizationService.generatePlatformListing(
-        freshItem,
-        platform,
-        freshItem.optimizedListing
-      )
-      setQueue(prev => (prev || []).map(i =>
-        i.id === itemId
-          ? {
-              ...i,
-              optimizedListing: {
-                ...i.optimizedListing!,
-                platformListings: { ...i.optimizedListing!.platformListings, [platform]: platformListing }
-              }
-            }
-          : i
-      ))
-      logActivity(`${platform.charAt(0).toUpperCase() + platform.slice(1)} listing generated`)
-    } catch (error) {
-      console.error('Platform listing generation failed:', error)
-      toast.error(`Failed to generate ${platform} listing`)
-    }
-  }, [queue, setQueue, listingOptimizationService, handleOptimizeItem])
-
   // Seed 3 test items so the queue cards can be verified (dev/debug only)
   useEffect(() => {
     if (import.meta.env.DEV && queue && queue.length === 0) {
@@ -2283,7 +2252,6 @@ function App() {
                 item={detailItem}
                 onClose={() => setDetailItemId(null)}
                 onOptimize={handleOptimizeItem}
-                onOptimizeForPlatform={handleOptimizeForPlatform}
                 settings={settings}
                 onEdit={handleEditQueueItem}
               />
