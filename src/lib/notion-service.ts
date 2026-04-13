@@ -164,8 +164,7 @@ export class NotionService {
 
       // Legacy / existing fields kept for backward compat
       'Price':          { number: listing.price },
-      'Item ID':        rt(listing.itemId),
-      'Date Added':     { date: { start: new Date(listing.timestamp).toISOString() } },
+      'Date Acquired':  { date: { start: new Date(listing.timestamp).toISOString() } },
       'Tags':           { multi_select: listing.tags.map(tag => ({ name: tag })) },
     }
 
@@ -203,7 +202,7 @@ export class NotionService {
     if (listing.expenseType)          sessionProperties['Expense Type']   = { select: { name: listing.expenseType } }
     if (typeof listing.sessionNumber === 'number') sessionProperties['Session #'] = { number: listing.sessionNumber }
     if (listing.sessionId)            sessionProperties['Session ID']     = rt(listing.sessionId)
-    if (listing.scannedBy)            sessionProperties['Scanned By']     = rt(listing.scannedBy)
+    if (listing.scannedBy)            sessionProperties['Source / Vendor'] = rt(listing.scannedBy)
     if (listing.operatorName)         sessionProperties['Operator']       = rt(listing.operatorName)
 
     // Description block in page body
