@@ -13,7 +13,7 @@ import {
   User,
   PaperPlaneRight,
   CircleNotch,
-  Sparkle,
+  Lightning,
   Tag,
   TrendUp,
   Copy,
@@ -394,25 +394,25 @@ export function ListingDetailScreen({
                   </div>
                 )}
 
-                {/* Regen + List buttons */}
+                {/* Optimize + List buttons — Apple pill style */}
                 <div className="flex gap-2">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => onOptimize(item.id)}
-                    className="flex-1 h-9 text-xs border-s2 text-t2 hover:text-t1 hover:bg-s1 rounded-xl"
+                    className="flex-1 h-9 text-xs border-s2 text-t2 hover:text-t1 hover:bg-s1 rounded-full"
                   >
-                    <Sparkle size={13} className="mr-1.5" />
-                    Regenerate
+                    <Lightning size={13} className="mr-1.5" />
+                    Optimize
                   </Button>
                   {onPushToNotion && item.listingStatus !== 'published' && (
                     <Button
                       size="sm"
                       onClick={() => onPushToNotion(item.id)}
-                      className="flex-1 h-9 text-xs font-bold text-white rounded-xl"
+                      className="flex-1 h-9 text-xs font-bold text-white rounded-full"
                       style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                     >
-                      List on Notion
+                      List
                     </Button>
                   )}
                 </div>
@@ -425,10 +425,10 @@ export function ListingDetailScreen({
                 </div>
                 <Button
                   onClick={() => onOptimize(item.id)}
-                  className="bg-b1 hover:bg-b2 text-bg h-9 text-xs font-medium rounded-xl"
+                  className="bg-b1 hover:bg-b2 text-bg h-9 text-xs font-medium rounded-full"
                 >
-                  <Sparkle size={13} className="mr-1.5" />
-                  Generate eBay listing
+                  <Lightning size={13} className="mr-1.5" />
+                  Optimize
                 </Button>
               </div>
             )}

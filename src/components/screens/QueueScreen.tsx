@@ -141,7 +141,7 @@ function SortableItem({
       style={style}
       className={cn(
         // Reset Card defaults (gap-6, py-6, bg-card) and apply scan-card DNA
-        "border overflow-hidden flex flex-col gap-0 p-0 py-0 transition-colors",
+        "border overflow-hidden flex flex-col gap-0 p-0 py-0 transition-colors rounded-2xl",
         isSelected ? 'border-b1' : 'border-s2/60'
       )}
     >
@@ -252,14 +252,20 @@ function SortableItem({
             )}
           </div>
 
-          {/* Listing status pill — only LIVE badge; "OPTIMIZED" is redundant with the completion bar + READY TO LIST CTA */}
-          {item.listingStatus === 'published' && (
+          {/* Listing status pill */}
+          {item.listingStatus === 'published' ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border bg-green/10 text-green border-green/30">
+              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-green/10 text-green border-green/30">
                 LIVE
               </span>
             </div>
-          )}
+          ) : item.optimizedListing ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-b1/10 text-b1 border-b1/30">
+                ✓ OPTIMIZED
+              </span>
+            </div>
+          ) : null}
 
           {/* Tags */}
           {item.tags && item.tags.length > 0 && (
@@ -300,79 +306,67 @@ function SortableItem({
         </div>
       </div>
 
-      {/* ── Action bar — same pattern as scan cards, queue-specific CTAs ── */}
-      <div className={cn(
-        "border-t border-s2/60 flex items-center",
-        isSelected && "bg-accent-3/10"
-      )}>
-        {/* Edit */}
+      {/* ── Action bar — Apple-style inset pill buttons ── */}
+      <div className="px-3 py-2 flex items-center gap-1.5">
+        {/* Icon buttons — small pills */}
         <button
           onClick={() => onEdit(item)}
           title="Edit"
           aria-label="Edit item"
-          className="w-11 h-10 flex items-center justify-center text-t2 hover:bg-s1 hover:text-t1 active:opacity-60 transition-colors"
+          className="h-8 w-8 flex items-center justify-center rounded-full text-t2 bg-s1/80 hover:bg-s2 active:scale-95 transition-all"
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         >
           <PencilSimple size={13} weight="bold" />
         </button>
 
-        {/* View detail */}
         {onOpenDetail && (
-          <>
-            <div className="w-px h-5 bg-s2 flex-shrink-0" />
-            <button
-              onClick={() => onOpenDetail(item)}
-              title="View detail"
-              aria-label="View detail"
-              className="w-11 h-10 flex items-center justify-center text-b1 hover:bg-b1/10 active:opacity-60 transition-colors"
-              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <Eye size={13} weight="bold" />
-            </button>
-          </>
+          <button
+            onClick={() => onOpenDetail(item)}
+            title="View detail"
+            aria-label="View detail"
+            className="h-8 w-8 flex items-center justify-center rounded-full text-b1 bg-b1/10 hover:bg-b1/20 active:scale-95 transition-all"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <Eye size={13} weight="bold" />
+          </button>
         )}
 
-        {/* Re-analyze (conditional) */}
         {(item.decision === 'PENDING' || item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
-          <>
-            <div className="w-px h-5 bg-s2 flex-shrink-0" />
-            <button
-              onClick={() => onReanalyze(item.id)}
-              title="Re-analyze"
-              aria-label="Re-analyze item"
-              className="w-11 h-10 flex items-center justify-center text-amber hover:bg-amber/10 active:opacity-60 transition-colors"
-              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <ArrowCounterClockwise size={13} weight="bold" />
-            </button>
-          </>
+          <button
+            onClick={() => onReanalyze(item.id)}
+            title="Re-analyze"
+            aria-label="Re-analyze item"
+            className="h-8 w-8 flex items-center justify-center rounded-full text-amber bg-amber/10 hover:bg-amber/20 active:scale-95 transition-all"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <ArrowCounterClockwise size={13} weight="bold" />
+          </button>
         )}
 
-        {/* Primary CTA — fills remaining width */}
-        <div className="w-px h-5 bg-s2 flex-shrink-0" />
+        {/* Spacer pushes CTAs to the right */}
+        <div className="flex-1" />
+
+        {/* Primary CTAs — pill buttons */}
         {item.listingStatus === 'published' && onOpenSoldDialog ? (
           <>
             <button
               onClick={() => onOpenSoldDialog(item)}
               aria-label="Mark as sold"
-              className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-none"
+              className="h-8 px-4 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
               style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
             >
               Sold
             </button>
             {onDelist && (
-              <>
-                <div className="w-px h-5 bg-white/20 flex-shrink-0" />
-                <button
-                  onClick={() => onDelist(item.id)}
-                  title="Delist"
-                  aria-label="Delist item"
-                  className="w-11 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
-                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  <X size={13} weight="bold" />
-                </button>
-              </>
+              <button
+                onClick={() => onDelist(item.id)}
+                title="Delist"
+                aria-label="Delist item"
+                className="h-8 w-8 flex items-center justify-center rounded-full text-red/60 bg-red/10 hover:bg-red/20 active:scale-95 transition-all"
+                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <X size={13} weight="bold" />
+              </button>
             )}
           </>
         ) : item.decision === 'BUY' ? (
@@ -380,29 +374,28 @@ function SortableItem({
             <button
               onClick={() => onCreateListing(item.id)}
               aria-label="Optimize listing"
-              className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-b1 hover:bg-b2 active:opacity-80 transition-colors"
+              className="h-8 px-4 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-b1 hover:bg-b2 rounded-full active:scale-95 transition-all"
               style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
             >
               <Lightning size={13} weight="bold" />
               Optimize
             </button>
           ) : (
-            // Optimized — show Regen + List buttons
             <>
-              <div className="w-px h-5 bg-s2 flex-shrink-0" />
               <button
                 onClick={() => onCreateListing(item.id)}
-                aria-label="Regenerate listing"
-                className="w-11 h-10 flex items-center justify-center text-t2 hover:text-b1 hover:bg-b1/10 active:opacity-60 transition-colors"
+                aria-label="Re-optimize listing"
+                className="h-8 px-3 flex items-center justify-center gap-1 text-[11px] font-semibold text-t2 bg-s1/80 hover:bg-s2 rounded-full active:scale-95 transition-all"
                 style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
               >
-                <ArrowCounterClockwise size={13} weight="bold" />
+                <Lightning size={12} weight="bold" />
+                Optimize
               </button>
               {onPushToNotion && (
                 <button
                   onClick={() => onPushToNotion(item.id)}
-                  aria-label="List on Notion"
-                  className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all"
+                  aria-label="List item"
+                  className="h-8 px-5 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
                   style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                 >
                   List
@@ -414,24 +407,21 @@ function SortableItem({
           <button
             onClick={() => onBuyItem(item.id)}
             aria-label="Buy this item"
-            className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-none"
+            className="h-8 px-4 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
             style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
           >
-            Buy ✅
+            Buy
           </button>
-        ) : (
-          <div className="flex-1" />
-        )}
+        ) : null}
 
-        {/* Overflow menu — tap to reveal delete confirmation (prevents accidental removal) */}
-        <div className="w-px h-5 bg-s2 flex-shrink-0" />
+        {/* More options */}
         <button
           onClick={() => setConfirmDelete(v => !v)}
           title="More options"
           aria-label="More options"
           className={cn(
-            'w-11 h-10 flex items-center justify-center transition-colors',
-            confirmDelete ? 'text-red bg-red/10' : 'text-t3 hover:text-t1 hover:bg-s1'
+            'h-8 w-8 flex items-center justify-center rounded-full transition-all active:scale-95',
+            confirmDelete ? 'text-red bg-red/10' : 'text-t3 bg-s1/80 hover:bg-s2'
           )}
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         >
@@ -442,17 +432,17 @@ function SortableItem({
       {confirmDelete && (
         <div className="px-3 pb-3 pt-2 border-t border-s2/60 flex items-center justify-between gap-2">
           <p className="text-[10px] text-t3 leading-tight">Remove this item from your queue?</p>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex gap-1.5 shrink-0">
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-[10px] font-semibold text-t3 hover:text-t1 px-2 py-1 rounded transition-colors"
+              className="text-[10px] font-semibold text-t3 hover:text-t1 px-3 py-1 rounded-full bg-s1/80 hover:bg-s2 transition-all active:scale-95"
               style={{ touchAction: 'manipulation' }}
             >
               Cancel
             </button>
             <button
               onClick={() => { onRemove(item.id); setConfirmDelete(false) }}
-              className="text-[10px] font-bold text-red px-2 py-1 rounded bg-red/10 hover:bg-red/20 transition-colors"
+              className="text-[10px] font-bold text-white px-3 py-1 rounded-full bg-red hover:bg-red/90 transition-all active:scale-95"
               style={{ touchAction: 'manipulation' }}
             >
               Remove

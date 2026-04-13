@@ -1478,7 +1478,7 @@ ${settings.userProfile.aiContext}` : ''}`
               className={cn('tab-btn', activeTab === 'scans' && 'active')}
             >
               <span>
-                📸 SCAN QUEUE{sessionScans.length > 0 && ` (${sessionScans.length})`}
+                📸 SCANS{sessionScans.length > 0 && ` (${sessionScans.length})`}
               </span>
             </button>
             <button
