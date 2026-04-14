@@ -193,7 +193,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   // Derive all counts from live item data — session metadata counters can lag
   const buyItems = sessionItems.filter(i => i.decision === 'BUY')
   const passItems = sessionItems.filter(i => i.decision === 'PASS')
-  const maybeCount = sessionItems.filter(i => i.decision === 'PENDING').length
+  const maybeCount = sessionItems.filter(i => i.decision === 'MAYBE').length
   const liveBuyCount = buyItems.length
   const livePassCount = passItems.length
   const totalScans = sessionItems.length

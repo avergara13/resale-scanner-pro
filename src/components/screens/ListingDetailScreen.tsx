@@ -114,7 +114,7 @@ export function ListingDetailScreen({
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const handleQuickAction = useCallback(async (actionType: 'title' | 'description' | 'specifics') => {
-    const apiKey = settings?.geminiApiKey || settings?.anthropicApiKey
+    const apiKey = settings?.geminiApiKey || settings?.openaiApiKey || settings?.anthropicApiKey
     if (!apiKey || isChatProcessing) return
     setIsChatProcessing(true)
     const productName = item.productName || 'Unknown product'
@@ -127,6 +127,7 @@ export function ListingDetailScreen({
       const result = await callLLM(prompts[actionType], {
         task: 'chat',
         geminiApiKey: settings?.geminiApiKey,
+        openaiApiKey: settings?.openaiApiKey,
         anthropicApiKey: settings?.anthropicApiKey,
         maxTokens: 600,
         temperature: 0.6,
@@ -184,12 +185,12 @@ export function ListingDetailScreen({
     setChatInput('')
     setIsChatProcessing(true)
 
-    const apiKey = settings?.geminiApiKey || settings?.anthropicApiKey
+    const apiKey = settings?.geminiApiKey || settings?.openaiApiKey || settings?.anthropicApiKey
     if (!apiKey) {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'No API key configured. Add a Gemini or Anthropic key in Settings.',
+        content: 'No API key configured. Add a Gemini, OpenAI, or Anthropic key in Settings.',
       }])
       setIsChatProcessing(false)
       return
@@ -199,6 +200,7 @@ export function ListingDetailScreen({
       const response = await callLLM(text, {
         task: 'chat',
         geminiApiKey: settings?.geminiApiKey,
+        openaiApiKey: settings?.openaiApiKey,
         anthropicApiKey: settings?.anthropicApiKey,
         systemPrompt: agentSystemPrompt,
         maxTokens: 800,
@@ -251,6 +253,7 @@ export function ListingDetailScreen({
                 <span className={cn(
                   'text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full shrink-0',
                   item.decision === 'BUY'     ? 'bg-green/15 text-green' :
+                  item.decision === 'MAYBE'   ? 'bg-amber/15 text-amber' :
                   item.decision === 'PENDING' ? 'bg-amber/15 text-amber' :
                                                 'bg-red/15 text-red'
                 )}>

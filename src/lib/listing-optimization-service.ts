@@ -67,9 +67,13 @@ export interface ListingOptimizationContext {
 
 export class ListingOptimizationService {
   private geminiApiKey?: string
+  private openaiApiKey?: string
+  private anthropicApiKey?: string
 
-  constructor(geminiApiKey?: string) {
+  constructor(geminiApiKey?: string, openaiApiKey?: string, anthropicApiKey?: string) {
     this.geminiApiKey = geminiApiKey
+    this.openaiApiKey = openaiApiKey
+    this.anthropicApiKey = anthropicApiKey
   }
 
   async generateOptimizedListing(context: ListingOptimizationContext): Promise<OptimizedListing> {
@@ -82,6 +86,8 @@ export class ListingOptimizationService {
       const response = await callLLM(prompt, {
         task: 'listing',
         geminiApiKey: this.geminiApiKey,
+        openaiApiKey: this.openaiApiKey,
+        anthropicApiKey: this.anthropicApiKey,
         jsonMode: true,
       })
 
@@ -470,6 +476,8 @@ Return ONLY valid JSON:
       const response = await callLLM(prompt, {
         task: 'listing',
         geminiApiKey: this.geminiApiKey,
+        openaiApiKey: this.openaiApiKey,
+        anthropicApiKey: this.anthropicApiKey,
         jsonMode: true,
         maxTokens: 1200,
         systemPrompt,
@@ -545,7 +553,9 @@ Return ONLY valid JSON:
 }
 
 export function createListingOptimizationService(
-  geminiApiKey?: string
+  geminiApiKey?: string,
+  openaiApiKey?: string,
+  anthropicApiKey?: string
 ): ListingOptimizationService {
-  return new ListingOptimizationService(geminiApiKey)
+  return new ListingOptimizationService(geminiApiKey, openaiApiKey, anthropicApiKey)
 }

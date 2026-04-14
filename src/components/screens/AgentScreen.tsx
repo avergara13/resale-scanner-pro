@@ -323,7 +323,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
 
     const buy = unique.filter(i => i.decision === 'BUY').length
     const pass = unique.filter(i => i.decision === 'PASS').length
-    const maybe = unique.filter(i => i.decision === 'PENDING').length
+    const maybe = unique.filter(i => i.decision === 'MAYBE').length
     // Queue count: items currently sitting in the listing queue (inQueue flag)
     const queueCount = sessionItems.filter(i => i.inQueue).length
     const totalProfit = unique
@@ -334,13 +334,13 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     return { total: unique.length, buy, pass, pending: maybe, maybe, queueCount, totalProfit }
   }, [sessionItems, scanHistoryKV, currentSession?.id])
 
-  // Session-scoped PENDING scan cards (most recent first) for the Scan Queue tab
-  // Only shows "Maybe" items — PASS items go to scan history only
+  // Session-scoped MAYBE scan cards (most recent first) for the Scan Queue tab
+  // Shows items saved as MAYBE — PASS items go to scan history only
   const sessionScans = useMemo(() => {
     const items = scanHistoryKV || []
     const filtered = currentSession?.id
-      ? items.filter(i => i.sessionId === currentSession.id && i.decision === 'PENDING')
-      : items.filter(i => i.decision === 'PENDING')
+      ? items.filter(i => i.sessionId === currentSession.id && (i.decision === 'PENDING' || i.decision === 'MAYBE'))
+      : items.filter(i => i.decision === 'PENDING' || i.decision === 'MAYBE')
     return [...filtered].sort((a, b) => b.timestamp - a.timestamp).slice(0, 100)
   }, [scanHistoryKV, currentSession?.id])
 
@@ -1070,7 +1070,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
 ## Current App State
 
 ### ${currentSession?.active ? `Session: ${currentSession.name || 'Active'} — Listings` : 'All Listings (Global)'}
-- ${queueStats.total} items (${queueStats.buy} BUY, ${queueStats.pass} PASS, ${queueStats.pending} PENDING)
+- ${queueStats.total} items (${queueStats.buy} BUY, ${queueStats.pass} PASS, ${queueStats.maybe} MAYBE)
 - Potential profit: $${(queueStats.totalProfit || 0).toFixed(2)}
 ${recentItems ? `\nRecent Items:\n${recentItems}` : ''}
 
@@ -1104,11 +1104,11 @@ ${settings.userProfile.aiContext}` : ''}`
 
       // Guard: ensure at least one API key is configured before hitting callLLM
       // (callLLM throws on missing keys but the error message may not reach the user clearly)
-      if (!settings?.geminiApiKey && !settings?.anthropicApiKey) {
+      if (!settings?.geminiApiKey && !settings?.openaiApiKey && !settings?.anthropicApiKey) {
         const noKeyMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: '⚙️ No AI API key configured. Go to **Settings → AI Configuration** and add your Gemini or Claude API key to start chatting.',
+          content: '⚙️ No AI API key configured. Go to **Settings → AI Configuration** and add your Gemini, OpenAI, or Anthropic API key to start chatting.',
           timestamp: Date.now(),
         }
         setChatSessions((prev) =>
@@ -1127,6 +1127,7 @@ ${settings.userProfile.aiContext}` : ''}`
       const response = await callLLM(userPrompt, {
         task: 'chat',
         geminiApiKey: settings?.geminiApiKey,
+        openaiApiKey: settings?.openaiApiKey,
         anthropicApiKey: settings?.anthropicApiKey,
         systemPrompt: AGENT_SYSTEM_INSTRUCTIONS,
       })

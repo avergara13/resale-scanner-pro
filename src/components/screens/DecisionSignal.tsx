@@ -8,9 +8,12 @@ interface DecisionSignalProps {
 }
 
 export function DecisionSignal({ decision, item }: DecisionSignalProps) {
+  // PENDING is a pre-pipeline internal state — never render a final-decision card for it
+  if (decision === 'PENDING') return null
+
   const isBuy = decision === 'BUY'
   const isPass = decision === 'PASS'
-  const isPending = !isBuy && !isPass
+  const isMaybe = decision === 'MAYBE'
 
   return (
     <motion.div
@@ -22,38 +25,19 @@ export function DecisionSignal({ decision, item }: DecisionSignalProps) {
         'mt-4 py-5 rounded-2xl flex flex-col items-center justify-center font-black border-4 shadow-xl',
         isBuy && 'bg-gradient-to-br from-green/20 to-green/10 text-green border-green',
         isPass && 'bg-gradient-to-br from-red/20 to-red/10 text-red border-red',
-        isPending && 'bg-gradient-to-br from-amber/10 to-amber/5 text-amber border-amber/60'
+        isMaybe && 'bg-gradient-to-br from-amber/20 to-amber/10 text-amber border-amber'
       )}
     >
-      {isPending ? (
-        <div className="flex items-center gap-3 py-1 px-2">
-          <span className="text-2xl">📊</span>
-          <div className="text-left">
-            <p className="text-base font-black tracking-wide leading-tight">NEEDS SELL PRICE</p>
-            <p className="text-[11px] font-medium opacity-70 leading-tight">
-              Enter a sell price in the draft below → tap Recalculate
-            </p>
-            <p className="text-[10px] font-medium opacity-50 leading-tight mt-0.5">
-              Buy price defaults to $0 (free) if left blank
-            </p>
-          </div>
+      <div className="text-4xl tracking-tight mb-1">{decision}</div>
+      {item?.profitMargin != null && isFinite(item.profitMargin) && (
+        <div className="text-base font-bold opacity-80">
+          Margin: {item.profitMargin.toFixed(1)}%
         </div>
-      ) : (
-        <div className="text-4xl tracking-tight mb-1">{decision}</div>
       )}
-      {!isPending && (
-        <>
-          {item?.profitMargin != null && isFinite(item.profitMargin) && (
-            <div className="text-base font-bold opacity-80">
-              Margin: {item.profitMargin.toFixed(1)}%
-            </div>
-          )}
-          {item?.marketData?.recommendedPlatform && (
-            <div className="mt-1 text-xs font-semibold opacity-80 text-center px-4">
-              💡 Sell on {item.marketData.recommendedPlatform}
-            </div>
-          )}
-        </>
+      {item?.marketData?.recommendedPlatform && (
+        <div className="mt-1 text-xs font-semibold opacity-80 text-center px-4">
+          💡 Sell on {item.marketData.recommendedPlatform}
+        </div>
       )}
     </motion.div>
   )

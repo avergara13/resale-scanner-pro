@@ -18,6 +18,10 @@ export interface GeminiAnalysisOptions {
   includeBrand?: boolean
   includeSearchTerms?: boolean
   customPrompt?: string
+  /** User-reported condition captured at the camera. When present, it anchors the
+   *  sale-price estimate so Gemini values the item against eBay sold comps in the
+   *  same condition bucket (New ≠ Good ≠ For Parts). Flows through to ROI math. */
+  condition?: string
 }
 
 export class GeminiService {
@@ -154,13 +158,18 @@ export class GeminiService {
       return options.customPrompt
     }
 
-    const priceContext = purchasePrice 
-      ? `The seller is asking $${purchasePrice.toFixed(2)} for this item.` 
+    const priceContext = purchasePrice
+      ? `The seller is asking $${purchasePrice.toFixed(2)} for this item.`
+      : ''
+
+    const conditionContext = options.condition
+      ? `The user reports this item is in "${options.condition}" condition. Base your estimated sale price and market comps on eBay sold listings in "${options.condition}" condition — adjust up for New / Like New and down for Good / Acceptable / For Parts.`
       : ''
 
     return `You are an expert product identification system for resale businesses. Analyze this image and identify the product with details optimized for eBay/online resale.
 
 ${priceContext}
+${conditionContext}
 
 Provide your response as a JSON object with the following structure:
 {

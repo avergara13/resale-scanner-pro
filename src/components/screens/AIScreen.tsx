@@ -318,7 +318,7 @@ export function AIScreen({
     if (!pipelineComplete || !currentItem) return
     if (itemName === '') setItemName(currentItem.productName || '')
     if (category === '') setCategory(currentItem.category || '')
-    if (condition === '') setCondition('Good')
+    if (condition === '') setCondition(currentItem.condition || 'New')
     // Always pre-fill buy price so user can see and edit the assumed cost
     // purchasePrice=0 → empty string (user sees "free / $0 assumed")
     if (buyPrice === '') {
@@ -336,7 +336,7 @@ export function AIScreen({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipelineComplete, currentItem?.id]) // minimal deps — if-guards prevent overwrites
 
-  // Auto-scroll to decision/result when pipeline finishes (BUY, PASS, or PENDING "needs price")
+  // Auto-scroll to decision/result when pipeline finishes (BUY / MAYBE / PASS)
   const decisionRef = useRef<HTMLDivElement>(null)
   const prevPipelineComplete = useRef(false)
   useEffect(() => {
@@ -407,7 +407,7 @@ export function AIScreen({
                 )
               })()}
 
-              {/* Decision signal — show once pipeline is done, including PENDING "needs price" */}
+              {/* Decision signal — show once pipeline produces a final BUY / MAYBE / PASS */}
               {pipelineComplete && decision && (
                 <div className="mt-3 sm:mt-4" ref={decisionRef}>
                   <DecisionSignal decision={decision} item={currentItem} />

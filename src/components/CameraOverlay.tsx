@@ -1,13 +1,13 @@
 import { useRef, useState, useEffect, useMemo } from 'react'
-import { X, Lightning, Check, MapPin, Barcode as BarcodeIcon, Camera, Images, MagicWand, GridFour, Trash } from '@phosphor-icons/react'
+import { X, Lightning, Check, Barcode as BarcodeIcon, Camera, Images, MagicWand, GridFour, Trash } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useKV } from '@github/spark/hooks'
-import { AddLocationDialog } from './AddLocationDialog'
 import { BarcodeScanner } from './BarcodeScanner'
 import { createBarcodeService } from '@/lib/barcode-service'
-import type { ThriftStoreLocation } from '@/types'
 import type { BarcodeProduct } from '@/lib/barcode-service'
+
+/** Matches the Condition select in AIScreen so the camera-side choice round-trips */
+const CONDITIONS = ['New', 'Like New', 'Very Good', 'Good', 'Acceptable', 'For Parts'] as const
 
 const LISTING_PHOTO_TIPS = [
   'Front view — clean, well-lit',
@@ -20,8 +20,8 @@ const LISTING_PHOTO_TIPS = [
 interface CameraOverlayProps {
   isOpen: boolean
   onClose: () => void
-  onCapture: (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => void
-  onQuickDraft?: (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => void
+  onCapture: (imageData: string, price: number, barcodeProduct?: BarcodeProduct, condition?: string) => void
+  onQuickDraft?: (imageData: string, price: number, barcodeProduct?: BarcodeProduct, condition?: string) => void
   /**
    * When provided and `isAddPhotoMode` is true, a successful barcode lookup while the
    * camera is open in add-photo mode merges the product data into the current item
@@ -47,9 +47,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarc
   const [listingPhotos, setListingPhotos] = useState<string[]>([])
   const [showGrid, setShowGrid] = useState(true)
   const [autoEnhance, setAutoEnhance] = useState(true)
-  const [savedLocations, setSavedLocations] = useKV<ThriftStoreLocation[]>('saved-locations', [])
-  const [selectedLocation, setSelectedLocation] = useState<ThriftStoreLocation | undefined>(undefined)
-  const [showLocationDialog, setShowLocationDialog] = useState(false)
+  const [condition, setCondition] = useState<string>('New')
   const [barcodeProduct, setBarcodeProduct] = useState<BarcodeProduct | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
   
@@ -64,7 +62,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarc
       stopCamera()
       setPrice('')
       setQuickDraftMode(false)
-      setSelectedLocation(undefined)
+      setCondition('New')
     }
     return () => {
       isMountedRef.current = false
@@ -165,26 +163,17 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarc
 
       const capturedBarcodeProduct = barcodeProduct || undefined
       if (quickDraftMode && onQuickDraft) {
-        onQuickDraft(imageData, parseFloat(price) || 0, selectedLocation, capturedBarcodeProduct)
+        onQuickDraft(imageData, parseFloat(price) || 0, capturedBarcodeProduct, condition)
         setDraftCount(prev => prev + 1)
         setShowCaptureFlash(true)
         setTimeout(() => setShowCaptureFlash(false), 300)
         setPrice('')
       } else {
-        onCapture(imageData, parseFloat(price) || 0, selectedLocation, capturedBarcodeProduct)
+        onCapture(imageData, parseFloat(price) || 0, capturedBarcodeProduct, condition)
         setPrice('')
       }
       setBarcodeProduct(null)
     }
-  }
-
-  const handleLocationSave = (location: ThriftStoreLocation) => {
-    const exists = savedLocations?.find(loc => loc.id === location.id)
-    if (!exists) {
-      setSavedLocations((prev) => [...(prev || []), location])
-    }
-    setSelectedLocation(location)
-    setShowLocationDialog(false)
   }
 
   const handleBarcodeDetected = async (barcode: string, product?: BarcodeProduct) => {
@@ -410,33 +399,23 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarc
                     />
                   </div>
                   
-                  <button
-                    onClick={() => setShowLocationDialog(true)}
-                    className={cn(
-                      "flex items-center justify-between gap-2 px-4 py-3 rounded-lg border transition-all",
-                      selectedLocation
-                        ? "bg-green/20 border-green/40 text-white"
-                        : "bg-white/10 border-white/20 text-white/60"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <MapPin size={20} weight={selectedLocation ? 'fill' : 'regular'} />
-                      <span className="text-sm font-medium">
-                        {selectedLocation ? selectedLocation.name : 'Add Location (Optional)'}
-                      </span>
-                    </div>
-                    {selectedLocation && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedLocation(undefined)
-                        }}
-                        className="p-1 hover:bg-white/10 rounded-full transition-colors"
-                      >
-                        <X size={16} />
-                      </button>
-                    )}
-                  </button>
+                  {/* Condition — baked into Gemini pricing and ROI math for this scan */}
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
+                      Condition
+                    </span>
+                    <select
+                      value={condition}
+                      onChange={(e) => setCondition(e.target.value)}
+                      className="w-full bg-white/10 text-white border border-white/20 rounded-lg h-12 px-3 text-base font-medium outline-none focus:border-white/60"
+                    >
+                      {CONDITIONS.map((c) => (
+                        <option key={c} value={c} className="bg-black text-white">
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </>
               )}
 
@@ -509,7 +488,7 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarc
                   {listingPhotos.length > 0 && (
                     <button
                       onClick={() => {
-                        onCapture(listingPhotos[0], 0, selectedLocation, barcodeProduct || undefined)
+                        onCapture(listingPhotos[0], 0, barcodeProduct || undefined, condition)
                         setListingPhotos([])
                         setBarcodeProduct(null)
                       }}
@@ -580,14 +559,6 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarc
         )}
       </AnimatePresence>
 
-      {showLocationDialog && (
-        <AddLocationDialog
-          open={showLocationDialog}
-          onOpenChange={setShowLocationDialog}
-          onSave={handleLocationSave}
-          existingLocations={savedLocations || []}
-        />
-      )}
     </>
   )
 }
