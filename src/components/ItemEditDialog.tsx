@@ -251,7 +251,7 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
             </div>
 
             {profitMargin !== null && !isNaN(profitMargin) && isFinite(profitMargin) && (
-              <div className="flex items-center gap-2 p-3 bg-t4 border border-t3 rounded-md">
+              <div className="flex items-center gap-2 p-3 bg-s1 border border-s2 rounded-md">
                 <span className="text-xs font-medium text-t1">Profit Margin:</span>
                 <Badge
                   variant="secondary"
