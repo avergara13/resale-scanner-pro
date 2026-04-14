@@ -542,7 +542,7 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
       })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.warn('[LLM] Gemini failed, trying next provider:', msg)
+      console.debug('[LLM] Gemini failed, trying next provider:', msg)
       errors.push(`Gemini: ${msg}`)
     }
   }
@@ -558,7 +558,7 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
       })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.warn('[LLM] OpenAI failed, trying next provider:', msg)
+      console.debug('[LLM] OpenAI failed, trying next provider:', msg)
       errors.push(`OpenAI: ${msg}`)
     }
   }
@@ -573,7 +573,7 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
       })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.warn('[LLM] Claude failed:', msg)
+      console.debug('[LLM] Claude failed:', msg)
       errors.push(`Claude: ${msg}`)
     }
   }
