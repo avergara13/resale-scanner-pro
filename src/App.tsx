@@ -43,17 +43,21 @@ import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, 
 import { cn } from './lib/utils'
 import { useDeviceId } from './hooks/use-device-id'
 
-/** Pure helper — determines BUY/PASS/PENDING from profit metrics */
+/** Pure helper — determines BUY / MAYBE / PASS from profit metrics.
+ *  MAYBE fires when margin lands within 6 pp below the user's minMargin threshold
+ *  (e.g. threshold 30% → margin 24.0–29.99% = MAYBE; ≥30% = BUY; <24% = PASS). */
 function makeDecision(
   sellPrice: number,
   buyPrice: number,
   profitMargin: number,
   netProfit: number,
   minMargin: number
-): 'BUY' | 'PASS' | 'PENDING' {
-  if (sellPrice <= 0) return 'PENDING'
+): 'BUY' | 'PASS' | 'MAYBE' | 'PENDING' {
+  if (sellPrice <= 0) return 'PASS'
   if (buyPrice === 0) return netProfit > 0 ? 'BUY' : 'PASS'
-  return profitMargin > minMargin ? 'BUY' : 'PASS'
+  if (profitMargin >= minMargin) return 'BUY'
+  if (profitMargin >= minMargin - 6) return 'MAYBE'
+  return 'PASS'
 }
 
 // Synthesize a completed 5-step pipeline for items re-opened from the scan queue.
@@ -172,8 +176,8 @@ function App() {
 
   const listingOptimizationService = useMemo(() => {
     const key = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
-    return createListingOptimizationService(key)
-  }, [settings?.geminiApiKey])
+    return createListingOptimizationService(key, settings?.openaiApiKey, settings?.anthropicApiKey)
+  }, [settings?.geminiApiKey, settings?.openaiApiKey, settings?.anthropicApiKey])
 
   const notionService = useMemo(() => {
     const key = settings?.notionApiKey || import.meta.env.VITE_NOTION_API_KEY
@@ -278,7 +282,7 @@ function App() {
     }
   }, [allSessions, settings?.userProfile, globalProfile])
 
-  const handleCapture = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct, existingItem?: ScannedItem) => {
+  const handleCapture = useCallback(async (imageData: string, price: number, barcodeProduct?: BarcodeProduct, condition?: string, existingItem?: ScannedItem) => {
     // Route to add-photo handler — append this image to the current item without a new pipeline run
     if (cameraMode === 'add-photo') {
       setCameraMode('new-scan')
@@ -328,7 +332,7 @@ function App() {
           purchasePrice: price,
           decision: 'PENDING',
           inQueue: false,
-          location,
+          condition: condition || 'New',   // user-selected at camera; feeds Gemini + AIScreen
           sessionId: activeSession?.id,
           scannedBy: settings?.userProfile?.operatorId,
           // Pre-seed from barcode lookup; Gemini vision will overwrite with better data if available
@@ -360,7 +364,7 @@ function App() {
         try {
           visionResult = await geminiService.analyzeProductImage(
             imageData,
-            {},
+            { condition: newItem.condition || 'New' },   // anchor sale-price estimate to user-reported condition
             price,
             newItem.additionalImageData?.length ? newItem.additionalImageData : undefined,
           )
@@ -554,7 +558,7 @@ function App() {
               try {
                 const directPriceText = await callLLM(
                   `What is the current average resale price for "${productLabel}" on eBay or Mercari? Reply with ONLY a single dollar amount like "$24.99".`,
-                  { geminiApiKey: geminiKey, anthropicApiKey: anthropicKey, task: 'chat' }
+                  { geminiApiKey: geminiKey, openaiApiKey: settings?.openaiApiKey, anthropicApiKey: anthropicKey, task: 'chat' }
                 )
                 const directPrice = parseResearchPrice(directPriceText)
                 if (directPrice > 0) {
@@ -571,7 +575,7 @@ function App() {
                 try {
                   const tier3Text = await callLLM(
                     `You are a resale expert. Based on eBay, Mercari, and Poshmark sold comps, what is the median resale price for "${productLabel}"? Reply ONLY with: RECOMMENDED_SELL_PRICE: $XX.XX`,
-                    { geminiApiKey: geminiKey, anthropicApiKey: anthropicKey, task: 'complex' }
+                    { geminiApiKey: geminiKey, openaiApiKey: settings?.openaiApiKey, anthropicApiKey: anthropicKey, task: 'complex' }
                   )
                   const tier3Price = parseResearchPrice(tier3Text)
                   if (tier3Price > 0) {
@@ -601,7 +605,7 @@ function App() {
             try {
               const fallbackText = await callLLM(
                 `Based on eBay and Mercari sold listings, what is the median resale price for "${productLabel}"? Reply ONLY with: RECOMMENDED_SELL_PRICE: $XX.XX`,
-                { geminiApiKey: geminiKey, anthropicApiKey: anthropicKey, task: 'complex' }
+                { geminiApiKey: geminiKey, openaiApiKey: settings?.openaiApiKey, anthropicApiKey: anthropicKey, task: 'complex' }
               )
               const fallbackPrice = parseResearchPrice(fallbackText)
               if (fallbackPrice > 0) {
@@ -1231,9 +1235,9 @@ function App() {
     handleCapture(
       imageToUse,
       currentItem.purchasePrice,
-      currentItem.location,
-      undefined,
-      currentItem,   // existingItem → pipeline updates in place, scan history entry replaced
+      undefined,                       // barcodeProduct — not applicable on re-analyze
+      currentItem.condition || 'New',  // preserve condition so Gemini re-prices with the same anchor
+      currentItem,                     // existingItem → pipeline updates in place, scan history entry replaced
     )
   }, [currentItem, handleCapture])
 
@@ -1557,7 +1561,7 @@ function App() {
       purchasePrice: effectivePrice,
       notes: notes || currentItem!.notes,
       inQueue: false,
-      decision: 'PENDING',
+      decision: 'MAYBE',
     }
     // Update the scan history entry with the current prices/notes
     setScanHistory(prev => {
@@ -1574,7 +1578,7 @@ function App() {
     logActivity('Saved for later research — not added to queue')
   }, [currentItem, setScanHistory, setScreen, setAgentActiveTab])
 
-  const handleQuickDraft = useCallback(async (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => {
+  const handleQuickDraft = useCallback(async (imageData: string, price: number, barcodeProduct?: BarcodeProduct, condition?: string) => {
     const optimized = await optimizeAndCache(imageData)
 
     // Same auto-session guard as handleCapture — every item must be session-scoped
@@ -1597,7 +1601,7 @@ function App() {
       description: barcodeProduct?.description || 'Captured in quick draft mode - analyze later',
       category: barcodeProduct?.category || undefined,
       sessionId: activeSession?.id,
-      location,
+      condition: condition || 'New',   // carry condition into the queue so batch-analyze prices it correctly
       marketData: barcodeProduct ? { barcodeProduct } : undefined,
     }
 
@@ -1669,7 +1673,7 @@ function App() {
 
         if (geminiService) {
           try {
-            visionResult = await geminiService.analyzeProductImage(item.imageData, {}, item.purchasePrice)
+            visionResult = await geminiService.analyzeProductImage(item.imageData, { condition: item.condition || 'New' }, item.purchasePrice)
             mockProductName = visionResult.productName
             setBatchProgress({ current: processedCount + 1, total: unanalyzedItems.length, currentItemName: visionResult.productName })
           } catch (error) {
@@ -1849,7 +1853,7 @@ function App() {
     setPipeline([])
     setScreen('scan-result')
     try {
-      await handleCapture(imageSource, item.purchasePrice, item.location)
+      await handleCapture(imageSource, item.purchasePrice, undefined, item.condition || 'New')
       setQueue(prev => (prev || []).filter(i => i.id !== itemId))
     } catch {
       // handleCapture already shows a toast; item stays in queue so no data is lost
@@ -1988,16 +1992,8 @@ function App() {
     }
   }, [])
 
-  // Auto-redirect: if there's an active session on launch, jump to its dashboard
-  const hasAutoNavigated = useRef(false)
-  useEffect(() => {
-    if (hasAutoNavigated.current) return
-    if (session?.active && screen === 'session') {
-      hasAutoNavigated.current = true
-      setSelectedSessionId(session.id)
-      setScreen('session-detail')
-    }
-  }, [session?.active, screen]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Launch always lands on SessionScreen (session cards + Start New Session CTA).
+  // Users can tap Resume on an active session card to continue — no auto-redirect.
 
   // One-time settings migration: copy global → device-scoped on first load
   const [legacySettings] = useKV<AppSettings | undefined>('settings', undefined)
@@ -2617,6 +2613,12 @@ function App() {
           }
         }}
         onCameraOpen={() => {
+          // Already reviewing a scan result — the camera should append to that item,
+          // not kick off a brand-new pipeline that replaces the user's current context.
+          if (screen === 'scan-result' && currentItem) {
+            openCameraForAddPhoto()
+            return
+          }
           // If no session is open, auto-start one so the scan is always session-scoped.
           // handleStartSession sets the KV session and navigates to session-detail;
           // the camera overlay opens on top of it so the first scan lands in the new session.

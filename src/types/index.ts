@@ -106,7 +106,7 @@ export interface PlatformListing {
 
 export type PipelinePhase = 'vision' | 'lens' | 'market' | 'profit' | 'decision'
 
-export type Decision = 'BUY' | 'PASS' | 'PENDING'
+export type Decision = 'BUY' | 'PASS' | 'MAYBE' | 'PENDING'
 
 export interface PipelineStep {
   id: PipelinePhase
@@ -382,6 +382,7 @@ export interface ImageQualitySettings {
 
 export interface AppSettings {
   geminiApiKey?: string
+  openaiApiKey?: string
   anthropicApiKey?: string
   ebayApiKey?: string
   ebayAppId?: string

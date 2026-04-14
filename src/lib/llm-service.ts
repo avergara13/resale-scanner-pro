@@ -391,7 +391,56 @@ BEST_PLATFORM: [platform name]`
   return result
 }
 
-// ------- Anthropic Claude (secondary — complex tasks only) -------
+// ------- OpenAI (1st fallback) -------
+
+const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions'
+
+async function callOpenAI(
+  prompt: string,
+  apiKey: string,
+  options: { model?: string; maxTokens?: number; temperature?: number; systemPrompt?: string } = {}
+): Promise<string> {
+  const { model = 'gpt-4o-mini', maxTokens = 1024, temperature = 0.7, systemPrompt } = options
+
+  type Message = { role: 'system' | 'user'; content: string }
+  const messages: Message[] = []
+  if (systemPrompt && systemPrompt.trim().length > 10) {
+    messages.push({ role: 'system', content: systemPrompt })
+  }
+  messages.push({ role: 'user', content: prompt })
+
+  let response: Response
+  try {
+    response = await fetchWithTimeout(OPENAI_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // SECURITY: BYO-key — user supplies their own key stored only in local device settings.
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+    })
+  } catch (err) {
+    if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new Error(`OpenAI request timed out after ${LLM_FETCH_TIMEOUT_MS / 1000}s — network or provider issue`)
+    }
+    throw err
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '')
+    throw new Error(`OpenAI ${response.status}: ${errorText.slice(0, 200)}`)
+  }
+
+  const data = await response.json()
+  const text = data?.choices?.[0]?.message?.content
+  if (!text) {
+    throw new Error('OpenAI returned empty response')
+  }
+  return text
+}
+
+// ------- Anthropic Claude (2nd / last fallback) -------
 
 async function callClaude(
   prompt: string,
@@ -448,6 +497,7 @@ export type LLMTask = 'chat' | 'listing' | 'research' | 'complex'
 export interface LLMOptions {
   task?: LLMTask
   geminiApiKey?: string
+  openaiApiKey?: string
   anthropicApiKey?: string
   model?: string
   jsonMode?: boolean
@@ -457,16 +507,19 @@ export interface LLMOptions {
 }
 
 /**
- * Route LLM calls by task type for cost optimization:
- *   chat     → Gemini Flash (cheapest)
- *   listing  → Gemini Flash (fast generation)
- *   research → Gemini Flash (bulk queries)
- *   complex  → Claude Haiku first, falls back to Gemini
+ * Linear provider cascade — always tries in this order, regardless of task type:
+ *   1. Gemini Flash  (primary — cheapest, fastest, Google Search grounding)
+ *   2. OpenAI        (1st fallback — gpt-4o-mini)
+ *   3. Anthropic     (2nd / last fallback — Claude Haiku)
+ *
+ * If a provider key is absent or the call fails, the next provider is tried.
+ * All three failures are reported in the thrown error message.
  */
 export async function callLLM(prompt: string, options: LLMOptions = {}): Promise<string> {
   const {
     task = 'chat',
     geminiApiKey,
+    openaiApiKey,
     anthropicApiKey,
     model,
     jsonMode = false,
@@ -475,21 +528,9 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
     systemPrompt,
   } = options
 
-  // Complex tasks → try Claude first (better reasoning, still cost-efficient with Haiku)
-  if (task === 'complex' && anthropicApiKey && anthropicApiKey.length >= 10) {
-    try {
-      return await callClaude(prompt, anthropicApiKey, {
-        model: model || 'claude-haiku-4-5-20251001',
-        maxTokens: maxTokens || 1024,
-        systemPrompt,
-      })
-    } catch (claudeError) {
-      console.warn('Claude failed, falling back to Gemini:', claudeError)
-      // Fall through to Gemini
-    }
-  }
+  const errors: string[] = []
 
-  // All other tasks (and Claude fallback) → Gemini Flash
+  // ── 1. Gemini (primary) ──────────────────────────────────────────────────
   if (geminiApiKey && geminiApiKey.length >= 10) {
     try {
       return await callGemini(prompt, geminiApiKey, {
@@ -499,28 +540,46 @@ export async function callLLM(prompt: string, options: LLMOptions = {}): Promise
         temperature: temperature ?? (task === 'chat' ? 0.7 : 0.4),
         systemInstruction: systemPrompt,
       })
-    } catch (geminiError) {
-      // If Claude key is available and Gemini just failed, try Claude as last resort
-      if (anthropicApiKey && anthropicApiKey.length >= 10 && task !== 'complex') {
-        console.warn('[LLM] Gemini failed, falling back to Claude:', geminiError)
-        return callClaude(prompt, anthropicApiKey, {
-          model: model || 'claude-haiku-4-5-20251001',
-          maxTokens: maxTokens || 1024,
-          systemPrompt,
-        })
-      }
-      throw geminiError
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.debug('[LLM] Gemini failed, trying next provider:', msg)
+      errors.push(`Gemini: ${msg}`)
     }
   }
 
-  // No Gemini key — try Claude directly for any task type
-  if (anthropicApiKey && anthropicApiKey.length >= 10) {
-    return callClaude(prompt, anthropicApiKey, {
-      model: model || 'claude-haiku-4-5-20251001',
-      maxTokens: maxTokens || 1024,
-      systemPrompt,
-    })
+  // ── 2. OpenAI (1st fallback) ─────────────────────────────────────────────
+  if (openaiApiKey && openaiApiKey.length >= 10) {
+    try {
+      return await callOpenAI(prompt, openaiApiKey, {
+        model: model || 'gpt-4o-mini',
+        maxTokens: maxTokens || 1024,
+        temperature: temperature ?? (task === 'chat' ? 0.7 : 0.4),
+        systemPrompt,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.debug('[LLM] OpenAI failed, trying next provider:', msg)
+      errors.push(`OpenAI: ${msg}`)
+    }
   }
 
-  throw new Error('AI unavailable — configure a Gemini or Claude API key in Settings')
+  // ── 3. Anthropic Claude (2nd / last fallback) ────────────────────────────
+  if (anthropicApiKey && anthropicApiKey.length >= 10) {
+    try {
+      return await callClaude(prompt, anthropicApiKey, {
+        model: model || 'claude-haiku-4-5-20251001',
+        maxTokens: maxTokens || 1024,
+        systemPrompt,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.debug('[LLM] Claude failed:', msg)
+      errors.push(`Claude: ${msg}`)
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`All AI providers failed — ${errors.join(' | ')}`)
+  }
+  throw new Error('AI unavailable — configure a Gemini, OpenAI, or Anthropic API key in Settings')
 }

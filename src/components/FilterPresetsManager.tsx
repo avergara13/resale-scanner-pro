@@ -408,7 +408,7 @@ export function FilterPresetsManager({ isOpen, onClose, onApplyPreset }: FilterP
                   Decision
                 </label>
                 <div className="flex gap-2">
-                  {(['BUY', 'PASS', 'PENDING'] as Decision[]).map((decision) => (
+                  {(['BUY', 'MAYBE', 'PASS', 'PENDING'] as Decision[]).map((decision) => (
                     <Button
                       key={decision}
                       variant={selectedDecisions.includes(decision) ? 'default' : 'outline'}

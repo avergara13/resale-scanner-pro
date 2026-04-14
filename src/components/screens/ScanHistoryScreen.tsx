@@ -19,7 +19,7 @@ interface ScanHistoryScreenProps {
 export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistory: scanHistoryProp }: ScanHistoryScreenProps) {
   const [globalScanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [filter, setFilter] = useState<'all' | 'BUY' | 'PASS' | 'PENDING'>('all')
+  const [filter, setFilter] = useState<'all' | 'BUY' | 'MAYBE' | 'PASS' | 'PENDING'>('all')
 
   // Use prop data when session-scoped, fall back to global KV
   const effectiveHistory = scanHistoryProp ?? globalScanHistory
@@ -92,7 +92,7 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
       <div className="px-4 pt-3 pb-3 border-b border-s2 bg-fg">
         {/* Filter tabs + Clear All */}
         <div className="flex items-center gap-1.5">
-          {(['all', 'BUY', 'PASS', 'PENDING'] as const).map(f => (
+          {(['all', 'BUY', 'MAYBE', 'PASS', 'PENDING'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}

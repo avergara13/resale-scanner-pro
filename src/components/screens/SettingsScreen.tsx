@@ -135,6 +135,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       enableLensInBatch: true,
       lensSkipConfidence: 0.85,
       geminiApiKey: '',
+      openaiApiKey: '',
       anthropicApiKey: '',
       notionApiKey: '',
       googleApiKey: '',
@@ -158,7 +159,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
     return <XCircle className="text-s3" weight="fill" />
   }
 
-  const aiConfigured = !!(hasKey(settings.geminiApiKey) || hasKey(settings.anthropicApiKey))
+  const aiConfigured = !!(hasKey(settings.geminiApiKey) || hasKey(settings.openaiApiKey) || hasKey(settings.anthropicApiKey))
   const googleConfigured = !!hasKey(settings.googleApiKey)
   const ebayConfigured = !!(hasKey(settings.ebayApiKey) && hasKey(settings.ebayAppId))
   const supabaseConfigured = !!(hasKey(settings.supabaseUrl) && hasKey(settings.supabaseKey))
@@ -325,8 +326,32 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
+                      <Label htmlFor="openai-api-key" className="text-xs uppercase tracking-wide text-t2">
+                        OpenAI API Key (1st Fallback)
+                      </Label>
+                      <button onClick={() => toggleKeyVisibility('openai')} className="text-t2 hover:text-t1">
+                        {showKeys.openai ? <EyeClosed size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <Input
+                      id="openai-api-key"
+                      type={showKeys.openai ? 'text' : 'password'}
+                      value={settings.openaiApiKey || ''}
+                      onChange={(e) => onUpdate({ openaiApiKey: e.target.value })}
+                      placeholder="sk-..."
+                      className="font-mono text-sm"
+                    />
+                    {hasKey(settings.openaiApiKey) && (
+                      <p className="text-xs text-green mt-1 flex items-center gap-1">
+                        <CheckCircle size={12} weight="fill" /> Key configured
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
                       <Label htmlFor="anthropic-api-key" className="text-xs uppercase tracking-wide text-t2">
-                        Anthropic API Key (Backup)
+                        Anthropic API Key (2nd Fallback)
                       </Label>
                       <button onClick={() => toggleKeyVisibility('anthropic')} className="text-t2 hover:text-t1">
                         {showKeys.anthropic ? <EyeClosed size={16} /> : <Eye size={16} />}
@@ -340,6 +365,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                       placeholder="sk-ant-..."
                       className="font-mono text-sm"
                     />
+                    {hasKey(settings.anthropicApiKey) && (
+                      <p className="text-xs text-green mt-1 flex items-center gap-1">
+                        <CheckCircle size={12} weight="fill" /> Key configured
+                      </p>
+                    )}
                   </div>
                 </div>
 
