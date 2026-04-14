@@ -22,10 +22,19 @@ interface CameraOverlayProps {
   onClose: () => void
   onCapture: (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => void
   onQuickDraft?: (imageData: string, price: number, location?: ThriftStoreLocation, barcodeProduct?: BarcodeProduct) => void
+  /**
+   * When provided and `isAddPhotoMode` is true, a successful barcode lookup while the
+   * camera is open in add-photo mode merges the product data into the current item
+   * instead of waiting for a new-scan capture.
+   */
+  onBarcodeForCurrentItem?: (product: BarcodeProduct) => void
+  /** True when the camera was opened from the scan-result screen to add more photos/data
+   *  to an existing item. Switches barcode handling to merge-into-current-item behavior. */
+  isAddPhotoMode?: boolean
   geminiApiKey?: string
 }
 
-export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, geminiApiKey }: CameraOverlayProps) {
+export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarcodeForCurrentItem, isAddPhotoMode, geminiApiKey }: CameraOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isMountedRef = useRef(true)
@@ -181,6 +190,12 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, gemini
   const handleBarcodeDetected = async (barcode: string, product?: BarcodeProduct) => {
     setBarcodeProduct(product || null)
     if (product) {
+      // When camera was opened from scan-result to add more research to an existing item,
+      // merge barcode data into the current item instead of waiting for a photo capture.
+      // The user can still take a photo after — that flows through onCapture as normal.
+      if (isAddPhotoMode && onBarcodeForCurrentItem) {
+        onBarcodeForCurrentItem(product)
+      }
       setMode('lens')
     }
   }
