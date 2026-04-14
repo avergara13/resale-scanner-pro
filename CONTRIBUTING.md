@@ -218,8 +218,8 @@ props that were never connected — both were `undefined` in production. The
   optimization and writes `optimizedListing` + `listingStatus: 'ready'` to queue.
   `handlePushToNotion` calls Notion API, writes `notionPageId` + `notionUrl` back
   to queue item. Both handlers passed to `AgentScreen` via JSX props.
-  `notionDatabaseId` default pre-filled: `7e49058fa8874889b9f6ae5a6c3bf8e7`
-  (Hobbyst Resale Inventory DB).
+  `notionDatabaseId` default pre-filled: `3318ed3e-1385-45d3-9a60-63a628eeefff`
+  (📦 Master Inventory DB — the canonical 77-property DB with pipeline views).
 
 **Verification:**
 - 12 wiring references confirmed in `src/App.tsx` at audit

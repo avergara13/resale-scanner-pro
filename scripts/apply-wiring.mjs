@@ -22,7 +22,7 @@ const ROOT   = resolve(__dir, '..')
 const APP    = resolve(ROOT, 'src/App.tsx')
 const SERVER = resolve(ROOT, 'server.js')
 
-const NOTION_DB_ID = process.env.NOTION_DATABASE_ID || '7e49058fa8874889b9f6ae5a6c3bf8e7'
+const NOTION_DB_ID = process.env.NOTION_DATABASE_ID || '3318ed3e-1385-45d3-9a60-63a628eeefff'
 
 console.log('🔧  Loft OS Wiring Script — Resale Scanner Pro')
 console.log(`📁  Repo: ${ROOT}`)
@@ -89,7 +89,7 @@ const WIRING_CHECKS = [
     detect: src => src.includes('notionDatabaseId:'),
     patch: src => src.replace(
       "    preferredAiModel: 'gemini-2.0-flash-exp',\n  })",
-      `    preferredAiModel: 'gemini-2.0-flash-exp',\n    notionDatabaseId: '${NOTION_DB_ID}', // Hobbyst Resale Inventory DB\n  })`
+      `    preferredAiModel: 'gemini-2.0-flash-exp',\n    notionDatabaseId: '${NOTION_DB_ID}', // 📦 Master Inventory DB\n  })`
     )
   },
 
