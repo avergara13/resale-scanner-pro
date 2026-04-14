@@ -23,7 +23,7 @@ const notionApiKey = process.env.NOTION_API_KEY || process.env.VITE_NOTION_API_K
 const notionInventoryDbId = process.env.NOTION_INVENTORY_DATABASE_ID || process.env.VITE_NOTION_DATABASE_ID || '3318ed3e-1385-45d3-9a60-63a628eeefff'
 // Notion Sales DB — source of truth for WF-01 email-parsed sales. Railway env var wins;
 // fallback is the canonical Sales DB ID per the Sold Tab data contract.
-const notionSalesDbId = process.env.NOTION_SALES_DATABASE_ID || '4e7de9b9-c9fc-4219-8a4e-3296c62c7ea6'
+const notionSalesDbId = process.env.NOTION_SALES_DATABASE_ID || 'a8a86796-187c-4ef8-9ac0-e92d9f8df665'
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
 
