@@ -56,6 +56,20 @@ function makeDecision(
   return profitMargin > minMargin ? 'BUY' : 'PASS'
 }
 
+// Synthesize a completed 5-step pipeline for items re-opened from the scan queue.
+// Mirrors the shape handleCapture builds at scan time, but marks every step complete
+// so AIScreen renders the same end-of-scan visual the user saw originally — no empty
+// space above the action bar. Pure function; no network calls, no re-analysis.
+function buildCompletedPipeline(): PipelineStep[] {
+  return [
+    { id: 'vision', label: 'Vision Analysis', status: 'complete', progress: 100 },
+    { id: 'lens', label: 'Google Lens', status: 'complete', progress: 100 },
+    { id: 'market', label: 'Market Research', status: 'complete', progress: 100 },
+    { id: 'profit', label: 'Profit Calculation', status: 'complete', progress: 100 },
+    { id: 'decision', label: 'Decision', status: 'complete', progress: 100 },
+  ]
+}
+
 function App() {
   const [screen, setScreen] = useState<Screen>('session')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
@@ -2340,7 +2354,7 @@ function App() {
                 profitGoals={profitGoals || []}
                 onOpenScanItem={(item) => {
                   setCurrentItem(item)
-                  setPipeline([])
+                  setPipeline(buildCompletedPipeline())
                   setOpenedFromScans(true)
                   setScreen('scan-result')
                 }}
