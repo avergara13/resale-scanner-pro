@@ -295,18 +295,53 @@ export class NotionService {
     }
 
     try {
-      const properties: Record<string, unknown> = {
-        'Status': { select: { name: update.status } },
+      // Map workflow state → Notion Status select options (emoji-prefixed in DB).
+      // Unmapped states (shipped/completed/delisted) fold into the nearest valid option;
+      // side-channels (Carrier, Date Sold, Sale Price) capture the detail.
+      const statusOption = (s: typeof update.status): string => {
+        switch (s) {
+          case 'published': return '🟣 Listed – Awaiting Sale'
+          case 'ready':     return '📸 Ready to List'
+          case 'sold':
+          case 'shipped':
+          case 'completed': return '✅ Sold'
+          case 'returned':  return '↩️ Returned'
+          case 'delisted':  return '📸 Ready to List' // delisted returns to inventory-ready
+          default:          return '🟣 Listed – Awaiting Sale'
+        }
       }
-      if (update.soldPrice !== undefined) properties['Sold Price']       = { number: update.soldPrice }
-      if (update.soldOn)                  properties['Sold On']           = { select: { name: update.soldOn } }
-      if (update.trackingNumber)          properties['Tracking Number']   = rt(update.trackingNumber)
-      if (update.shippingCarrier)         properties['Shipping Carrier']  = rt(update.shippingCarrier)
-      if (update.soldDate)                properties['Sold Date']         = { date: { start: new Date(update.soldDate).toISOString() } }
-      if (update.shippedDate)             properties['Shipped Date']      = { date: { start: new Date(update.shippedDate).toISOString() } }
-      if (update.returnedDate)            properties['Returned Date']     = { date: { start: new Date(update.returnedDate).toISOString() } }
-      if (update.returnReason)            properties['Return Reason']     = rt(update.returnReason)
-      if (update.delistedDate)            properties['Delisted Date']     = { date: { start: new Date(update.delistedDate).toISOString() } }
+
+      // Normalize carrier string to the DB's Carrier select options. Missing match → skip.
+      const carrierOption = (raw?: string): string | null => {
+        if (!raw) return null
+        const s = raw.toLowerCase()
+        if (s.includes('usps'))  return 'USPS'
+        if (s.includes('ups'))   return 'UPS'
+        if (s.includes('fedex')) return 'FedEx'
+        return null
+      }
+
+      const properties: Record<string, unknown> = {
+        'Status': { select: { name: statusOption(update.status) } },
+      }
+      // Map to actual DB property names. Sold Price → Sale Price, Sold Date → Date Sold.
+      if (update.soldPrice !== undefined) properties['Sale Price'] = { number: update.soldPrice }
+      if (update.soldDate)                properties['Date Sold']  = { date: { start: new Date(update.soldDate).toISOString() } }
+
+      // Carrier (select) — only set if we recognize the carrier name.
+      const normalizedCarrier = carrierOption(update.shippingCarrier)
+      if (normalizedCarrier)              properties['Carrier']    = { select: { name: normalizedCarrier } }
+
+      // Tracking, soldOn, shipped/returned/delisted dates, returnReason: no matching DB columns.
+      // Stash human-readable sync details into Listing Notes so nothing is lost.
+      const notesLines: string[] = []
+      if (update.trackingNumber)  notesLines.push(`Tracking: ${update.trackingNumber}`)
+      if (update.soldOn)          notesLines.push(`Sold on: ${update.soldOn}`)
+      if (update.shippedDate)     notesLines.push(`Shipped: ${new Date(update.shippedDate).toISOString().slice(0,10)}`)
+      if (update.returnedDate)    notesLines.push(`Returned: ${new Date(update.returnedDate).toISOString().slice(0,10)}`)
+      if (update.returnReason)    notesLines.push(`Return reason: ${update.returnReason}`)
+      if (update.delistedDate)    notesLines.push(`Delisted: ${new Date(update.delistedDate).toISOString().slice(0,10)}`)
+      if (notesLines.length > 0)  properties['Listing Notes'] = rt(notesLines.join(' • '))
 
       // Status updates are the most-visible Notion writes (Sold → Shipped → Delisted chain).
       // Bump retries + widen backoff so transient 429/503s don't strand an item in the wrong state.
