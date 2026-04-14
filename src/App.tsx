@@ -785,7 +785,11 @@ function App() {
       console.error('Capture failed:', msg)
       toast.error(msg.toLowerCase().includes('quota') ? 'Storage full — clearing cache and retrying. Please try again.' : `Capture failed: ${msg}`)
     }
-  }, [settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset, simulateProgress, completeStep, tagSuggestionService, setScanHistory, createSession, setAllSessions, setSelectedSessionId])
+    // `handleAddPhotoToCurrentItem` is referenced inside this callback but declared later in
+    // the component (line ~1215). Adding it to deps would hit a TDZ error during render.
+    // The closure picks it up correctly at call time; eslint-disable the rule locally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraMode, currentItem, settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset, simulateProgress, completeStep, tagSuggestionService, setScanHistory, createSession, setAllSessions, setSelectedSessionId])
 
   const handleRemoveFromQueue = useCallback((id: string) => {
     setQueue((prev) => (prev || []).filter(item => item.id !== id))
@@ -1196,6 +1200,9 @@ function App() {
     }
     // Re-run the full AI pipeline on the existing photo, preserving the item ID.
     // This lets the user retry a failed scan or get a second opinion without creating a duplicate card.
+    // Reset cameraMode first so a stale 'add-photo' (from a cancelled camera session) doesn't
+    // route this re-analyze into the add-photo handler and create a duplicate image.
+    setCameraMode('new-scan')
     handleCapture(
       imageToUse,
       currentItem.purchasePrice,
@@ -1224,6 +1231,35 @@ function App() {
     } : prev)
     toast('Photo added — tap Re-analyze to scan with all photos')
   }, [currentItem, optimizeAndCache])
+
+  // Merges barcode/QR lookup data into the current item during research phase.
+  // Called by CameraOverlay when a barcode is scanned while `isAddPhotoMode === true`.
+  // Fill-if-empty strategy — preserves richer AI-generated data, fills gaps from UPC lookup.
+  // Full BarcodeProduct is always stored at marketData.barcodeProduct (same pattern as
+  // new-scan flow at line ~701; Notion service reads from here for the UPC/EAN field).
+  const handleMergeBarcodeIntoCurrentItem = useCallback((product: BarcodeProduct) => {
+    if (!currentItem) return
+    setCurrentItem(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        productName: prev.productName && prev.productName !== 'Unknown Product'
+          ? prev.productName
+          : product.title || prev.productName,
+        description: prev.description && prev.description !== 'Product analysis unavailable'
+          ? prev.description
+          : product.description || prev.description,
+        category: prev.category && prev.category !== 'General'
+          ? prev.category
+          : product.category || prev.category,
+        marketData: {
+          ...prev.marketData,
+          barcodeProduct: product,
+        },
+      }
+    })
+    toast.success(`Barcode data added: ${product.title || product.barcode}`)
+  }, [currentItem])
 
   const handleDeleteAdditionalPhoto = useCallback((index: number) => {
     setCurrentItem(prev => {
@@ -2570,9 +2606,11 @@ function App() {
 
       <CameraOverlay
         isOpen={cameraOpen}
-        onClose={() => setCameraOpen(false)}
+        onClose={() => { setCameraOpen(false); setCameraMode('new-scan') }}
         onCapture={handleCapture}
         onQuickDraft={handleQuickDraft}
+        onBarcodeForCurrentItem={handleMergeBarcodeIntoCurrentItem}
+        isAddPhotoMode={cameraMode === 'add-photo'}
         geminiApiKey={settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY}
       />
 
