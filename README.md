@@ -49,6 +49,14 @@ The current product already includes the main operating surfaces:
 - **Sold and shipping operations** for sale logging, tracking, and post-sale
   follow-through
 
+## Live product views
+
+Current production screenshots from the Railway deploy:
+
+| Session workflow | Agent workspace |
+| --- | --- |
+| ![Resale Scanner Pro session view](./assets/readme/session.png) | ![Resale Scanner Pro agent view](./assets/readme/agent.png) |
+
 ## Honest status
 
 This app is far beyond a prototype, but it is not positioned here as a
