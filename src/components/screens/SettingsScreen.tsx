@@ -646,6 +646,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     />
                   </div>
 
+                  <NotionConnectionTest
+                    apiKey={settings.notionApiKey}
+                    databaseId={settings.notionDatabaseId}
+                  />
+
                   <Separator className="bg-s1" />
 
                   <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Automation</p>
@@ -1281,6 +1286,102 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Notion Connection Test ──────────────────────────────────────────────────
+// Preflight the Settings screen exposes so operators can verify Notion is
+// reachable without having to scan an item and hope. Calls /api/notion/health
+// on the server which retrieves the DB schema — if that succeeds, /pages POSTs
+// will also succeed (same credential path).
+interface NotionConnectionTestProps {
+  apiKey?: string
+  databaseId?: string
+}
+
+function NotionConnectionTest({ apiKey, databaseId }: NotionConnectionTestProps) {
+  const [state, setState] = useState<
+    | { status: 'idle' }
+    | { status: 'testing' }
+    | { status: 'ok'; title: string; propertyCount: number }
+    | { status: 'error'; error: string; stage?: string }
+  >({ status: 'idle' })
+
+  const run = async () => {
+    setState({ status: 'testing' })
+    try {
+      const url = `/api/notion/health${databaseId ? `?dbId=${encodeURIComponent(databaseId)}` : ''}`
+      const res = await fetch(url, { method: 'GET' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.ok) {
+        setState({
+          status: 'error',
+          error: data?.error || `${res.status} ${res.statusText}`,
+          stage: data?.stage,
+        })
+        return
+      }
+      setState({
+        status: 'ok',
+        title: data.dbTitle || '<untitled>',
+        propertyCount: data.propertyCount || 0,
+      })
+    } catch (err) {
+      setState({
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+        stage: 'network',
+      })
+    }
+  }
+
+  // Surface the API-key warning client-side before making a request
+  const missingKey = !apiKey || apiKey.trim().length === 0
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={run}
+          disabled={state.status === 'testing' || missingKey}
+          className="text-xs"
+        >
+          {state.status === 'testing' ? 'Testing…' : 'Test Notion Connection'}
+        </Button>
+        {state.status === 'ok' && (
+          <span className="flex items-center gap-1 text-xs text-green">
+            <CheckCircle size={14} weight="fill" />
+            Connected
+          </span>
+        )}
+        {state.status === 'error' && (
+          <span className="flex items-center gap-1 text-xs text-red-500">
+            <XCircle size={14} weight="fill" />
+            Failed
+          </span>
+        )}
+      </div>
+
+      {missingKey && (
+        <p className="text-xs text-t2">Add the Notion integration token above, then test.</p>
+      )}
+
+      {state.status === 'ok' && (
+        <p className="text-xs text-t2">
+          DB: <span className="font-mono text-t1">{state.title}</span> · {state.propertyCount} properties
+        </p>
+      )}
+
+      {state.status === 'error' && (
+        <div className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-xs text-t1">
+          <p className="font-semibold">Notion health check failed{state.stage ? ` (${state.stage})` : ''}</p>
+          <p className="mt-1 text-t2 break-words">{state.error}</p>
+        </div>
+      )}
     </div>
   )
 }

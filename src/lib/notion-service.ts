@@ -75,6 +75,15 @@ export interface NotionPushResponse {
   error?: string
 }
 
+export interface NotionHealthResult {
+  ok: boolean
+  dbTitle?: string
+  dbId?: string
+  propertyCount?: number
+  stage?: string
+  error?: string
+}
+
 // ── Normalise condition string → exact Notion Select option ──────────────────
 function normaliseCondition(raw: string): string {
   const s = raw.toLowerCase().trim()
@@ -118,6 +127,46 @@ export class NotionService {
 
   isConfigured(): boolean {
     return !!(this.apiKey && this.databaseId)
+  }
+
+  /**
+   * Preflight — verify API key + DB reachability + integration access via the
+   * server-side /api/notion/health endpoint. Returns a structured result so the
+   * Settings screen can show ✅ or the concrete error without forcing a user to
+   * scan a real item first.
+   */
+  async testConnection(): Promise<NotionHealthResult> {
+    if (!this.databaseId) {
+      return {
+        ok: false,
+        stage: 'config',
+        error: 'Database ID is not set. Add it in Settings.',
+      }
+    }
+    try {
+      const url = `/api/notion/health?dbId=${encodeURIComponent(this.databaseId)}`
+      const response = await fetch(url, { method: 'GET' })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        return {
+          ok: false,
+          stage: data?.stage || 'request',
+          error: data?.error || data?.message || `${response.status} ${response.statusText}`,
+        }
+      }
+      return {
+        ok: true,
+        dbId: data?.dbId,
+        dbTitle: data?.dbTitle,
+        propertyCount: data?.propertyCount,
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        stage: 'network',
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
   }
 
   async pushListing(listing: NotionListingData): Promise<NotionPushResponse> {
