@@ -584,6 +584,43 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // ── Notion health — preflight check the Settings screen can call anytime.
+  // Verifies: (1) API key present, (2) DB reachable, (3) integration has read
+  // access to the target DB. A successful 200 implies push should work too —
+  // the same credentials authorize /pages POST.
+  if (requestUrl.pathname === '/api/notion/health' && req.method === 'GET') {
+    try {
+      if (!notionApiKey) {
+        sendJson(res, 503, {
+          ok: false,
+          stage: 'api-key',
+          error: 'NOTION_API_KEY is not configured on the server.',
+        })
+        return
+      }
+      const dbId = normalizeUuid(requestUrl.searchParams.get('dbId') || notionInventoryDbId)
+      const db = await notionRequest(`/databases/${dbId}`)
+      const dbTitle = db?.title?.[0]?.plain_text || '<untitled>'
+      const propertyCount = db?.properties ? Object.keys(db.properties).length : 0
+      sendJson(res, 200, {
+        ok: true,
+        dbId,
+        dbTitle,
+        propertyCount,
+      })
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[notion/health] failed:', error.message)
+      sendJson(res, status, {
+        ok: false,
+        stage: 'retrieve-database',
+        error: error.message,
+        ...(error.payload || {}),
+      })
+    }
+    return
+  }
+
   // ── Notion proxy — browser can't call api.notion.com directly (CORS) ──
   if (requestUrl.pathname === '/api/notion/push' && req.method === 'POST') {
     try {
