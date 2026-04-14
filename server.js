@@ -15,15 +15,29 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// Notion rejects 32-char hex IDs without dashes with HTTP 400. Normalize anything
+// that's 32 hex chars (with or without existing dashes) into canonical 8-4-4-4-12
+// UUID form. No-op for strings that don't match. Applied to env-var overrides so a
+// legacy-format ID in Railway env never flows through to call sites that bypass the
+// request-body normalizer in /api/notion/push.
+function normalizeUuid(id) {
+  if (typeof id !== 'string') return id
+  const hex = id.replace(/-/g, '').toLowerCase()
+  if (!/^[0-9a-f]{32}$/.test(hex)) return id
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
 const port    = Number(process.env.PORT || 3000)
 const distDir = path.join(__dirname, 'dist')
 const notionApiKey = process.env.NOTION_API_KEY || process.env.VITE_NOTION_API_KEY || ''
 // Notion Master Inventory DB — source of truth for listed items (photos, price, SKU).
 // Fallback is the canonical Master Inventory DB ID; Railway env var always wins.
-const notionInventoryDbId = process.env.NOTION_INVENTORY_DATABASE_ID || process.env.VITE_NOTION_DATABASE_ID || '3318ed3e-1385-45d3-9a60-63a628eeefff'
+// normalizeUuid() applied so an env-var override in legacy no-dashes format resolves
+// to canonical form before any call site reads the constant.
+const notionInventoryDbId = normalizeUuid(process.env.NOTION_INVENTORY_DATABASE_ID || process.env.VITE_NOTION_DATABASE_ID || '3318ed3e-1385-45d3-9a60-63a628eeefff')
 // Notion Sales DB — source of truth for WF-01 email-parsed sales. Railway env var wins;
 // fallback is the canonical Sales DB ID per the Sold Tab data contract.
-const notionSalesDbId = process.env.NOTION_SALES_DATABASE_ID || 'a8a86796-187c-4ef8-9ac0-e92d9f8df665'
+const notionSalesDbId = normalizeUuid(process.env.NOTION_SALES_DATABASE_ID || 'a8a86796-187c-4ef8-9ac0-e92d9f8df665')
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
 
@@ -122,16 +136,6 @@ async function notionRequest(pathname, init = {}) {
       ...(init.headers || {}),
     },
   })
-}
-
-// Notion rejects 32-char hex IDs without dashes with HTTP 400. Normalize anything
-// that's 32 hex chars (with or without existing dashes) into canonical 8-4-4-4-12
-// UUID form before forwarding. No-op for strings that don't match.
-function normalizeUuid(id) {
-  if (typeof id !== 'string') return id
-  const hex = id.replace(/-/g, '').toLowerCase()
-  if (!/^[0-9a-f]{32}$/.test(hex)) return id
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
 function supabaseHeaders() {
