@@ -124,6 +124,16 @@ async function notionRequest(pathname, init = {}) {
   })
 }
 
+// Notion rejects 32-char hex IDs without dashes with HTTP 400. Normalize anything
+// that's 32 hex chars (with or without existing dashes) into canonical 8-4-4-4-12
+// UUID form before forwarding. No-op for strings that don't match.
+function normalizeUuid(id) {
+  if (typeof id !== 'string') return id
+  const hex = id.replace(/-/g, '').toLowerCase()
+  if (!/^[0-9a-f]{32}$/.test(hex)) return id
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
 function supabaseHeaders() {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase credentials are not configured on the server.')
@@ -574,6 +584,11 @@ const server = http.createServer(async (req, res) => {
   if (requestUrl.pathname === '/api/notion/push' && req.method === 'POST') {
     try {
       const body = await readRequestBody(req)
+      // Defensive normalization: older frontend defaults stored the DB ID without dashes,
+      // which Notion API rejects with HTTP 400. Canonicalize before forwarding.
+      if (body?.parent?.database_id) {
+        body.parent.database_id = normalizeUuid(body.parent.database_id)
+      }
       const result = await notionRequest('/pages', {
         method: 'POST',
         body: JSON.stringify(body),

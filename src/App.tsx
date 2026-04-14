@@ -114,7 +114,7 @@ function App() {
     shippingMaterialsCost: 0.75,
     paypalFeePercent: 0,
     preferredAiModel: 'gemini-2.5-flash',
-    notionDatabaseId: '3318ed3e138545d39a6063a628eeefff',
+    notionDatabaseId: '3318ed3e-1385-45d3-9a60-63a628eeefff',
     imageQuality: { preset: 'balanced' },
     // Pre-populated from Railway env vars — both users get keys automatically.
     // Overridable per-device in Settings if needed.
@@ -165,6 +165,17 @@ function App() {
     const key = settings?.notionApiKey || import.meta.env.VITE_NOTION_API_KEY
     return createNotionService(key, settings?.notionDatabaseId)
   }, [settings?.notionApiKey, settings?.notionDatabaseId])
+
+  // One-time migration: earlier builds stored the Notion DB ID as a 32-char hex string
+  // with no dashes, which Notion API rejects with HTTP 400. Rewrite to canonical
+  // 8-4-4-4-12 UUID form on app load. No-op after first successful run.
+  useEffect(() => {
+    const id = settings?.notionDatabaseId
+    if (!id || id.includes('-')) return
+    if (!/^[0-9a-f]{32}$/i.test(id)) return
+    const canonical = `${id.slice(0, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}-${id.slice(16, 20)}-${id.slice(20)}`.toLowerCase()
+    setSettings(prev => prev ? { ...prev, notionDatabaseId: canonical } : prev)
+  }, [settings?.notionDatabaseId, setSettings])
 
   // Set of session IDs marked as personal — used to exclude from business profit calculations
   const personalSessionIds = useMemo(() => {
