@@ -59,8 +59,8 @@ interface QueueScreenProps {
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
-  onPushToNotion?: (itemId: string) => Promise<void>
-  onPushToEbay?: (itemId: string) => Promise<void>
+  /** WO-RSP-010: opens the in-app ListingBuilder — replaces onPushToNotion + onPushToEbay */
+  onOpenListingBuilder?: (itemId: string) => void
   onEditPhotos?: (item: ScannedItem) => void
 }
 
@@ -82,8 +82,8 @@ interface SortableItemProps {
   onReanalyze?: (itemId: string) => void
   onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
-  onPushToNotion?: (itemId: string) => Promise<void>
-  onPushToEbay?: (itemId: string) => Promise<void>
+  /** WO-RSP-010: opens the in-app ListingBuilder */
+  onOpenListingBuilder?: (itemId: string) => void
   onEditPhotos?: (item: ScannedItem) => void
   onDecisionChange?: (itemId: string, decision: Decision) => void
 }
@@ -103,8 +103,7 @@ function SortableItem({
   onReanalyze,
   onOpenDetail,
   onBuyItem,
-  onPushToNotion,
-  onPushToEbay,
+  onOpenListingBuilder,
   onEditPhotos,
   onDecisionChange,
 }: SortableItemProps) {
@@ -431,25 +430,15 @@ function SortableItem({
                 <Lightning size={12} weight="bold" />
                 Optimize
               </button>
-              {onPushToNotion && !item.notionPageId && (
+              {/* WO-RSP-010: single "Build Listing" CTA replaces List + Push to eBay */}
+              {onOpenListingBuilder && !item.ebayListingId && (
                 <button
-                  onClick={() => onPushToNotion(item.id)}
-                  aria-label="List item"
+                  onClick={() => onOpenListingBuilder(item.id)}
+                  aria-label="Build listing"
                   className="h-8 px-5 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
-                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
                 >
-                  List
-                </button>
-              )}
-              {onPushToEbay && item.notionPageId && !item.ebayListingId && (
-                <button
-                  onClick={() => onPushToEbay(item.id)}
-                  aria-label="Push to eBay"
-                  title="Push to eBay (requires ED approval + AI check pass)"
-                  className="h-8 px-4 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
-                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)' }}
-                >
-                  Push to eBay
+                  Build Listing
                 </button>
               )}
               {item.ebayListingId && (
@@ -552,7 +541,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem, onPushToNotion, onPushToEbay, onEditPhotos }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem, onOpenListingBuilder, onEditPhotos }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -1430,8 +1419,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onReanalyze={onReanalyze}
                       onOpenDetail={onOpenDetail}
                       onBuyItem={onBuyItem}
-                      onPushToNotion={onPushToNotion}
-                      onPushToEbay={onPushToEbay}
+                      onOpenListingBuilder={onOpenListingBuilder}
                       onEditPhotos={onEditPhotos}
                       onDecisionChange={(id, decision) => handleSaveEdit(id, { decision })}
                     />

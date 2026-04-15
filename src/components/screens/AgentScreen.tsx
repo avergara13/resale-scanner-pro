@@ -240,7 +240,6 @@ interface AgentScreenProps {
   onProcessingChange?: (processing: boolean) => void
   onCreateListing?: (itemId: string) => Promise<void>
   onOptimizeItem?: (itemId: string) => Promise<void>
-  onPushToNotion?: (itemId: string) => Promise<void>
   onBatchAnalyze?: () => Promise<void>
   onEditItem?: (itemId: string, updates: Partial<ScannedItem>) => void
   onRerunPipeline?: (itemId: string) => Promise<void>
@@ -262,7 +261,7 @@ interface AgentScreenProps {
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true }: AgentScreenProps) {
   const deviceId = useDeviceId()
   const [currentSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const sessionId = currentSession?.id
@@ -657,28 +656,18 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
           addMsg(`**Step 2/3 — Optimize:** No items to optimize.`)
         }
 
-        // Step 3: Push to Notion — include both freshly processed items
-        // AND any pre-existing optimized-but-unpushed items.
-        // onPushToNotion guards: skips items without optimizedListing or
-        // already-pushed (notionPageId). Safe to over-include IDs.
+        // Step 3: Collect items ready for listing — includes freshly optimized
+        // items AND any pre-existing optimized-but-unlisted items.
         const preExistingReadyIds = sessionItems
-          .filter(i => i.optimizedListing && !i.notionPageId)
+          .filter(i => i.optimizedListing && !i.ebayListingId)
           .map(i => i.id)
         const pushCandidateIds = [...new Set([...allCandidateIds, ...preExistingReadyIds])]
 
-        if (pushCandidateIds.length > 0 && onPushToNotion) {
-          addMsg(`**Step 3/3 — Publishing listing(s) to Notion**`)
-          let pushed = 0
-          for (const itemId of pushCandidateIds) {
-            try {
-              await onPushToNotion(itemId)
-              pushed++
-            } catch (error) {
-              // onPushToNotion returns early for items without optimizedListing
-              // or already pushed — not a real failure
-            }
-          }
-          addMsg(`✅ Published ${pushed} listing(s) to Notion.`)
+        // WO-RSP-010: Push path moved to in-app ListingBuilder. Agent
+        // can optimize listings but the final push requires the ED to
+        // review the listing in the Builder and confirm via gate.
+        if (pushCandidateIds.length > 0) {
+          addMsg(`**Step 3/3 — Ready to list:** ${pushCandidateIds.length} listing(s) optimized. Open the Queue and tap **Build Listing** on each item to review, gate-check, and push to eBay.`)
         } else {
           addMsg(`**Step 3/3 — Publish:** No listings to push.`)
         }
@@ -791,22 +780,11 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
           )
         )
 
-        let successCount = 0
-        for (const item of readyItems) {
-          if (onPushToNotion) {
-            try {
-              await onPushToNotion(item.id)
-              successCount++
-            } catch (error) {
-              console.error('Failed to push item:', item.id, error)
-            }
-          }
-        }
-
+        // WO-RSP-010: Push path moved to in-app ListingBuilder
         const completionMessage: ChatMessage = {
           id: (Date.now() + 2).toString(),
           role: 'assistant',
-          content: `✅ Successfully pushed ${successCount} of ${readyItems.length} listings to Notion!`,
+          content: `**Step 3/3 — Ready to list:** ${readyItems.length} listing(s) optimized. Open the **Queue** and tap **Build Listing** on each item to review, gate-check, and push to eBay.`,
           timestamp: Date.now(),
         }
 
@@ -817,8 +795,8 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
               : s
           )
         )
-        
-        logActivity(`Pushed ${successCount} listings to Notion`)
+
+        logActivity(`${readyItems.length} listing(s) ready — open Queue → Build Listing`)
         setIsProcessing(false)
         return
       }
@@ -1215,7 +1193,7 @@ ${settings.userProfile.aiContext}` : ''}`
       // but short-circuit here as well to avoid the dev-mode warning.
       if (isMountedRef.current) setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals, queueItems])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals, queueItems])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {

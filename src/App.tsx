@@ -22,6 +22,7 @@ import { SoldScreen } from './components/screens/SoldScreen'
 import { SessionDetailScreen } from './components/screens/SessionDetailScreen'
 import { ListingDetailScreen } from './components/screens/ListingDetailScreen'
 import { PhotoManager } from './components/screens/PhotoManager'
+import { ListingBuilder } from './components/screens/ListingBuilder'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { retryOperation } from './lib/retry-service'
 import { getRetryOptions } from './lib/retry-config'
@@ -103,6 +104,8 @@ function App() {
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
+  // WO-RSP-010: ListingBuilder screen item ID
+  const [listingBuilderItemId, setListingBuilderItemId] = useState<string | null>(null)
   const [liveSoldItems, setLiveSoldItems] = useState<SoldItem[]>([])
   const [soldWarnings, setSoldWarnings] = useState<string[]>([])
   const [soldLoading, setSoldLoading] = useState(false)
@@ -407,7 +410,7 @@ function App() {
           )
           mockProductName = visionResult.productName
           // PKT-004 Correction 3 — persist upcEan on newItem immediately so it's
-          // available in handlePushToNotion (visionResult is out of scope there)
+          // available downstream (visionResult is out of scope in callbacks)
           if (visionResult.upcEan) {
             newItem = { ...newItem, upcEan: visionResult.upcEan }
           }
@@ -1071,229 +1074,45 @@ function App() {
     ))
   }, [setQueue, listingOptimizationService])
 
-  const handlePushToNotion = useCallback(async (itemId: string) => {
-    if (!notionService) {
-      toast.error('Configure Notion API key and Database ID in Settings')
-      return
-    }
-    // Read fresh queue via ref — pipeline just optimized this item, stale
-    // closure would still show optimizedListing as undefined.
-    const item = (queueRef.current || []).find(i => i.id === itemId)
-    if (!item || item.notionPageId || !item.optimizedListing) return
+  // ── WO-RSP-010: ListingBuilder navigation ────────────────────────────────
+  // Open the in-app ListingBuilder for a queue item. This replaces the old
+  // one-click "Push to Notion" and "Push to eBay" buttons — the new flow is
+  // RSP → ListingBuilder gate → eBay → Notion (mirrored after eBay success).
+  const handleOpenListingBuilder = useCallback((itemId: string) => {
+    setListingBuilderItemId(itemId)
+    setScreen('listing-builder')
+  }, [])
 
-    const listing = item.optimizedListing
-    const profit = listing
-      ? listing.price - item.purchasePrice
-      : (item.estimatedSellPrice || 0) - item.purchasePrice
-
-    // Resolve session context for traceability — item carries the session UUID,
-    // look it up in allSessions to get the human-readable name ('AV-001') and number.
-    const linkedSession = (allSessions || []).find(s => s.id === item.sessionId)
-    const expenseType = linkedSession?.sessionType === 'business'
-      ? '💼 Business' as const
-      : linkedSession?.sessionType === 'personal'
-      ? '🏡 Personal' as const
-      : undefined
-
-    // Market Notes: human notes only. Platform ROI data is derivable
-    // downstream and belongs in its own column, not concatenated here.
-    const marketNotes = item.notes || undefined
-
-    // ── PKT-002: Upload photos to Supabase Storage ───────────────────────────
-    const sku = listing
-      ? [listing.itemSpecifics?.['Model'], item.tags?.find(t => t.startsWith('HRBO-'))].filter(Boolean).join('-') || item.tags?.find(t => t.startsWith('HRBO-'))
-      : item.tags?.find(t => t.startsWith('HRBO-'))
-    let photoUrls: string[] | undefined
-    if (supabaseService && sku) {
-      const photos = [item.imageData, ...(item.additionalImageData || [])].filter(Boolean) as string[]
-      if (photos.length > 0) {
-        const uploaded = await Promise.allSettled(
-          photos.map((data, i) => supabaseService.uploadPhoto(data, sku, `${sku}-0${i + 1}.jpg`))
-        )
-        const successfulUrls = uploaded
-          .filter(r => r.status === 'fulfilled' && r.value)
-          .map(r => (r as PromiseFulfilledResult<string>).value)
-        if (successfulUrls.length > 0) photoUrls = successfulUrls
-        const failedPhotoCount = photos.length - successfulUrls.length
-        if (failedPhotoCount > 0) {
-          toast.warning(`📷 ${failedPhotoCount} photo${failedPhotoCount > 1 ? 's' : ''} failed to upload — listing saved. You can retry from the listing card.`)
-        }
-      }
-    }
-
-    // ── Assemble full Notion payload ─────────────────────────────────────────
-    // D5h: Photo Count derives from what was actually uploaded above, not from
-    // the pre-upload count on item.additionalImages. Keeps Notion in sync with
-    // what eBay will actually see.
-    const photoCount = photoUrls?.length ?? 0
-    // D5g: Pipe-joined item specifics for the "Item Specifics" rich_text column.
-    const itemSpecificsRaw = listing?.itemSpecifics
-      ? Object.entries(listing.itemSpecifics)
-          .filter(([, v]) => v && v !== 'null' && v !== 'N/A')
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(' | ')
-      : undefined
-    const result = await notionService.pushListing({
-      // Core
-      title: listing?.title || item.productName || 'Unknown Item',
-      description: listing?.description || item.description || '',
-      price: listing?.price || item.estimatedSellPrice || 0,
-      purchasePrice: item.purchasePrice,
-      category: listing?.category || item.category || 'General',
-      condition: listing?.condition || 'Good',
-      tags: listing?.suggestedTags || [],
-      images: item.imageData ? [item.imageData] : [],
-      profit,
-      profitMargin: item.profitMargin || 0,
-      status: 'ready',
-      itemId: item.id,
-      timestamp: item.timestamp,
-      location: item.location?.name,
-      notes: marketNotes,
-      // Session + operator traceability
-      sessionId: linkedSession?.name,
-      sessionNumber: linkedSession?.sessionNumber,
-      scannedBy: item.scannedBy,
-      operatorName: linkedSession?.operatorName || settings?.userProfile?.operatorName,
-      expenseType,
-      // GROUP 1 — Core Identity
-      seoTitle: listing?.title?.slice(0, 80),
-      subtitle: listing?.subtitle?.slice(0, 55),
-      // D5e: Brand fallback — prefer itemSpecifics, then a conservative
-      // leading-capitalized-word regex on productName (captures Andis, Wahl,
-      // Norelco, etc.), then fall back to lens best-match first token.
-      brand: listing?.itemSpecifics?.['Brand']
-        || item.productName?.match(/^([A-Z][a-zA-Z&]{1,19})(?:\s|$)/)?.[1]
-        || (item.lensAnalysis?.bestMatch?.title?.split(/\s+/)[0])
-        || undefined,
-      modelSku: [listing?.itemSpecifics?.['Model'] || listing?.itemSpecifics?.['Style'], sku].filter(Boolean).join(' | ') || undefined,
-      upcEanGtin: item.upcEan || item.lensResults?.[0]?.snippet?.match(/\b(\d{12}|\d{13}|\d{8})\b/)?.[1],
-      ebayCategoryId: listing?.ebayCategoryId,
-      // GROUP 2 — Item Specifics
-      color: listing?.itemSpecifics?.['Color'],
-      material: listing?.itemSpecifics?.['Material'],
-      itemSpecificsRaw,
-      dimensions: listing?.itemSpecifics?.['Dimensions'],
-      packageWeightLbs: listing?.weightOz ? +(listing.weightOz / 16).toFixed(2) : undefined,
-      // GROUP 3 — Market Data
-      ebayAvgSold: item.marketData?.ebayAvgSold,
-      ebayHigh: item.marketData?.ebayPriceRange?.max,
-      ebayLow: item.marketData?.ebayPriceRange?.min,
-      autoAcceptPrice: listing?.autoAcceptPrice,
-      aiConfidence: item.lensResults?.length ? 'High' : 'Medium',
-      marketNotes,
-      photoCount,
-      // PKT-20260414-001: 12 new columns
-      conditionDescription: listing?.conditionDescription,
-      seoKeywords: listing?.seoKeywords?.join(', ') || listing?.keywords?.join(', '),
-      department: listing?.department,
-      size: listing?.size || listing?.itemSpecifics?.['Size'],
-      itemWeightOz: listing?.weightOz,
-      listingDuration: 'GTC',
-      bestOfferEnabled: true,
-      autoDeclinePrice: listing?.autoDeclinePrice,
-      soldCompCount: item.marketData?.ebaySoldCount,
-      ebayFvfRate: listing?.ebayFvfRate,
-      estShippingLabelCost: listing?.estShippingLabelCost,
-      subtitleCostFlag: listing?.subtitleCostFlag ?? false,
-      photoUrls,
-      // Status auto-progression
-      notionStatus: photoUrls?.length ? '📸 Ready to List' : '🔍 Researched – Price Set',
-      // Shipping + listing type SELECTs (exact option strings)
-      shippingStrategy: listing?.shippingService || 'USPS Ground Advantage',
-      listingType: 'Buy It Now',
+  // Called by ListingBuilder.onPushed after a successful eBay push.
+  const handleListingPushed = useCallback((
+    itemId: string,
+    listingId: string,
+    listingUrl: string,
+    notionPageId: string,
+  ) => {
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId
+        ? { ...i, ebayListingId: listingId, notionPageId: notionPageId || i.notionPageId, listingStatus: 'published', publishedDate: Date.now() }
+        : i
+    ))
+    setScreen('queue')
+    toast.success(`eBay listing live: ${listingId}`, {
+      action: { label: 'Open', onClick: () => window.open(listingUrl, '_blank', 'noopener,noreferrer') },
     })
-
-    // ── Supabase save (non-blocking) ─────────────────────────────────────────
-    if (supabaseService) {
-      supabaseService.saveScan({
-        notion_page_id: result.success ? result.pageId : undefined,
-        title: listing?.title || item.productName,
-        ebay_category_id: listing?.ebayCategoryId,
-        seo_title: listing?.title?.slice(0, 80),
-        subtitle: listing?.subtitle?.slice(0, 55),
-        upc_ean: item.upcEan,
-        brand: listing?.itemSpecifics?.['Brand'],
-        model: listing?.itemSpecifics?.['Model'],
-        condition: listing?.condition,
-        condition_description: listing?.conditionDescription,
-        item_description: listing?.description?.slice(0, 5000),
-        color: listing?.itemSpecifics?.['Color'],
-        size: listing?.size || listing?.itemSpecifics?.['Size'],
-        department: listing?.department,
-        seo_keywords: listing?.seoKeywords || listing?.keywords,
-        item_weight_oz: listing?.weightOz,
-        shipping_strategy: listing?.shippingService,
-        listing_duration: 'GTC',
-        best_offer_enabled: true,
-        listing_price: listing?.price,
-        auto_accept_price: listing?.autoAcceptPrice,
-        auto_decline_price: listing?.autoDeclinePrice,
-        comp_range_low: item.marketData?.ebayPriceRange?.min,
-        comp_range_high: item.marketData?.ebayPriceRange?.max,
-        sold_comp_count: item.marketData?.ebaySoldCount,
-        ebay_fvf_rate: listing?.ebayFvfRate,
-        est_shipping_label_cost: listing?.estShippingLabelCost,
-        gross_profit_est: listing?.grossProfitEst,
-        roi_pct_est: listing?.roiPctEst,
-        break_even_price: listing?.breakEvenPrice,
-        net_payout_est: listing?.netPayoutEst,
-        photo_count: photoCount,
-        photo_urls: photoUrls,
-        subtitle_cost_flag: listing?.subtitleCostFlag ?? false,
-        notion_push_status: result.success ? 'success' : 'failed',
-        notion_push_timestamp: new Date().toISOString(),
-        session_id: item.sessionId,
-        operator_id: item.scannedBy,
-        purchase_price: item.purchasePrice,
-        decision: item.decision,
-      }).catch(e => console.warn('[supabase] saveScan failed:', e))
-    }
-
-    if (result.success) {
-      setQueue((prev) => (prev || []).map(i =>
-        i.id === itemId
-          ? { ...i, notionPageId: result.pageId, notionUrl: result.url, listingStatus: 'published', publishedDate: Date.now() }
-          : i
-      ))
-      // Update Notion status from 'ready' → 'published'
-      if (result.pageId && notionService) {
-        notionService.updateListingStatus(result.pageId, { status: 'published' }).catch(e => console.warn('Notion status update failed:', e))
-      }
-      logActivity('Pushed to Notion ✓')
-    } else {
-      toast.error(`Notion error: ${result.error}`)
-    }
-  }, [setQueue, notionService, allSessions, settings])
-
-  // Push a Notion-backed listing to eBay. Server gates on Push Approved +
-  // AI Check Status; 403 means ED hasn't cleared the item yet, 503 means
-  // OAuth/policies aren't configured. Both surface as toasts without
-  // changing local state so the button stays pressable once unblocked.
-  const handlePushToEbay = useCallback(async (itemId: string) => {
-    const item = (queueRef.current || []).find(i => i.id === itemId)
-    if (!item || !item.notionPageId || item.ebayListingId) return
-    try {
-      const response = await fetch(`/api/ebay/push-listing/${item.notionPageId}`, {
-        method: 'POST',
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        const msg = data?.error || `eBay push failed (${response.status})`
-        toast.error(msg)
-        return
-      }
-      setQueue(prev => (prev || []).map(i =>
-        i.id === itemId ? { ...i, ebayListingId: String(data.listingId) } : i
-      ))
-      toast.success(`eBay listing live: ${data.listingId}`, {
-        action: { label: 'Open', onClick: () => window.open(data.listingUrl, '_blank', 'noopener,noreferrer') },
-      })
-      logActivity('Pushed to eBay ✓')
-    } catch (error) {
-      toast.error(`eBay push error: ${error instanceof Error ? error.message : String(error)}`)
-    }
+    logActivity('Pushed to eBay ✓')
   }, [setQueue])
+
+  // Batch photo uploader for ListingBuilder — wraps supabaseService so the
+  // screen doesn't need to reach into settings or build its own client.
+  const handleUploadPhotos = useCallback(async (photos: string[], sku: string): Promise<string[]> => {
+    if (!supabaseService) return []
+    const results = await Promise.allSettled(
+      photos.map((data, i) => supabaseService.uploadPhoto(data, sku, `${sku}-0${i + 1}.jpg`))
+    )
+    return results
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled' && !!r.value)
+      .map(r => r.value)
+  }, [supabaseService])
 
   const handleMarkAsSold = useCallback((
     itemId: string,
@@ -2720,7 +2539,6 @@ function App() {
                 onPendingMessageHandled={() => setAgentPendingMessage(null)}
                 onCreateListing={handleOptimizeItem}
                 onOptimizeItem={handleOptimizeItem}
-                onPushToNotion={handlePushToNotion}
                 onBatchAnalyze={handleBatchAnalyze}
                 onEditItem={handleEditQueueItem}
                 onMarkAsSold={handleMarkAsSold}
@@ -2808,8 +2626,7 @@ function App() {
                 personalSessionIds={personalSessionIds}
                 onReanalyze={handleReanalyzeItem}
                 onOpenDetail={(item) => setDetailItemId(item.id)}
-                onPushToNotion={handlePushToNotion}
-                onPushToEbay={handlePushToEbay}
+                onOpenListingBuilder={handleOpenListingBuilder}
                 onEditPhotos={(item) => handleOpenPhotoManager(item, 'queue')}
               />
             </motion.div>
@@ -2824,7 +2641,7 @@ function App() {
                 onOptimize={handleOptimizeItem}
                 settings={settings}
                 onEdit={handleEditQueueItem}
-                onPushToNotion={handlePushToNotion}
+                onOpenListingBuilder={handleOpenListingBuilder}
               />
             ) : null
           })()}
@@ -3014,6 +2831,34 @@ function App() {
               />
             </motion.div>
           )}
+
+          {screen === 'listing-builder' && listingBuilderItemId && (() => {
+            const lbItem = (queue || []).find(i => i.id === listingBuilderItemId)
+            if (!lbItem) return null
+            return (
+              <motion.div
+                key="listing-builder"
+                custom={slideDir.current}
+                variants={screenVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                style={{ willChange: 'opacity, transform' }}
+                className="absolute inset-0"
+              >
+                <ListingBuilder
+                  item={lbItem}
+                  initialListing={lbItem.optimizedListing}
+                  settings={settings}
+                  onBack={() => setScreen('queue')}
+                  onPushed={handleListingPushed}
+                  onEditPhotos={(item) => handleOpenPhotoManager(item, 'listing-builder' as Screen)}
+                  onUploadPhotos={handleUploadPhotos}
+                />
+              </motion.div>
+            )
+          })()}
         </AnimatePresence>
       </div>
 

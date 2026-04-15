@@ -96,7 +96,7 @@ interface ListingDetailScreenProps {
   onOptimize: (itemId: string) => Promise<void>
   settings?: AppSettings
   onEdit?: (itemId: string, updates: Partial<ScannedItem>) => void
-  onPushToNotion?: (itemId: string) => Promise<void>
+  onOpenListingBuilder?: (itemId: string) => void
 }
 
 export function ListingDetailScreen({
@@ -105,7 +105,7 @@ export function ListingDetailScreen({
   onOptimize,
   settings,
   onEdit,
-  onPushToNotion,
+  onOpenListingBuilder,
 }: ListingDetailScreenProps) {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [chatInput, setChatInput] = useState('')
@@ -408,14 +408,14 @@ export function ListingDetailScreen({
                     <Lightning size={13} className="mr-1.5" />
                     Optimize
                   </Button>
-                  {onPushToNotion && item.listingStatus !== 'published' && (
+                  {onOpenListingBuilder && item.listingStatus !== 'published' && (
                     <Button
                       size="sm"
-                      onClick={() => onPushToNotion(item.id)}
+                      onClick={() => onOpenListingBuilder(item.id)}
                       className="flex-1 h-9 text-xs font-bold text-white rounded-full"
-                      style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                      style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
                     >
-                      List
+                      Build Listing
                     </Button>
                   )}
                 </div>

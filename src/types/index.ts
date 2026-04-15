@@ -1,4 +1,4 @@
-export type Screen = 'session' | 'session-detail' | 'agent' | 'scan-result' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history' | 'photo-manager'
+export type Screen = 'session' | 'session-detail' | 'agent' | 'scan-result' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history' | 'photo-manager' | 'listing-builder'
 
 export type SoldShippingStatus = '🔴 Need Label' | '🟡 Label Ready' | '📦 Packed' | '✅ Shipped'
 
