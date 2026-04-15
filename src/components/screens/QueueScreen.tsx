@@ -21,7 +21,7 @@ import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { cn } from '@/lib/utils'
-import type { ScannedItem, CategoryPreset, ItemTag } from '@/types'
+import type { ScannedItem, CategoryPreset, ItemTag, Decision } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
 import {
   DndContext,
@@ -83,6 +83,7 @@ interface SortableItemProps {
   onBuyItem?: (id: string) => void
   onPushToNotion?: (itemId: string) => Promise<void>
   onEditPhotos?: (item: ScannedItem) => void
+  onDecisionChange?: (itemId: string, decision: Decision) => void
 }
 
 function SortableItem({
@@ -102,6 +103,7 @@ function SortableItem({
   onBuyItem,
   onPushToNotion,
   onEditPhotos,
+  onDecisionChange,
 }: SortableItemProps) {
   const {
     attributes,
@@ -474,25 +476,49 @@ function SortableItem({
           <DotsThreeVertical size={15} weight="bold" />
         </button>
       </div>
-      {/* Delete confirmation row — only visible after tapping ⋮ */}
+      {/* More options panel — decision override + remove */}
       {confirmDelete && (
-        <div className="px-3 pb-3 pt-2 border-t border-s2/60 flex items-center justify-between gap-2">
-          <p className="text-[10px] text-t3 leading-tight">Remove this item from your queue?</p>
-          <div className="flex gap-1.5 shrink-0">
-            <button
-              onClick={() => setConfirmDelete(false)}
-              className="text-[10px] font-semibold text-t3 hover:text-t1 px-3 py-1 rounded-full bg-s1/80 hover:bg-s2 transition-all active:scale-95"
-              style={{ touchAction: 'manipulation' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => { onRemove(item.id); setConfirmDelete(false) }}
-              className="text-[10px] font-bold text-white px-3 py-1 rounded-full bg-red hover:bg-red/90 transition-all active:scale-95"
-              style={{ touchAction: 'manipulation' }}
-            >
-              Remove
-            </button>
+        <div className="px-3 pb-3 pt-2 border-t border-s2/60 space-y-2">
+          {onDecisionChange && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] font-bold uppercase tracking-wide text-t3 shrink-0">Decision</span>
+              {(['BUY', 'PASS', 'MAYBE'] as Decision[]).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => { onDecisionChange(item.id, d); setConfirmDelete(false) }}
+                  className={cn(
+                    'flex-1 text-[10px] font-bold px-2 py-1 rounded-full border transition-all active:scale-95',
+                    item.decision === d
+                      ? d === 'BUY'   ? 'bg-green/20 text-green border-green/40'
+                        : d === 'PASS' ? 'bg-red/20 text-red border-red/40'
+                        : 'bg-amber/20 text-amber border-amber/40'
+                      : 'bg-s1/80 text-t3 border-s2/60 hover:border-b1/40 hover:text-t1'
+                  )}
+                  style={{ touchAction: 'manipulation' }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] text-t3 leading-tight">Remove this item from queue?</p>
+            <div className="flex gap-1.5 shrink-0">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="text-[10px] font-semibold text-t3 hover:text-t1 px-3 py-1 rounded-full bg-s1/80 hover:bg-s2 transition-all active:scale-95"
+                style={{ touchAction: 'manipulation' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { onRemove(item.id); setConfirmDelete(false) }}
+                className="text-[10px] font-bold text-white px-3 py-1 rounded-full bg-red hover:bg-red/90 transition-all active:scale-95"
+                style={{ touchAction: 'manipulation' }}
+              >
+                Remove
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1380,6 +1406,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onBuyItem={onBuyItem}
                       onPushToNotion={onPushToNotion}
                       onEditPhotos={onEditPhotos}
+                      onDecisionChange={(id, decision) => handleSaveEdit(id, { decision })}
                     />
                   ))}
                 </div>

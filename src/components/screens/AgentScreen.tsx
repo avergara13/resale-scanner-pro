@@ -117,6 +117,9 @@ function describeToolCall(call: AgentToolCall, items?: ScannedItem[]): string {
     case 'add_task': return `Add task: "${call.taskText}"`
     case 'complete_task': return 'Mark task complete'
     case 'clear_tasks': return 'Clear all tasks'
+    case 'mark_as_sold': return `Mark as sold: ${name}${call.soldPrice ? ` — $${call.soldPrice} on ${call.soldMarketplace ?? 'unknown'}` : ''}`
+    case 'mark_shipped': return `Mark shipped: ${name}${call.trackingNumber ? ` — tracking ${call.trackingNumber}` : ''}`
+    case 'add_remove_from_queue': return call.queueAction === 'remove' ? `Remove from queue: ${name}` : `Add to queue: ${name}`
     default: return call.tool
   }
 }
@@ -150,12 +153,17 @@ When you need to take an action on behalf of the user, emit a tool call at the E
 <tool_call>{"tool":"add_task","taskText":"Buy bubble wrap for shipping"}</tool_call>
 <tool_call>{"tool":"complete_task","taskId":"TASK_ID"}</tool_call>
 <tool_call>{"tool":"clear_tasks"}</tool_call>
+<tool_call>{"tool":"mark_as_sold","itemId":"ITEM_ID","soldPrice":25.00,"soldMarketplace":"ebay"}</tool_call>
+<tool_call>{"tool":"mark_shipped","itemId":"ITEM_ID","trackingNumber":"9400111899223456789012","shippingCarrier":"USPS"}</tool_call>
+<tool_call>{"tool":"add_remove_from_queue","itemId":"ITEM_ID","queueAction":"remove"}</tool_call>
 
 Rules:
 - Only emit a tool call when the user explicitly asks for an action.
 - Always explain what you are doing in plain text BEFORE the tool_call tag.
 - itemId must be an exact ID from the app state below.
-- taskId must be an exact ID from the task list below.` as const
+- taskId must be an exact ID from the task list below.
+- soldMarketplace must be one of: ebay, mercari, poshmark, facebook, whatnot, other.
+- queueAction must be "add" (marks item active in queue) or "remove" (marks item as PASS).` as const
 
 function formatMessage(text: string): string {
   let formatted = text
@@ -406,10 +414,16 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         setTodos(prev => (prev || []).map(t => t.id === call.taskId ? { ...t, completed: true } : t))
       } else if (call.tool === 'clear_tasks') {
         setTodos([])
+      } else if (call.tool === 'mark_as_sold' && call.itemId && call.soldPrice != null && call.soldMarketplace) {
+        onMarkAsSold?.(call.itemId, call.soldPrice, call.soldMarketplace)
+      } else if (call.tool === 'mark_shipped' && call.itemId && call.trackingNumber && call.shippingCarrier) {
+        onMarkShipped?.(call.itemId, call.trackingNumber, call.shippingCarrier)
+      } else if (call.tool === 'add_remove_from_queue' && call.itemId) {
+        onEditItem?.(call.itemId, { decision: call.queueAction === 'remove' ? 'PASS' : 'PENDING' })
       }
     }
     setPendingToolCalls(null)
-  }, [pendingToolCalls, onRerunPipeline, onOptimizeItem, onEditItem, onBatchAnalyze, setTodos])
+  }, [pendingToolCalls, onRerunPipeline, onOptimizeItem, onEditItem, onBatchAnalyze, setTodos, onMarkAsSold, onMarkShipped])
 
   const handleCreateSession = useCallback(() => {
     // One-session model: open the existing session if it exists

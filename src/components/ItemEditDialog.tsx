@@ -29,6 +29,8 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
     productName: item?.productName || '',
     description: item?.description || '',
     category: item?.category || '',
+    condition: item?.condition || 'Good',
+    preferredPlatform: item?.preferredPlatform || '',
     purchasePrice: item?.purchasePrice.toString() || '0',
     estimatedSellPrice: item?.estimatedSellPrice?.toString() || '',
     notes: item?.notes || '',
@@ -47,6 +49,8 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
         productName: item.productName || '',
         description: item.description || '',
         category: item.category || '',
+        condition: item.condition || 'Good',
+        preferredPlatform: item.preferredPlatform || '',
         purchasePrice: item.purchasePrice.toString() || '0',
         estimatedSellPrice: item.estimatedSellPrice?.toString() || '',
         notes: item.notes || '',
@@ -110,6 +114,8 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
       productName: formData.productName || undefined,
       description: formData.description || undefined,
       category: formData.category || undefined,
+      condition: formData.condition || undefined,
+      preferredPlatform: formData.preferredPlatform || undefined,
       purchasePrice: parseFloat(formData.purchasePrice) || 0,
       estimatedSellPrice: formData.estimatedSellPrice ? parseFloat(formData.estimatedSellPrice) : undefined,
       notes: formData.notes || undefined,
@@ -210,6 +216,41 @@ export function ItemEditDialog({ item, isOpen, onClose, onSave, geminiService }:
                 placeholder="e.g., Footwear, Electronics, Clothing"
                 className="bg-bg border-s2 text-t1 placeholder:text-s3"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="edit-condition" className="text-sm font-medium text-t1">
+                  Condition
+                </Label>
+                <select
+                  id="edit-condition"
+                  value={formData.condition}
+                  onChange={(e) => handleInputChange('condition', e.target.value)}
+                  className="h-9 w-full rounded-md border border-s2 bg-bg px-3 text-sm text-t1"
+                >
+                  {['New', 'Like New', 'Very Good', 'Good', 'Fair', 'Poor'].map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-platform" className="text-sm font-medium text-t1">
+                  Preferred Platform
+                </Label>
+                <select
+                  id="edit-platform"
+                  value={formData.preferredPlatform}
+                  onChange={(e) => handleInputChange('preferredPlatform', e.target.value)}
+                  className="h-9 w-full rounded-md border border-s2 bg-bg px-3 text-sm text-t1"
+                >
+                  <option value="">— any —</option>
+                  {['eBay', 'Mercari', 'Poshmark', 'Facebook Marketplace', 'Depop', 'Grailed', 'Whatnot'].map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

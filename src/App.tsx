@@ -1962,7 +1962,14 @@ function App() {
       const currentQueue = prev || []
       return currentQueue.map(item => item.id === itemId ? { ...item, ...updates } : item)
     })
-  }, [setQueue])
+    const { listingStatus } = updates
+    if (listingStatus && listingStatus !== 'not-started' && listingStatus !== 'optimizing') {
+      const item = queue?.find(i => i.id === itemId)
+      if (item?.notionPageId && notionService) {
+        notionService.updateListingStatus(item.notionPageId, { status: listingStatus }).catch(e => console.warn('Notion sync failed:', e))
+      }
+    }
+  }, [setQueue, queue, notionService])
 
   const handleReorderQueue = useCallback((reorderedItems: ScannedItem[]) => {
     setQueue(reorderedItems)
