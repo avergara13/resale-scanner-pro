@@ -307,9 +307,17 @@ function App() {
   const handleCapture = useCallback(async (imageData: string, price: number, barcodeProduct?: BarcodeProduct, condition?: string, existingItem?: ScannedItem) => {
     // Route captured image back to Photo Manager without a new pipeline run
     if (cameraMode === 'listing-photo') {
+      triggerCapture()
       setCameraMode('new-scan')
       setCameraOpen(false)
-      setPendingPhotoDecision(prev => prev ? { ...prev, capturedPhoto: imageData } : prev)
+      setPendingPhotoDecision(prev => {
+        if (!prev) {
+          // Photo Manager unmounted between camera open and capture — drop the photo with feedback
+          toast.error('Photo Manager closed before capture completed.')
+          return prev
+        }
+        return { ...prev, capturedPhoto: imageData }
+      })
       return
     }
 
@@ -1866,6 +1874,13 @@ function App() {
     setCameraOpen(true)
   }, [pendingPhotoDecision])
 
+  // Stable ref for PhotoManager useEffect — inline arrows would re-trigger on every App render
+  const handleCapturedPhotoConsumed = useCallback(() => {
+    setPendingPhotoDecision(prev =>
+      prev ? { ...prev, capturedPhoto: undefined } : prev
+    )
+  }, [])
+
   // ── Photo Manager: open from item (Entry Points B & C) ───────────────────────
   const handleOpenPhotoManager = useCallback((item: ScannedItem, fromScreen: Screen) => {
     // Edit mode: existing photoUrls are remote URLs (pass through); no local photos yet
@@ -2946,11 +2961,7 @@ function App() {
                 onBack={handlePhotoManagerBack}
                 onAddViaCamera={handleListingCameraOpen}
                 capturedPhoto={pendingPhotoDecision.capturedPhoto}
-                onCapturedPhotoConsumed={() =>
-                  setPendingPhotoDecision(prev =>
-                    prev ? { ...prev, capturedPhoto: undefined } : prev
-                  )
-                }
+                onCapturedPhotoConsumed={handleCapturedPhotoConsumed}
               />
             </motion.div>
           )}

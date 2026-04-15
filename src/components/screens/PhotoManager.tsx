@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { ArrowLeft, Star, X, Image, ArrowsClockwise } from '@phosphor-icons/react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -74,13 +75,25 @@ export function PhotoManager({
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
-  // Consume capturedPhoto from listing camera overlay — append to slots then clear
+  // Consume capturedPhoto from listing camera overlay — append to slots then clear.
+  // The ref guard is critical: if App re-renders for an unrelated reason while
+  // capturedPhoto is still set, the effect would otherwise re-fire and append a
+  // duplicate. Tracking the consumed value by identity makes this idempotent.
+  const consumedPhotoRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!capturedPhoto) return
+    if (!capturedPhoto || consumedPhotoRef.current === capturedPhoto) return
+    consumedPhotoRef.current = capturedPhoto
+    let droppedAtMax = false
     setSlots(prev => {
-      if (prev.length >= MAX_PHOTOS) return prev
+      if (prev.length >= MAX_PHOTOS) {
+        droppedAtMax = true
+        return prev
+      }
       return [...prev, { type: 'local', data: capturedPhoto }]
     })
+    if (droppedAtMax) {
+      toast.error(`Maximum ${MAX_PHOTOS} photos reached — capture discarded`)
+    }
     onCapturedPhotoConsumed?.()
   }, [capturedPhoto, onCapturedPhotoConsumed])
 
