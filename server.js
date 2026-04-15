@@ -666,9 +666,29 @@ async function getSoldFeed() {
   }
 }
 
-function sendFile(res, filePath) {
+// Cache-Control strategy for static assets:
+// - /assets/* — Vite emits content-hashed filenames (index-ABC123.js), so the URL
+//   itself changes when content changes. Safe to cache forever with `immutable`.
+// - index.html — the only entry point that isn't hashed. MUST be revalidated on
+//   every request so users pick up new deploys immediately after they land.
+// - Everything else (favicon, manifest, unhashed assets) — short cache, browser
+//   will revalidate on refresh but not on every navigation.
+function cacheControlFor(urlPath) {
+  if (urlPath.startsWith('/assets/')) {
+    return 'public, max-age=31536000, immutable'
+  }
+  if (urlPath === '/index.html' || urlPath === '/') {
+    return 'no-cache, no-store, must-revalidate'
+  }
+  return 'public, max-age=3600'
+}
+
+function sendFile(res, filePath, urlPath = '') {
   const ext = path.extname(filePath).toLowerCase()
-  res.writeHead(200, { 'Content-Type': CONTENT_TYPES[ext] || 'application/octet-stream' })
+  res.writeHead(200, {
+    'Content-Type': CONTENT_TYPES[ext] || 'application/octet-stream',
+    'Cache-Control': cacheControlFor(urlPath),
+  })
   fs.createReadStream(filePath).pipe(res)
 }
 
@@ -1117,14 +1137,15 @@ const server = http.createServer(async (req, res) => {
   const filePath = path.join(distDir, safePath.replace(/^\/+/, '').split('?')[0])
 
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-    sendFile(res, filePath)
+    sendFile(res, filePath, safePath)
     return
   }
 
-  // SPA fallback — all routes serve index.html
+  // SPA fallback — all routes serve index.html. Always use '/index.html' as the
+  // cache key so unknown routes get the no-cache policy, not the 1h default.
   const indexPath = path.join(distDir, 'index.html')
   if (fs.existsSync(indexPath)) {
-    sendFile(res, indexPath)
+    sendFile(res, indexPath, '/index.html')
     return
   }
 
