@@ -257,20 +257,16 @@ TITLE OPTIMIZATION (80 characters max):
 - Use power words (NWT, Vintage, Rare, Limited, etc.)
 - Add relevant specifications (size, color, model number)
 - Avoid special characters and ALL CAPS
-- Use vertical bars | to separate key features
+- Do NOT use pipe symbols (|). No category labels appended. Format: [Brand] [Model] [Key Feature] [Condition if New].
 
 DESCRIPTION OPTIMIZATION:
-- Base the description on the Vision Analysis above, expanding with selling points
-- Start with a compelling hook highlighting the item's best feature
-- Include detailed condition description
-- List all features and specifications in bullet points
-- Add measurements/dimensions if applicable
-- Mention what's included
-- Describe intended use or occasions
-- End with shipping and return policy
-- Use proper formatting with line breaks
-- Include relevant keywords naturally (no keyword stuffing)
-- Professional, friendly tone
+Structure EXACTLY:
+1. One sentence — what it is and why buy it
+2. "Condition: [honest assessment]"
+3. "Features:" [4-6 bullets]
+4. "What's included: [list]"
+5. "Ships within 1 business day from Orlando FL. 30-day returns accepted."
+No ADDITIONAL NOTES section. No repeated content. No filler. 800–1500 chars.
 
 TAGS:
 - You MUST include ALL existing item tags (listed above) in your suggestedTags output
@@ -293,16 +289,6 @@ PRICING:
 - Ensure minimum ${context.item.profitMargin ?? 30}% NET profit margin after ALL costs
 - If sell-through rate is LOW (<40%), consider pricing more aggressively
 
-CONDITION CODES:
-- New with tags (NWT)
-- New without tags (NWOT)  
-- New with box (NIB)
-- Like New
-- Excellent
-- Good
-- Fair
-- For Parts
-
 SEO KEYWORDS:
 - Extract 8-12 relevant search terms
 - Include synonyms and related terms
@@ -310,7 +296,7 @@ SEO KEYWORDS:
 
 Return a JSON object with this exact structure:
 {
-  "title": "Optimized 80-char eBay title with | separators",
+  "title": "Optimized 80-char eBay title — no pipe symbols, no category append",
   "subtitle": "Keyword-rich eBay subtitle max 55 chars — different words from title",
   "description": "Full multi-paragraph formatted description with bullets (800–2000 chars)",
   "conditionDescription": "Honest 1000-char max description of specific flaws, wear, or 'No visible flaws noted' if clean",
@@ -337,21 +323,7 @@ Return a JSON object with this exact structure:
   }
 
   private generateFallbackTitle(item: ScannedItem): string {
-    const parts: string[] = []
-    
-    if (item.productName) {
-      parts.push(item.productName)
-    }
-    
-    if (item.category && item.category !== 'General') {
-      parts.push(item.category)
-    }
-
-    if (parts.length === 0) {
-      parts.push('Quality Item')
-    }
-
-    return parts.join(' | ').slice(0, 80)
+    return (item.productName || 'Quality Item').slice(0, 80)
   }
 
   private generateFallbackDescription(item: ScannedItem): string {

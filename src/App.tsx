@@ -1095,13 +1095,9 @@ function App() {
       ? '🏡 Personal' as const
       : undefined
 
-    // Build platform ROI summary string to append to Market Notes
-    const platformROINote = item.platformComparison?.length
-      ? 'Platform ROI — ' + item.platformComparison
-          .map(p => `${p.platform}: $${p.netProfit.toFixed(2)} (${p.profitMargin.toFixed(0)}%)`)
-          .join(' | ')
-      : undefined
-    const combinedNotes = [item.notes, platformROINote].filter(Boolean).join('\n')
+    // Market Notes: human notes only. Platform ROI data is derivable
+    // downstream and belongs in its own column, not concatenated here.
+    const marketNotes = item.notes || undefined
 
     // ── PKT-002: Upload photos to Supabase Storage ───────────────────────────
     const sku = listing
@@ -1126,7 +1122,17 @@ function App() {
     }
 
     // ── Assemble full Notion payload ─────────────────────────────────────────
-    const photoCount = 1 + (item.additionalImages?.length || 0)
+    // D5h: Photo Count derives from what was actually uploaded above, not from
+    // the pre-upload count on item.additionalImages. Keeps Notion in sync with
+    // what eBay will actually see.
+    const photoCount = photoUrls?.length ?? 0
+    // D5g: Pipe-joined item specifics for the "Item Specifics" rich_text column.
+    const itemSpecificsRaw = listing?.itemSpecifics
+      ? Object.entries(listing.itemSpecifics)
+          .filter(([, v]) => v && v !== 'null' && v !== 'N/A')
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(' | ')
+      : undefined
     const result = await notionService.pushListing({
       // Core
       title: listing?.title || item.productName || 'Unknown Item',
@@ -1143,7 +1149,7 @@ function App() {
       itemId: item.id,
       timestamp: item.timestamp,
       location: item.location?.name,
-      notes: combinedNotes || undefined,
+      notes: marketNotes,
       // Session + operator traceability
       sessionId: linkedSession?.name,
       sessionNumber: linkedSession?.sessionNumber,
@@ -1153,13 +1159,20 @@ function App() {
       // GROUP 1 — Core Identity
       seoTitle: listing?.title?.slice(0, 80),
       subtitle: listing?.subtitle?.slice(0, 55),
-      brand: listing?.itemSpecifics?.['Brand'] || (item.lensAnalysis?.bestMatch?.title?.split(/\s+/)[0]),
+      // D5e: Brand fallback — prefer itemSpecifics, then a conservative
+      // leading-capitalized-word regex on productName (captures Andis, Wahl,
+      // Norelco, etc.), then fall back to lens best-match first token.
+      brand: listing?.itemSpecifics?.['Brand']
+        || item.productName?.match(/^([A-Z][a-zA-Z&]{1,19})(?:\s|$)/)?.[1]
+        || (item.lensAnalysis?.bestMatch?.title?.split(/\s+/)[0])
+        || undefined,
       modelSku: [listing?.itemSpecifics?.['Model'] || listing?.itemSpecifics?.['Style'], sku].filter(Boolean).join(' | ') || undefined,
       upcEanGtin: item.upcEan || item.lensResults?.[0]?.snippet?.match(/\b(\d{12}|\d{13}|\d{8})\b/)?.[1],
       ebayCategoryId: listing?.ebayCategoryId,
       // GROUP 2 — Item Specifics
       color: listing?.itemSpecifics?.['Color'],
       material: listing?.itemSpecifics?.['Material'],
+      itemSpecificsRaw,
       dimensions: listing?.itemSpecifics?.['Dimensions'],
       packageWeightLbs: listing?.weightOz ? +(listing.weightOz / 16).toFixed(2) : undefined,
       // GROUP 3 — Market Data
@@ -1168,7 +1181,7 @@ function App() {
       ebayLow: item.marketData?.ebayPriceRange?.min,
       autoAcceptPrice: listing?.autoAcceptPrice,
       aiConfidence: item.lensResults?.length ? 'High' : 'Medium',
-      marketNotes: combinedNotes || undefined,
+      marketNotes,
       photoCount,
       // PKT-20260414-001: 12 new columns
       conditionDescription: listing?.conditionDescription,

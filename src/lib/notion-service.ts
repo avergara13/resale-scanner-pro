@@ -305,21 +305,10 @@ export class NotionService {
     if (typeof listing.sessionNumber === 'number') sessionProperties['Session #'] = { number: listing.sessionNumber }
     if (listing.sessionId)            sessionProperties['Session ID']     = rt(listing.sessionId)
 
-    // Description block in page body
-    const children = [
-      {
-        object: 'block',
-        type: 'heading_2',
-        heading_2: { rich_text: [{ text: { content: 'Item Description' } }] }
-      },
-      {
-        object: 'block',
-        type: 'paragraph',
-        paragraph: {
-          rich_text: [{ text: { content: (listing.description || 'No description available').slice(0, 2000) } }]
-        }
-      }
-    ]
+    // D5i: Page body block removed. 'Item Description' rich_text property is
+    // the canonical location for the description; duplicating it into page
+    // body heading_2 + paragraph blocks created visual noise in the Notion UI
+    // and doubled the storage for no downstream consumer.
 
     const attemptPush = async (properties: Record<string, unknown>) => {
       // Route through backend proxy — browser can't call api.notion.com directly (CORS)
@@ -331,7 +320,6 @@ export class NotionService {
         body: JSON.stringify({
           parent: { database_id: this.databaseId },
           properties,
-          children,
         })
       }, {
         maxRetries: 2,

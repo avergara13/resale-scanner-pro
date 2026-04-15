@@ -189,7 +189,7 @@ Provide your response as a JSON object with the following structure:
   "productName": "Concise, searchable product name (max 80 chars)",
   "description": "Detailed description noting condition, materials, features (max 500 chars)",
   "category": "Primary eBay category (e.g., 'Clothing & Accessories', 'Electronics', 'Collectibles')",
-  "condition": "Condition assessment (New, Like New, Excellent, Good, Fair, Poor)",
+  "condition": "Condition. Return EXACTLY ONE of: 'New – Sealed', 'New – Open Box', 'Used – Like New', 'Used – Very Good', 'Used – Good', 'Used – Acceptable', 'For Parts / Repair'. RULE: Item in original sealed packaging → 'New – Sealed'. Original packaging opened, item unused → 'New – Open Box'. Visible wear/scratches/stains/prior-use → use Used grades based on severity. Broken/missing components → 'For Parts / Repair'.",
   "brand": "Brand name if identifiable, otherwise null",
   "model": "Model number/name if applicable, otherwise null",
   "keyFeatures": ["List of 3-5 notable features or selling points"],
