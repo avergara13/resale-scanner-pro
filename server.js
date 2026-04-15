@@ -68,6 +68,11 @@ const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
 ].join(' ')
 const EBAY_MERCHANT_LOCATION_KEY = 'hobbyst-orlando'
+// Fixed UUID for the ebay_tokens singleton row. The table always holds exactly
+// one row; using a known ID lets us UPSERT (Prefer: resolution=merge-duplicates)
+// instead of DELETE+INSERT, which avoids PostgREST's UUID-parse error on
+// ?id=neq.null (PostgREST treats the string "null" as a literal UUID value).
+const EBAY_TOKENS_SINGLETON_ID = '00000000-0000-0000-0000-000000000001'
 
 const DEFAULT_SHIP_FROM_ZIP = '32806'
 const VALID_SHIPPING_STATUSES = new Set(['🔴 Need Label', '🟡 Label Ready', '📦 Packed', '✅ Shipped'])
@@ -218,8 +223,10 @@ async function getValidEbayToken() {
   if (!ebayAppId || !ebayCertId) {
     throw new Error('EBAY_CREDENTIALS_MISSING')
   }
+  // Fetch the singleton row by its known fixed ID — no ambiguity if stale
+  // rows from earlier debugging are ever left behind.
   const rows = await fetchJson(
-    `${supabaseUrl}/rest/v1/ebay_tokens?select=*&limit=1`,
+    `${supabaseUrl}/rest/v1/ebay_tokens?select=*&id=eq.${EBAY_TOKENS_SINGLETON_ID}`,
     { headers: supabaseServiceHeaders() }
   )
   const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null
@@ -249,16 +256,19 @@ async function getValidEbayToken() {
     },
     body: refreshBody,
   })
-  // PATCH the existing row in place — refresh_token rotates only on full re-auth.
-  const patchResp = await fetch(`${supabaseUrl}/rest/v1/ebay_tokens?id=eq.${row.id}`, {
-    method: 'PATCH',
-    headers: { ...supabaseServiceHeaders(), Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      access_token: tokenData.access_token,
-      expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-    }),
-  })
+  // PATCH the singleton row in place — refresh_token rotates only on full re-auth.
+  const patchResp = await fetch(
+    `${supabaseUrl}/rest/v1/ebay_tokens?id=eq.${EBAY_TOKENS_SINGLETON_ID}`,
+    {
+      method: 'PATCH',
+      headers: { ...supabaseServiceHeaders(), Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        access_token: tokenData.access_token,
+        expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  )
   await assertSupabaseOk(patchResp, 'PATCH ebay_tokens (refresh)')
   return tokenData.access_token
 }
@@ -908,17 +918,13 @@ const server = http.createServer(async (req, res) => {
         ebayUserId: tokenData.ebay_user_id || 'not-in-token',
       })
 
-      // Single-row token store: clear all existing rows, then insert fresh.
-      // ?id=neq.null is the PostgREST idiom for "match every row" — required
-      // because Supabase REST refuses an unfiltered DELETE.
-      const deleteResp = await fetch(`${supabaseUrl}/rest/v1/ebay_tokens?id=neq.null`, {
-        method: 'DELETE',
-        headers: supabaseServiceHeaders(),
-      })
-      // DIAG-3: DELETE result
-      console.log('[oauth-cb] DELETE result', { status: deleteResp.status, ok: deleteResp.ok })
-      await assertSupabaseOk(deleteResp, 'DELETE ebay_tokens')
-      const insertPayload = {
+      // Singleton UPSERT: the ebay_tokens table is designed to hold exactly
+      // one row. Using a fixed ID + Prefer:resolution=merge-duplicates makes
+      // this atomic and race-free — no DELETE+INSERT window where the row
+      // doesn't exist. Previous DELETE-then-INSERT approach failed because
+      // PostgREST's ?id=neq.null treated the string "null" as a literal UUID.
+      const upsertPayload = {
+        id: EBAY_TOKENS_SINGLETON_ID,
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         token_type: tokenData.token_type || 'User',
@@ -927,19 +933,26 @@ const server = http.createServer(async (req, res) => {
           ? new Date(Date.now() + tokenData.refresh_token_expires_in * 1000).toISOString()
           : null,
         scope: tokenData.scope || EBAY_OAUTH_SCOPES,
+        updated_at: new Date().toISOString(),
       }
-      const insertResp = await fetch(`${supabaseUrl}/rest/v1/ebay_tokens`, {
-        method: 'POST',
-        headers: { ...supabaseServiceHeaders(), Prefer: 'return=minimal' },
-        body: JSON.stringify(insertPayload),
-      })
-      // DIAG-4: INSERT result
-      console.log('[oauth-cb] INSERT result', { status: insertResp.status, ok: insertResp.ok })
-      if (!insertResp.ok) {
-        const errBody = await insertResp.text().catch(() => '')
-        console.error('[oauth-cb] INSERT error body:', errBody)
+      const upsertResp = await fetch(
+        `${supabaseUrl}/rest/v1/ebay_tokens?on_conflict=id`,
+        {
+          method: 'POST',
+          headers: {
+            ...supabaseServiceHeaders(),
+            Prefer: 'resolution=merge-duplicates, return=minimal',
+          },
+          body: JSON.stringify(upsertPayload),
+        }
+      )
+      // DIAG-3: UPSERT result (replaced old DIAG-3/4 DELETE+INSERT pair)
+      console.log('[oauth-cb] UPSERT result', { status: upsertResp.status, ok: upsertResp.ok })
+      if (!upsertResp.ok) {
+        const errBody = await upsertResp.text().catch(() => '')
+        console.error('[oauth-cb] UPSERT error body:', errBody)
       }
-      await assertSupabaseOk(insertResp, 'INSERT ebay_tokens')
+      await assertSupabaseOk(upsertResp, 'UPSERT ebay_tokens')
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       res.end(
