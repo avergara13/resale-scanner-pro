@@ -1639,10 +1639,13 @@ function App() {
     // Extract full photos BEFORE clearing currentItem so Photo Manager can display them.
     // currentItem is NOT cleared here — Back button from Photo Manager restores scan result.
     // The queue add + optimization run in handlePhotoManagerDone after the user taps Done.
+    // existingUrls: use photoUrls if item was previously saved (e.g. reopened from scans).
+    // localPhotos: base64 from this capture session (stripped on first save, so may be empty on reopen).
+    const _pmExistingUrls = currentItem!.photoUrls || []
     const _pmLocalPhotos = [currentItem!.imageData, ...(currentItem!.additionalImageData || [])].filter(Boolean) as string[]
     setPendingPhotoDecision({
       item: listingItem,
-      existingUrls: [],              // fresh scan — no previously-uploaded URLs
+      existingUrls: _pmExistingUrls,
       localPhotos: _pmLocalPhotos,
       decision: 'BUY',
     })
@@ -1714,10 +1717,13 @@ function App() {
     // ── Photo Manager intercept ───────────────────────────────────────────────
     // Extract full photos BEFORE clearing currentItem — Photo Manager needs them for display.
     // currentItem is NOT cleared here — Back button from Photo Manager restores scan result.
+    // existingUrls: use photoUrls if item was previously saved (e.g. reopened from scans).
+    // localPhotos: base64 from this capture session (stripped on first save, so may be empty on reopen).
+    const _pmExistingUrlsMaybe = currentItem!.photoUrls || []
     const _pmLocalPhotos = [currentItem!.imageData, ...(currentItem!.additionalImageData || [])].filter(Boolean) as string[]
     setPendingPhotoDecision({
       item: maybeItem,
-      existingUrls: [],
+      existingUrls: _pmExistingUrlsMaybe,
       localPhotos: _pmLocalPhotos,
       decision: 'MAYBE',
     })
