@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { ArrowLeft, Star, X, Image, ArrowsClockwise } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -31,6 +31,13 @@ export interface PhotoManagerProps {
    *  Called with (orderedSlots, primaryIndex) where orderedSlots preserves type info. */
   onDone: (existingUrls: string[], localPhotos: string[], primaryIndex: number) => Promise<void>
   onBack: () => void
+  /** Called when user taps "Use Listing Camera". App opens the camera overlay and calls
+   *  onCapturedPhotoConsumed after passing the result back via capturedPhoto. */
+  onAddViaCamera?: (currentPrimaryIndex: number) => void
+  /** Image data-URL captured from the listing camera. Photo Manager appends it to slots
+   *  then calls onCapturedPhotoConsumed to clear the prop. */
+  capturedPhoto?: string
+  onCapturedPhotoConsumed?: () => void
 }
 
 const MAX_PHOTOS = 24
@@ -46,6 +53,9 @@ export function PhotoManager({
   mode,
   onDone,
   onBack,
+  onAddViaCamera,
+  capturedPhoto,
+  onCapturedPhotoConsumed,
 }: PhotoManagerProps) {
   // Merge into unified ordered list — existing first, then new local captures
   const [slots, setSlots] = useState<PhotoSlot[]>(() => [
@@ -63,6 +73,16 @@ export function PhotoManager({
   // Drag-reorder state
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+  // Consume capturedPhoto from listing camera overlay — append to slots then clear
+  useEffect(() => {
+    if (!capturedPhoto) return
+    setSlots(prev => {
+      if (prev.length >= MAX_PHOTOS) return prev
+      return [...prev, { type: 'local', data: capturedPhoto }]
+    })
+    onCapturedPhotoConsumed?.()
+  }, [capturedPhoto, onCapturedPhotoConsumed])
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -342,15 +362,18 @@ export function PhotoManager({
             Choose from Library
           </button>
 
-          {/* Use Listing Camera — disabled this sprint, camera round-trip state needs separate wiring */}
           <button
-            disabled
-            title="Coming soon — use Choose from Library"
-            className="w-full h-12 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-s2/40 text-s2 text-sm font-bold cursor-not-allowed select-none"
+            onClick={() => onAddViaCamera?.(primaryIndex)}
+            disabled={slots.length >= MAX_PHOTOS || !onAddViaCamera}
+            className={cn(
+              'w-full h-12 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed text-sm font-bold transition-all active:scale-98',
+              slots.length >= MAX_PHOTOS || !onAddViaCamera
+                ? 'border-s2/40 text-t3/50 cursor-not-allowed'
+                : 'border-b1/40 text-b1 hover:bg-b1/5 hover:border-b1'
+            )}
           >
             <Image size={18} weight="regular" />
             Use Listing Camera
-            <span className="text-[10px] font-normal text-t3/60 ml-1">(coming soon)</span>
           </button>
 
           {/* Retake scan photo — only shown when there are existing photos */}
