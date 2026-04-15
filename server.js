@@ -825,14 +825,25 @@ const server = http.createServer(async (req, res) => {
   // (DELETE + INSERT — single-row table, never upsert), returns a confirmation page.
   if (requestUrl.pathname === '/api/ebay/oauth-callback' && req.method === 'GET') {
     try {
+      const code = requestUrl.searchParams.get('code')
+      const state = requestUrl.searchParams.get('state')
+      const ebayError = requestUrl.searchParams.get('error')
+      // DIAG-1: confirm route is reached and basic env state
+      console.log('[oauth-cb] route hit', {
+        hasCode: !!code,
+        hasState: !!state,
+        hasEbayError: !!ebayError,
+        ebayAppId: ebayAppId ? `${ebayAppId.slice(0, 8)}…` : 'MISSING',
+        ebayCertId: ebayCertId ? '✅ set' : '❌ MISSING',
+        supabaseUrl: supabaseUrl ? `${supabaseUrl.slice(0, 32)}…` : 'MISSING',
+        supabaseServiceKey: supabaseServiceKey ? '✅ set' : '❌ MISSING',
+        sandbox: ebaySandbox,
+      })
       if (!ebayAppId || !ebayCertId || !ebayRedirectUri) {
         res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8' })
         res.end('<h1>503 — eBay OAuth credentials not configured on the server.</h1>')
         return
       }
-      const code = requestUrl.searchParams.get('code')
-      const state = requestUrl.searchParams.get('state')
-      const ebayError = requestUrl.searchParams.get('error')
       if (ebayError) {
         const desc = requestUrl.searchParams.get('error_description') || ''
         res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' })
@@ -867,6 +878,15 @@ const server = http.createServer(async (req, res) => {
         },
         body: exchangeBody,
       })
+      // DIAG-2: confirm token exchange response shape
+      console.log('[oauth-cb] token received', {
+        tokenType: tokenData.token_type,
+        expiresIn: tokenData.expires_in,
+        hasAccessToken: !!tokenData.access_token,
+        hasRefreshToken: !!tokenData.refresh_token,
+        refreshExpiresIn: tokenData.refresh_token_expires_in,
+        ebayUserId: tokenData.ebay_user_id || 'not-in-token',
+      })
 
       // Single-row token store: clear all existing rows, then insert fresh.
       // ?id=neq.null is the PostgREST idiom for "match every row" — required
@@ -875,21 +895,30 @@ const server = http.createServer(async (req, res) => {
         method: 'DELETE',
         headers: supabaseServiceHeaders(),
       })
+      // DIAG-3: DELETE result
+      console.log('[oauth-cb] DELETE result', { status: deleteResp.status, ok: deleteResp.ok })
       await assertSupabaseOk(deleteResp, 'DELETE ebay_tokens')
+      const insertPayload = {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        token_type: tokenData.token_type || 'User',
+        expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+        refresh_expires_at: tokenData.refresh_token_expires_in
+          ? new Date(Date.now() + tokenData.refresh_token_expires_in * 1000).toISOString()
+          : null,
+        scope: tokenData.scope || EBAY_OAUTH_SCOPES,
+      }
       const insertResp = await fetch(`${supabaseUrl}/rest/v1/ebay_tokens`, {
         method: 'POST',
         headers: { ...supabaseServiceHeaders(), Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          token_type: tokenData.token_type || 'User',
-          expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-          refresh_expires_at: tokenData.refresh_token_expires_in
-            ? new Date(Date.now() + tokenData.refresh_token_expires_in * 1000).toISOString()
-            : null,
-          scope: tokenData.scope || EBAY_OAUTH_SCOPES,
-        }),
+        body: JSON.stringify(insertPayload),
       })
+      // DIAG-4: INSERT result
+      console.log('[oauth-cb] INSERT result', { status: insertResp.status, ok: insertResp.ok })
+      if (!insertResp.ok) {
+        const errBody = await insertResp.text().catch(() => '')
+        console.error('[oauth-cb] INSERT error body:', errBody)
+      }
       await assertSupabaseOk(insertResp, 'INSERT ebay_tokens')
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
