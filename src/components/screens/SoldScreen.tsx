@@ -376,6 +376,10 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
               platform: item.platform,
             })
 
+            const ebayOrderUrl = item.orderNumber
+              ? `https://www.ebay.com/sh/ord/details?orderid=${encodeURIComponent(item.orderNumber)}`
+              : 'https://www.ebay.com/sh/ord/?status=AWAITING_SHIPMENT'
+
             const netIncome = item.netIncome ?? ((item.salePrice || 0) - (item.platformFee || 0))
 
             return (
@@ -507,6 +511,30 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                   </div>
                 ) : null}
 
+                {/* ── Buy Label quick-links — always visible until shipped ── */}
+                {draft.shippingStatus !== '✅ Shipped' && (
+                  <div className="flex gap-1.5 mt-2">
+                    <a
+                      href={ebayOrderUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1 h-8 rounded-xl border border-s2/60 text-[10px] font-bold text-t2 hover:text-t1 hover:border-b1/40 transition-colors"
+                    >
+                      <ArrowSquareOut size={10} />
+                      eBay Label
+                    </a>
+                    <a
+                      href={pirateShipUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1 h-8 rounded-xl border border-s2/60 text-[10px] font-bold text-t2 hover:text-t1 hover:border-b1/40 transition-colors"
+                    >
+                      <ArrowSquareOut size={10} />
+                      Pirate Ship
+                    </a>
+                  </div>
+                )}
+
                 {/* ── Row 4: Expand/Collapse details ───────────────── */}
                 <button
                   onClick={() => setExpandedItemId(isExpanded ? null : item.salePageId)}
@@ -556,6 +584,9 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                           <option key={option} value={option}>{option}</option>
                         ))}
                       </select>
+                      <p className="text-[8px] text-t3 leading-snug">
+                        eBay Label = bought via eBay Seller Hub · Pirate Ship = ship.pirateship.com
+                      </p>
                     </div>
 
                     {!item.isManualEntry && (
