@@ -21,6 +21,7 @@ import { ScanHistoryScreen } from './components/screens/ScanHistoryScreen'
 import { SoldScreen } from './components/screens/SoldScreen'
 import { SessionDetailScreen } from './components/screens/SessionDetailScreen'
 import { ListingDetailScreen } from './components/screens/ListingDetailScreen'
+import { PhotoManager } from './components/screens/PhotoManager'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
 import { retryOperation } from './lib/retry-service'
 import { getRetryOptions } from './lib/retry-config'
@@ -87,6 +88,17 @@ function App() {
   // Tracks whether the current scan-result was opened from the Agent Scans tab (Reopen)
   // vs a fresh camera scan. Used to show "← Scans" back label in the header.
   const [openedFromScans, setOpenedFromScans] = useState(false)
+
+  // Photo Manager state — set before navigating to 'photo-manager'; cleared on Done or Back.
+  // Correction 1: existingUrls are already-uploaded https:// URLs (pass through, no re-upload).
+  //               localPhotos are new base64/data-URLs captured this session (uploaded on Done).
+  const [pendingPhotoDecision, setPendingPhotoDecision] = useState<{
+    item: ScannedItem              // lightweight (imageData stripped), ready for queue/history
+    existingUrls: string[]         // already-uploaded Supabase URLs — pass through unchanged
+    localPhotos: string[]          // new base64/data-URLs — these get uploaded on Done
+    decision: 'BUY' | 'MAYBE' | 'edit'
+    returnScreen?: Screen          // for edit-mode Back navigation (Entry Points B & C)
+  } | null>(null)
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
   const [detailItemId, setDetailItemId] = useState<string | null>(null)
@@ -780,6 +792,7 @@ function App() {
       delete persistableItem.imageData
       delete persistableItem.imageOptimized
       delete persistableItem.additionalImageData  // strip full base64; keep additionalImages thumbnails
+      delete persistableItem.photos               // strip working base64 array; photoUrls (remote URLs) are kept
       setScanHistory(prev => {
         const existing = prev || []
         if (effectiveExistingItem) {
@@ -1089,6 +1102,10 @@ function App() {
           .filter(r => r.status === 'fulfilled' && r.value)
           .map(r => (r as PromiseFulfilledResult<string>).value)
         if (successfulUrls.length > 0) photoUrls = successfulUrls
+        const failedPhotoCount = photos.length - successfulUrls.length
+        if (failedPhotoCount > 0) {
+          toast.warning(`📷 ${failedPhotoCount} photo${failedPhotoCount > 1 ? 's' : ''} failed to upload — listing saved. You can retry from the listing card.`)
+        }
       }
     }
 
@@ -1344,7 +1361,7 @@ function App() {
       return
     }
 
-    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = currentItem!
     const draftItem: ScannedItem = {
       ...lightweight,
       purchasePrice: Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice,
@@ -1575,7 +1592,7 @@ function App() {
       toast.error('No image to save')
       return
     }
-    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = currentItem!
     // NaN means the field was left empty — fall back to the analyzed price
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     const effectiveSellPrice =
@@ -1618,40 +1635,19 @@ function App() {
       ...(draft?.platform && { preferredPlatform: draft.platform }),
       ...(effectiveSellPrice !== currentItem!.estimatedSellPrice && { estimatedSellPrice: effectiveSellPrice }),
     }
-    setQueue(prev => {
-      const current = prev || []
-      if (current.some(i => i.id === listingItem.id)) {
-        return current.map(i => i.id === listingItem.id ? listingItem : i)
-      }
-      return [...current, listingItem]
+    // ── Photo Manager intercept ───────────────────────────────────────────────
+    // Extract full photos BEFORE clearing currentItem so Photo Manager can display them.
+    // currentItem is NOT cleared here — Back button from Photo Manager restores scan result.
+    // The queue add + optimization run in handlePhotoManagerDone after the user taps Done.
+    const _pmLocalPhotos = [currentItem!.imageData, ...(currentItem!.additionalImageData || [])].filter(Boolean) as string[]
+    setPendingPhotoDecision({
+      item: listingItem,
+      existingUrls: [],              // fresh scan — no previously-uploaded URLs
+      localPhotos: _pmLocalPhotos,
+      decision: 'BUY',
     })
-    // Erase from scan history — item has moved to the listing queue
-    setScanHistory(prev => (prev || []).filter(i => i.id !== listingItem.id))
-    // Navigate to queue immediately — optimization runs in the background
-    setCurrentItem(undefined)
-    setPipeline([])
-    setScreen('queue')
-    // Optimize directly with listingItem — avoids stale queue closure read
-    // (handleOptimizeItem looks up the item from queue, which hasn't committed yet)
-    try {
-      const optimized = await listingOptimizationService.generateOptimizedListing({
-        item: listingItem,
-        marketData: listingItem.marketData,
-      })
-      const mergedTags = Array.from(new Set([
-        ...(listingItem.tags || []),
-        ...(optimized.suggestedTags || []),
-      ]))
-      setQueue(prev => (prev || []).map(i =>
-        i.id === listingItem.id
-          ? { ...i, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
-          : i
-      ))
-      logActivity('Added to queue — listing optimized')
-    } catch {
-      toast.error('Optimization failed — item saved, edit manually in Queue')
-    }
-  }, [currentItem, setQueue, listingOptimizationService, settings])
+    setScreen('photo-manager')
+  }, [currentItem, setPendingPhotoDecision, settings])
 
   const handlePassFromScan = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
@@ -1659,7 +1655,7 @@ function App() {
       return
     }
     // Strip heavy blobs — keep thumbnail for scan history display
-    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = currentItem!
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     // Recompute metrics if price changed — keeps stored profitMargin accurate
     let resolvedMargin = currentItem!.profitMargin
@@ -1702,7 +1698,7 @@ function App() {
       toast.error('No image to save')
       return
     }
-    const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = currentItem!
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     // MAYBE items live in the working queue AND scan-history.
     // Queue lets the user reopen/edit the card indefinitely.
@@ -1715,26 +1711,172 @@ function App() {
       inQueue: true,
       decision: 'MAYBE',
     }
-    // Add to working queue (upsert — safe if re-MAYBE'd)
-    setQueue(prev => {
-      const current = prev || []
-      if (current.some(i => i.id === maybeItem.id)) return current.map(i => i.id === maybeItem.id ? maybeItem : i)
-      return [...current, maybeItem]
+    // ── Photo Manager intercept ───────────────────────────────────────────────
+    // Extract full photos BEFORE clearing currentItem — Photo Manager needs them for display.
+    // currentItem is NOT cleared here — Back button from Photo Manager restores scan result.
+    const _pmLocalPhotos = [currentItem!.imageData, ...(currentItem!.additionalImageData || [])].filter(Boolean) as string[]
+    setPendingPhotoDecision({
+      item: maybeItem,
+      existingUrls: [],
+      localPhotos: _pmLocalPhotos,
+      decision: 'MAYBE',
     })
-    // Keep in scan-history as permanent session record
-    setScanHistory(prev => {
-      const existing = prev || []
-      const idx = existing.findIndex(i => i.id === maybeItem.id)
-      if (idx !== -1) return existing.map((i, j) => j === idx ? maybeItem : i)
-      return [maybeItem, ...existing.slice(0, 499)]
-    })
+    setScreen('photo-manager')
+  }, [currentItem, setPendingPhotoDecision, setScreen])
+
+  // ── Photo Manager: Done ───────────────────────────────────────────────────────
+  // Called by PhotoManager when the user taps Done.
+  // Correction 1: existingUrls pass through unchanged; only localPhotos get uploaded.
+  // Correction 2: dependency array is fully explicit (no `...` placeholder).
+  const handlePhotoManagerDone = useCallback(async (
+    existingUrls: string[],
+    localPhotos: string[],
+    primaryIndex: number,
+  ) => {
+    if (!pendingPhotoDecision) return
+    const { item, decision, returnScreen } = pendingPhotoDecision
+
+    // Upload new local photos only — existing URLs are already on Supabase
+    let newlyUploadedUrls: string[] = []
+    if (supabaseService && localPhotos.length > 0) {
+      const sku = item.tags?.find(t => t.startsWith('HRBO-'))
+      if (sku) {
+        const startIndex = existingUrls.length  // offset filenames past existing photos
+        const results = await Promise.allSettled(
+          localPhotos.map((photo, i) =>
+            supabaseService.uploadPhoto(photo, sku, `${sku}-0${startIndex + i + 1}.jpg`)
+          )
+        )
+        newlyUploadedUrls = results
+          .filter(r => r.status === 'fulfilled' && r.value)
+          .map(r => (r as PromiseFulfilledResult<string>).value)
+        const failedCount = localPhotos.length - newlyUploadedUrls.length
+        if (failedCount > 0) {
+          toast.warning(`📷 ${failedCount} photo${failedCount > 1 ? 's' : ''} failed to upload — item saved.`)
+        }
+      }
+    }
+
+    const finalPhotoUrls = [...existingUrls, ...newlyUploadedUrls]
+    const finalItem: ScannedItem = {
+      ...item,
+      primaryPhotoIndex: primaryIndex,
+      ...(finalPhotoUrls.length > 0 && { photoUrls: finalPhotoUrls }),
+    }
+
+    // Clear pending state + currentItem (now safe since user confirmed Done)
+    setPendingPhotoDecision(null)
     setCurrentItem(undefined)
     setPipeline([])
+
+    if (decision === 'BUY') {
+      setQueue(prev => {
+        const current = prev || []
+        if (current.some(i => i.id === finalItem.id)) return current.map(i => i.id === finalItem.id ? finalItem : i)
+        return [...current, finalItem]
+      })
+      setScanHistory(prev => (prev || []).filter(i => i.id !== finalItem.id))
+      setScreen('queue')
+      logActivity('Added to queue — photos saved')
+      // Run optimization after navigating so user sees the queue immediately
+      if (listingOptimizationService) {
+        try {
+          const optimized = await listingOptimizationService.generateOptimizedListing({
+            item: finalItem,
+            marketData: finalItem.marketData,
+          })
+          const mergedTags = Array.from(new Set([
+            ...(finalItem.tags || []),
+            ...(optimized.suggestedTags || []),
+          ]))
+          setQueue(prev => (prev || []).map(i =>
+            i.id === finalItem.id
+              ? { ...i, tags: mergedTags, optimizedListing: { ...optimized, optimizedAt: Date.now() }, listingStatus: 'ready' }
+              : i
+          ))
+          logActivity('Listing optimized')
+        } catch {
+          toast.error('Optimization failed — item saved, edit manually in Queue')
+        }
+      }
+    } else if (decision === 'MAYBE') {
+      setQueue(prev => {
+        const current = prev || []
+        if (current.some(i => i.id === finalItem.id)) return current.map(i => i.id === finalItem.id ? finalItem : i)
+        return [...current, finalItem]
+      })
+      setScanHistory(prev => {
+        const existing = prev || []
+        const idx = existing.findIndex(i => i.id === finalItem.id)
+        if (idx !== -1) return existing.map((i, j) => j === idx ? finalItem : i)
+        return [finalItem, ...existing.slice(0, 499)]
+      })
+      setAgentActiveTab('scans')
+      setScreen('agent')
+      toast('Saved to Scan Queue — tap to continue researching')
+      logActivity('Saved for later research — added to queue')
+    } else {
+      // edit mode — item already in queue/history, just update with new photoUrls
+      setQueue(prev => (prev || []).map(i => i.id === finalItem.id ? { ...i, photoUrls: finalItem.photoUrls, primaryPhotoIndex: finalItem.primaryPhotoIndex } : i))
+      setScreen(returnScreen || 'queue')
+      toast('✅ Photos updated')
+    }
+  }, [
+    pendingPhotoDecision,
+    supabaseService,
+    listingOptimizationService,
+    setQueue,
+    setScanHistory,
+    setScreen,
+    setAgentActiveTab,
+    setPendingPhotoDecision,
+    setCurrentItem,
+    setPipeline,
+  ])
+
+  // ── Photo Manager: Back ───────────────────────────────────────────────────────
+  // Back from Photo Manager in BUY/MAYBE mode restores the scan result
+  // (currentItem is still set — we intentionally did not clear it on intercept).
+  // Back from edit mode returns to the originating screen.
+  const handlePhotoManagerBack = useCallback(() => {
+    const returnTo = pendingPhotoDecision?.returnScreen
+    setPendingPhotoDecision(null)
+    setScreen(returnTo || 'scan-result')
+  }, [pendingPhotoDecision, setPendingPhotoDecision, setScreen])
+
+  // ── Photo Manager: open from item (Entry Points B & C) ───────────────────────
+  const handleOpenPhotoManager = useCallback((item: ScannedItem, fromScreen: Screen) => {
+    // Edit mode: existing photoUrls are remote URLs (pass through); no local photos yet
+    setPendingPhotoDecision({
+      item,
+      existingUrls: item.photoUrls || (item.imageThumbnail ? [item.imageThumbnail] : []),
+      localPhotos: [],
+      decision: 'edit',
+      returnScreen: fromScreen,
+    })
+    setScreen('photo-manager')
+  }, [setPendingPhotoDecision, setScreen])
+
+  // ── PASS Restore ──────────────────────────────────────────────────────────────
+  const handleRestorePassItem = useCallback((item: ScannedItem) => {
+    // 1. Update scanHistoryKV: PASS → MAYBE
+    setScanHistory(prev => (prev || []).map(i =>
+      i.id === item.id ? { ...i, decision: 'MAYBE' as const, inQueue: true } : i
+    ))
+    // 2. Re-add to working queue with full saved state
+    const restoredItem: ScannedItem = { ...item, decision: 'MAYBE', inQueue: true }
+    setQueue(prev => {
+      const current = prev || []
+      if (current.some(i => i.id === restoredItem.id)) return current.map(i => i.id === restoredItem.id ? restoredItem : i)
+      return [...current, restoredItem]
+    })
+    // 3. Navigate to agent/scans tab
     setAgentActiveTab('scans')
     setScreen('agent')
-    toast('Saved to Scan Queue — tap to continue researching')
-    logActivity('Saved for later research — added to queue')
-  }, [currentItem, setQueue, setScanHistory, setScreen, setAgentActiveTab])
+    // 4. Toast
+    toast('Item restored to scan pile as MAYBE')
+    logActivity(`${item.productName || 'Item'} restored from PASS → MAYBE`)
+  }, [setScanHistory, setQueue, setAgentActiveTab, setScreen])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, barcodeProduct?: BarcodeProduct, condition?: string) => {
     const optimized = await optimizeAndCache(imageData)
@@ -2582,6 +2724,7 @@ function App() {
                 onReanalyze={handleReanalyzeItem}
                 onOpenDetail={(item) => setDetailItemId(item.id)}
                 onPushToNotion={handlePushToNotion}
+                onEditPhotos={(item) => handleOpenPhotoManager(item, 'queue')}
               />
             </motion.div>
           )}
@@ -2750,6 +2893,35 @@ function App() {
                 onOpenChat={() => setScreen('agent')}
                 onNavigateTo={(s) => { secondaryReturnScreen.current = screen; setScreen(s) }}
                 currentOperatorId={settings?.userProfile?.operatorId}
+                onRestoreItem={handleRestorePassItem}
+                onOpenPhotoManager={(item) => handleOpenPhotoManager(item, 'session-detail')}
+              />
+            </motion.div>
+          )}
+          {screen === 'photo-manager' && pendingPhotoDecision && (
+            <motion.div
+              key="photo-manager"
+              custom={slideDir.current}
+              variants={screenVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+              style={{ willChange: 'opacity, transform' }}
+              className="absolute inset-0"
+            >
+              <PhotoManager
+                initialExistingUrls={pendingPhotoDecision.existingUrls}
+                initialLocalPhotos={pendingPhotoDecision.localPhotos}
+                initialPrimaryIndex={pendingPhotoDecision.item.primaryPhotoIndex ?? 0}
+                itemName={pendingPhotoDecision.item.productName}
+                sku={pendingPhotoDecision.item.tags?.find(t => t.startsWith('HRBO-'))}
+                mode={
+                  pendingPhotoDecision.decision === 'BUY' ? 'buy' :
+                  pendingPhotoDecision.decision === 'MAYBE' ? 'maybe' : 'edit'
+                }
+                onDone={handlePhotoManagerDone}
+                onBack={handlePhotoManagerBack}
               />
             </motion.div>
           )}

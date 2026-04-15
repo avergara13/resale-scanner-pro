@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CheckCircle, XCircle, TrendUp, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, TrendUp, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise, Camera } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -37,9 +37,13 @@ interface SessionDetailScreenProps {
   onNavigateTo?: (screen: Screen) => void
   /** Current device operator — used for ownership guards on End/Delete/Reopen */
   currentOperatorId?: string
+  /** Restore a PASS item: changes decision to MAYBE and re-adds to scan pile. */
+  onRestoreItem?: (item: ScannedItem) => void
+  /** Open Photo Manager for any item (Entry Point C). */
+  onOpenPhotoManager?: (item: ScannedItem) => void
 }
 
-export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo, currentOperatorId }: SessionDetailScreenProps) {
+export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo, currentOperatorId, onRestoreItem, onOpenPhotoManager }: SessionDetailScreenProps) {
   const [allSessionsFallback, setAllSessionsFallback] = useKV<Session[]>('all-sessions', [])
   const allSessions = allSessionsProp ?? allSessionsFallback
   const setAllSessions = onUpdateSessions ?? setAllSessionsFallback
@@ -494,14 +498,17 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 {filteredItems.map(item => (
                   <div
                     key={item.id}
-                    onClick={() => onOpenItem?.(item)}
-                    className={cn(
-                      'flex items-center justify-between py-2 px-3 rounded-lg border border-s2/40 transition-colors',
-                      onOpenItem && 'cursor-pointer hover:border-b1/30 hover:bg-b1/5 active:bg-b1/10'
-                    )}
+                    className="flex items-center justify-between py-2 px-3 rounded-lg border border-s2/40"
                     style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}
                   >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {/* Left: badge + name (tappable to open) */}
+                    <div
+                      className={cn(
+                        'flex items-center gap-2 min-w-0 flex-1',
+                        onOpenItem && 'cursor-pointer active:opacity-70'
+                      )}
+                      onClick={() => onOpenItem?.(item)}
+                    >
                       <Badge
                         variant="secondary"
                         className={cn(
@@ -515,15 +522,40 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                       </Badge>
                       <span className="text-xs text-t1 truncate font-medium">{item.productName || 'Unknown'}</span>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                      <span className="text-[10px] font-mono text-t3">${item.purchasePrice.toFixed(2)}</span>
-                      {item.estimatedSellPrice != null && (
-                        <>
-                          <TrendUp size={10} className="text-t3" />
-                          <span className="text-[10px] font-mono text-green">${item.estimatedSellPrice.toFixed(2)}</span>
-                        </>
+                    {/* Right: price + action buttons */}
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                      <span className="text-[10px] font-mono text-t3 mr-1">${item.purchasePrice.toFixed(2)}</span>
+                      {/* Photos button — all rows */}
+                      {onOpenPhotoManager && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onOpenPhotoManager(item) }}
+                          className="w-7 h-7 flex items-center justify-center rounded-md text-t3 hover:text-b1 hover:bg-b1/10 active:scale-90 transition-all"
+                          aria-label="Manage photos"
+                        >
+                          <Camera size={13} weight="bold" />
+                        </button>
                       )}
-                      {onOpenItem && <CaretRight size={10} className="text-t3 flex-shrink-0 ml-1" />}
+                      {/* Restore — PASS rows only */}
+                      {item.decision === 'PASS' && onRestoreItem && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onRestoreItem(item) }}
+                          className="h-7 flex items-center gap-1 px-2 rounded-md text-amber hover:bg-amber/10 active:scale-95 transition-all text-[10px] font-bold"
+                          aria-label="Restore to scan pile"
+                        >
+                          <ArrowCounterClockwise size={11} weight="bold" />
+                          Restore
+                        </button>
+                      )}
+                      {/* Open arrow */}
+                      {onOpenItem && (
+                        <button
+                          onClick={() => onOpenItem(item)}
+                          className="w-7 h-7 flex items-center justify-center rounded-md text-t3 hover:text-t1 active:scale-90 transition-all"
+                          aria-label="Open item details"
+                        >
+                          <CaretRight size={10} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -1,4 +1,4 @@
-export type Screen = 'session' | 'session-detail' | 'agent' | 'scan-result' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history'
+export type Screen = 'session' | 'session-detail' | 'agent' | 'scan-result' | 'queue' | 'sold' | 'settings' | 'tag-analytics' | 'location-insights' | 'cost-tracking' | 'scan-history' | 'photo-manager'
 
 export type SoldShippingStatus = '🔴 Need Label' | '🟡 Label Ready' | '📦 Packed' | '✅ Shipped'
 
@@ -169,6 +169,9 @@ export interface ScannedItem {
   imageOptimized?: string
   additionalImages?: string[]       // thumbnails for photos 2–5; persisted with item
   additionalImageData?: string[]    // full base64 for photos 2–5; in-memory only (stripped on KV save)
+  photos?: string[]                 // ordered base64/data-URL array managed by Photo Manager; stripped on KV save
+  primaryPhotoIndex?: number        // index of eBay hero photo in photos[]; default 0
+  photoUrls?: string[]              // Supabase Storage public URLs (persisted in KV)
   purchasePrice: number
   productName?: string
   description?: string
