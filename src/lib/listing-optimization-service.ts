@@ -1,5 +1,8 @@
-import type { ScannedItem, MarketData, ResalePlatform, PlatformListing, OptimizedListing as AppOptimizedListing } from '@/types'
+import type { ScannedItem, MarketData, ResalePlatform, PlatformListing, OptimizedListing } from '@/types'
 import { callLLM } from './llm-service'
+import { getCategoryInfo } from './ebay-category-table'
+import { calculateProfitFallback } from './ebay-service'
+import type { GeminiVisionResponse } from './gemini-service'
 
 /**
  * Sanitize a user-supplied string before interpolating it into an LLM prompt.
@@ -39,19 +42,8 @@ function validateOptimizedListingShape(raw: unknown): raw is Record<string, unkn
   return typeof obj.title === 'string' && typeof obj.description === 'string'
 }
 
-export interface OptimizedListing {
-  title: string
-  description: string
-  category: string
-  condition: string
-  price: number
-  shippingCost: number
-  itemSpecifics: Record<string, string>
-  keywords: string[]
-  suggestedTags: string[]
-  seoScore: number
-  recommendations: string[]
-}
+// OptimizedListing is the canonical type from @/types — re-exported here for back-compat
+export type { OptimizedListing } from '@/types'
 
 export interface ListingOptimizationContext {
   item: ScannedItem
@@ -63,6 +55,8 @@ export interface ListingOptimizationContext {
     model?: string
     year?: string
   }
+  /** Gemini vision result — used for weight estimate and UPC when available */
+  visionResult?: GeminiVisionResponse
 }
 
 export class ListingOptimizationService {
@@ -121,18 +115,66 @@ export class ListingOptimizationService {
         ? (p.itemSpecifics as Record<string, string>)
         : {}
 
+      const resolvedCategory = (typeof p.category === 'string' && p.category) || context.item.category || 'Other'
+      const categoryInfo = getCategoryInfo(resolvedCategory)
+      const weightOz = context.visionResult?.estimatedWeightOz || categoryInfo.defaultWeightOz
+      // USPS Ground Advantage / Priority Mail tier estimates
+      const estShippingLabelCost = weightOz <= 15.99 ? 4.19 : weightOz <= 32 ? 7.90 : 12.40
+      const ebayFvfRate = categoryInfo.fvfRate
+
+      // PKT-004 Correction 1 — pass dollar amount directly, not a % of price
+      const metrics = calculateProfitFallback(
+        context.item.purchasePrice,
+        price,
+        estShippingLabelCost,   // dollar amount
+        ebayFvfRate
+      )
+      // Compute break-even and gross profit (not included in calculateProfitFallback return)
+      const _combinedFeeRate = (ebayFvfRate + 3.0) / 100
+      const breakEvenPrice = +((context.item.purchasePrice + estShippingLabelCost + 0.75 + 0.30) / (1 - _combinedFeeRate)).toFixed(2)
+      const grossProfitEst = +(price - context.item.purchasePrice - estShippingLabelCost - 0.75).toFixed(2)
+
+      // Coerce new LLM fields with safe fallbacks
+      const subtitle = typeof p.subtitle === 'string' ? p.subtitle.slice(0, 55) : undefined
+      const conditionDescription = typeof p.conditionDescription === 'string' ? p.conditionDescription.slice(0, 1000) : undefined
+      const department = typeof p.department === 'string' ? p.department : undefined
+      const size = typeof p.size === 'string' ? p.size : undefined
+      const seoKeywords = [...keywords]
+
       return {
         title,
         description,
-        category: (typeof p.category === 'string' && p.category) || context.item.category || 'Other',
+        category: resolvedCategory,
         condition: (typeof p.condition === 'string' && p.condition) || 'Good',
         price,
         shippingCost,
         itemSpecifics,
         keywords,
+        seoKeywords,
         suggestedTags,
         seoScore: this.calculateSEOScore(title, description, keywords),
         recommendations,
+        optimizedAt: Date.now(),
+        // ── eBay enrichment fields (PKT-20260414-001) ───────────────────────
+        subtitle,
+        subtitleCostFlag: !!subtitle,
+        conditionDescription,
+        department,
+        size: size || (typeof p.itemSpecifics === 'object' && p.itemSpecifics ? (p.itemSpecifics as Record<string, string>)['Size'] : undefined),
+        listingFormat: 'Fixed Price',
+        listingDuration: 'GTC',
+        bestOfferEnabled: true,
+        autoAcceptPrice: +(price * 0.88).toFixed(2),
+        autoDeclinePrice: +(price * 0.73).toFixed(2),
+        weightOz,
+        ebayCategoryId: categoryInfo.ebayCategoryId,
+        shippingService: categoryInfo.shippingService,
+        estShippingLabelCost,
+        ebayFvfRate,
+        breakEvenPrice,
+        grossProfitEst,
+        roiPctEst: +metrics.roi.toFixed(1),
+        netPayoutEst: +metrics.netProfit.toFixed(2),
       }
     } catch (error) {
       console.error('Failed to generate optimized listing:', error)
@@ -269,9 +311,14 @@ SEO KEYWORDS:
 Return a JSON object with this exact structure:
 {
   "title": "Optimized 80-char eBay title with | separators",
-  "description": "Full multi-paragraph formatted description with bullets",
+  "subtitle": "Keyword-rich eBay subtitle max 55 chars — different words from title",
+  "description": "Full multi-paragraph formatted description with bullets (800–2000 chars)",
+  "conditionDescription": "Honest 1000-char max description of specific flaws, wear, or 'No visible flaws noted' if clean",
   "category": "eBay category name",
   "condition": "Condition from list above",
+  "department": "Men | Women | Unisex | Boys | Girls | Youth | N/A",
+  "size": "Item size string if applicable (e.g. '10.5 US Men\\'s', 'L', '32x34'), null if not applicable",
+  "listingFormat": "Fixed Price",
   "price": 49.99,
   "shippingCost": 5.99,
   "itemSpecifics": {
@@ -336,13 +383,20 @@ Return a JSON object with this exact structure:
 
   private generateFallbackListing(context: ListingOptimizationContext): OptimizedListing {
     const { item } = context
+    const price = item.estimatedSellPrice || item.purchasePrice * 3
+    const categoryInfo = getCategoryInfo(item.category || 'Other')
+    const estShippingLabelCost = 7.90
+    const metrics = calculateProfitFallback(item.purchasePrice, price, estShippingLabelCost, categoryInfo.fvfRate)
+    const _fbrCombinedFeeRate = (categoryInfo.fvfRate + 3.0) / 100
+    const breakEvenPrice = +((item.purchasePrice + estShippingLabelCost + 0.75 + 0.30) / (1 - _fbrCombinedFeeRate)).toFixed(2)
+    const grossProfitEst = +(price - item.purchasePrice - estShippingLabelCost - 0.75).toFixed(2)
 
     return {
       title: this.generateFallbackTitle(item),
       description: this.generateFallbackDescription(item),
       category: item.category || 'Other',
       condition: 'Good',
-      price: item.estimatedSellPrice || item.purchasePrice * 3,
+      price,
       shippingCost: 5.99,
       itemSpecifics: {},
       keywords: [],
@@ -352,7 +406,21 @@ Return a JSON object with this exact structure:
         'Configure AI API key in Settings for optimized listings',
         'Add more product details for better optimization',
         'Include high-quality photos from multiple angles'
-      ]
+      ],
+      optimizedAt: Date.now(),
+      ebayCategoryId: categoryInfo.ebayCategoryId,
+      weightOz: categoryInfo.defaultWeightOz,
+      shippingService: categoryInfo.shippingService,
+      estShippingLabelCost,
+      ebayFvfRate: categoryInfo.fvfRate,
+      listingDuration: 'GTC',
+      bestOfferEnabled: true,
+      autoAcceptPrice: +(price * 0.88).toFixed(2),
+      autoDeclinePrice: +(price * 0.73).toFixed(2),
+      breakEvenPrice,
+      grossProfitEst,
+      roiPctEst: +metrics.roi.toFixed(1),
+      netPayoutEst: +metrics.netProfit.toFixed(2),
     }
   }
 
@@ -388,7 +456,7 @@ Return a JSON object with this exact structure:
   async generatePlatformListing(
     item: ScannedItem,
     platform: ResalePlatform,
-    ebayListing: AppOptimizedListing
+    ebayListing: OptimizedListing
   ): Promise<PlatformListing> {
     const platformRules: Record<ResalePlatform, { name: string; titleMax: number; feePercent: number; rules: string }> = {
       ebay: {
@@ -502,7 +570,7 @@ Return ONLY valid JSON:
   private generateFallbackPlatformListing(
     _item: ScannedItem,
     platform: ResalePlatform,
-    ebayListing: AppOptimizedListing,
+    ebayListing: OptimizedListing,
     p: { name: string; titleMax: number; feePercent: number }
   ): PlatformListing {
     const adjustedPrice = platform === 'facebook'

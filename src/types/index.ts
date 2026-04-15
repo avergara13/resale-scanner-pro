@@ -190,6 +190,7 @@ export interface ScannedItem {
   location?: ThriftStoreLocation
   optimizedListing?: OptimizedListing
   listingStatus?: 'not-started' | 'optimizing' | 'ready' | 'published' | 'sold' | 'shipped' | 'completed' | 'returned' | 'delisted'
+  upcEan?: string            // from Gemini vision if barcode visible in photo
   ebayListingId?: string
   notionPageId?: string
   notionUrl?: string
@@ -225,6 +226,28 @@ export interface OptimizedListing {
   optimizedAt: number
   /** @deprecated Platform-specific listings moved to n8n. RSP is data collection only. */
   platformListings?: Partial<Record<ResalePlatform, PlatformListing>>
+
+  // ── eBay enrichment fields (PKT-20260414-001) ──────────────────────────────
+  ebayCategoryId?: string           // from ebay-category-table
+  subtitle?: string                 // 55-char eBay subtitle
+  subtitleCostFlag?: boolean        // true = subtitle generated ($0.15/listing)
+  conditionDescription?: string     // honest flaw/wear description ≤1000 chars
+  seoKeywords?: string[]            // alias for keywords; 10–15 comma-sep terms
+  department?: string               // Men | Women | Unisex | Boys | Girls | N/A
+  size?: string                     // extracted or inferred size string
+  listingFormat?: string            // Fixed Price | Auction
+  listingDuration?: string          // GTC
+  bestOfferEnabled?: boolean
+  autoAcceptPrice?: number          // 88% of listing price
+  autoDeclinePrice?: number         // 73% of listing price
+  weightOz?: number                 // item weight in oz
+  shippingService?: string          // recommended shipping service
+  estShippingLabelCost?: number     // estimated label cost in USD
+  ebayFvfRate?: number              // category FVF % (e.g. 13.25)
+  breakEvenPrice?: number
+  grossProfitEst?: number
+  roiPctEst?: number
+  netPayoutEst?: number
 }
 
 export interface ThriftStoreLocation {
