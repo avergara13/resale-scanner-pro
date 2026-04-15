@@ -453,10 +453,16 @@ export interface SharedTodo {
 export interface AgentToolCall {
   tool: 'rerun_pipeline' | 'create_listing' | 'update_item' | 'batch_analyze_queue'
        | 'add_task' | 'complete_task' | 'clear_tasks'
+       | 'mark_as_sold' | 'mark_shipped' | 'add_remove_from_queue'
   itemId?: string
   updates?: Partial<ScannedItem>
   taskText?: string
   taskId?: string
+  soldPrice?: number
+  soldMarketplace?: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
+  trackingNumber?: string
+  shippingCarrier?: string
+  queueAction?: 'add' | 'remove'
 }
 
 export interface ChatMessage {
