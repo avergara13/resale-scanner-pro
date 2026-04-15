@@ -494,7 +494,14 @@ function buildShippingProperties(update) {
   }
 
   if (update.shippingStatus === '✅ Shipped') {
-    properties['Ship Date'] = { date: { start: new Date().toISOString().slice(0, 10) } }
+    const shipDateIso = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    const returnWindow = new Date(shipDateIso)
+    returnWindow.setDate(returnWindow.getDate() + 30)
+    const returnWindowIso = returnWindow.toISOString().split('T')[0] // YYYY-MM-DD
+
+    properties['Ship Date'] = { date: { start: shipDateIso } }
+    properties['Loop Status'] = { rich_text: [{ text: { content: `CLOSED — return window through ${returnWindowIso}` } }] }
+    properties['Return Window Ends'] = { date: { start: returnWindowIso } }
   }
 
   return properties
@@ -688,6 +695,23 @@ const server = http.createServer(async (req, res) => {
           properties: buildShippingProperties(body),
         }),
       })
+
+      // Audit comment — written when the sold loop closes (Shipped).
+      // Non-fatal: comment failure must never block the shipping status update.
+      if (body.shippingStatus === '✅ Shipped') {
+        const labelPart = body.labelProvider ? ` via ${body.labelProvider}` : ''
+        const trackingPart = body.trackingNumber ? ` · Tracking ${body.trackingNumber}` : ''
+        const auditText = `Shipped${labelPart}${trackingPart} · ${new Date().toISOString()}`
+        notionRequest('/comments', {
+          method: 'POST',
+          body: JSON.stringify({
+            parent: { page_id: pageId },
+            rich_text: [{ type: 'text', text: { content: auditText } }],
+          }),
+        }).catch(err => {
+          console.warn('[sold-items] audit comment failed (non-fatal):', err.message || err)
+        })
+      }
 
       const refreshedFeed = await getSoldFeed()
       const item = refreshedFeed.items.find(candidate => candidate.salePageId === pageId)
