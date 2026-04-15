@@ -31,6 +31,7 @@ import { createGoogleLensService } from './lib/google-lens-service'
 import { createTagSuggestionService } from './lib/tag-suggestion-service'
 import { createListingOptimizationService } from './lib/listing-optimization-service'
 import { createNotionService } from './lib/notion-service'
+import { SupabaseService } from './lib/supabase-service'
 import { fetchSoldItems, updateSoldItemShipping } from './lib/sold-service'
 import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
@@ -99,6 +100,7 @@ function App() {
   const deviceId = useDeviceId()
 
   const [queue, setQueue] = useKV<ScannedItem[]>('queue', [])
+  const [hrboSkuCounter, setHrboSkuCounter] = useKV<number>('hrbo-sku-counter', 0)
   // Ref mirror of `queue` — used by pipeline handlers to escape stale closures
   // when the Agent runs multi-step flows (batch-analyze → optimize → push) and
   // subsequent handlers need the latest queue state, not the pre-pipeline snapshot.
@@ -183,6 +185,13 @@ function App() {
     const key = settings?.notionApiKey || import.meta.env.VITE_NOTION_API_KEY
     return createNotionService(key, settings?.notionDatabaseId)
   }, [settings?.notionApiKey, settings?.notionDatabaseId])
+
+  const supabaseService = useMemo(() => {
+    const url = import.meta.env.VITE_SUPABASE_URL
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+    if (!url || !key) return null
+    return new SupabaseService(url, key)
+  }, [])
 
   // One-time migration: earlier builds stored the Notion DB ID as a 32-char hex string
   // with no dashes, which Notion API rejects with HTTP 400. Rewrite to canonical
@@ -315,7 +324,7 @@ function App() {
 
     // If re-analyzing an existing item, preserve its ID and metadata so we don't
     // create a duplicate card in scan history. Otherwise create a fresh item.
-    const newItem: ScannedItem = effectiveExistingItem
+    let newItem: ScannedItem = effectiveExistingItem
       ? {
           ...effectiveExistingItem,
           imageData: optimized.original,
@@ -369,7 +378,12 @@ function App() {
             newItem.additionalImageData?.length ? newItem.additionalImageData : undefined,
           )
           mockProductName = visionResult.productName
-          
+          // PKT-004 Correction 3 — persist upcEan on newItem immediately so it's
+          // available in handlePushToNotion (visionResult is out of scope there)
+          if (visionResult.upcEan) {
+            newItem = { ...newItem, upcEan: visionResult.upcEan }
+          }
+
           setPipeline(prev => prev.map((s, i) =>
             i === 0 ? {
               ...s,
@@ -797,6 +811,30 @@ function App() {
         margin: updatedItem.profitMargin,
       })
       setScreen('scan-result')
+
+      // Auto-optimization for BUY/MAYBE — non-blocking, runs after user sees result
+      if ((decision === 'BUY' || decision === 'MAYBE') && listingOptimizationService) {
+        const sku = updatedItem.tags?.find(t => t.startsWith('HRBO-')) || generateSku()
+        listingOptimizationService.generateOptimizedListing({
+          item: { ...updatedItem, condition: updatedItem.condition || condition || 'Good' },
+          marketData: updatedItem.marketData,
+          visionResult,
+        }).then(optimized => {
+          const mergedTags = Array.from(new Set([
+            ...(updatedItem.tags || []).filter(t => !t.startsWith('HRBO-')),
+            sku,
+            ...(optimized.suggestedTags || []),
+          ]))
+          setQueue(prev => (prev || []).map(i =>
+            i.id === updatedItem.id
+              ? { ...i, optimizedListing: optimized, condition: optimized.condition || i.condition, tags: mergedTags }
+              : i
+          ))
+          setScanHistory(prev => (prev || []).map(i =>
+            i.id === updatedItem.id ? { ...i, optimizedListing: optimized } : i
+          ))
+        }).catch(e => console.warn('[opt] background optimization failed:', e))
+      }
     } catch (error) {
       console.error('Pipeline error:', error)
       reset() // Clear stuck 'analyzing' captureState
@@ -977,6 +1015,12 @@ function App() {
     })
   }, [setSettings, setGlobalProfile, setTheme, toggleAmbientLight])
 
+  const generateSku = useCallback((): string => {
+    const next = (hrboSkuCounter || 0) + 1
+    setHrboSkuCounter(next)
+    return `HRBO-${String(next).padStart(3, '0')}`
+  }, [hrboSkuCounter, setHrboSkuCounter])
+
   const handleOptimizeItem = useCallback(async (itemId: string) => {
     // Read fresh queue via ref to avoid stale closure when agent pipeline
     // chains batch-analyze → optimize (items that just flipped PENDING→BUY)
@@ -1030,7 +1074,28 @@ function App() {
       : undefined
     const combinedNotes = [item.notes, platformROINote].filter(Boolean).join('\n')
 
+    // ── PKT-002: Upload photos to Supabase Storage ───────────────────────────
+    const sku = listing
+      ? [listing.itemSpecifics?.['Model'], item.tags?.find(t => t.startsWith('HRBO-'))].filter(Boolean).join('-') || item.tags?.find(t => t.startsWith('HRBO-'))
+      : item.tags?.find(t => t.startsWith('HRBO-'))
+    let photoUrls: string[] | undefined
+    if (supabaseService && sku) {
+      const photos = [item.imageData, ...(item.additionalImageData || [])].filter(Boolean) as string[]
+      if (photos.length > 0) {
+        const uploaded = await Promise.allSettled(
+          photos.map((data, i) => supabaseService.uploadPhoto(data, sku, `${sku}-0${i + 1}.jpg`))
+        )
+        const successfulUrls = uploaded
+          .filter(r => r.status === 'fulfilled' && r.value)
+          .map(r => (r as PromiseFulfilledResult<string>).value)
+        if (successfulUrls.length > 0) photoUrls = successfulUrls
+      }
+    }
+
+    // ── Assemble full Notion payload ─────────────────────────────────────────
+    const photoCount = 1 + (item.additionalImages?.length || 0)
     const result = await notionService.pushListing({
+      // Core
       title: listing?.title || item.productName || 'Unknown Item',
       description: listing?.description || item.description || '',
       price: listing?.price || item.estimatedSellPrice || 0,
@@ -1052,7 +1117,92 @@ function App() {
       scannedBy: item.scannedBy,
       operatorName: linkedSession?.operatorName || settings?.userProfile?.operatorName,
       expenseType,
+      // GROUP 1 — Core Identity
+      seoTitle: listing?.title?.slice(0, 80),
+      subtitle: listing?.subtitle?.slice(0, 55),
+      brand: listing?.itemSpecifics?.['Brand'] || (item.lensAnalysis?.bestMatch?.title?.split(/\s+/)[0]),
+      modelSku: [listing?.itemSpecifics?.['Model'] || listing?.itemSpecifics?.['Style'], sku].filter(Boolean).join(' | ') || undefined,
+      upcEanGtin: item.upcEan || item.lensResults?.[0]?.snippet?.match(/\b(\d{12}|\d{13}|\d{8})\b/)?.[1],
+      ebayCategoryId: listing?.ebayCategoryId,
+      // GROUP 2 — Item Specifics
+      color: listing?.itemSpecifics?.['Color'],
+      material: listing?.itemSpecifics?.['Material'],
+      dimensions: listing?.itemSpecifics?.['Dimensions'],
+      packageWeightLbs: listing?.weightOz ? +(listing.weightOz / 16).toFixed(2) : undefined,
+      // GROUP 3 — Market Data
+      ebayAvgSold: item.marketData?.ebayAvgSold,
+      ebayHigh: item.marketData?.ebayPriceRange?.max,
+      ebayLow: item.marketData?.ebayPriceRange?.min,
+      autoAcceptPrice: listing?.autoAcceptPrice,
+      aiConfidence: item.lensResults?.length ? 'High' : 'Medium',
+      marketNotes: combinedNotes || undefined,
+      photoCount,
+      // PKT-20260414-001: 12 new columns
+      conditionDescription: listing?.conditionDescription,
+      seoKeywords: listing?.seoKeywords?.join(', ') || listing?.keywords?.join(', '),
+      department: listing?.department,
+      size: listing?.size || listing?.itemSpecifics?.['Size'],
+      itemWeightOz: listing?.weightOz,
+      listingDuration: 'GTC',
+      bestOfferEnabled: true,
+      autoDeclinePrice: listing?.autoDeclinePrice,
+      soldCompCount: item.marketData?.ebaySoldCount,
+      ebayFvfRate: listing?.ebayFvfRate,
+      estShippingLabelCost: listing?.estShippingLabelCost,
+      subtitleCostFlag: listing?.subtitleCostFlag ?? false,
+      photoUrls,
+      // Status auto-progression
+      notionStatus: photoUrls?.length ? '📸 Ready to List' : '🔍 Researched – Price Set',
+      // Shipping + listing type SELECTs (exact option strings)
+      shippingStrategy: listing?.shippingService || 'USPS Ground Advantage',
+      listingType: 'Buy It Now',
     })
+
+    // ── Supabase save (non-blocking) ─────────────────────────────────────────
+    if (supabaseService) {
+      supabaseService.saveScan({
+        notion_page_id: result.success ? result.pageId : undefined,
+        title: listing?.title || item.productName,
+        ebay_category_id: listing?.ebayCategoryId,
+        seo_title: listing?.title?.slice(0, 80),
+        subtitle: listing?.subtitle?.slice(0, 55),
+        upc_ean: item.upcEan,
+        brand: listing?.itemSpecifics?.['Brand'],
+        model: listing?.itemSpecifics?.['Model'],
+        condition: listing?.condition,
+        condition_description: listing?.conditionDescription,
+        item_description: listing?.description?.slice(0, 5000),
+        color: listing?.itemSpecifics?.['Color'],
+        size: listing?.size || listing?.itemSpecifics?.['Size'],
+        department: listing?.department,
+        seo_keywords: listing?.seoKeywords || listing?.keywords,
+        item_weight_oz: listing?.weightOz,
+        shipping_strategy: listing?.shippingService,
+        listing_duration: 'GTC',
+        best_offer_enabled: true,
+        listing_price: listing?.price,
+        auto_accept_price: listing?.autoAcceptPrice,
+        auto_decline_price: listing?.autoDeclinePrice,
+        comp_range_low: item.marketData?.ebayPriceRange?.min,
+        comp_range_high: item.marketData?.ebayPriceRange?.max,
+        sold_comp_count: item.marketData?.ebaySoldCount,
+        ebay_fvf_rate: listing?.ebayFvfRate,
+        est_shipping_label_cost: listing?.estShippingLabelCost,
+        gross_profit_est: listing?.grossProfitEst,
+        roi_pct_est: listing?.roiPctEst,
+        break_even_price: listing?.breakEvenPrice,
+        net_payout_est: listing?.netPayoutEst,
+        photo_count: photoCount,
+        photo_urls: photoUrls,
+        subtitle_cost_flag: listing?.subtitleCostFlag ?? false,
+        notion_push_status: result.success ? 'success' : 'failed',
+        notion_push_timestamp: new Date().toISOString(),
+        session_id: item.sessionId,
+        operator_id: item.scannedBy,
+        purchase_price: item.purchasePrice,
+        decision: item.decision,
+      }).catch(e => console.warn('[supabase] saveScan failed:', e))
+    }
 
     if (result.success) {
       setQueue((prev) => (prev || []).map(i =>
@@ -1554,16 +1704,24 @@ function App() {
     }
     const { imageData: _img, imageOptimized: _opt, ...lightweight } = currentItem!
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
-    // Maybe items go to scan history only — NOT the listing queue.
-    // The buyer can reopen from Scan History to continue researching before deciding.
+    // MAYBE items live in the working queue AND scan-history.
+    // Queue lets the user reopen/edit the card indefinitely.
+    // Scan-history is the permanent session record — it survives queue deletion
+    // because handleRemoveFromQueue only touches setQueue, never setScanHistory.
     const maybeItem: ScannedItem = {
       ...lightweight,
       purchasePrice: effectivePrice,
       notes: notes || currentItem!.notes,
-      inQueue: false,
+      inQueue: true,
       decision: 'MAYBE',
     }
-    // Update the scan history entry with the current prices/notes
+    // Add to working queue (upsert — safe if re-MAYBE'd)
+    setQueue(prev => {
+      const current = prev || []
+      if (current.some(i => i.id === maybeItem.id)) return current.map(i => i.id === maybeItem.id ? maybeItem : i)
+      return [...current, maybeItem]
+    })
+    // Keep in scan-history as permanent session record
     setScanHistory(prev => {
       const existing = prev || []
       const idx = existing.findIndex(i => i.id === maybeItem.id)
@@ -1575,8 +1733,8 @@ function App() {
     setAgentActiveTab('scans')
     setScreen('agent')
     toast('Saved to Scan Queue — tap to continue researching')
-    logActivity('Saved for later research — not added to queue')
-  }, [currentItem, setScanHistory, setScreen, setAgentActiveTab])
+    logActivity('Saved for later research — added to queue')
+  }, [currentItem, setQueue, setScanHistory, setScreen, setAgentActiveTab])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, barcodeProduct?: BarcodeProduct, condition?: string) => {
     const optimized = await optimizeAndCache(imageData)

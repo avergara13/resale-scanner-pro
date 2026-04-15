@@ -66,6 +66,25 @@ export interface NotionListingData {
 
   // GROUP 6 — Source
   sourceVendor?: string
+
+  // ── PKT-20260414-001: 12 net-new columns ─────────────────────────────────
+  conditionDescription?: string    // → "Condition Description" rich_text
+  seoKeywords?: string             // → "SEO Keywords" rich_text, comma-separated
+  size?: string                    // → "Size" rich_text
+  department?: string              // → "Department" select
+  itemWeightOz?: number            // → "Item Weight (oz)" number
+  listingDuration?: string         // → "Listing Duration" select
+  bestOfferEnabled?: boolean       // → "Best Offer Enabled" checkbox
+  autoAcceptPrice?: number         // → "Best Offer Min $" (type ALTER → number)
+  autoDeclinePrice?: number        // → "Auto-Decline Price" number
+  soldCompCount?: number           // → "Sold Comp Count" number
+  ebayFvfRate?: number             // → "eBay FVF Rate %" number
+  estShippingLabelCost?: number    // → "Est. Shipping Label Cost" number
+  subtitleCostFlag?: boolean       // → "Subtitle Cost Flag" checkbox
+  photoUrls?: string[]             // → "Listing Photos" files (external URLs)
+  notionStatus?: string            // → "Status" select auto-progression
+  shippingStrategy?: string        // → "Shipping Strategy" SELECT (exact option string)
+  listingType?: string             // → "eBay Listing Type" SELECT (exact option string)
 }
 
 export interface NotionPushResponse {
@@ -88,10 +107,14 @@ export interface NotionHealthResult {
 function normaliseCondition(raw: string): string {
   const s = raw.toLowerCase().trim()
   if (s.includes('sealed') || s.includes('unopened'))   return 'New – Sealed'
-  if (s.includes('open box') || s.includes('open-box')) return 'New – Open Box'
+  if (s.includes('new with tags') || s.includes('nwt'))     return 'New – Sealed'
+  if (s.includes('new without tags') || s.includes('nwot')) return 'New – Open Box'
+  if (s.includes('new with defects'))                        return 'New – Open Box'
+  if (s.includes('open box') || s.includes('open-box'))     return 'New – Open Box'
   if (s === 'new' || s.includes('brand new'))            return 'New'
   if (s.includes('like new') || s.includes('excellent') || s.includes('mint')) return 'Used – Like New'
   if (s.includes('very good'))                           return 'Used – Very Good'
+  if (s.includes('seller refurbished') || s.includes('refurb')) return 'Used – Acceptable'
   if (s.includes('good'))                                return 'Used – Good'
   if (s.includes('acceptab') || s.includes('fair') || s.includes('poor')) return 'Used – Acceptable'
   if (s.includes('part') || s.includes('repair') || s.includes('broken')) return 'For Parts / Repair'
@@ -196,8 +219,8 @@ export class NotionService {
       'Min Acceptable Price': { number: minAcceptable },
       'eBay Listing Type':    { select: { name: 'Buy It Now' } },
 
-      // GROUP 4 — Shipping defaults
-      'Shipping Strategy': { select: { name: 'USPS Ground Advantage' } },
+      // GROUP 4 — Shipping defaults (overridden by extended.shippingStrategy if set)
+      'Shipping Strategy': { select: { name: listing.shippingStrategy || 'USPS Ground Advantage' } },
       'Free Shipping':     { checkbox: (listing.price >= 20) },
       'Handling Time':     { select: { name: '🟢 1 Day' } },
       'Ship From ZIP':     rt(listing.shipFromZip || '32806'),
@@ -230,7 +253,8 @@ export class NotionService {
     if (listing.ebayAvgSold != null)    extended['eBay Sold Avg']          = { number: listing.ebayAvgSold }
     if (listing.ebayHigh != null)       extended['eBay High']              = { number: listing.ebayHigh }
     if (listing.ebayLow != null)        extended['eBay Low']               = { number: listing.ebayLow }
-    if (listing.bestOfferMin)           extended['Best Offer Min $']       = rt(listing.bestOfferMin)
+    // "Best Offer Min $" → number (after schema type fix; holds autoAcceptPrice)
+    if (listing.autoAcceptPrice != null) extended['Best Offer Min $']      = { number: listing.autoAcceptPrice }
     if (listing.packageWeightLbs != null) extended['Package Weight (lbs)'] = { number: listing.packageWeightLbs }
     if (listing.packageSize)            extended['Package Size']           = { select: { name: listing.packageSize } }
     if (listing.aiConfidence)           extended['AI Confidence']          = { select: { name: listing.aiConfidence } }
@@ -238,6 +262,42 @@ export class NotionService {
     if (listing.photoCount != null)     extended['Photo Count']            = { number: listing.photoCount }
     if (listing.sourceVendor || listing.scannedBy) extended['Source / Vendor'] = rt(listing.sourceVendor || listing.scannedBy || '')
     if (listing.notes)                  extended['Market Notes']           = rt(listing.notes)
+
+    // ── PKT-20260414-001: 12 net-new columns ──────────────────────────────────
+    // NEVER write formula columns: Break Even Price, Gross Margin %, Gross Profit,
+    // Net Payout, Projected Profit, ROI %, Total Cost, Days in Inventory, Last Updated
+    if (listing.conditionDescription)      extended['Condition Description']   = rt(listing.conditionDescription)
+    if (listing.seoKeywords)               extended['SEO Keywords']            = rt(listing.seoKeywords)
+    if (listing.size)                      extended['Size']                    = rt(listing.size)
+    if (listing.department)               extended['Department']              = { select: { name: listing.department } }
+    if (listing.itemWeightOz != null)      extended['Item Weight (oz)']       = { number: listing.itemWeightOz }
+    if (listing.listingDuration)          extended['Listing Duration']       = { select: { name: listing.listingDuration || 'GTC' } }
+    if (listing.bestOfferEnabled != null) extended['Best Offer Enabled']     = { checkbox: listing.bestOfferEnabled }
+    if (listing.autoDeclinePrice != null) extended['Auto-Decline Price']     = { number: listing.autoDeclinePrice }
+    if (listing.soldCompCount != null)    extended['Sold Comp Count']        = { number: listing.soldCompCount }
+    if (listing.ebayFvfRate != null)      extended['eBay FVF Rate %']        = { number: listing.ebayFvfRate }
+    if (listing.estShippingLabelCost != null) extended['Est. Shipping Label Cost'] = { number: listing.estShippingLabelCost }
+    if (listing.subtitleCostFlag != null) extended['Subtitle Cost Flag']     = { checkbox: listing.subtitleCostFlag }
+
+    // Status auto-progression (overrides base shipping strategy default if set)
+    if (listing.notionStatus)             extended['Status']                 = { select: { name: listing.notionStatus } }
+
+    // Corrected SELECT fields using exact Notion option strings
+    if (listing.shippingStrategy)         extended['Shipping Strategy']      = { select: { name: listing.shippingStrategy } }
+    if (listing.listingType)              extended['eBay Listing Type']      = { select: { name: listing.listingType } }
+
+    // PKT-002: Listing Photos — external URLs from Supabase Storage
+    if (listing.photoUrls?.length) {
+      extended['Listing Photos'] = {
+        files: listing.photoUrls.map((url, i) => ({
+          type: 'external',
+          name: `${listing.modelSku || 'photo'}-0${i + 1}.jpg`,
+          external: { url }
+        }))
+      }
+      // Backup first URL to "Photo Links" URL property if it exists
+      extended['Photo Links'] = { url: listing.photoUrls[0] }
+    }
 
     // ── Session traceability ─────────────────────────────────────────────────
     const sessionProperties: Record<string, unknown> = {}

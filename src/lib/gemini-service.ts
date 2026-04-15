@@ -11,6 +11,13 @@ export interface GeminiVisionResponse {
   searchTerms: string[]
   confidence: number
   suggestedTags?: string[]
+  // ── eBay enrichment fields (PKT-20260414-001) ──────────────────────────────
+  size?: string              // e.g. "10 Men's", "L", "32x34"
+  colorDetails?: string      // e.g. "Black with White Stripes"
+  estimatedWeightOz?: number // visual weight estimate in oz
+  countryOfOrigin?: string   // e.g. "China", "Vietnam"
+  conditionNotes?: string    // specific visible flaws/wear (≤200 chars)
+  upcEan?: string            // barcode if clearly legible, else null
 }
 
 export interface GeminiAnalysisOptions {
@@ -146,6 +153,12 @@ export class GeminiService {
         searchTerms: result.searchTerms || [result.productName],
         confidence: result.confidence || 0.5,
         suggestedTags: result.suggestedTags || [],
+        size: result.size,
+        colorDetails: result.colorDetails,
+        estimatedWeightOz: result.estimatedWeightOz,
+        countryOfOrigin: result.countryOfOrigin,
+        conditionNotes: result.conditionNotes,
+        upcEan: result.upcEan,
       }
     } catch (error) {
       console.error('Gemini vision analysis failed:', error)
@@ -182,7 +195,13 @@ Provide your response as a JSON object with the following structure:
   "keyFeatures": ["List of 3-5 notable features or selling points"],
   "searchTerms": ["Array of 5-10 keywords for searching eBay/Google, including brand, category, key descriptors"],
   "confidence": 0.0-1.0 confidence score in identification accuracy,
-  "suggestedTags": ["Array of 3-6 descriptive tags like 'Vintage', 'Designer', 'Rare', 'High Value', 'Quick Flip', 'Electronics', 'Collectible', 'Brand New', etc."]
+  "suggestedTags": ["Array of 3-6 descriptive tags like 'Vintage', 'Designer', 'Rare', 'High Value', 'Quick Flip', 'Electronics', 'Collectible', 'Brand New', etc."],
+  "size": "All size markings visible — shoe size (e.g. '10.5 US Men\\'s / 44.5 EU'), clothing size (S/M/L/XL or numeric), dimensions. null if not applicable",
+  "colorDetails": "Primary and secondary colors plus any patterns (e.g. 'Black with White Stripes', 'Red Plaid'). null if not determinable",
+  "estimatedWeightOz": "Best estimate in oz based on visual size and category. Sneakers ~24-32oz, t-shirt ~6oz, hoodie ~16oz, jacket ~32oz, phone ~6oz, console ~48oz. Return a number, not a string",
+  "countryOfOrigin": "Country of Manufacture if visible on label or tag (e.g. 'China', 'Vietnam', 'USA'). null if not visible",
+  "conditionNotes": "Specific visible flaws, wear, scratches, stains, missing parts in plain text — max 200 chars. Be honest. Use 'No visible flaws' if item looks clean. Do NOT repeat the overall condition field",
+  "upcEan": "Barcode number (UPC-A 12 digits, EAN-13 13 digits, or UPC-E 8 digits) if clearly legible in photo. Return digits only, no spaces. null if not visible"
 }
 
 Focus on:
@@ -190,7 +209,7 @@ Focus on:
 - Resale-relevant details (brand, condition, unique features)
 - Keywords that would help find comparable items on eBay
 - Honest condition assessment
-- Avoiding speculation - use "Unknown" if uncertain
+- Avoiding speculation - use null if uncertain
 
 Be specific and searchable. Prioritize information that helps determine resale value.`
   }

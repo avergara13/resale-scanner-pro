@@ -334,31 +334,33 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     return { total: unique.length, buy, pass, pending: maybe, maybe, queueCount, totalProfit }
   }, [sessionItems, scanHistoryKV, currentSession?.id])
 
-  // Session-scoped MAYBE scan cards (most recent first) for the Scan Queue tab
-  // Shows items saved as MAYBE — PASS items go to scan history only
+  // Session-scoped MAYBE/PENDING scan cards for the Scan Queue working list.
+  // Reads from queueItems (not scanHistory) so that:
+  //   - "Delete" removes from the working queue only
+  //   - Session scan history (scanHistoryKV, accessible via session dashboard "Scans") is never touched
   const sessionScans = useMemo(() => {
-    const items = scanHistoryKV || []
+    const items = queueItems.filter(i => i.decision === 'PENDING' || i.decision === 'MAYBE')
     const filtered = currentSession?.id
-      ? items.filter(i => i.sessionId === currentSession.id && (i.decision === 'PENDING' || i.decision === 'MAYBE'))
-      : items.filter(i => i.decision === 'PENDING' || i.decision === 'MAYBE')
+      ? items.filter(i => i.sessionId === currentSession.id)
+      : items
     return [...filtered].sort((a, b) => b.timestamp - a.timestamp).slice(0, 100)
-  }, [scanHistoryKV, currentSession?.id])
+  }, [queueItems, currentSession?.id])
 
   const handleDeleteScan = useCallback((itemId: string) => {
-    setScanHistoryKV(prev => (prev || []).filter(i => i.id !== itemId))
-  }, [setScanHistoryKV])
+    // Remove from working queue only — scanHistoryKV is the permanent session record
+    setQueueKV(prev => (prev || []).filter(i => i.id !== itemId))
+  }, [setQueueKV])
 
   const handlePromoteToQueue = useCallback((item: ScannedItem) => {
     const queueItem: ScannedItem = { ...item, inQueue: true, decision: 'BUY' as const }
     setQueueKV(prev => {
       const current = prev || []
-      if (current.some(i => i.id === queueItem.id)) return current
+      if (current.some(i => i.id === queueItem.id)) return current.map(i => i.id === queueItem.id ? queueItem : i)
       return [...current, queueItem]
     })
-    // Erase from scan history — item has moved to the listing queue
-    setScanHistoryKV(prev => (prev || []).filter(i => i.id !== item.id))
-    logActivity(`${item.productName || 'Item'} added to queue`)
-  }, [setQueueKV, setScanHistoryKV])
+    // Note: do NOT erase from scanHistoryKV — scan history is the permanent session record
+    logActivity(`${item.productName || 'Item'} promoted to BUY queue`)
+  }, [setQueueKV])
 
   const prevMessageCount = useRef(chatMessages.length)
   const agentHasMounted = useRef(false)
@@ -1730,7 +1732,6 @@ ${settings.userProfile.aiContext}` : ''}`
               </div>
             ) : (
               sessionScans.map(item => {
-                const alreadyQueued = queueItems.some(q => q.id === item.id)
                 const profit =
                   item.estimatedSellPrice != null
                     ? item.estimatedSellPrice - item.purchasePrice
@@ -1803,22 +1804,15 @@ ${settings.userProfile.aiContext}` : ''}`
                         Reopen
                       </button>
                       <div className="w-px h-5 bg-s2 flex-shrink-0" />
-                      {/* Add to Queue / already-queued indicator */}
-                      {alreadyQueued ? (
-                        <div className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-green">
-                          <Check size={13} weight="bold" />
-                          In Queue
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handlePromoteToQueue(item)}
-                          className="flex-1 h-8 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-xl mx-1.5"
-                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
-                        >
-                          <ShoppingCart size={13} weight="bold" />
-                          Add to Queue
-                        </button>
-                      )}
+                      {/* Promote to BUY */}
+                      <button
+                        onClick={() => handlePromoteToQueue(item)}
+                        className="flex-1 h-8 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-xl mx-1.5"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                      >
+                        <ShoppingCart size={13} weight="bold" />
+                        Mark BUY
+                      </button>
                       <div className="w-px h-5 bg-s2 flex-shrink-0" />
                       {/* Delete */}
                       <button
