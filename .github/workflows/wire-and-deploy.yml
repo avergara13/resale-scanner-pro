@@ -80,53 +80,75 @@ jobs:
         continue-on-error: true
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          # Pass user-controlled strings via env so bash never parses them as code.
+          RAW_MSG: ${{ github.event.head_commit.message || github.sha }}
+          AUTHOR: ${{ github.actor }}
+          COMPARE: ${{ github.event.compare || format('https://github.com/{0}/commit/{1}', github.repository, github.sha) }}
+          JOB_STATUS: ${{ job.status }}
         run: |
-          [ -z "$NOTION_API_KEY" ] && exit 0
+          if [ -z "$NOTION_API_KEY" ]; then
+            echo "NOTION_API_KEY not set — skipping"; exit 0
+          fi
           PAGE_ID="${{ env.LIVE_ACTIVITY_PAGE_ID }}"
-          SHORT_SHA="${{ github.sha }}"
-          SHORT_SHA="${SHORT_SHA:0:7}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
           TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          MSG=$(echo '${{ github.event.head_commit.message }}' | head -1 | cut -c1-100)
-          AUTHOR="${{ github.actor }}"
-          COMPARE="${{ github.event.compare }}"
-          JOB_STATUS="${{ job.status }}"
+          MSG=$(printf '%s' "$RAW_MSG" | head -1 | cut -c1-100)
 
-          # Dedup: skip if last 5 blocks already contain this SHA
-          EXISTING=$(curl -s \
+          # Dedup: extract plain_text from the last 5 blocks and check for the SHA.
+          # Skips the PATCH if a previous run already logged this SHA.
+          EXISTING_HTTP=$(curl -s -o /tmp/notion-existing.json -w '%{http_code}' \
             -H "Authorization: Bearer $NOTION_API_KEY" \
             -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
             "https://api.notion.com/v1/blocks/$PAGE_ID/children?page_size=5")
-          if echo "$EXISTING" | grep -q "$SHORT_SHA"; then
-            echo "Already logged $SHORT_SHA — skipping"
-            exit 0
+          if [ "$EXISTING_HTTP" -ge 200 ] && [ "$EXISTING_HTTP" -lt 300 ]; then
+            if jq -e --arg sha "$SHORT_SHA" \
+                '[.results[]?.callout?.rich_text[]?.plain_text?] | map(select(. != null) | contains($sha)) | any' \
+                /tmp/notion-existing.json > /dev/null; then
+              echo "Already logged $SHORT_SHA — skipping"
+              exit 0
+            fi
+          else
+            echo "::warning::Notion dedup GET returned $EXISTING_HTTP — proceeding without dedup"
+            cat /tmp/notion-existing.json
           fi
 
           if [ "$JOB_STATUS" = "success" ]; then
-            EMOJI="🚀"
-            COLOR="green_background"
-            LABEL="DEPLOYED"
+            EMOJI="🚀"; COLOR="green_background"; LABEL="DEPLOYED"
           else
-            EMOJI="🔴"
-            COLOR="red_background"
-            LABEL="FAILED"
+            EMOJI="🔴"; COLOR="red_background"; LABEL="FAILED"
           fi
 
-          curl -s -X PATCH \
+          # jq -n with --arg properly escapes ", \, newlines, etc. in user-controlled fields.
+          PAYLOAD=$(jq -n \
+            --arg label   "$LABEL" \
+            --arg ts      "$TIMESTAMP" \
+            --arg sha     "$SHORT_SHA" \
+            --arg msg     "$MSG" \
+            --arg author  "$AUTHOR" \
+            --arg compare "$COMPARE" \
+            --arg emoji   "$EMOJI" \
+            --arg color   "$COLOR" \
+            '{children: [{
+               object: "block",
+               type: "callout",
+               callout: {
+                 icon: { type: "emoji", emoji: $emoji },
+                 color: $color,
+                 rich_text: [{
+                   type: "text",
+                   text: { content: ($label + " · resale-scanner-pro · " + $ts + "\nCommit: " + $sha + " — " + $msg + "\nAuthor: " + $author + "\nDiff: " + $compare) }
+                 }]
+               }
+             }]}')
+
+          HTTP=$(curl -s -o /tmp/notion-resp.json -w '%{http_code}' -X PATCH \
             "https://api.notion.com/v1/blocks/$PAGE_ID/children" \
             -H "Authorization: Bearer $NOTION_API_KEY" \
             -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"children\": [{
-                \"object\": \"block\",
-                \"type\": \"callout\",
-                \"callout\": {
-                  \"icon\": { \"type\": \"emoji\", \"emoji\": \"$EMOJI\" },
-                  \"color\": \"$COLOR\",
-                  \"rich_text\": [{
-                    \"type\": \"text\",
-                    \"text\": { \"content\": \"$LABEL · resale-scanner-pro · $TIMESTAMP\nCommit: $SHORT_SHA — $MSG\nAuthor: $AUTHOR\nDiff: $COMPARE\" }
-                  }]
-                }
-              }]
-            }"
+            -d "$PAYLOAD")
+          echo "Notion PATCH HTTP $HTTP"
+          if [ "$HTTP" -ge 400 ]; then
+            cat /tmp/notion-resp.json
+            echo "::warning::Notion callout failed (HTTP $HTTP)"
+          fi
