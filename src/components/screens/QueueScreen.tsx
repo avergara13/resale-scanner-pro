@@ -60,6 +60,7 @@ interface QueueScreenProps {
   onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
   onPushToNotion?: (itemId: string) => Promise<void>
+  onPushToEbay?: (itemId: string) => Promise<void>
   onEditPhotos?: (item: ScannedItem) => void
 }
 
@@ -82,6 +83,7 @@ interface SortableItemProps {
   onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
   onPushToNotion?: (itemId: string) => Promise<void>
+  onPushToEbay?: (itemId: string) => Promise<void>
   onEditPhotos?: (item: ScannedItem) => void
   onDecisionChange?: (itemId: string, decision: Decision) => void
 }
@@ -102,6 +104,7 @@ function SortableItem({
   onOpenDetail,
   onBuyItem,
   onPushToNotion,
+  onPushToEbay,
   onEditPhotos,
   onDecisionChange,
 }: SortableItemProps) {
@@ -428,7 +431,7 @@ function SortableItem({
                 <Lightning size={12} weight="bold" />
                 Optimize
               </button>
-              {onPushToNotion && (
+              {onPushToNotion && !item.notionPageId && (
                 <button
                   onClick={() => onPushToNotion(item.id)}
                   aria-label="List item"
@@ -437,6 +440,29 @@ function SortableItem({
                 >
                   List
                 </button>
+              )}
+              {onPushToEbay && item.notionPageId && !item.ebayListingId && (
+                <button
+                  onClick={() => onPushToEbay(item.id)}
+                  aria-label="Push to eBay"
+                  title="Push to eBay (requires ED approval + AI check pass)"
+                  className="h-8 px-4 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)' }}
+                >
+                  Push to eBay
+                </button>
+              )}
+              {item.ebayListingId && (
+                <a
+                  href={`https://www.ebay.com/itm/${item.ebayListingId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="View eBay listing"
+                  className="h-8 px-3 flex items-center justify-center gap-1 text-[10px] font-bold text-white rounded-full active:scale-95 transition-all"
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'color-mix(in oklch, var(--green) 80%, var(--b1))' }}
+                >
+                  eBay LIVE
+                </a>
               )}
               {onEditPhotos && (
                 <button
@@ -526,7 +552,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem, onPushToNotion, onEditPhotos }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem, onPushToNotion, onPushToEbay, onEditPhotos }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -1405,6 +1431,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onOpenDetail={onOpenDetail}
                       onBuyItem={onBuyItem}
                       onPushToNotion={onPushToNotion}
+                      onPushToEbay={onPushToEbay}
                       onEditPhotos={onEditPhotos}
                       onDecisionChange={(id, decision) => handleSaveEdit(id, { decision })}
                     />
