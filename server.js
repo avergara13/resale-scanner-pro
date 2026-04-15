@@ -40,6 +40,34 @@ const notionInventoryDbId = normalizeUuid(process.env.NOTION_INVENTORY_DATABASE_
 const notionSalesDbId = normalizeUuid(process.env.NOTION_SALES_DATABASE_ID || 'a8a86796-187c-4ef8-9ac0-e92d9f8df665')
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+
+// ── eBay OAuth + Sell API config ─────────────────────────────────────────────
+// EBAY_CERT_ID (Client Secret) MUST NEVER fall back to a VITE_ var — VITE_-prefixed
+// vars are inlined into the public Vite bundle. The Client Secret is server-only.
+// EBAY_APP_ID (Client ID) is a public identifier; VITE_ fallback is acceptable but
+// flagged with a startup warning so the deprecated path is visible.
+const ebayAppId = process.env.EBAY_APP_ID || process.env.VITE_EBAY_APP_ID || ''
+const ebayAppIdViaVitefallback = !process.env.EBAY_APP_ID && !!process.env.VITE_EBAY_APP_ID
+const ebayCertId = process.env.EBAY_CERT_ID || ''
+const ebayRedirectUri = process.env.EBAY_REDIRECT_URI || ''
+const anthropicApiKey = process.env.ANTHROPIC_API_KEY || ''
+const ebaySandbox = process.env.EBAY_SANDBOX_MODE === 'true'
+const ebayBaseUrl = ebaySandbox ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com'
+const ebayAuthBaseUrl = ebaySandbox ? 'https://auth.sandbox.ebay.com' : 'https://auth.ebay.com'
+// Single-instance Railway deploy → in-memory nonce store survives the auth-url →
+// callback round-trip in normal operation. If Railway restarts mid-flow, ED just
+// hits /api/ebay/auth-url again — there's no user-facing impact.
+const ebayOAuthNonces = new Map() // nonce → expiry timestamp (ms)
+const EBAY_NONCE_TTL_MS = 10 * 60 * 1000 // 10 min
+const EBAY_OAUTH_SCOPES = [
+  'https://api.ebay.com/oauth/api_scope',
+  'https://api.ebay.com/oauth/api_scope/sell.inventory',
+  'https://api.ebay.com/oauth/api_scope/sell.marketing',
+  'https://api.ebay.com/oauth/api_scope/sell.account',
+  'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
+].join(' ')
+const EBAY_MERCHANT_LOCATION_KEY = 'hobbyst-orlando'
 
 const DEFAULT_SHIP_FROM_ZIP = '32806'
 const VALID_SHIPPING_STATUSES = new Set(['🔴 Need Label', '🟡 Label Ready', '📦 Packed', '✅ Shipped'])
@@ -147,6 +175,92 @@ function supabaseHeaders() {
     apikey: supabaseAnonKey,
     Authorization: `Bearer ${supabaseAnonKey}`,
   }
+}
+
+// Service-role headers — required for tables under RLS USING(false), like ebay_tokens.
+// Never expose the service role key to the frontend; it bypasses ALL RLS policies.
+function supabaseServiceHeaders() {
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Supabase service role credentials are not configured on the server.')
+  }
+
+  return {
+    apikey: supabaseServiceKey,
+    Authorization: `Bearer ${supabaseServiceKey}`,
+    'Content-Type': 'application/json',
+  }
+}
+
+// Throws if a Supabase REST response wasn't 2xx. Raw fetch (vs fetchJson) is needed
+// for DELETE/PATCH/INSERT with Prefer:return=minimal because the body is empty —
+// fetchJson would try to JSON-parse "" and fail. We still want loud errors though.
+async function assertSupabaseOk(response, label) {
+  if (response.ok) return
+  let bodyText = ''
+  try { bodyText = await response.text() } catch {}
+  const err = new Error(`Supabase ${label} failed: ${response.status} ${bodyText.slice(0, 200)}`)
+  err.status = response.status
+  throw err
+}
+
+// Sweep expired nonces to keep the Map bounded. Called on each /api/ebay/auth-url hit.
+function pruneEbayNonces() {
+  const now = Date.now()
+  for (const [nonce, expiresAt] of ebayOAuthNonces) {
+    if (expiresAt < now) ebayOAuthNonces.delete(nonce)
+  }
+}
+
+// Returns a valid eBay user access token, refreshing if it expires within 5 minutes.
+// Throws Error('EBAY_OAUTH_NOT_COMPLETED') if no row exists in ebay_tokens — caller
+// should translate to 503 with a clear instruction to visit /api/ebay/auth-url.
+async function getValidEbayToken() {
+  if (!ebayAppId || !ebayCertId) {
+    throw new Error('EBAY_CREDENTIALS_MISSING')
+  }
+  const rows = await fetchJson(
+    `${supabaseUrl}/rest/v1/ebay_tokens?select=*&limit=1`,
+    { headers: supabaseServiceHeaders() }
+  )
+  const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null
+  if (!row) {
+    const err = new Error('EBAY_OAUTH_NOT_COMPLETED')
+    err.status = 503
+    throw err
+  }
+  const expiresAtMs = new Date(row.expires_at).getTime()
+  // Reuse if at least 5 min of life remains — eBay doesn't penalise unnecessary refreshes
+  // but each call costs a round trip and burns rate limit headroom.
+  if (expiresAtMs > Date.now() + 5 * 60 * 1000) {
+    return row.access_token
+  }
+  // Refresh: POST to identity endpoint with grant_type=refresh_token + same scopes.
+  const basicAuth = Buffer.from(`${ebayAppId}:${ebayCertId}`).toString('base64')
+  const refreshBody = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: row.refresh_token,
+    scope: EBAY_OAUTH_SCOPES,
+  }).toString()
+  const tokenData = await fetchJson(`${ebayBaseUrl}/identity/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: refreshBody,
+  })
+  // PATCH the existing row in place — refresh_token rotates only on full re-auth.
+  const patchResp = await fetch(`${supabaseUrl}/rest/v1/ebay_tokens?id=eq.${row.id}`, {
+    method: 'PATCH',
+    headers: { ...supabaseServiceHeaders(), Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      access_token: tokenData.access_token,
+      expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
+  })
+  await assertSupabaseOk(patchResp, 'PATCH ebay_tokens (refresh)')
+  return tokenData.access_token
 }
 
 function getPlainText(property) {
@@ -668,6 +782,247 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // ── eBay OAuth — Route A: build authorization URL for ED to visit once ──
+  // ED hits this in a browser, gets a JSON {authUrl}, opens that URL, signs in
+  // to eBay, grants the seller scopes, and gets redirected to /oauth-callback.
+  if (requestUrl.pathname === '/api/ebay/auth-url' && req.method === 'GET') {
+    try {
+      if (!ebayAppId || !ebayCertId || !ebayRedirectUri) {
+        sendJson(res, 503, {
+          error: 'eBay OAuth credentials not configured on the server.',
+          missing: {
+            EBAY_APP_ID: !ebayAppId,
+            EBAY_CERT_ID: !ebayCertId,
+            EBAY_REDIRECT_URI: !ebayRedirectUri,
+          },
+        })
+        return
+      }
+      pruneEbayNonces()
+      // 32-char hex nonce — sufficient entropy for CSRF protection on a one-off admin flow.
+      const nonce = Array.from({ length: 32 }, () =>
+        Math.floor(Math.random() * 16).toString(16)
+      ).join('')
+      ebayOAuthNonces.set(nonce, Date.now() + EBAY_NONCE_TTL_MS)
+      const params = new URLSearchParams({
+        client_id: ebayAppId,
+        response_type: 'code',
+        redirect_uri: ebayRedirectUri,
+        scope: EBAY_OAUTH_SCOPES,
+        state: nonce,
+      })
+      const authUrl = `${ebayAuthBaseUrl}/oauth2/authorize?${params.toString()}`
+      sendJson(res, 200, { authUrl, sandbox: ebaySandbox })
+    } catch (error) {
+      console.error('[ebay/auth-url] failed:', error.message)
+      sendJson(res, 500, { error: error.message })
+    }
+    return
+  }
+
+  // ── eBay OAuth — Route B: callback handler. eBay redirects ED here with ?code= ──
+  // Exchanges the auth code for access + refresh tokens, stores them in ebay_tokens
+  // (DELETE + INSERT — single-row table, never upsert), returns a confirmation page.
+  if (requestUrl.pathname === '/api/ebay/oauth-callback' && req.method === 'GET') {
+    try {
+      if (!ebayAppId || !ebayCertId || !ebayRedirectUri) {
+        res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end('<h1>503 — eBay OAuth credentials not configured on the server.</h1>')
+        return
+      }
+      const code = requestUrl.searchParams.get('code')
+      const state = requestUrl.searchParams.get('state')
+      const ebayError = requestUrl.searchParams.get('error')
+      if (ebayError) {
+        const desc = requestUrl.searchParams.get('error_description') || ''
+        res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end(`<h1>eBay OAuth error</h1><p><strong>${ebayError}</strong>: ${desc}</p>`)
+        return
+      }
+      if (!code || !state) {
+        res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end('<h1>400 — Missing code or state parameter</h1>')
+        return
+      }
+      pruneEbayNonces()
+      if (!ebayOAuthNonces.has(state)) {
+        res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' })
+        res.end('<h1>400 — Invalid or expired state nonce. Visit /api/ebay/auth-url again.</h1>')
+        return
+      }
+      ebayOAuthNonces.delete(state)
+
+      // Exchange auth code → tokens. Basic auth = base64(client_id:client_secret).
+      const basicAuth = Buffer.from(`${ebayAppId}:${ebayCertId}`).toString('base64')
+      const exchangeBody = new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: ebayRedirectUri,
+      }).toString()
+      const tokenData = await fetchJson(`${ebayBaseUrl}/identity/v1/oauth2/token`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: exchangeBody,
+      })
+
+      // Single-row token store: clear all existing rows, then insert fresh.
+      // ?id=neq.null is the PostgREST idiom for "match every row" — required
+      // because Supabase REST refuses an unfiltered DELETE.
+      const deleteResp = await fetch(`${supabaseUrl}/rest/v1/ebay_tokens?id=neq.null`, {
+        method: 'DELETE',
+        headers: supabaseServiceHeaders(),
+      })
+      await assertSupabaseOk(deleteResp, 'DELETE ebay_tokens')
+      const insertResp = await fetch(`${supabaseUrl}/rest/v1/ebay_tokens`, {
+        method: 'POST',
+        headers: { ...supabaseServiceHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          token_type: tokenData.token_type || 'User',
+          expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+          refresh_expires_at: tokenData.refresh_token_expires_in
+            ? new Date(Date.now() + tokenData.refresh_token_expires_in * 1000).toISOString()
+            : null,
+          scope: tokenData.scope || EBAY_OAUTH_SCOPES,
+        }),
+      })
+      await assertSupabaseOk(insertResp, 'INSERT ebay_tokens')
+
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end(
+        `<!doctype html><html><head><title>eBay Connected</title>` +
+        `<style>body{font-family:system-ui;background:#0a0a0a;color:#fff;padding:48px;text-align:center}` +
+        `h1{color:#10b981;font-size:32px}p{color:#a3a3a3;font-size:16px}code{background:#1a1a1a;padding:8px 12px;border-radius:6px}</style>` +
+        `</head><body><h1>✅ eBay account connected</h1>` +
+        `<p>Tokens stored. You can close this tab and return to RSP.</p>` +
+        `<p style="margin-top:24px"><code>Mode: ${ebaySandbox ? 'SANDBOX' : 'PRODUCTION'}</code></p>` +
+        `</body></html>`
+      )
+    } catch (error) {
+      console.error('[ebay/oauth-callback] failed:', error.message, error.payload || '')
+      res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end(`<h1>500 — Token exchange failed</h1><pre>${error.message}</pre>`)
+    }
+    return
+  }
+
+  // ── eBay OAuth — Route C: manual refresh trigger (debugging / verification) ──
+  // Production code paths use getValidEbayToken() which refreshes inline; this
+  // route exists so ED can confirm the refresh path works after STOP-1.
+  if (requestUrl.pathname === '/api/ebay/refresh-token' && req.method === 'POST') {
+    try {
+      const accessToken = await getValidEbayToken()
+      sendJson(res, 200, {
+        ok: true,
+        accessTokenPreview: `${accessToken.slice(0, 16)}…(${accessToken.length} chars)`,
+      })
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ebay/refresh-token] failed:', error.message)
+      sendJson(res, status, { error: error.message })
+    }
+    return
+  }
+
+  // ── eBay setup-policies — fetch fulfillment/return/payment policy IDs and ensure
+  // the merchant inventory location exists. Run once after OAuth completes (STOP-2).
+  // ED takes the returned IDs and adds them to Railway as EBAY_*_POLICY_ID env vars.
+  if (requestUrl.pathname === '/api/ebay/setup-policies' && req.method === 'GET') {
+    try {
+      const accessToken = await getValidEbayToken()
+      const ebayAuthHeaders = {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Content-Language': 'en-US',
+      }
+
+      // Fetch all three policy lists in parallel — independent reads.
+      const [fulfillment, returns, payment] = await Promise.all([
+        fetchJson(
+          `${ebayBaseUrl}/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_US`,
+          { headers: ebayAuthHeaders }
+        ).catch(e => ({ error: e.message, status: e.status })),
+        fetchJson(
+          `${ebayBaseUrl}/sell/account/v1/return_policy?marketplace_id=EBAY_US`,
+          { headers: ebayAuthHeaders }
+        ).catch(e => ({ error: e.message, status: e.status })),
+        fetchJson(
+          `${ebayBaseUrl}/sell/account/v1/payment_policy?marketplace_id=EBAY_US`,
+          { headers: ebayAuthHeaders }
+        ).catch(e => ({ error: e.message, status: e.status })),
+      ])
+
+      // Merchant inventory location — create if it doesn't exist. eBay returns 404
+      // for missing locations, so we use a raw fetch to inspect the status code
+      // instead of fetchJson (which throws on non-2xx).
+      let locationStatus = 'unknown'
+      let locationCreatedNow = false
+      const locationCheck = await fetch(
+        `${ebayBaseUrl}/sell/inventory/v1/location/${EBAY_MERCHANT_LOCATION_KEY}`,
+        { headers: ebayAuthHeaders }
+      )
+      if (locationCheck.status === 200) {
+        const locData = await locationCheck.json().catch(() => ({}))
+        locationStatus = locData.merchantLocationStatus || 'EXISTS'
+      } else if (locationCheck.status === 404) {
+        // Create it. Address is the canonical Hobbyst Resale Orlando HQ (32806).
+        const createResp = await fetch(
+          `${ebayBaseUrl}/sell/inventory/v1/location/${EBAY_MERCHANT_LOCATION_KEY}`,
+          {
+            method: 'POST',
+            headers: ebayAuthHeaders,
+            body: JSON.stringify({
+              location: {
+                address: {
+                  addressLine1: '1 Hobbyst HQ',
+                  city: 'Orlando',
+                  stateOrProvince: 'FL',
+                  postalCode: DEFAULT_SHIP_FROM_ZIP,
+                  country: 'US',
+                },
+              },
+              locationTypes: ['WAREHOUSE'],
+              name: 'Hobbyst Resale Orlando',
+              merchantLocationStatus: 'ENABLED',
+            }),
+          }
+        )
+        if (createResp.ok || createResp.status === 204) {
+          locationStatus = 'ENABLED'
+          locationCreatedNow = true
+        } else {
+          const errText = await createResp.text().catch(() => '')
+          locationStatus = `create-failed-${createResp.status}: ${errText.slice(0, 200)}`
+        }
+      } else {
+        locationStatus = `check-failed-${locationCheck.status}`
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        sandbox: ebaySandbox,
+        merchantLocation: {
+          key: EBAY_MERCHANT_LOCATION_KEY,
+          status: locationStatus,
+          createdNow: locationCreatedNow,
+        },
+        fulfillmentPolicies: fulfillment,
+        returnPolicies: returns,
+        paymentPolicies: payment,
+        instructions: 'Add the chosen policy IDs to Railway as EBAY_FULFILLMENT_POLICY_ID, EBAY_RETURN_POLICY_ID, EBAY_PAYMENT_POLICY_ID before Phase B.',
+      })
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ebay/setup-policies] failed:', error.message, error.payload || '')
+      sendJson(res, status, { error: error.message, ...(error.payload || {}) })
+    }
+    return
+  }
+
   if (requestUrl.pathname === '/api/sold-items' && req.method === 'GET') {
     try {
       sendJson(res, 200, await getSoldFeed())
@@ -772,4 +1127,16 @@ server.listen(port, '0.0.0.0', () => {
   // make it obvious whether the Sold tab / Notion sync will work at runtime.
   console.log(`🗄️  Notion: ${notionApiKey ? '✅ API key set' : '❌ NO API KEY — Sold tab will fail'} | Sales DB: ${notionSalesDbId} | Inventory DB: ${notionInventoryDbId}`)
   console.log(`🔌 Supabase: ${supabaseUrl && supabaseAnonKey ? '✅ credentials set' : '⚠️  credentials missing — scan history merge disabled'}`)
+  // eBay OAuth diagnostics — Phase A (WO-RSP-008). All three required for OAuth routes.
+  // SUPABASE_SERVICE_ROLE_KEY is required separately for token storage (RLS bypass).
+  const ebayConfigParts = [
+    ebayAppId ? '✅ App ID' : '❌ App ID',
+    ebayCertId ? '✅ Cert ID' : '❌ Cert ID',
+    ebayRedirectUri ? '✅ Redirect URI' : '❌ Redirect URI',
+    supabaseServiceKey ? '✅ Service Role Key' : '❌ Service Role Key',
+  ]
+  console.log(`🛒 eBay OAuth: ${ebayConfigParts.join(' · ')} | Mode: ${ebaySandbox ? 'SANDBOX' : 'PRODUCTION'}`)
+  if (ebayAppIdViaVitefallback) {
+    console.warn('⚠️  EBAY_APP_ID falling back to deprecated VITE_EBAY_APP_ID. Set EBAY_APP_ID in Railway and remove the VITE_ var.')
+  }
 })
