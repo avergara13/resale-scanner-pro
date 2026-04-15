@@ -170,10 +170,9 @@ function App() {
     return createEbayService(
       settings?.ebayAppId,
       settings?.ebayDevId,
-      settings?.ebayCertId,
-      settings?.ebayApiKey
+      settings?.ebayCertId
     )
-  }, [settings?.ebayAppId, settings?.ebayDevId, settings?.ebayCertId, settings?.ebayApiKey])
+  }, [settings?.ebayAppId, settings?.ebayDevId, settings?.ebayCertId])
 
   const geminiService = useMemo(() => {
     // Use stored setting first; fall back to env var so both phones work automatically.
@@ -1253,6 +1252,35 @@ function App() {
       toast.error(`Notion error: ${result.error}`)
     }
   }, [setQueue, notionService, allSessions, settings])
+
+  // Push a Notion-backed listing to eBay. Server gates on Push Approved +
+  // AI Check Status; 403 means ED hasn't cleared the item yet, 503 means
+  // OAuth/policies aren't configured. Both surface as toasts without
+  // changing local state so the button stays pressable once unblocked.
+  const handlePushToEbay = useCallback(async (itemId: string) => {
+    const item = (queueRef.current || []).find(i => i.id === itemId)
+    if (!item || !item.notionPageId || item.ebayListingId) return
+    try {
+      const response = await fetch(`/api/ebay/push-listing/${item.notionPageId}`, {
+        method: 'POST',
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        const msg = data?.error || `eBay push failed (${response.status})`
+        toast.error(msg)
+        return
+      }
+      setQueue(prev => (prev || []).map(i =>
+        i.id === itemId ? { ...i, ebayListingId: String(data.listingId) } : i
+      ))
+      toast.success(`eBay listing live: ${data.listingId}`, {
+        action: { label: 'Open', onClick: () => window.open(data.listingUrl, '_blank', 'noopener,noreferrer') },
+      })
+      logActivity('Pushed to eBay ✓')
+    } catch (error) {
+      toast.error(`eBay push error: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }, [setQueue])
 
   const handleMarkAsSold = useCallback((
     itemId: string,
@@ -2768,6 +2796,7 @@ function App() {
                 onReanalyze={handleReanalyzeItem}
                 onOpenDetail={(item) => setDetailItemId(item.id)}
                 onPushToNotion={handlePushToNotion}
+                onPushToEbay={handlePushToEbay}
                 onEditPhotos={(item) => handleOpenPhotoManager(item, 'queue')}
               />
             </motion.div>

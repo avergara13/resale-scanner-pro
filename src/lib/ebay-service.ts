@@ -73,13 +73,11 @@ export class EbayService {
   private appId: string
   private devId?: string
   private certId?: string
-  private oauthToken?: string
 
-  constructor(appId: string, devId?: string, certId?: string, oauthToken?: string) {
+  constructor(appId: string, devId?: string, certId?: string) {
     this.appId = appId
     this.devId = devId
     this.certId = certId
-    this.oauthToken = oauthToken
   }
 
   async searchCompletedListings(keywords: string, categoryId?: string): Promise<EbayMarketData> {
@@ -374,11 +372,10 @@ export function calculateProfitFallback(
 export function createEbayService(
   appId?: string,
   devId?: string,
-  certId?: string,
-  oauthToken?: string
+  certId?: string
 ): EbayService | null {
   if (!appId) {
     return null
   }
-  return new EbayService(appId, devId, certId, oauthToken)
+  return new EbayService(appId, devId, certId)
 }

@@ -1085,6 +1085,446 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // ── D3: AI 2nd-Check Route ────────────────────────────────────────────────
+  // POST /api/notion/ai-check/:notionPageId
+  // Reads a Notion listing page, asks Claude to audit it, applies any
+  // corrections back to Notion, and writes AI Check Status / Notes. Gate
+  // between "ready to list" and "ED Approved → eBay push". Options strings
+  // are CA-canonical (PKT-20260415-021) — silent-reject on exact-match misses.
+  const aiCheckMatch = requestUrl.pathname.match(/^\/api\/notion\/ai-check\/([^/]+)$/)
+  if (aiCheckMatch && req.method === 'POST') {
+    const pageId = aiCheckMatch[1]
+    try {
+      if (!anthropicApiKey) {
+        sendJson(res, 503, { error: 'ANTHROPIC_API_KEY not configured on the server.' })
+        return
+      }
+
+      // Mark the page "In Progress" before the Anthropic round-trip so the UI
+      // reflects work happening. Swallow errors — this is cosmetic.
+      await notionRequest(`/pages/${pageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          properties: {
+            'AI Check Status': { select: { name: '🤖 In Progress' } },
+            'Status': { select: { name: '🤖 AI Check In Progress' } },
+          },
+        }),
+      }).catch((e) => console.warn('[ai-check] progress marker failed:', e.message))
+
+      const page = await notionRequest(`/pages/${pageId}`)
+      const props = page.properties || {}
+      const getTitle = (p) => (p?.title?.[0]?.plain_text) || ''
+      const getRt = (p) => (p?.rich_text?.map((r) => r.plain_text).join('') || '')
+      const getSel = (p) => p?.select?.name || ''
+      const getNum = (p) => (typeof p?.number === 'number' ? p.number : null)
+
+      const listingSummary = {
+        title: getTitle(props['Item Name']),
+        seoTitle: getRt(props['SEO Title']),
+        subtitle: getRt(props['Subtitle']),
+        brand: getRt(props['Brand']),
+        model: getRt(props['Model / SKU']),
+        mpn: getRt(props['MPN']),
+        upc: getRt(props['UPC / EAN / GTIN']),
+        category: getSel(props['Category']),
+        ebayCategoryId: getRt(props['eBay Category ID']),
+        condition: getSel(props['Condition']),
+        conditionDescription: getRt(props['Condition Description']),
+        color: getRt(props['Color']),
+        size: getRt(props['Size']),
+        material: getRt(props['Material']),
+        department: getSel(props['Department']),
+        itemSpecifics: getRt(props['Item Specifics']),
+        dimensions: getRt(props['Item L x W x H (in)']),
+        weightOz: getNum(props['Item Weight (oz)']),
+        weightLbs: getNum(props['Package Weight (lbs)']),
+        description: getRt(props['Item Description']),
+        listingPrice: getNum(props['Listing Price']),
+        minAcceptable: getNum(props['Min Acceptable Price']),
+        bestOfferEnabled: props['Best Offer Enabled']?.checkbox ?? null,
+        autoAccept: getNum(props['Best Offer Min $']),
+        autoDecline: getNum(props['Auto-Decline Price']),
+        shippingStrategy: getSel(props['Shipping Strategy']),
+        listingType: getSel(props['eBay Listing Type']),
+        returnPolicy: getSel(props['Return Policy']),
+      }
+
+      const systemPrompt = [
+        'You are an eBay listing QA auditor. Review the provided listing and return ONLY valid JSON (no markdown fences, no prose) matching:',
+        '{ "passed": boolean, "corrections": { [notionPropertyName]: string | number }, "flags": string[], "notes": string }',
+        '',
+        'Rules:',
+        '- passed=true only if the listing is accurate, complete, and would not be rejected or down-ranked by eBay.',
+        '- corrections keys MUST match Notion property names exactly (e.g. "SEO Title", "Item Description", "Brand").',
+        '- Only include a correction when the current value is clearly wrong, empty-but-required, or would reduce visibility.',
+        '- flags are short human-readable warnings the ED should see before approval (e.g. "Title missing brand").',
+        '- notes is a 1-3 sentence summary, no newlines, no markdown.',
+        '- If data is sparse but plausible, prefer passed=true with flags over failing.',
+      ].join('\n')
+
+      const anthropicResp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicApiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2000,
+          system: systemPrompt,
+          messages: [
+            { role: 'user', content: JSON.stringify(listingSummary, null, 2) },
+          ],
+        }),
+      })
+      if (!anthropicResp.ok) {
+        const errText = await anthropicResp.text().catch(() => '')
+        throw Object.assign(new Error(`Anthropic ${anthropicResp.status}: ${errText.slice(0, 300)}`), { status: 502 })
+      }
+      const anthropicData = await anthropicResp.json()
+      const rawText = anthropicData?.content?.[0]?.text || ''
+      // Strip ```json fences defensively even though the prompt forbids them.
+      const jsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
+      let parsed
+      try {
+        parsed = JSON.parse(jsonText)
+      } catch (e) {
+        throw Object.assign(new Error(`AI returned non-JSON: ${rawText.slice(0, 300)}`), { status: 502 })
+      }
+
+      const passed = parsed.passed === true
+      const corrections = (parsed.corrections && typeof parsed.corrections === 'object') ? parsed.corrections : {}
+      const flags = Array.isArray(parsed.flags) ? parsed.flags : []
+      const notesText = typeof parsed.notes === 'string' ? parsed.notes : ''
+
+      // Apply corrections — only touch properties we know exist in Master
+      // Inventory. Silent-drop unknown keys rather than risking a 400 that
+      // aborts the whole flow.
+      const rtField = (content) => ({ rich_text: [{ text: { content: String(content).slice(0, 2000) } }] })
+      const correctionPropMap = {
+        'Item Name': (v) => ({ title: [{ text: { content: String(v).slice(0, 2000) } }] }),
+        'SEO Title': (v) => rtField(String(v).slice(0, 80)),
+        'Subtitle': (v) => rtField(String(v).slice(0, 55)),
+        'Brand': rtField,
+        'Model / SKU': rtField,
+        'MPN': rtField,
+        'UPC / EAN / GTIN': rtField,
+        'Color': rtField,
+        'Size': rtField,
+        'Material': rtField,
+        'Condition Description': rtField,
+        'Item Description': rtField,
+        'Item Specifics': rtField,
+        'Item L x W x H (in)': rtField,
+        'SEO Keywords': rtField,
+        'Market Notes': rtField,
+        'Listing Price': (v) => ({ number: Number(v) }),
+        'Min Acceptable Price': (v) => ({ number: Number(v) }),
+        'Best Offer Min $': (v) => ({ number: Number(v) }),
+        'Auto-Decline Price': (v) => ({ number: Number(v) }),
+      }
+      const correctionProps = {}
+      const appliedCorrections = {}
+      for (const [key, val] of Object.entries(corrections)) {
+        const mapper = correctionPropMap[key]
+        if (!mapper) continue
+        correctionProps[key] = mapper(val)
+        appliedCorrections[key] = val
+      }
+
+      const flagsText = flags.length ? `Flags: ${flags.join(' · ')}\n` : ''
+      const correctionsText = Object.keys(appliedCorrections).length
+        ? `Corrections applied: ${Object.keys(appliedCorrections).join(', ')}\n`
+        : ''
+      const aiNotes = (flagsText + correctionsText + notesText).slice(0, 2000)
+
+      // CA-canonical strings — must match exactly (PKT-20260415-021).
+      const aiCheckStatusName = passed ? '✅ Passed' : '⚠️ Needs Review'
+      const pageStatusName = passed ? '👁️ Pending ED Approval' : '⚠️ Needs Review'
+
+      const patchProps = {
+        ...correctionProps,
+        'AI Check Status': { select: { name: aiCheckStatusName } },
+        'AI Check Notes': rtField(aiNotes),
+        'Status': { select: { name: pageStatusName } },
+      }
+      await notionRequest(`/pages/${pageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ properties: patchProps }),
+      })
+
+      sendJson(res, 200, {
+        ok: true,
+        passed,
+        flags,
+        notes: notesText,
+        correctionsApplied: Object.keys(appliedCorrections),
+      })
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ai-check] failed:', error.message)
+      // Best-effort: mark Notion page Needs Review so the UI doesn't leave it
+      // stuck "In Progress" after a server error.
+      await notionRequest(`/pages/${pageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          properties: {
+            'AI Check Status': { select: { name: '⚠️ Needs Review' } },
+            'AI Check Notes': { rich_text: [{ text: { content: `AI check error: ${error.message}`.slice(0, 2000) } }] },
+          },
+        }),
+      }).catch(() => {})
+      sendJson(res, status, { error: error.message, ...(error.payload || {}) })
+    }
+    return
+  }
+
+  // ── D4: eBay Listing Push ─────────────────────────────────────────────────
+  // POST /api/ebay/push-listing/:notionPageId
+  // Gated: Push Approved === true AND AI Check Status === "✅ Passed".
+  // Writes inventory_item → creates offer → publishes → mirrors result back
+  // to Notion + Supabase. merchantLocationKey must be EBAY_MERCHANT_LOCATION_KEY.
+  const pushListingMatch = requestUrl.pathname.match(/^\/api\/ebay\/push-listing\/([^/]+)$/)
+  if (pushListingMatch && req.method === 'POST') {
+    const pageId = pushListingMatch[1]
+    try {
+      if (!process.env.EBAY_FULFILLMENT_POLICY_ID ||
+          !process.env.EBAY_RETURN_POLICY_ID ||
+          !process.env.EBAY_PAYMENT_POLICY_ID) {
+        sendJson(res, 503, {
+          error: 'eBay policy IDs not configured. Run GET /api/ebay/setup-policies and add the IDs to Railway.',
+        })
+        return
+      }
+
+      const page = await notionRequest(`/pages/${pageId}`)
+      const props = page.properties || {}
+      const getTitle = (p) => (p?.title?.[0]?.plain_text) || ''
+      const getRt = (p) => (p?.rich_text?.map((r) => r.plain_text).join('') || '')
+      const getSel = (p) => p?.select?.name || ''
+      const getNum = (p) => (typeof p?.number === 'number' ? p.number : null)
+      const getChk = (p) => p?.checkbox === true
+      const getFiles = (p) => (p?.files || []).map((f) => f?.external?.url || f?.file?.url).filter(Boolean)
+
+      const pushApproved = getChk(props['Push Approved'])
+      const aiCheckStatus = getSel(props['AI Check Status'])
+      if (!pushApproved || aiCheckStatus !== '✅ Passed') {
+        sendJson(res, 403, {
+          error: 'Listing not cleared for push.',
+          pushApproved,
+          aiCheckStatus,
+          required: { pushApproved: true, aiCheckStatus: '✅ Passed' },
+        })
+        return
+      }
+
+      // Build SKU — prefer "Model / SKU", fall back to a stable page-id slug.
+      const skuBase = (getRt(props['Model / SKU']) || getTitle(props['Item Name']) || `page-${pageId}`)
+        .toString()
+        .replace(/[^A-Za-z0-9_-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 48) || `page-${pageId.slice(0, 8)}`
+      const sku = skuBase
+
+      // Map Notion condition select → eBay condition enum. eBay Sell API uses
+      // conditionId strings, not string enums, for new-with-defects etc — we
+      // expose the enum form which Inventory API accepts via "condition".
+      const conditionMap = {
+        'New': 'NEW',
+        'New – Sealed': 'NEW',
+        'New – Open Box': 'LIKE_NEW',
+        'Used – Like New': 'LIKE_NEW',
+        'Used – Very Good': 'VERY_GOOD',
+        'Used – Good': 'GOOD',
+        'Used – Acceptable': 'ACCEPTABLE',
+        'For Parts / Repair': 'FOR_PARTS_OR_NOT_WORKING',
+      }
+      const notionCondition = getSel(props['Condition'])
+      const ebayCondition = conditionMap[notionCondition] || 'USED_GOOD'
+
+      const title = (getRt(props['SEO Title']) || getTitle(props['Item Name']) || '').slice(0, 80)
+      const description = getRt(props['Item Description']) || title
+      const brand = getRt(props['Brand'])
+      const model = getRt(props['Model / SKU'])
+      const mpn = getRt(props['MPN'])
+      const upc = getRt(props['UPC / EAN / GTIN'])
+      const color = getRt(props['Color'])
+      const size = getRt(props['Size'])
+      const material = getRt(props['Material'])
+      const department = getSel(props['Department'])
+      const ebayCategoryId = getRt(props['eBay Category ID'])
+      const weightOz = getNum(props['Item Weight (oz)'])
+      const photoUrls = getFiles(props['Listing Photos'])
+      const price = getNum(props['Listing Price'])
+      const bestOfferEnabled = getChk(props['Best Offer Enabled'])
+      const autoAccept = getNum(props['Best Offer Min $'])
+      const autoDecline = getNum(props['Auto-Decline Price'])
+
+      if (!title || !description || !price) {
+        sendJson(res, 400, { error: 'Listing missing required fields (title, description, or price).' })
+        return
+      }
+
+      const aspects = {}
+      if (brand) aspects['Brand'] = [brand]
+      if (model) aspects['MPN'] = [mpn || model]
+      if (color) aspects['Color'] = [color]
+      if (size) aspects['Size'] = [size]
+      if (material) aspects['Material'] = [material]
+      if (department) aspects['Department'] = [department]
+
+      const accessToken = await getValidEbayToken()
+      const ebayAuthHeaders = {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Content-Language': 'en-US',
+      }
+
+      // Mark Notion "🔄 Pushing" before the multi-step eBay flow so the UI
+      // shows activity. Best-effort.
+      await notionRequest(`/pages/${pageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          properties: { 'eBay Push Status': { select: { name: '🔄 Pushing' } } },
+        }),
+      }).catch(() => {})
+
+      // STEP 1 — inventory_item (PUT is an upsert)
+      const inventoryPayload = {
+        availability: { shipToLocationAvailability: { quantity: 1 } },
+        condition: ebayCondition,
+        product: {
+          title,
+          description,
+          aspects,
+          imageUrls: photoUrls,
+          ...(brand ? { brand } : {}),
+          ...(mpn ? { mpn } : {}),
+          ...(upc ? { upc: [upc] } : {}),
+        },
+        ...(weightOz ? {
+          packageWeightAndSize: {
+            weight: { value: weightOz, unit: 'OUNCE' },
+          },
+        } : {}),
+      }
+      const invResp = await fetch(
+        `${ebayBaseUrl}/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`,
+        { method: 'PUT', headers: ebayAuthHeaders, body: JSON.stringify(inventoryPayload) }
+      )
+      if (!invResp.ok && invResp.status !== 204) {
+        const errText = await invResp.text().catch(() => '')
+        throw Object.assign(new Error(`inventory_item PUT ${invResp.status}: ${errText.slice(0, 400)}`), { status: invResp.status })
+      }
+
+      // STEP 2 — create offer
+      const offerPayload = {
+        sku,
+        marketplaceId: 'EBAY_US',
+        format: 'FIXED_PRICE',
+        availableQuantity: 1,
+        ...(ebayCategoryId ? { categoryId: ebayCategoryId } : {}),
+        listingDescription: description,
+        listingPolicies: {
+          fulfillmentPolicyId: process.env.EBAY_FULFILLMENT_POLICY_ID,
+          paymentPolicyId: process.env.EBAY_PAYMENT_POLICY_ID,
+          returnPolicyId: process.env.EBAY_RETURN_POLICY_ID,
+          ...((bestOfferEnabled && autoAccept) ? {
+            bestOfferTerms: {
+              bestOfferEnabled: true,
+              ...(autoAccept ? { autoAcceptPrice: { value: autoAccept.toFixed(2), currency: 'USD' } } : {}),
+              ...(autoDecline ? { autoDeclinePrice: { value: autoDecline.toFixed(2), currency: 'USD' } } : {}),
+            },
+          } : {}),
+        },
+        pricingSummary: {
+          price: { value: price.toFixed(2), currency: 'USD' },
+        },
+        merchantLocationKey: EBAY_MERCHANT_LOCATION_KEY,
+      }
+      const offerResp = await fetch(`${ebayBaseUrl}/sell/inventory/v1/offer`, {
+        method: 'POST',
+        headers: ebayAuthHeaders,
+        body: JSON.stringify(offerPayload),
+      })
+      if (!offerResp.ok) {
+        const errText = await offerResp.text().catch(() => '')
+        throw Object.assign(new Error(`offer POST ${offerResp.status}: ${errText.slice(0, 400)}`), { status: offerResp.status })
+      }
+      const offerData = await offerResp.json()
+      const offerId = offerData.offerId
+      if (!offerId) throw new Error('offer POST succeeded but returned no offerId')
+
+      // STEP 3 — publish
+      const publishResp = await fetch(
+        `${ebayBaseUrl}/sell/inventory/v1/offer/${offerId}/publish`,
+        { method: 'POST', headers: ebayAuthHeaders }
+      )
+      if (!publishResp.ok) {
+        const errText = await publishResp.text().catch(() => '')
+        throw Object.assign(new Error(`offer publish ${publishResp.status}: ${errText.slice(0, 400)}`), { status: publishResp.status })
+      }
+      const publishData = await publishResp.json()
+      const listingId = publishData.listingId
+      if (!listingId) throw new Error('publish succeeded but returned no listingId')
+
+      const listingUrl = `https://www.ebay.com/itm/${listingId}`
+
+      // Mirror success back to Notion.
+      await notionRequest(`/pages/${pageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          properties: {
+            'eBay Item Number': { rich_text: [{ text: { content: String(listingId) } }] },
+            'eBay Push Status': { select: { name: '✅ Live' } },
+            'Listing URL': { url: listingUrl },
+            'Status': { select: { name: '🟣 Listed – Awaiting Sale' } },
+            'Listed': { checkbox: true },
+            'Push Approved': { checkbox: false },
+          },
+        }),
+      })
+
+      // Mirror to Supabase scans table if present. Match by Notion page id
+      // when we've recorded it; silent no-op if the scan row doesn't exist.
+      if (supabaseUrl && supabaseServiceKey) {
+        await fetch(
+          `${supabaseUrl}/rest/v1/scans?notion_page_id=eq.${encodeURIComponent(pageId)}`,
+          {
+            method: 'PATCH',
+            headers: { ...supabaseServiceHeaders(), Prefer: 'return=minimal' },
+            body: JSON.stringify({ ebay_listing_id: String(listingId) }),
+          }
+        ).catch((e) => console.warn('[push-listing] supabase mirror failed:', e.message))
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        sku,
+        offerId,
+        listingId: String(listingId),
+        listingUrl,
+      })
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[push-listing] failed:', error.message)
+      // Best-effort: mark Notion Failed so the UI doesn't stay "Pushing".
+      await notionRequest(`/pages/${pageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          properties: {
+            'eBay Push Status': { select: { name: '❌ Failed' } },
+            'AI Check Notes': { rich_text: [{ text: { content: `eBay push error: ${error.message}`.slice(0, 2000) } }] },
+          },
+        }),
+      }).catch(() => {})
+      sendJson(res, status, { error: error.message, ...(error.payload || {}) })
+    }
+    return
+  }
+
   if (requestUrl.pathname === '/api/sold-items' && req.method === 'GET') {
     try {
       sendJson(res, 200, await getSoldFeed())
