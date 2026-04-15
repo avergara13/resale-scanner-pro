@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, Eye, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus, DotsThreeVertical } from '@phosphor-icons/react'
+import { Trash, Eye, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus, DotsThreeVertical, Camera } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import { Card } from '@/components/ui/card'
@@ -60,6 +60,7 @@ interface QueueScreenProps {
   onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
   onPushToNotion?: (itemId: string) => Promise<void>
+  onEditPhotos?: (item: ScannedItem) => void
 }
 
 type FilterOption = 'ALL' | 'ITEMS' | 'LISTED'
@@ -81,6 +82,7 @@ interface SortableItemProps {
   onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
   onPushToNotion?: (itemId: string) => Promise<void>
+  onEditPhotos?: (item: ScannedItem) => void
 }
 
 function SortableItem({
@@ -99,6 +101,7 @@ function SortableItem({
   onOpenDetail,
   onBuyItem,
   onPushToNotion,
+  onEditPhotos,
 }: SortableItemProps) {
   const {
     attributes,
@@ -433,6 +436,17 @@ function SortableItem({
                   List
                 </button>
               )}
+              {onEditPhotos && (
+                <button
+                  onClick={() => onEditPhotos(item)}
+                  aria-label="Edit photos"
+                  title="Edit Photos"
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-t3 hover:text-b1 hover:bg-b1/10 active:scale-95 transition-all"
+                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <Camera size={14} weight="bold" />
+                </button>
+              )}
             </>
           )
         ) : onBuyItem ? (
@@ -486,7 +500,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem, onPushToNotion }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem, onPushToNotion, onEditPhotos }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -1365,6 +1379,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onOpenDetail={onOpenDetail}
                       onBuyItem={onBuyItem}
                       onPushToNotion={onPushToNotion}
+                      onEditPhotos={onEditPhotos}
                     />
                   ))}
                 </div>

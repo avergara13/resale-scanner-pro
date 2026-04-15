@@ -126,7 +126,7 @@ export class SupabaseService {
         .upload(path, blob, { contentType: 'image/jpeg', upsert: true })
 
       if (error) {
-        console.warn('[supabase] uploadPhoto error:', error.message)
+        console.error('[photo] upload error full:', JSON.stringify(error))
         return null
       }
 
