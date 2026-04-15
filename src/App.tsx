@@ -82,7 +82,7 @@ function App() {
   const [showSessionTrends, setShowSessionTrends] = useState(false)
   const [agentPendingMessage, setAgentPendingMessage] = useState<string | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
-  const [cameraMode, setCameraMode] = useState<'new-scan' | 'add-photo' | 'replace-primary'>('new-scan')
+  const [cameraMode, setCameraMode] = useState<'new-scan' | 'add-photo' | 'replace-primary' | 'listing-photo'>('new-scan')
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
   // Tracks whether the current scan-result was opened from the Agent Scans tab (Reopen)
@@ -98,6 +98,7 @@ function App() {
     localPhotos: string[]          // new base64/data-URLs — these get uploaded on Done
     decision: 'BUY' | 'MAYBE' | 'edit'
     returnScreen?: Screen          // for edit-mode Back navigation (Entry Points B & C)
+    capturedPhoto?: string         // image from listing camera overlay; consumed by PhotoManager
   } | null>(null)
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
@@ -304,6 +305,22 @@ function App() {
   }, [allSessions, settings?.userProfile, globalProfile])
 
   const handleCapture = useCallback(async (imageData: string, price: number, barcodeProduct?: BarcodeProduct, condition?: string, existingItem?: ScannedItem) => {
+    // Route captured image back to Photo Manager without a new pipeline run
+    if (cameraMode === 'listing-photo') {
+      triggerCapture()
+      setCameraMode('new-scan')
+      setCameraOpen(false)
+      setPendingPhotoDecision(prev => {
+        if (!prev) {
+          // Photo Manager unmounted between camera open and capture — drop the photo with feedback
+          toast.error('Photo Manager closed before capture completed.')
+          return prev
+        }
+        return { ...prev, capturedPhoto: imageData }
+      })
+      return
+    }
+
     // Route to add-photo handler — append this image to the current item without a new pipeline run
     if (cameraMode === 'add-photo') {
       setCameraMode('new-scan')
@@ -1850,6 +1867,20 @@ function App() {
     setScreen(returnTo || 'scan-result')
   }, [pendingPhotoDecision, setPendingPhotoDecision, setScreen])
 
+  // ── Photo Manager: open listing camera overlay ───────────────────────────────
+  const handleListingCameraOpen = useCallback((_currentPrimaryIndex: number) => {
+    if (!pendingPhotoDecision) return
+    setCameraMode('listing-photo')
+    setCameraOpen(true)
+  }, [pendingPhotoDecision])
+
+  // Stable ref for PhotoManager useEffect — inline arrows would re-trigger on every App render
+  const handleCapturedPhotoConsumed = useCallback(() => {
+    setPendingPhotoDecision(prev =>
+      prev ? { ...prev, capturedPhoto: undefined } : prev
+    )
+  }, [])
+
   // ── Photo Manager: open from item (Entry Points B & C) ───────────────────────
   const handleOpenPhotoManager = useCallback((item: ScannedItem, fromScreen: Screen) => {
     // Edit mode: existing photoUrls are remote URLs (pass through); no local photos yet
@@ -2928,6 +2959,9 @@ function App() {
                 }
                 onDone={handlePhotoManagerDone}
                 onBack={handlePhotoManagerBack}
+                onAddViaCamera={handleListingCameraOpen}
+                capturedPhoto={pendingPhotoDecision.capturedPhoto}
+                onCapturedPhotoConsumed={handleCapturedPhotoConsumed}
               />
             </motion.div>
           )}
