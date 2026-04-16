@@ -65,6 +65,8 @@ interface QueueScreenProps {
   highlightItemId?: string | null
   /** Clear highlight after animation completes */
   onHighlightClear?: () => void
+  /** Re-scan: return a BUY item to the scan pile for re-research */
+  onReScanItem?: (id: string) => void
 }
 
 type FilterOption = 'ALL' | 'ITEMS' | 'LISTED'
@@ -86,6 +88,7 @@ interface SortableItemProps {
   onBuyItem?: (id: string) => void
   onOpenListingBuilder?: (itemId: string) => void
   onListItem?: (itemId: string) => void
+  onReScanItem?: (id: string) => void
 }
 
 function SortableItem({
@@ -104,6 +107,7 @@ function SortableItem({
   onBuyItem,
   onOpenListingBuilder,
   onListItem,
+  onReScanItem,
 }: SortableItemProps) {
   const {
     attributes,
@@ -414,6 +418,19 @@ function SortableItem({
           </>
         ) : null}
 
+        {/* Re-scan — return to scan pile for re-research (not available once live on eBay) */}
+        {onReScanItem && !item.ebayListingId && (
+          <button
+            onClick={() => onReScanItem(item.id)}
+            aria-label="Return to scan pile"
+            className="h-8 px-2.5 flex items-center justify-center gap-1 text-[10px] font-bold text-amber rounded-full bg-amber/10 hover:bg-amber/20 active:scale-95 transition-all"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <ArrowCounterClockwise size={12} weight="bold" />
+            Re-scan
+          </button>
+        )}
+
         {/* Spacer */}
         <div className="flex-1" />
 
@@ -459,7 +476,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onBuyItem, onOpenListingBuilder, onListItem, highlightItemId, onHighlightClear }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onBuyItem, onOpenListingBuilder, onListItem, highlightItemId, onHighlightClear, onReScanItem }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -604,6 +621,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     if (DONE_STATUSES.includes(item.listingStatus ?? '')) {
       return false
     }
+
+    // Listing Queue only shows BUY items — MAYBE/PENDING/PASS belong in the scan pile or session history
+    if (item.decision === 'MAYBE' || item.decision === 'PENDING' || item.decision === 'PASS') return false
 
     const matchesFilter =
       filter === 'ALL' ||
@@ -1348,6 +1368,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       onBuyItem={onBuyItem}
                       onOpenListingBuilder={onOpenListingBuilder}
                       onListItem={onListItem}
+                      onReScanItem={onReScanItem}
                     />
                   ))}
                 </div>
@@ -1472,6 +1493,17 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                             >
                               List
                             </Button>
+                          )}
+                          {onReScanItem && !item.ebayListingId && (
+                            <button
+                              onClick={() => onReScanItem(item.id)}
+                              aria-label="Return to scan pile"
+                              className="h-7 md:h-8 px-2.5 flex items-center justify-center gap-1 text-[10px] font-bold text-amber rounded-full bg-amber/10 hover:bg-amber/20 active:scale-95 transition-all"
+                              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                            >
+                              <ArrowCounterClockwise size={12} weight="bold" />
+                              Re-scan
+                            </button>
                           )}
                           <div className="flex-1" />
                           <Button
