@@ -1731,6 +1731,7 @@ function App() {
     listingOptimizationService,
     setQueue,
     setScanHistory,
+    setSession,
     setScreen,
     setAgentActiveTab,
     setPendingPhotoDecision,
