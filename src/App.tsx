@@ -34,6 +34,7 @@ import { createListingOptimizationService } from './lib/listing-optimization-ser
 import { createNotionService } from './lib/notion-service'
 import { SupabaseService } from './lib/supabase-service'
 import { urlToDataUrl } from './lib/photo'
+import { stripPersistFields } from './lib/scan-item'
 import { fetchSoldItems, updateSoldItemShipping } from './lib/sold-service'
 import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
@@ -833,13 +834,9 @@ function App() {
       
       setCurrentItem(updatedItem)
 
-      // Log to scan history — strip large base64 images to avoid localStorage quota issues
-      // Only persist the thumbnail; full images are only needed during the AI pipeline (in memory)
-      const persistableItem = { ...updatedItem }
-      delete persistableItem.imageData
-      delete persistableItem.imageOptimized
-      delete persistableItem.additionalImageData  // strip full base64; keep additionalImages thumbnails
-      delete persistableItem.photos               // strip working base64 array; photoUrls (remote URLs) are kept
+      // Log to scan history — strip large base64 images to avoid localStorage quota issues.
+      // Only persist the thumbnail; full images are only needed during the AI pipeline (in memory).
+      const persistableItem = stripPersistFields(updatedItem)
       setScanHistory(prev => {
         const existing = prev || []
         if (effectiveExistingItem) {
@@ -1314,7 +1311,7 @@ function App() {
       return
     }
 
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = currentItem!
+    const lightweight = stripPersistFields(currentItem!)
     const draftItem: ScannedItem = {
       ...lightweight,
       purchasePrice: Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice,
@@ -1545,7 +1542,7 @@ function App() {
       toast.error('No image to save')
       return
     }
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = currentItem!
+    const lightweight = stripPersistFields(currentItem!)
     // NaN means the field was left empty — fall back to the analyzed price
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     const effectiveSellPrice =
@@ -1611,7 +1608,7 @@ function App() {
       return
     }
     // Strip heavy blobs — keep thumbnail for scan history display
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = currentItem!
+    const lightweight = stripPersistFields(currentItem!)
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     // Recompute metrics if price changed — keeps stored profitMargin accurate
     let resolvedMargin = currentItem!.profitMargin
@@ -1656,7 +1653,7 @@ function App() {
       toast.error('No image to save')
       return
     }
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = currentItem!
+    const lightweight = stripPersistFields(currentItem!)
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     // MAYBE items live in the working queue AND scan-history.
     // Queue lets the user reopen/edit the card indefinitely.
@@ -1727,21 +1724,15 @@ function App() {
     }
 
     const finalPhotoUrls = [...existingUrls, ...newlyUploadedUrls]
-    // Use pendingPhotoDecision.item (may have been patched with generated SKU above)
+    // Use pendingPhotoDecision.item (may have been patched with generated SKU above).
+    // stripPersistFields is the canonical KV scrub — defends against any upstream handler
+    // that forgot to strip (the original root cause of photos not sticking).
     const latestItem = pendingPhotoDecision.item
-    const finalItem: ScannedItem = {
+    const finalItem: ScannedItem = stripPersistFields({
       ...latestItem,
       primaryPhotoIndex: primaryIndex,
       ...(finalPhotoUrls.length > 0 && { photoUrls: finalPhotoUrls }),
-    }
-    // Belt-and-suspenders: strip ALL base64 blobs before writing to KV-persisted state.
-    // Lightweight destructure upstream (handleCreateListingFromScan etc.) should already
-    // exclude these, but explicit delete guarantees no multi-MB blobs enter localStorage.
-    const _mutableFinal = finalItem as unknown as Record<string, unknown>
-    delete _mutableFinal.imageData
-    delete _mutableFinal.imageOptimized
-    delete _mutableFinal.additionalImageData
-    delete _mutableFinal.photos
+    })
 
     // Clear pending state + currentItem (now safe since user confirmed Done)
     setPendingPhotoDecision(null)
@@ -1932,7 +1923,7 @@ function App() {
 
   // ── Agent screen: PASS scan card ──────────────────────────────────────────
   const handlePassFromAgent = useCallback((item: ScannedItem) => {
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = item
+    const lightweight = stripPersistFields(item)
     const passItem: ScannedItem = { ...lightweight, decision: 'PASS', inQueue: false }
     setScanHistory(prev => {
       const existing = prev || []
