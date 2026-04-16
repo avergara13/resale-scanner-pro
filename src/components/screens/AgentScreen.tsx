@@ -27,7 +27,8 @@ import {
   ChatCircle,
   Camera,
   ShoppingCart,
-  ArrowSquareOut,
+  X,
+  ArrowClockwise,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -240,7 +241,6 @@ interface AgentScreenProps {
   onProcessingChange?: (processing: boolean) => void
   onCreateListing?: (itemId: string) => Promise<void>
   onOptimizeItem?: (itemId: string) => Promise<void>
-  onPushToNotion?: (itemId: string) => Promise<void>
   onBatchAnalyze?: () => Promise<void>
   onEditItem?: (itemId: string, updates: Partial<ScannedItem>) => void
   onRerunPipeline?: (itemId: string) => Promise<void>
@@ -250,6 +250,16 @@ interface AgentScreenProps {
   /** Open a specific queue item in the scan analysis screen (loads it as currentItem) */
   onOpenScanItem?: (item: ScannedItem) => void
   onOpenCamera?: () => void
+  /** Promote a PENDING/MAYBE scan card to BUY (routes through Photo Manager) */
+  onPromoteToBuy?: (item: ScannedItem) => void
+  /** Pass a scan card — records to scan history, removes from working queue */
+  onPassItem?: (item: ScannedItem) => void
+  /** Permanently delete a scan card from queue + scan history */
+  onDeleteItem?: (itemId: string) => void
+  /** Restore a PASS item back to MAYBE in the scan pile */
+  onRestorePassItem?: (item: ScannedItem) => void
+  /** Navigate to queue screen and highlight item */
+  onViewInQueue?: (itemId: string) => void
   onStartSession?: () => void
   onEndSession?: () => void
   onEditSession?: (sessionId: string, updates: Partial<Session>) => void
@@ -262,7 +272,7 @@ interface AgentScreenProps {
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true, onPromoteToBuy, onPassItem, onDeleteItem, onRestorePassItem, onViewInQueue }: AgentScreenProps) {
   const deviceId = useDeviceId()
   const [currentSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const sessionId = currentSession?.id
@@ -283,9 +293,9 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const [taskInput, setTaskInput] = useState('')
   const [showTaskInput, setShowTaskInput] = useState(false)
   const [pendingToolCalls, setPendingToolCalls] = useState<AgentToolCall[] | null>(null)
-  // Direct KV access for scan history mutations in the Scans tab
-  const [scanHistoryKV, setScanHistoryKV] = useKV<ScannedItem[]>('scan-history', [])
-  const [, setQueueKV] = useKV<ScannedItem[]>('queue', [])
+  // Direct KV read for session stats (scan history props come from App.tsx, but
+  // scanHistoryKV is the real-time hook for counting BUY/PASS in sessionStats)
+  const [scanHistoryKV] = useKV<ScannedItem[]>('scan-history', [])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   // Tracks whether the component is still mounted so long-running async
@@ -342,10 +352,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     return { total: unique.length, buy, pass, pending: maybe, maybe, queueCount, totalProfit }
   }, [sessionItems, scanHistoryKV, currentSession?.id])
 
-  // Session-scoped MAYBE/PENDING scan cards for the Scan Queue working list.
-  // Reads from queueItems (not scanHistory) so that:
-  //   - "Delete" removes from the working queue only
-  //   - Session scan history (scanHistoryKV, accessible via session dashboard "Scans") is never touched
+  // Session-scoped MAYBE/PENDING scan cards for the active scan pile.
   const sessionScans = useMemo(() => {
     const items = queueItems.filter(i => i.decision === 'PENDING' || i.decision === 'MAYBE')
     const filtered = currentSession?.id
@@ -354,21 +361,16 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     return [...filtered].sort((a, b) => b.timestamp - a.timestamp).slice(0, 100)
   }, [queueItems, currentSession?.id])
 
-  const handleDeleteScan = useCallback((itemId: string) => {
-    // Remove from working queue only — scanHistoryKV is the permanent session record
-    setQueueKV(prev => (prev || []).filter(i => i.id !== itemId))
-  }, [setQueueKV])
+  // Session History — BUY items from queue + PASS items from scanHistory, current session
+  const sessionHistory = useMemo(() => {
+    const sessionFilter = (i: ScannedItem) => currentSession?.id ? i.sessionId === currentSession.id : true
+    const buyItems = queueItems.filter(i => i.decision === 'BUY' && sessionFilter(i))
+    const passItems = scanHistory.filter(i => i.decision === 'PASS' && sessionFilter(i))
+    return [...buyItems, ...passItems].sort((a, b) => b.timestamp - a.timestamp)
+  }, [queueItems, scanHistory, currentSession?.id])
 
-  const handlePromoteToQueue = useCallback((item: ScannedItem) => {
-    const queueItem: ScannedItem = { ...item, inQueue: true, decision: 'BUY' as const }
-    setQueueKV(prev => {
-      const current = prev || []
-      if (current.some(i => i.id === queueItem.id)) return current.map(i => i.id === queueItem.id ? queueItem : i)
-      return [...current, queueItem]
-    })
-    // Note: do NOT erase from scanHistoryKV — scan history is the permanent session record
-    logActivity(`${item.productName || 'Item'} promoted to BUY queue`)
-  }, [setQueueKV])
+  // Delete confirmation state
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const prevMessageCount = useRef(chatMessages.length)
   const agentHasMounted = useRef(false)
@@ -657,28 +659,18 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
           addMsg(`**Step 2/3 — Optimize:** No items to optimize.`)
         }
 
-        // Step 3: Push to Notion — include both freshly processed items
-        // AND any pre-existing optimized-but-unpushed items.
-        // onPushToNotion guards: skips items without optimizedListing or
-        // already-pushed (notionPageId). Safe to over-include IDs.
+        // Step 3: Collect items ready for listing — includes freshly optimized
+        // items AND any pre-existing optimized-but-unlisted items.
         const preExistingReadyIds = sessionItems
-          .filter(i => i.optimizedListing && !i.notionPageId)
+          .filter(i => i.optimizedListing && !i.ebayListingId)
           .map(i => i.id)
         const pushCandidateIds = [...new Set([...allCandidateIds, ...preExistingReadyIds])]
 
-        if (pushCandidateIds.length > 0 && onPushToNotion) {
-          addMsg(`**Step 3/3 — Publishing listing(s) to Notion**`)
-          let pushed = 0
-          for (const itemId of pushCandidateIds) {
-            try {
-              await onPushToNotion(itemId)
-              pushed++
-            } catch (error) {
-              // onPushToNotion returns early for items without optimizedListing
-              // or already pushed — not a real failure
-            }
-          }
-          addMsg(`✅ Published ${pushed} listing(s) to Notion.`)
+        // WO-RSP-010: Push path moved to in-app ListingBuilder. Agent
+        // can optimize listings but the final push requires the ED to
+        // review the listing in the Builder and confirm via gate.
+        if (pushCandidateIds.length > 0) {
+          addMsg(`**Step 3/3 — Ready to list:** ${pushCandidateIds.length} listing(s) optimized. Open the Queue and tap **Build Listing** on each item to review, gate-check, and push to eBay.`)
         } else {
           addMsg(`**Step 3/3 — Publish:** No listings to push.`)
         }
@@ -791,22 +783,11 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
           )
         )
 
-        let successCount = 0
-        for (const item of readyItems) {
-          if (onPushToNotion) {
-            try {
-              await onPushToNotion(item.id)
-              successCount++
-            } catch (error) {
-              console.error('Failed to push item:', item.id, error)
-            }
-          }
-        }
-
+        // WO-RSP-010: Push path moved to in-app ListingBuilder
         const completionMessage: ChatMessage = {
           id: (Date.now() + 2).toString(),
           role: 'assistant',
-          content: `✅ Successfully pushed ${successCount} of ${readyItems.length} listings to Notion!`,
+          content: `**Step 3/3 — Ready to list:** ${readyItems.length} listing(s) optimized. Open the **Queue** and tap **Build Listing** on each item to review, gate-check, and push to eBay.`,
           timestamp: Date.now(),
         }
 
@@ -817,8 +798,8 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
               : s
           )
         )
-        
-        logActivity(`Pushed ${successCount} listings to Notion`)
+
+        logActivity(`${readyItems.length} listing(s) ready — open Queue → Build Listing`)
         setIsProcessing(false)
         return
       }
@@ -1215,7 +1196,7 @@ ${settings.userProfile.aiContext}` : ''}`
       // but short-circuit here as well to avoid the dev-mode warning.
       if (isMountedRef.current) setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onPushToNotion, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals, queueItems])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals, queueItems])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {
@@ -1755,7 +1736,9 @@ ${settings.userProfile.aiContext}` : ''}`
                     ? 'text-green bg-green/10 border-green/30'
                     : item.decision === 'PASS'
                       ? 'text-red bg-red/10 border-red/30'
-                      : 'text-amber bg-amber/10 border-amber/30'
+                      : item.decision === 'MAYBE'
+                        ? 'text-amber bg-amber/10 border-amber/30'
+                        : 'text-sky bg-sky/10 border-sky/30' // PENDING — visually distinct from MAYBE
 
                 return (
                   <Card
@@ -1763,8 +1746,13 @@ ${settings.userProfile.aiContext}` : ''}`
                     className="border-s2/60 flex flex-col gap-0 overflow-hidden"
                     style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
                   >
-                    {/* ── Info row ── */}
-                    <div className="p-3 flex gap-3 items-start">
+                    {/* ── Tappable info row → opens scan-result ── */}
+                    <div
+                      role="button"
+                      onClick={() => onOpenScanItem?.(item)}
+                      className="p-3 flex gap-3 items-start cursor-pointer active:opacity-80 transition-opacity"
+                      style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                    >
                       {(item.imageThumbnail || item.imageData) && (
                         <img
                           src={item.imageThumbnail || item.imageData}
@@ -1806,41 +1794,105 @@ ${settings.userProfile.aiContext}` : ''}`
                       </div>
                     </div>
 
-                    {/* ── Action row ── */}
-                    <div className="border-t border-s2/60 flex items-center">
-                      {/* Reopen — go back to scan analysis */}
+                    {/* ── Action row (no border-t — flush card pattern) ── */}
+                    <div className="flex items-center">
+                      {/* PASS */}
                       <button
-                        onClick={() => onOpenScanItem?.(item)}
-                        className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-t2 hover:text-t1 hover:bg-s1 active:opacity-60 transition-colors"
+                        onClick={() => onPassItem?.(item)}
+                        className="flex-1 h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold text-red hover:bg-red/10 active:opacity-60 transition-colors"
                         style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        <ArrowSquareOut size={13} weight="bold" />
-                        Reopen
+                        <X size={13} weight="bold" />
+                        PASS
                       </button>
                       <div className="w-px h-5 bg-s2 flex-shrink-0" />
-                      {/* Promote to BUY */}
+                      {/* BUY — routes through Photo Manager */}
                       <button
-                        onClick={() => handlePromoteToQueue(item)}
+                        onClick={() => onPromoteToBuy?.(item)}
                         className="flex-1 h-8 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-xl mx-1.5"
                         style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
                       >
                         <ShoppingCart size={13} weight="bold" />
-                        Mark BUY
+                        BUY
                       </button>
                       <div className="w-px h-5 bg-s2 flex-shrink-0" />
-                      {/* Delete */}
-                      <button
-                        onClick={() => handleDeleteScan(item.id)}
-                        className="w-12 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
-                        title="Remove from scan history"
-                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        <Trash size={14} weight="bold" />
-                      </button>
+                      {/* Delete — with confirm */}
+                      {confirmDeleteId === item.id ? (
+                        <div className="flex items-center gap-1 px-2">
+                          <button
+                            onClick={() => { onDeleteItem?.(item.id); setConfirmDeleteId(null) }}
+                            className="text-[10px] font-bold text-red hover:underline"
+                            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            Remove
+                          </button>
+                          <span className="text-t3 text-[10px]">|</span>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-[10px] font-bold text-t3 hover:underline"
+                            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(item.id)}
+                          className="w-12 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
+                          title="Permanently remove"
+                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          <Trash size={14} weight="bold" />
+                        </button>
+                      )}
                     </div>
                   </Card>
                 )
               })
+            )}
+
+            {/* ── Session History — completed decisions ── */}
+            {sessionHistory.length > 0 && (
+              <div className="mt-6">
+                <p className="text-[11px] font-bold text-t3 uppercase tracking-wider mb-2 px-1">
+                  Session History
+                </p>
+                {sessionHistory.map(item => (
+                  <div key={item.id} className="flex items-center gap-3 py-2 px-1 border-b border-s2/40">
+                    {item.imageThumbnail && (
+                      <img src={item.imageThumbnail} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-t1 truncate">{item.productName || 'Item'}</p>
+                      <p className="text-[10px] text-t3">${item.purchasePrice.toFixed(2)}</p>
+                    </div>
+                    <span className={cn('text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border',
+                      item.decision === 'BUY' ? 'text-green bg-green/10 border-green/30' : 'text-red bg-red/10 border-red/30'
+                    )}>
+                      {item.decision}
+                    </span>
+                    {item.decision === 'PASS' && (
+                      <button
+                        onClick={() => onRestorePassItem?.(item)}
+                        className="text-[10px] font-bold text-b1 hover:underline flex items-center gap-0.5"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <ArrowClockwise size={10} weight="bold" />
+                        Restore
+                      </button>
+                    )}
+                    {item.decision === 'BUY' && (
+                      <button
+                        onClick={() => onViewInQueue?.(item.id)}
+                        className="text-[10px] font-bold text-b1 hover:underline"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        View in Queue
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

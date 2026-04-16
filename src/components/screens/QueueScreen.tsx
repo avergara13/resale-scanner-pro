@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, Eye, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus, DotsThreeVertical, Camera } from '@phosphor-icons/react'
+import { Trash, Lightning, DownloadSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import { Card } from '@/components/ui/card'
@@ -9,7 +9,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { logActivity } from '@/lib/activity-log'
-import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
@@ -57,11 +56,15 @@ interface QueueScreenProps {
   onDelist?: (itemId: string) => void
   personalSessionIds?: Set<string>
   onReanalyze?: (itemId: string) => void
-  onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
-  onPushToNotion?: (itemId: string) => Promise<void>
-  onPushToEbay?: (itemId: string) => Promise<void>
-  onEditPhotos?: (item: ScannedItem) => void
+  /** WO-RSP-010: opens the in-app ListingBuilder (card body tap + edit) */
+  onOpenListingBuilder?: (itemId: string) => void
+  /** Quick-list: opens ListingBuilder with gate drawer pre-opened */
+  onListItem?: (itemId: string) => void
+  /** Item to scroll-to and flash-highlight (from Agent "View in Queue") */
+  highlightItemId?: string | null
+  /** Clear highlight after animation completes */
+  onHighlightClear?: () => void
 }
 
 type FilterOption = 'ALL' | 'ITEMS' | 'LISTED'
@@ -72,20 +75,17 @@ interface SortableItemProps {
   isSelected: boolean
   allTags: ItemTag[]
   isPersonal?: boolean
+  isHighlighted?: boolean
   onToggleSelect: (id: string) => void
-  onEdit: (item: ScannedItem) => void
   onRemove: (id: string) => void
   onCreateListing: (id: string) => void
   onEditTags: (itemId: string, tags: string[]) => void
   onOpenSoldDialog?: (item: ScannedItem) => void
   onDelist?: (itemId: string) => void
   onReanalyze?: (itemId: string) => void
-  onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
-  onPushToNotion?: (itemId: string) => Promise<void>
-  onPushToEbay?: (itemId: string) => Promise<void>
-  onEditPhotos?: (item: ScannedItem) => void
-  onDecisionChange?: (itemId: string, decision: Decision) => void
+  onOpenListingBuilder?: (itemId: string) => void
+  onListItem?: (itemId: string) => void
 }
 
 function SortableItem({
@@ -93,20 +93,17 @@ function SortableItem({
   isSelected,
   allTags,
   isPersonal,
+  isHighlighted,
   onToggleSelect,
-  onEdit,
   onRemove,
   onCreateListing,
   onEditTags,
   onOpenSoldDialog,
   onDelist,
   onReanalyze,
-  onOpenDetail,
   onBuyItem,
-  onPushToNotion,
-  onPushToEbay,
-  onEditPhotos,
-  onDecisionChange,
+  onOpenListingBuilder,
+  onListItem,
 }: SortableItemProps) {
   const {
     attributes,
@@ -119,20 +116,28 @@ function SortableItem({
 
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  // Listing completion — 6 fields required before an item is ready to push
-  // productName + price (40 pts core) + category + condition + description + AI optimization (60 pts)
-  const completionPct = (() => {
+  // Card state — determines left border accent + available actions
+  const cardState: 'unoptimized' | 'ready' | 'live' = item.ebayListingId
+    ? 'live'
+    : item.optimizedListing
+    ? 'ready'
+    : 'unoptimized'
+
+  // Gate completion score (7 required fields) — replaces old 6-field completion %
+  const gateScore = useMemo(() => {
     if (item.decision !== 'BUY' || item.listingStatus === 'published') return null
-    const fields = [
-      { filled: !!item.productName,          pts: 20 },
-      { filled: !!item.estimatedSellPrice,   pts: 20 },
-      { filled: !!item.category,             pts: 15 },
-      { filled: !!item.condition,            pts: 15 },
-      { filled: !!item.description,          pts: 15 },
-      { filled: !!item.optimizedListing,     pts: 15 },
+    const l = item.optimizedListing
+    const checks = [
+      !!(l?.title || item.productName)?.trim() && ((l?.title || item.productName) || '').length <= 80,  // title
+      !!(l?.condition || item.condition),                                                                // condition
+      (l?.description || item.description || '').length >= 400,                                          // description
+      (item.photoUrls?.length || item.additionalImageData?.length || item.imageData ? 1 : 0) >= 1,      // photo
+      (l?.price || item.estimatedSellPrice || 0) > 0,                                                   // price
+      !!(l?.itemSpecifics?.['Brand'] || item.productName?.match(/^([A-Z][a-zA-Z&]{1,19})(?:\s|$)/)?.[1]), // brand
+      !!(l?.ebayCategoryId) && l?.ebayCategoryId !== '99',                                               // category
     ]
-    return fields.reduce((sum, f) => sum + (f.filled ? f.pts : 0), 0)
-  })()
+    return { passed: checks.filter(Boolean).length, total: 7 }
+  }, [item])
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -146,23 +151,27 @@ function SortableItem({
   return (
     <Card
       ref={setNodeRef}
+      id={`queue-item-${item.id}`}
       style={style}
       className={cn(
-        // Reset Card defaults (gap-6, py-6, bg-card) and apply scan-card DNA
-        "border overflow-hidden flex flex-col gap-0 p-0 py-0 transition-colors rounded-2xl",
-        isSelected ? 'border-b1' : 'border-s2/60'
+        "border overflow-hidden flex flex-col gap-0 p-0 py-0 transition-colors rounded-2xl border-l-[3px]",
+        isSelected ? 'border-b1' : 'border-s2/60',
+        // Left border accent by card state
+        cardState === 'live' ? 'border-l-green' : cardState === 'ready' ? 'border-l-indigo-500' : 'border-l-amber',
+        // Flash highlight from "View in Queue"
+        isHighlighted && 'ring-2 ring-b1 ring-opacity-80 animate-pulse'
       )}
     >
-      {/* ── Listing completion bar — top of card, only for BUY items not yet published ── */}
-      {completionPct !== null && (
+      {/* ── Gate completion bar — scores 7 required fields ── */}
+      {gateScore && (
         <div className="relative w-full h-1.5 flex-shrink-0" style={{ background: 'color-mix(in oklch, var(--s2) 40%, transparent)' }}>
           <div
             className="h-full transition-all duration-500"
             style={{
-              width: `${completionPct}%`,
-              background: completionPct === 100
+              width: `${(gateScore.passed / gateScore.total) * 100}%`,
+              background: gateScore.passed >= 7
                 ? 'var(--green)'
-                : completionPct >= 60
+                : gateScore.passed >= 4
                 ? 'var(--amber)'
                 : 'var(--red)',
             }}
@@ -198,6 +207,14 @@ function SortableItem({
           </label>
         </div>
 
+        {/* Tappable zone: thumbnail + content → opens ListingBuilder */}
+        <div
+          className="flex gap-2.5 flex-1 min-w-0 cursor-pointer active:opacity-80 transition-opacity"
+          role="button"
+          tabIndex={0}
+          onClick={() => onOpenListingBuilder?.(item.id)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpenListingBuilder?.(item.id) }}
+        >
         {/* Thumbnail — rounded-lg to match scan cards */}
         {(item.imageThumbnail || item.imageData) ? (
           <img
@@ -224,12 +241,12 @@ function SortableItem({
               )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
-              {completionPct !== null && (
+              {gateScore && (
                 <span className={cn(
                   "font-mono font-bold text-[8px] px-1 py-0.5 rounded",
-                  completionPct === 100 ? 'text-green' : completionPct >= 60 ? 'text-amber' : 'text-red'
+                  gateScore.passed >= 7 ? 'text-green' : gateScore.passed >= 4 ? 'text-amber' : 'text-red'
                 )}>
-                  {completionPct}%
+                  {gateScore.passed}/{gateScore.total}
                 </span>
               )}
               {item.profitMargin != null && isFinite(item.profitMargin) && (
@@ -260,52 +277,34 @@ function SortableItem({
             )}
           </div>
 
-          {/* Listing status pill */}
-          {item.listingStatus === 'published' ? (
-            <div className="flex items-center gap-1.5">
-              {item.notionUrl ? (
-                <a
-                  href={item.notionUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={e => e.stopPropagation()}
-                  className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-green/10 text-green border-green/30 hover:bg-green/20 active:scale-95 transition-all"
-                >
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green" />
-                  </span>
-                  LISTED
-                </a>
-              ) : (
-                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-green/10 text-green border-green/30">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green" />
-                  </span>
-                  LISTED
+          {/* Card state pill + gate score */}
+          <div className="flex items-center gap-1.5">
+            {cardState === 'live' ? (
+              <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-green/10 text-green border-green/30">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green" />
                 </span>
-              )}
-              {item.publishedDate && (
-                <span className="text-[8px] text-t3 font-medium">
-                  {(() => {
-                    const mins = Math.floor((Date.now() - item.publishedDate) / 60000)
-                    if (mins < 1) return 'just now'
-                    if (mins < 60) return `${mins}m ago`
-                    const hrs = Math.floor(mins / 60)
-                    if (hrs < 24) return `${hrs}h ago`
-                    return `${Math.floor(hrs / 24)}d ago`
-                  })()}
-                </span>
-              )}
-            </div>
-          ) : item.optimizedListing ? (
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-b1/10 text-b1 border-b1/30">
-                ✓ OPTIMIZED
+                eBay Live
               </span>
-            </div>
-          ) : null}
+            ) : cardState === 'ready' ? (
+              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-indigo-500/10 text-indigo-400 border-indigo-500/30">
+                Ready to List
+              </span>
+            ) : item.decision === 'BUY' ? (
+              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-amber/10 text-amber border-amber/30">
+                Needs Optimization
+              </span>
+            ) : null}
+            {gateScore && (
+              <span className={cn(
+                "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full",
+                gateScore.passed >= 7 ? 'text-green' : gateScore.passed >= 4 ? 'text-amber' : 'text-red'
+              )}>
+                {gateScore.passed}/{gateScore.total}
+              </span>
+            )}
+          </div>
 
           {/* Tags */}
           {item.tags && item.tags.length > 0 && (
@@ -344,49 +343,13 @@ function SortableItem({
             </div>
           )}
         </div>
+        </div>{/* close tappable zone */}
       </div>
 
-      {/* ── Action bar — Apple-style inset pill buttons ── */}
+      {/* ── Action bar — simplified: Optimize | List | Delete ── */}
       <div className="px-3 py-2 flex items-center gap-1.5">
-        {/* Icon buttons — small pills */}
-        <button
-          onClick={() => onEdit(item)}
-          title="Edit"
-          aria-label="Edit item"
-          className="h-8 w-8 flex items-center justify-center rounded-full text-t2 bg-s1/80 hover:bg-s2 active:scale-95 transition-all"
-          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-        >
-          <PencilSimple size={13} weight="bold" />
-        </button>
 
-        {onOpenDetail && (
-          <button
-            onClick={() => onOpenDetail(item)}
-            title="View detail"
-            aria-label="View detail"
-            className="h-8 w-8 flex items-center justify-center rounded-full text-b1 bg-b1/10 hover:bg-b1/20 active:scale-95 transition-all"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <Eye size={13} weight="bold" />
-          </button>
-        )}
-
-        {(item.decision === 'PENDING' || item.description === 'Product analysis unavailable' || (!item.estimatedSellPrice && item.imageThumbnail)) && onReanalyze && (
-          <button
-            onClick={() => onReanalyze(item.id)}
-            title="Re-analyze"
-            aria-label="Re-analyze item"
-            className="h-8 w-8 flex items-center justify-center rounded-full text-amber bg-amber/10 hover:bg-amber/20 active:scale-95 transition-all"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <ArrowCounterClockwise size={13} weight="bold" />
-          </button>
-        )}
-
-        {/* Spacer pushes CTAs to the right */}
-        <div className="flex-1" />
-
-        {/* Primary CTAs — pill buttons */}
+        {/* Published items: Sold + Delist */}
         {item.listingStatus === 'published' && onOpenSoldDialog ? (
           <>
             <button
@@ -410,123 +373,67 @@ function SortableItem({
             )}
           </>
         ) : item.decision === 'BUY' ? (
-          !item.optimizedListing ? (
+          <>
+            {/* Optimize */}
             <button
               onClick={() => onCreateListing(item.id)}
-              aria-label="Optimize listing"
-              className="h-8 px-4 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-b1 hover:bg-b2 rounded-full active:scale-95 transition-all"
+              aria-label={item.optimizedListing ? "Re-optimize listing" : "Optimize listing"}
+              className={cn(
+                "h-8 px-3 flex items-center justify-center gap-1 text-[11px] font-bold rounded-full active:scale-95 transition-all",
+                !item.optimizedListing ? "text-white bg-b1 hover:bg-b2" : "text-t2 bg-s1/80 hover:bg-s2"
+              )}
               style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
             >
-              <Lightning size={13} weight="bold" />
+              <Lightning size={12} weight="bold" />
               Optimize
             </button>
-          ) : (
-            <>
+            {/* List — quick-list path with gate pre-opened */}
+            {item.optimizedListing && !item.ebayListingId && onListItem && (
               <button
-                onClick={() => onCreateListing(item.id)}
-                aria-label="Re-optimize listing"
-                className="h-8 px-3 flex items-center justify-center gap-1 text-[11px] font-semibold text-t2 bg-s1/80 hover:bg-s2 rounded-full active:scale-95 transition-all"
-                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                onClick={() => onListItem(item.id)}
+                aria-label="List on eBay"
+                className="h-8 px-4 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
+                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)' }}
               >
-                <Lightning size={12} weight="bold" />
-                Optimize
+                List
               </button>
-              {onPushToNotion && !item.notionPageId && (
-                <button
-                  onClick={() => onPushToNotion(item.id)}
-                  aria-label="List item"
-                  className="h-8 px-5 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
-                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
-                >
-                  List
-                </button>
-              )}
-              {onPushToEbay && item.notionPageId && !item.ebayListingId && (
-                <button
-                  onClick={() => onPushToEbay(item.id)}
-                  aria-label="Push to eBay"
-                  title="Push to eBay (requires ED approval + AI check pass)"
-                  className="h-8 px-4 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
-                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)' }}
-                >
-                  Push to eBay
-                </button>
-              )}
-              {item.ebayListingId && (
-                <a
-                  href={`https://www.ebay.com/itm/${item.ebayListingId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="View eBay listing"
-                  className="h-8 px-3 flex items-center justify-center gap-1 text-[10px] font-bold text-white rounded-full active:scale-95 transition-all"
-                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'color-mix(in oklch, var(--green) 80%, var(--b1))' }}
-                >
-                  eBay LIVE
-                </a>
-              )}
-              {onEditPhotos && (
-                <button
-                  onClick={() => onEditPhotos(item)}
-                  aria-label="Edit photos"
-                  title="Edit Photos"
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-t3 hover:text-b1 hover:bg-b1/10 active:scale-95 transition-all"
-                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  <Camera size={14} weight="bold" />
-                </button>
-              )}
-            </>
-          )
-        ) : onBuyItem ? (
-          <button
-            onClick={() => onBuyItem(item.id)}
-            aria-label="Buy this item"
-            className="h-8 px-4 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white rounded-full active:scale-95 transition-all"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
-          >
-            Buy
-          </button>
+            )}
+            {/* eBay LIVE */}
+            {item.ebayListingId && (
+              <a
+                href={`https://www.ebay.com/itm/${item.ebayListingId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View eBay listing"
+                className="h-8 px-3 flex items-center justify-center gap-1 text-[10px] font-bold text-white rounded-full active:scale-95 transition-all"
+                style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'color-mix(in oklch, var(--green) 80%, var(--b1))' }}
+              >
+                eBay LIVE
+              </a>
+            )}
+          </>
         ) : null}
 
-        {/* More options */}
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Delete */}
         <button
           onClick={() => setConfirmDelete(v => !v)}
-          title="More options"
-          aria-label="More options"
+          title="Delete"
+          aria-label="Delete item"
           className={cn(
             'h-8 w-8 flex items-center justify-center rounded-full transition-all active:scale-95',
             confirmDelete ? 'text-red bg-red/10' : 'text-t3 bg-s1/80 hover:bg-s2'
           )}
           style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         >
-          <DotsThreeVertical size={15} weight="bold" />
+          <Trash size={13} weight="bold" />
         </button>
       </div>
       {/* More options panel — decision override + remove */}
       {confirmDelete && (
-        <div className="px-3 pb-3 pt-2 border-t border-s2/60 space-y-2">
-          {onDecisionChange && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-wide text-t3 shrink-0">Decision</span>
-              {(['BUY', 'PASS', 'MAYBE'] as Decision[]).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => { onDecisionChange(item.id, d); setConfirmDelete(false) }}
-                  className={cn(
-                    'flex-1 text-[10px] font-bold px-2 py-1 rounded-full border transition-all active:scale-95',
-                    item.decision === d
-                      ? d === 'BUY'   ? 'bg-green/20 text-green border-green/40'
-                        : d === 'PASS' ? 'bg-red/20 text-red border-red/40'
-                        : 'bg-amber/20 text-amber border-amber/40'
-                      : 'bg-s1/80 text-t3 border-s2/60 hover:border-b1/40 hover:text-t1'
-                  )}
-                  style={{ touchAction: 'manipulation' }}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="px-3 pb-3 pt-2 border-t border-s2/60">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] text-t3 leading-tight">Remove this item from queue?</p>
             <div className="flex gap-1.5 shrink-0">
@@ -552,7 +459,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem, onPushToNotion, onPushToEbay, onEditPhotos }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onBuyItem, onOpenListingBuilder, onListItem, highlightItemId, onHighlightClear }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -560,7 +467,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   )
   const { filters: advancedFilters, setFilters: setAdvancedFilters } = useAdvancedFilterPreference('queue-screen')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [manualName, setManualName] = useState('')
@@ -577,6 +483,23 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [soldMarketplace, setSoldMarketplace] = useState<'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'>('ebay')
   const [showTrendIndicator, setShowTrendIndicator] = useState(false)
   const [locationInsightsOpen, setLocationInsightsOpen] = useState(false)
+
+  // Scroll-to + flash-highlight when arriving from "View in Queue"
+  const [flashId, setFlashId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!highlightItemId) return
+    // Small delay to let the screen render first
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`queue-item-${highlightItemId}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setFlashId(highlightItemId)
+        setTimeout(() => setFlashId(null), 1500)
+      }
+      onHighlightClear?.()
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [highlightItemId, onHighlightClear])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -673,14 +596,14 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     }
   }, [queueItems])
   
+  // Statuses that belong in Sold tab — never show in queue
+  const DONE_STATUSES = ['sold', 'shipped', 'completed', 'returned', 'delisted']
+
   const filteredItems = queueItems.filter(item => {
     // Exclude items that have moved to the Sold tab or been delisted
-    if (item.listingStatus === 'sold' || item.listingStatus === 'shipped' || item.listingStatus === 'completed' || item.listingStatus === 'returned' || item.listingStatus === 'delisted') {
+    if (DONE_STATUSES.includes(item.listingStatus ?? '')) {
       return false
     }
-
-    // Exclude promoted items (optimizing/ready/published) from BUY tab — they belong in the listing flow
-    const isPromoted = ['optimizing', 'ready', 'published'].includes(item.listingStatus ?? '')
 
     const matchesFilter =
       filter === 'ALL' ||
@@ -777,8 +700,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   })
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
   
+  // Badge counts must use the same exclusions as filteredItems so the number
+  // on the tab always equals the number of cards that actually render.
   const itemsCount = queueItems.filter(item =>
-    item.decision === 'BUY' && item.listingStatus !== 'published'
+    !DONE_STATUSES.includes(item.listingStatus ?? '') &&
+    item.decision === 'BUY' &&
+    item.listingStatus !== 'published'
   ).length
   const listedCount = queueItems.filter(item =>
     item.listingStatus === 'published'
@@ -896,9 +823,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     }
   }, [sortedItems.length, previousItemCount, queueItems.length, previousFilteredCount])
 
-  const handleEdit = (item: ScannedItem) => {
-    setEditingItem(item)
-  }
 
   const handleSaveEdit = (itemId: string, updates: Partial<ScannedItem>) => {
     onEdit(itemId, updates)
@@ -1015,13 +939,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           willChange: isPulling || isRefreshing ? 'transform' : 'auto',
         }}
       >
-      <ItemEditDialog
-        item={editingItem}
-        isOpen={editingItem !== null}
-        onClose={() => setEditingItem(null)}
-        onSave={handleSaveEdit}
-        geminiService={geminiService}
-      />
       <BulkTagOperations
         isOpen={bulkTagDialogOpen}
         onClose={() => setBulkTagDialogOpen(false)}
@@ -1416,8 +1333,8 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       isSelected={selectedIds.has(item.id)}
                       allTags={allTags || []}
                       isPersonal={!!item.sessionId && !!personalSessionIds?.has(item.sessionId)}
+                      isHighlighted={flashId === item.id}
                       onToggleSelect={handleToggleSelect}
-                      onEdit={handleEdit}
                       onRemove={onRemove}
                       onCreateListing={onCreateListing}
                       onEditTags={(itemId, tags) => onEdit(itemId, { tags })}
@@ -1428,12 +1345,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       } : undefined}
                       onDelist={onDelist}
                       onReanalyze={onReanalyze}
-                      onOpenDetail={onOpenDetail}
                       onBuyItem={onBuyItem}
-                      onPushToNotion={onPushToNotion}
-                      onPushToEbay={onPushToEbay}
-                      onEditPhotos={onEditPhotos}
-                      onDecisionChange={(id, decision) => handleSaveEdit(id, { decision })}
+                      onOpenListingBuilder={onOpenListingBuilder}
+                      onListItem={onListItem}
                     />
                   ))}
                 </div>
@@ -1535,38 +1449,31 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           </div>
                         )}
                         <div className="flex gap-1 items-center mt-1 md:mt-1.5">
-                          <Button
-                            size="sm"
-                            onClick={() => handleEdit(item)}
-                            variant="outline"
-                            title="Edit"
-                            aria-label="Edit item"
-                            className="h-7 w-7 md:h-8 md:w-8 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
-                          >
-                            <PencilSimple size={13} weight="bold" aria-hidden />
-                          </Button>
-                          {item.decision === 'BUY' ? (
-                            !item.optimizedListing && (
-                              <Button
-                                size="sm"
-                                onClick={() => onCreateListing(item.id)}
-                                aria-label="Optimize listing"
-                                className="flex-1 bg-b1 hover:bg-b2 text-white h-7 md:h-8 text-[11px] md:text-xs font-semibold"
-                              >
-                                Optimize
-                              </Button>
-                            )
-                          ) : onBuyItem ? (
+                          {item.decision === 'BUY' && (
                             <Button
                               size="sm"
-                              onClick={() => onBuyItem(item.id)}
-                              aria-label="Buy this item"
-                              className="flex-1 text-white h-7 md:h-8 text-[11px] md:text-xs font-bold active:scale-[0.98] transition-all"
-                              style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                              onClick={() => onCreateListing(item.id)}
+                              aria-label={item.optimizedListing ? "Re-optimize" : "Optimize"}
+                              className={cn(
+                                "h-7 md:h-8 text-[11px] md:text-xs font-semibold",
+                                !item.optimizedListing ? "flex-1 bg-b1 hover:bg-b2 text-white" : "px-3 text-t2 bg-s1/80 hover:bg-s2"
+                              )}
                             >
-                              Buy ✅
+                              Optimize
                             </Button>
-                          ) : null}
+                          )}
+                          {item.decision === 'BUY' && item.optimizedListing && !item.ebayListingId && onListItem && (
+                            <Button
+                              size="sm"
+                              onClick={() => onListItem(item.id)}
+                              aria-label="List on eBay"
+                              className="h-7 md:h-8 text-[11px] md:text-xs font-bold text-white"
+                              style={{ background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)' }}
+                            >
+                              List
+                            </Button>
+                          )}
+                          <div className="flex-1" />
                           <Button
                             size="sm"
                             variant="ghost"

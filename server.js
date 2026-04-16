@@ -1281,14 +1281,19 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
-  // ── D4: eBay Listing Push ─────────────────────────────────────────────────
-  // POST /api/ebay/push-listing/:notionPageId
-  // Gated: Push Approved === true AND AI Check Status === "✅ Passed".
-  // Writes inventory_item → creates offer → publishes → mirrors result back
-  // to Notion + Supabase. merchantLocationKey must be EBAY_MERCHANT_LOCATION_KEY.
-  const pushListingMatch = requestUrl.pathname.match(/^\/api\/ebay\/push-listing\/([^/]+)$/)
-  if (pushListingMatch && req.method === 'POST') {
-    const pageId = pushListingMatch[1]
+  // ── WO-RSP-010 D3: eBay Listing Push (RSP Front Office → eBay → Notion) ──
+  // POST /api/ebay/push-listing
+  // Body: { listingData, notionPageId: string|null, supabaseItemId?: string }
+  //
+  // Flow: validate payload → PUT inventory_item → POST offer → POST publish →
+  // after eBay success, create Notion page (if notionPageId=null) or PATCH
+  // existing page with confirmed eBay data → mirror to Supabase scans if an
+  // id is provided. Gate lives in RSP ListingBuilder; server trusts the push.
+  //
+  // Push Approved column retired — gate moved to RSP ListingBuilder. Column
+  // preserved in Notion for historical records only; we never write it here.
+  if (requestUrl.pathname === '/api/ebay/push-listing' && req.method === 'POST') {
+    let notionPageId = null
     try {
       if (!process.env.EBAY_FULFILLMENT_POLICY_ID ||
           !process.env.EBAY_RETURN_POLICY_ID ||
@@ -1299,38 +1304,31 @@ const server = http.createServer(async (req, res) => {
         return
       }
 
-      const page = await notionRequest(`/pages/${pageId}`)
-      const props = page.properties || {}
-      const getTitle = (p) => (p?.title?.[0]?.plain_text) || ''
-      const getRt = (p) => (p?.rich_text?.map((r) => r.plain_text).join('') || '')
-      const getSel = (p) => p?.select?.name || ''
-      const getNum = (p) => (typeof p?.number === 'number' ? p.number : null)
-      const getChk = (p) => p?.checkbox === true
-      const getFiles = (p) => (p?.files || []).map((f) => f?.external?.url || f?.file?.url).filter(Boolean)
+      const body = await readRequestBody(req)
+      const listingData = body?.listingData || {}
+      notionPageId = body?.notionPageId ? normalizeUuid(body.notionPageId) : null
+      const supabaseItemId = body?.supabaseItemId || null
 
-      const pushApproved = getChk(props['Push Approved'])
-      const aiCheckStatus = getSel(props['AI Check Status'])
-      if (!pushApproved || aiCheckStatus !== '✅ Passed') {
-        sendJson(res, 403, {
-          error: 'Listing not cleared for push.',
-          pushApproved,
-          aiCheckStatus,
-          required: { pushApproved: true, aiCheckStatus: '✅ Passed' },
-        })
+      // ── Validate required RSP-provided fields ────────────────────────────
+      const title = String(listingData.title || '').slice(0, 80).trim()
+      const condition = String(listingData.condition || '').trim()
+      const price = typeof listingData.price === 'number' ? listingData.price : Number(listingData.price)
+      const photoUrls = Array.isArray(listingData.photoUrls)
+        ? listingData.photoUrls.filter((u) => typeof u === 'string' && u.length > 0)
+        : []
+
+      const missing = []
+      if (!title) missing.push('title')
+      if (!condition) missing.push('condition')
+      if (!Number.isFinite(price) || price <= 0) missing.push('price')
+      if (photoUrls.length === 0) missing.push('photoUrls (at least 1)')
+      if (missing.length > 0) {
+        sendJson(res, 400, { error: `Listing missing required fields: ${missing.join(', ')}` })
         return
       }
 
-      // Build SKU — prefer "Model / SKU", fall back to a stable page-id slug.
-      const skuBase = (getRt(props['Model / SKU']) || getTitle(props['Item Name']) || `page-${pageId}`)
-        .toString()
-        .replace(/[^A-Za-z0-9_-]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 48) || `page-${pageId.slice(0, 8)}`
-      const sku = skuBase
-
-      // Map Notion condition select → eBay condition enum. eBay Sell API uses
-      // conditionId strings, not string enums, for new-with-defects etc — we
-      // expose the enum form which Inventory API accepts via "condition".
+      // Notion condition → eBay enum. RSP ListingBuilder sends canonical
+      // Notion strings; default to USED_GOOD if something slips through.
       const conditionMap = {
         'New': 'NEW',
         'New – Sealed': 'NEW',
@@ -1341,39 +1339,52 @@ const server = http.createServer(async (req, res) => {
         'Used – Acceptable': 'ACCEPTABLE',
         'For Parts / Repair': 'FOR_PARTS_OR_NOT_WORKING',
       }
-      const notionCondition = getSel(props['Condition'])
-      const ebayCondition = conditionMap[notionCondition] || 'USED_GOOD'
+      const ebayCondition = conditionMap[condition] || 'USED_GOOD'
 
-      const title = (getRt(props['SEO Title']) || getTitle(props['Item Name']) || '').slice(0, 80)
-      const description = getRt(props['Item Description']) || title
-      const brand = getRt(props['Brand'])
-      const model = getRt(props['Model / SKU'])
-      const mpn = getRt(props['MPN'])
-      const upc = getRt(props['UPC / EAN / GTIN'])
-      const color = getRt(props['Color'])
-      const size = getRt(props['Size'])
-      const material = getRt(props['Material'])
-      const department = getSel(props['Department'])
-      const ebayCategoryId = getRt(props['eBay Category ID'])
-      const weightOz = getNum(props['Item Weight (oz)'])
-      const photoUrls = getFiles(props['Listing Photos'])
-      const price = getNum(props['Listing Price'])
-      const bestOfferEnabled = getChk(props['Best Offer Enabled'])
-      const autoAccept = getNum(props['Best Offer Min $'])
-      const autoDecline = getNum(props['Auto-Decline Price'])
+      const subtitle = String(listingData.subtitle || '').slice(0, 55)
+      const conditionDescription = String(listingData.conditionDescription || '')
+      const description = String(listingData.description || title)
+      const brand = String(listingData.brand || '')
+      const model = String(listingData.model || '')
+      const sku = (String(listingData.sku || model || title)
+        .replace(/[^A-Za-z0-9_-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 48)) || `rsp-${Date.now().toString(36)}`
+      const mpn = String(listingData.mpn || '')
+      const upc = String(listingData.upc || '')
+      const color = String(listingData.color || '')
+      const size = String(listingData.size || '')
+      const material = String(listingData.material || '')
+      const department = String(listingData.department || '')
+      const ebayCategoryId = String(listingData.ebayCategoryId || '')
+      const weightOz = typeof listingData.weightOz === 'number' ? listingData.weightOz : null
+      const pkgDims = listingData.packageDimensions && typeof listingData.packageDimensions === 'object'
+        ? {
+            lengthIn: Number(listingData.packageDimensions.lengthIn) || 0,
+            widthIn:  Number(listingData.packageDimensions.widthIn)  || 0,
+            heightIn: Number(listingData.packageDimensions.heightIn) || 0,
+          }
+        : null
+      const bestOfferEnabled = listingData.bestOfferEnabled === true
+      const autoAccept = typeof listingData.autoAccept === 'number' ? listingData.autoAccept : null
+      const autoDecline = typeof listingData.autoDecline === 'number' ? listingData.autoDecline : null
+      const purchasePrice = typeof listingData.purchasePrice === 'number' ? listingData.purchasePrice : null
+      const shippingStrategy = String(listingData.shippingStrategy || 'USPS Ground Advantage')
+      const freeShipping = typeof listingData.freeShipping === 'boolean' ? listingData.freeShipping : (price >= 20)
+      const itemSpecifics = (listingData.itemSpecifics && typeof listingData.itemSpecifics === 'object') ? listingData.itemSpecifics : {}
 
-      if (!title || !description || !price) {
-        sendJson(res, 400, { error: 'Listing missing required fields (title, description, or price).' })
-        return
-      }
-
+      // Build eBay aspects. Prefer explicit itemSpecifics from RSP; fall back
+      // to scalar fields for back-compat.
       const aspects = {}
-      if (brand) aspects['Brand'] = [brand]
-      if (model) aspects['MPN'] = [mpn || model]
-      if (color) aspects['Color'] = [color]
-      if (size) aspects['Size'] = [size]
-      if (material) aspects['Material'] = [material]
-      if (department) aspects['Department'] = [department]
+      for (const [k, v] of Object.entries(itemSpecifics)) {
+        if (v && String(v).trim() && String(v).trim() !== 'N/A') aspects[k] = [String(v)]
+      }
+      if (brand && !aspects['Brand']) aspects['Brand'] = [brand]
+      if ((mpn || model) && !aspects['MPN']) aspects['MPN'] = [mpn || model]
+      if (color && !aspects['Color']) aspects['Color'] = [color]
+      if (size && !aspects['Size']) aspects['Size'] = [size]
+      if (material && !aspects['Material']) aspects['Material'] = [material]
+      if (department && !aspects['Department']) aspects['Department'] = [department]
 
       const accessToken = await getValidEbayToken()
       const ebayAuthHeaders = {
@@ -1382,31 +1393,32 @@ const server = http.createServer(async (req, res) => {
         'Content-Language': 'en-US',
       }
 
-      // Mark Notion "🔄 Pushing" before the multi-step eBay flow so the UI
-      // shows activity. Best-effort.
-      await notionRequest(`/pages/${pageId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          properties: { 'eBay Push Status': { select: { name: '🔄 Pushing' } } },
-        }),
-      }).catch(() => {})
-
-      // STEP 1 — inventory_item (PUT is an upsert)
+      // ── STEP 1 — inventory_item (PUT is an upsert) ───────────────────────
       const inventoryPayload = {
         availability: { shipToLocationAvailability: { quantity: 1 } },
         condition: ebayCondition,
+        ...(conditionDescription ? { conditionDescription: conditionDescription.slice(0, 1000) } : {}),
         product: {
           title,
           description,
           aspects,
           imageUrls: photoUrls,
+          ...(subtitle ? { subtitle } : {}),
           ...(brand ? { brand } : {}),
           ...(mpn ? { mpn } : {}),
           ...(upc ? { upc: [upc] } : {}),
         },
-        ...(weightOz ? {
+        ...((weightOz || pkgDims) ? {
           packageWeightAndSize: {
-            weight: { value: weightOz, unit: 'OUNCE' },
+            ...(weightOz ? { weight: { value: weightOz, unit: 'OUNCE' } } : {}),
+            ...(pkgDims && pkgDims.lengthIn > 0 && pkgDims.widthIn > 0 && pkgDims.heightIn > 0 ? {
+              dimensions: {
+                length: pkgDims.lengthIn,
+                width:  pkgDims.widthIn,
+                height: pkgDims.heightIn,
+                unit: 'INCH',
+              },
+            } : {}),
           },
         } : {}),
       }
@@ -1419,7 +1431,7 @@ const server = http.createServer(async (req, res) => {
         throw Object.assign(new Error(`inventory_item PUT ${invResp.status}: ${errText.slice(0, 400)}`), { status: invResp.status })
       }
 
-      // STEP 2 — create offer
+      // ── STEP 2 — create offer ────────────────────────────────────────────
       const offerPayload = {
         sku,
         marketplaceId: 'EBAY_US',
@@ -1457,7 +1469,7 @@ const server = http.createServer(async (req, res) => {
       const offerId = offerData.offerId
       if (!offerId) throw new Error('offer POST succeeded but returned no offerId')
 
-      // STEP 3 — publish
+      // ── STEP 3 — publish ─────────────────────────────────────────────────
       const publishResp = await fetch(
         `${ebayBaseUrl}/sell/inventory/v1/offer/${offerId}/publish`,
         { method: 'POST', headers: ebayAuthHeaders }
@@ -1472,30 +1484,111 @@ const server = http.createServer(async (req, res) => {
 
       const listingUrl = `https://www.ebay.com/itm/${listingId}`
 
-      // Mirror success back to Notion.
-      await notionRequest(`/pages/${pageId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          properties: {
-            'eBay Item Number': { rich_text: [{ text: { content: String(listingId) } }] },
-            'eBay Push Status': { select: { name: '✅ Live' } },
-            'Listing URL': { url: listingUrl },
-            'Status': { select: { name: '🟣 Listed – Awaiting Sale' } },
-            'Listed': { checkbox: true },
-            'Push Approved': { checkbox: false },
-          },
-        }),
-      })
+      // ── STEP 4 — Notion mirror (AFTER eBay success) ──────────────────────
+      // Create a fresh page when notionPageId is null; otherwise PATCH the
+      // existing page with the same confirmed-eBay properties. Property
+      // names mirror NotionService.pushListing so Notion schema is unchanged.
+      // NOTE: We never write Push Approved — column retired per WO-RSP-010.
+      const rt = (content) => ({ rich_text: [{ text: { content: String(content || '').slice(0, 2000) } }] })
+      const confirmedProps = {
+        'eBay Item Number': rt(String(listingId)),
+        'eBay Push Status': { select: { name: '✅ Live' } },
+        'Listing URL': { url: listingUrl },
+        'Status': { select: { name: '🟣 Listed – Awaiting Sale' } },
+        'Listed': { checkbox: true },
+        'AI Check Status': { select: { name: '✅ Passed' } },
+      }
 
-      // Mirror to Supabase scans table if present. Match by Notion page id
-      // when we've recorded it; silent no-op if the scan row doesn't exist.
-      if (supabaseUrl && supabaseServiceKey) {
+      let createdOrUpdatedPageId = notionPageId
+      if (notionPageId) {
+        // Update existing page — patch confirmed eBay data. Avoid
+        // overwriting listing fields that haven't changed.
+        await notionRequest(`/pages/${notionPageId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ properties: confirmedProps }),
+        })
+      } else {
+        // Create new page — full property set from listingData + confirmed.
+        const minAcceptable = typeof listingData.minAcceptable === 'number'
+          ? listingData.minAcceptable
+          : (purchasePrice != null ? +(purchasePrice * 1.35).toFixed(2) : null)
+
+        const createProps = {
+          'Item Name': { title: [{ text: { content: title } }] },
+          'Condition': { select: { name: condition } },
+          'Listing Price': { number: price },
+          'eBay Listing Type': { select: { name: 'Buy It Now' } },
+          'Shipping Strategy': { select: { name: shippingStrategy } },
+          'Free Shipping': { checkbox: freeShipping },
+          'Handling Time': { select: { name: '🟢 1 Day' } },
+          'Ship From ZIP': rt(listingData.shipFromZip || DEFAULT_SHIP_FROM_ZIP),
+          'Local Pickup': { checkbox: false },
+          'Return Policy': { select: { name: '✅ 30-Day Free Returns' } },
+          'AI Researched': { checkbox: true },
+          'Photos Taken': { checkbox: photoUrls.length > 0 },
+          'Date Acquired': { date: { start: new Date().toISOString() } },
+          ...(purchasePrice != null ? { 'Purchase Price': { number: purchasePrice } } : {}),
+          ...(minAcceptable != null ? { 'Min Acceptable Price': { number: minAcceptable } } : {}),
+          ...(subtitle ? { 'Subtitle': rt(subtitle) } : {}),
+          ...(listingData.seoTitle ? { 'SEO Title': rt(String(listingData.seoTitle).slice(0, 80)) } : {}),
+          ...(brand ? { 'Brand': rt(brand) } : {}),
+          ...(model ? { 'Model / SKU': rt(model) } : {}),
+          ...(mpn ? { 'MPN': rt(mpn) } : {}),
+          ...(upc ? { 'UPC / EAN / GTIN': rt(upc) } : {}),
+          ...(ebayCategoryId ? { 'eBay Category ID': rt(ebayCategoryId) } : {}),
+          ...(color ? { 'Color': rt(color) } : {}),
+          ...(size ? { 'Size': rt(size) } : {}),
+          ...(material ? { 'Material': rt(material) } : {}),
+          ...(department ? { 'Department': { select: { name: department } } } : {}),
+          ...(conditionDescription ? { 'Condition Description': rt(conditionDescription) } : {}),
+          ...(description ? { 'Item Description': rt(description) } : {}),
+          ...(listingData.itemSpecificsRaw ? { 'Item Specifics': rt(listingData.itemSpecificsRaw) } : {}),
+          ...(weightOz != null ? { 'Item Weight (oz)': { number: weightOz } } : {}),
+          ...(bestOfferEnabled ? { 'Best Offer Enabled': { checkbox: true } } : {}),
+          ...(autoAccept != null ? { 'Best Offer Min $': { number: autoAccept } } : {}),
+          ...(autoDecline != null ? { 'Auto-Decline Price': { number: autoDecline } } : {}),
+          ...(listingData.marketNotes ? { 'Market Notes': rt(listingData.marketNotes) } : {}),
+          ...(photoUrls.length ? {
+            'Listing Photos': {
+              files: photoUrls.map((url, i) => ({
+                type: 'external',
+                name: `${model || 'photo'}-0${i + 1}.jpg`,
+                external: { url },
+              })),
+            },
+            'Photo Links': { url: photoUrls[0] },
+            'Photo Count': { number: photoUrls.length },
+          } : {}),
+          ...confirmedProps,
+        }
+
+        const created = await notionRequest('/pages', {
+          method: 'POST',
+          body: JSON.stringify({
+            parent: { database_id: notionInventoryDbId },
+            properties: createProps,
+          }),
+        })
+        createdOrUpdatedPageId = created?.id || null
+      }
+
+      // ── STEP 5 — Supabase scans mirror ───────────────────────────────────
+      if (supabaseUrl && supabaseServiceKey && (supabaseItemId || createdOrUpdatedPageId)) {
+        const filter = supabaseItemId
+          ? `id=eq.${encodeURIComponent(supabaseItemId)}`
+          : `notion_page_id=eq.${encodeURIComponent(createdOrUpdatedPageId)}`
+        const mirrorBody = { ebay_listing_id: String(listingId) }
+        if (createdOrUpdatedPageId && !supabaseItemId) {
+          // No extra field — filter is already notion_page_id
+        } else if (createdOrUpdatedPageId) {
+          mirrorBody.notion_page_id = createdOrUpdatedPageId
+        }
         await fetch(
-          `${supabaseUrl}/rest/v1/scans?notion_page_id=eq.${encodeURIComponent(pageId)}`,
+          `${supabaseUrl}/rest/v1/scans?${filter}`,
           {
             method: 'PATCH',
             headers: { ...supabaseServiceHeaders(), Prefer: 'return=minimal' },
-            body: JSON.stringify({ ebay_listing_id: String(listingId) }),
+            body: JSON.stringify(mirrorBody),
           }
         ).catch((e) => console.warn('[push-listing] supabase mirror failed:', e.message))
       }
@@ -1506,20 +1599,25 @@ const server = http.createServer(async (req, res) => {
         offerId,
         listingId: String(listingId),
         listingUrl,
+        notionPageId: createdOrUpdatedPageId,
       })
     } catch (error) {
       const status = error.status || 500
       console.error('[push-listing] failed:', error.message)
-      // Best-effort: mark Notion Failed so the UI doesn't stay "Pushing".
-      await notionRequest(`/pages/${pageId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          properties: {
-            'eBay Push Status': { select: { name: '❌ Failed' } },
-            'AI Check Notes': { rich_text: [{ text: { content: `eBay push error: ${error.message}`.slice(0, 2000) } }] },
-          },
-        }),
-      }).catch(() => {})
+      // Best-effort: if the caller gave us an existing page, mark it Failed
+      // so the UI doesn't stay "Pushing". On the create path we have no page
+      // to mark — the error surfaces via the API response alone.
+      if (notionPageId) {
+        await notionRequest(`/pages/${notionPageId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            properties: {
+              'eBay Push Status': { select: { name: '❌ Failed' } },
+              'AI Check Notes': { rich_text: [{ text: { content: `eBay push error: ${error.message}`.slice(0, 2000) } }] },
+            },
+          }),
+        }).catch(() => {})
+      }
       sendJson(res, status, { error: error.message, ...(error.payload || {}) })
     }
     return

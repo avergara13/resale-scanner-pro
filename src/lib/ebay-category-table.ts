@@ -136,6 +136,34 @@ const CATEGORY_TABLE: Array<{ keywords: string[]; info: CategoryInfo }> = [
                'silver', 'diamond', 'pendant'],
     info: { ebayCategoryId: '281', fvfRate: 13.25, defaultWeightOz: 4, shippingService: 'USPS Ground Advantage' },
   },
+  // ── Personal Care & Grooming ─────────────────────────────────────────────
+  {
+    keywords: ['trimmer', 'shaver', 'clipper', 'razor', 'grooming', 'hair removal',
+               'andis', 'wahl', 'braun', 'norelco', 'epilator'],
+    info: { ebayCategoryId: '26676', fvfRate: 13.25, defaultWeightOz: 24, shippingService: 'USPS Ground Advantage' },
+  },
+  // ── Camera & Photo ───────────────────────────────────────────────────────
+  {
+    keywords: ['camera', 'dslr', 'mirrorless', 'lens', 'tripod', 'gopro', 'polaroid'],
+    info: { ebayCategoryId: '625', fvfRate: 13.25, defaultWeightOz: 16, shippingService: 'USPS Ground Advantage' },
+  },
+  // ── Musical Instruments ──────────────────────────────────────────────────
+  {
+    keywords: ['guitar', 'piano', 'keyboard', 'drum', 'bass', 'ukulele', 'violin',
+               'amplifier', 'microphone'],
+    info: { ebayCategoryId: '619', fvfRate: 13.25, defaultWeightOz: 32, shippingService: 'USPS Priority Mail' },
+  },
+  // ── Baby & Kids ──────────────────────────────────────────────────────────
+  {
+    keywords: ['stroller', 'car seat', 'baby monitor', 'high chair', 'baby', 'infant', 'toddler'],
+    info: { ebayCategoryId: '2984', fvfRate: 13.25, defaultWeightOz: 16, shippingService: 'USPS Ground Advantage' },
+  },
+  // ── Health & Beauty ──────────────────────────────────────────────────────
+  {
+    keywords: ['supplement', 'vitamin', 'skincare', 'makeup', 'perfume', 'cologne',
+               'beauty', 'lotion'],
+    info: { ebayCategoryId: '26395', fvfRate: 13.25, defaultWeightOz: 8, shippingService: 'USPS Ground Advantage' },
+  },
   // ── Vintage & Antiques ───────────────────────────────────────────────────
   {
     keywords: ['vintage', 'antique', 'retro', 'classic', 'art', 'painting', 'print',
