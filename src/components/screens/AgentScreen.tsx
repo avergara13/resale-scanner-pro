@@ -1242,49 +1242,6 @@ ${settings.userProfile.aiContext}` : ''}`
     setViewMode('chat')
   }, [setChatSessions, setActiveSessionId])
 
-  // Shared stats bar used in both views
-  const statsBar = (
-    <div
-      className="px-3 border-b border-s1/50"
-      style={{ background: 'color-mix(in oklch, var(--fg) 90%, transparent)', WebkitBackdropFilter: 'blur(16px)', backdropFilter: 'blur(16px)', height: '36px', display: 'flex', alignItems: 'center' }}
-    >
-      <div className="flex items-center gap-3 flex-1 overflow-x-auto scrollbar-none">
-        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
-          <span className="text-green font-bold text-[11px]">{queueStats.buy}</span> buy
-        </span>
-        <span className="text-[9px] text-s2 flex-shrink-0">·</span>
-        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
-          <span className="text-red font-bold text-[11px]">{queueStats.pass}</span> pass
-        </span>
-        <span className="text-[9px] text-s2 flex-shrink-0">·</span>
-        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
-          <span className="text-amber font-bold text-[11px]">{queueStats.maybe}</span> maybe
-        </span>
-        <span className="text-[9px] text-s2 flex-shrink-0">·</span>
-        <span className="text-[10px] text-t3 font-medium flex-shrink-0">
-          <span className="text-t1 font-bold text-[11px]">{queueStats.queueCount}</span> queue
-        </span>
-        {queueStats.totalProfit > 0 && (
-          <>
-            <span className="text-[9px] text-s2 flex-shrink-0">·</span>
-            <span className="text-[10px] text-t3 font-medium flex-shrink-0">
-              <span className="text-green font-bold text-[11px]">${queueStats.totalProfit.toFixed(0)}</span> profit
-            </span>
-          </>
-        )}
-      </div>
-      {activeTab === 'chat' && viewMode === 'chat' && chatMessages.length > 0 && (
-        <button
-          onClick={handleNewChat}
-          className="flex items-center gap-1 text-[10px] font-semibold text-t3 hover:text-t1 transition-colors active:opacity-50 flex-shrink-0 px-2 py-1 rounded-lg hover:bg-s1"
-          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-        >
-          New Chat
-        </button>
-      )}
-    </div>
-  )
-
   // Shared input bar — floating glass pill, sits just above the bottom nav
   const inputBar = (
     <motion.div
@@ -1469,27 +1426,31 @@ ${settings.userProfile.aiContext}` : ''}`
               onClick={() => setActiveTab('chat')}
               className={cn('tab-btn', activeTab === 'chat' && 'active')}
             >
-              <span>💬 CHAT</span>
+              <span className="flex items-center gap-1.5">
+                <ChatCircle size={12} weight={activeTab === 'chat' ? 'fill' : 'regular'} />
+                Chat
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('scans')}
               className={cn('tab-btn', activeTab === 'scans' && 'active')}
             >
-              <span>
-                📸 SCANS{sessionScans.length > 0 && ` (${sessionScans.length})`}
+              <span className="flex items-center gap-1.5">
+                <Camera size={12} weight={activeTab === 'scans' ? 'fill' : 'regular'} />
+                Scans{sessionScans.length > 0 && ` (${sessionScans.length})`}
               </span>
             </button>
             <button
               onClick={() => setActiveTab('tasks')}
               className={cn('tab-btn', activeTab === 'tasks' && 'active')}
             >
-              <span>
-                ✅ TASKS{pendingTodos.length > 0 && ` (${pendingTodos.length})`}
+              <span className="flex items-center gap-1.5">
+                <CheckCircle size={12} weight={activeTab === 'tasks' ? 'fill' : 'regular'} />
+                Tasks{pendingTodos.length > 0 && ` (${pendingTodos.length})`}
               </span>
             </button>
           </div>
         </div>
-        {statsBar}
       </div>
 
       {/* ── Chat tab ── */}

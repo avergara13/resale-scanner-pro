@@ -3,17 +3,17 @@ import { ThemeToggle } from './ThemeToggle'
 import type { Screen } from '@/types'
 
 const SCREEN_TITLES: Partial<Record<Screen, string>> = {
-  session: 'RESALE SCANNER PRO',
-  agent: 'AGENT',
-  'scan-result': 'SCAN RESULT',
-  queue: 'LISTING QUEUE',
-  sold: 'SOLD',
-  settings: 'SETTINGS',
-  'session-detail': 'SESSION',
-  'scan-history': 'SCAN HISTORY',
-  'tag-analytics': 'TAG ANALYTICS',
-  'location-insights': 'LOCATIONS',
-  'cost-tracking': 'COST TRACKING',
+  session: 'Resale Scanner Pro',
+  agent: 'Agent',
+  'scan-result': 'Scan Result',
+  queue: 'Listing Queue',
+  sold: 'Sold',
+  settings: 'Settings',
+  'session-detail': 'Session',
+  'scan-history': 'Scan History',
+  'tag-analytics': 'Tag Analytics',
+  'location-insights': 'Locations',
+  'cost-tracking': 'Cost Tracking',
 }
 
 interface AppHeaderProps {
@@ -40,11 +40,11 @@ export function AppHeader({ screen, onNavigateToSettings, onNavigateToTrends, on
           >
             <ArrowLeft size={18} weight="bold" />
             {backLabel && (
-              <span className="text-[11px] font-semibold tracking-wide text-t2 uppercase">{backLabel}</span>
+              <span className="text-[13px] font-medium text-t2">{backLabel}</span>
             )}
           </button>
         )}
-        <span className="text-[11px] font-black tracking-widest text-t1 uppercase">{title}</span>
+        <span className="text-[14px] font-semibold tracking-tight text-t1">{title}</span>
       </div>
       <div className="flex items-center gap-0.5">
         {onNavigateToTrends && (
