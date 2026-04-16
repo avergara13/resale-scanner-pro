@@ -1089,7 +1089,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           </div>
         </DialogContent>
       </Dialog>
-      <div className="px-3 sm:px-4 md:px-5 pt-2 pb-0 border-b border-s1 bg-fg sticky top-0 z-10 shadow-sm">
+      <div className="px-3 sm:px-4 md:px-5 pt-2 pb-0 border-b border-s1 bg-bg sticky top-0 z-10 shadow-sm">
         {/* Action buttons — only rendered when at least one is visible */}
         {((onNavigateToLocationInsights && queueItems.some(item => item.location)) ||
           (onNavigateToTagAnalytics && (allTags || []).length > 0) ||
@@ -1165,9 +1165,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         <div
           className="border-b border-s1/60"
           style={{
-            background: 'color-mix(in oklch, var(--fg) 85%, transparent)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
             height: '38px',
             display: 'flex',
             alignItems: 'center',
