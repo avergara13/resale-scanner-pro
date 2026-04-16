@@ -33,6 +33,7 @@ import { createTagSuggestionService } from './lib/tag-suggestion-service'
 import { createListingOptimizationService } from './lib/listing-optimization-service'
 import { createNotionService } from './lib/notion-service'
 import { SupabaseService } from './lib/supabase-service'
+import { urlToDataUrl } from './lib/photo'
 import { fetchSoldItems, updateSoldItemShipping } from './lib/sold-service'
 import { useCaptureState } from './hooks/use-capture-state'
 import { useTheme } from './hooks/use-theme'
@@ -242,9 +243,33 @@ function App() {
     logActivity('Session restored')
   }, [setAllSessions])
 
+  // Cascade cleanup for a hard-deleted session:
+  //   - Collects photoUrls across queue + scanHistory for items in this session
+  //   - Skips items with `ebayListingId` (live listing — deleting photos would
+  //     break the live eBay listing's image URLs that buyers see)
+  //   - Fire-and-forget Supabase storage delete (errors logged inside deletePhotos)
+  //   - Removes session items from queue and scanHistory KV
+  // Used by both handlePermanentDeleteSession (immediate) and the 60s hard-purge
+  // inside handleDeleteSession (after undo window expires).
+  const purgeSessionData = useCallback((sessionId: string) => {
+    const allItems = [...(queue || []), ...(scanHistory || [])]
+    const urlsToDelete = new Set<string>()
+    for (const item of allItems) {
+      if (item.sessionId !== sessionId) continue
+      if (item.ebayListingId) continue   // live listing — leave photos on Supabase
+      for (const url of item.photoUrls || []) urlsToDelete.add(url)
+    }
+    if (supabaseService && urlsToDelete.size > 0) {
+      void supabaseService.deletePhotos(Array.from(urlsToDelete))
+    }
+    setQueue(prev => (prev || []).filter(i => i.sessionId !== sessionId))
+    setScanHistory(prev => (prev || []).filter(i => i.sessionId !== sessionId))
+  }, [queue, scanHistory, supabaseService, setQueue, setScanHistory])
+
   const handlePermanentDeleteSession = useCallback((sessionId: string) => {
+    purgeSessionData(sessionId)
     setAllSessions((prev) => (prev || []).filter(s => s.id !== sessionId))
-  }, [setAllSessions])
+  }, [purgeSessionData, setAllSessions])
 
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
     const updateInterval = 80
@@ -362,6 +387,7 @@ function App() {
           imageThumbnail: optimized.thumbnail,
           imageOptimized: optimized.original,
           decision: 'PENDING' as const,   // reset for clean pipeline run
+          listingStatus: undefined,       // re-analyze resets gate so optimize/push re-evaluates
         }
       : {
           id: Date.now().toString(),
@@ -760,7 +786,9 @@ function App() {
 
       const updatedItem: ScannedItem = {
         ...newItem,
-        productName: visionResult?.productName || barcodeProduct?.title || mockProductName,
+        // Re-analyze / replace-primary preserve existing productName — user may have edited it.
+        // Fresh scan falls through to AI-derived name.
+        productName: effectiveExistingItem?.productName || visionResult?.productName || barcodeProduct?.title || mockProductName,
         description: visionResult?.description || barcodeProduct?.description || 'Product analysis unavailable',
         category: visionResult?.category || barcodeProduct?.category || 'General',
         estimatedSellPrice: sellPrice > 0 ? sellPrice : undefined,
@@ -821,6 +849,28 @@ function App() {
         }
         return [persistableItem, ...existing.slice(0, 499)]
       })
+
+      // Re-analyze path: mirror the refreshed research into the queue in-place so the
+      // listing-side card picks up new marketData / description / comps without losing
+      // user-curated assets (photoUrls, primaryPhotoIndex, edited productName).
+      // No-op if the item isn't in the queue (fresh scan or agent-only item).
+      if (effectiveExistingItem) {
+        setQueue(prev => (prev || []).map(i =>
+          i.id === effectiveExistingItem.id
+            ? {
+                ...i,
+                ...persistableItem,
+                // Preserve curated assets — persistableItem has photoUrls intact, but be explicit:
+                photoUrls: i.photoUrls,
+                primaryPhotoIndex: i.primaryPhotoIndex,
+                // Preserve user-edited name (persistableItem.productName already falls back to existing via handleCapture above):
+                productName: i.productName || persistableItem.productName,
+                // Reset listing gate so optimize / push re-evaluate against refreshed research:
+                listingStatus: undefined,
+              }
+            : i
+        ))
+      }
 
       // Only increment itemsScanned here — decision counters (buyCount, passCount) change
       // at the confirmed user-decision moment (handlePhotoManagerDone for BUY,
@@ -885,7 +935,7 @@ function App() {
     // the component (line ~1215). Adding it to deps would hit a TDZ error during render.
     // The closure picks it up correctly at call time; eslint-disable the rule locally.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraMode, currentItem, settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset, simulateProgress, completeStep, tagSuggestionService, setScanHistory, createSession, setAllSessions, setSelectedSessionId])
+  }, [cameraMode, currentItem, settings, session, setSession, ebayService, geminiService, googleLensService, optimizeAndCache, triggerCapture, startAnalyzing, triggerSuccess, triggerFail, reset, simulateProgress, completeStep, tagSuggestionService, setScanHistory, setQueue, createSession, setAllSessions, setSelectedSessionId])
 
   const handleRemoveFromQueue = useCallback((id: string) => {
     setQueue((prev) => (prev || []).filter(item => item.id !== id))
@@ -921,6 +971,20 @@ function App() {
       setSession(undefined)
       lastSyncedSession.current = ''
     }
+
+    // Snapshot photo URLs NOW (at soft-delete time) so the 60s timer never
+    // operates on a stale closure. Items can be added to queue/scanHistory
+    // during the undo window; snapshot stays consistent with the decision point.
+    const snapshotItems = [
+      ...(queue || []).filter(i => i.sessionId === sessionId),
+      ...(scanHistory || []).filter(i => i.sessionId === sessionId),
+    ]
+    const snapshotUrls = new Set<string>()
+    for (const item of snapshotItems) {
+      if (item.ebayListingId) continue
+      for (const url of item.photoUrls || []) snapshotUrls.add(url)
+    }
+
     toast('Session deleted', {
       description: 'You have 60 seconds to recover it from the Session tab.',
       action: {
@@ -934,17 +998,22 @@ function App() {
       },
       duration: 10000,
     })
-    // Hard-delete after 60 seconds if not restored
+    // Hard-delete after 60s if not restored — use snapshotted URLs to avoid stale closure
     setTimeout(() => {
       setAllSessions((prev) => {
         const sess = (prev || []).find(s => s.id === sessionId)
-        if (sess?.deletedAt) {
-          return (prev || []).filter(s => s.id !== sessionId)
+        if (!sess?.deletedAt) return prev || []
+        // Delete Supabase photos using the snapshot captured at soft-delete time
+        if (supabaseService && snapshotUrls.size > 0) {
+          void supabaseService.deletePhotos(Array.from(snapshotUrls))
         }
-        return prev || []
+        // Remove items from KV stores
+        setQueue(qPrev => (qPrev || []).filter(i => i.sessionId !== sessionId))
+        setScanHistory(hPrev => (hPrev || []).filter(i => i.sessionId !== sessionId))
+        return (prev || []).filter(s => s.id !== sessionId)
       })
     }, 60000)
-  }, [session, setSession, setAllSessions])
+  }, [session, setSession, setAllSessions, queue, scanHistory, supabaseService, setQueue, setScanHistory])
 
   const handleEndSession = useCallback(() => {
     if (session) {
@@ -1865,12 +1934,39 @@ function App() {
     logActivity(`${item.productName || 'Item'} passed from scan pile`)
   }, [setScanHistory, setQueue, setSession])
 
+  // ── Scan-history bulk delete (Scan History screen — selected + clear all) ──
+  // Cascades to Supabase photos for any deleted item EXCEPT those with a live
+  // eBay listing (ebayListingId). If `ids` is omitted, clears the entire
+  // scan-history KV.
+  const handleScanHistoryDelete = useCallback((ids?: string[]) => {
+    const idSet = ids ? new Set(ids) : null
+    const targets = (scanHistory || []).filter(i => !idSet || idSet.has(i.id))
+    const urlsToDelete = new Set<string>()
+    for (const item of targets) {
+      if (item.ebayListingId) continue
+      for (const url of item.photoUrls || []) urlsToDelete.add(url)
+    }
+    if (supabaseService && urlsToDelete.size > 0) {
+      void supabaseService.deletePhotos(Array.from(urlsToDelete))
+    }
+    setScanHistory(prev => idSet ? (prev || []).filter(i => !idSet.has(i.id)) : [])
+  }, [scanHistory, supabaseService, setScanHistory])
+
   // ── Agent screen: Permanently delete scan card ────────────────────────────
+  // Cascades to Supabase photo storage, but leaves photos intact if the item
+  // has a live eBay listing (ebayListingId) — buyers on eBay.com would see
+  // broken images otherwise.
   const handleDeleteFromAgent = useCallback((itemId: string) => {
+    const item =
+      (queue || []).find(i => i.id === itemId) ||
+      (scanHistory || []).find(i => i.id === itemId)
+    if (item && !item.ebayListingId && item.photoUrls?.length && supabaseService) {
+      void supabaseService.deletePhotos(item.photoUrls)
+    }
     setQueue(prev => (prev || []).filter(i => i.id !== itemId))
     setScanHistory(prev => (prev || []).filter(i => i.id !== itemId))
     toast('Permanently removed')
-  }, [setQueue, setScanHistory])
+  }, [queue, scanHistory, supabaseService, setQueue, setScanHistory])
 
   // ── Agent screen: View in Queue ───────────────────────────────────────────
   const [highlightQueueItemId, setHighlightQueueItemId] = useState<string | null>(null)
@@ -2161,12 +2257,36 @@ function App() {
   }, [setQueue])
 
   const handleReanalyzeItem = useCallback(async (itemId: string) => {
-    const item = (queue || []).find(i => i.id === itemId)
+    // Search queue first; fall back to scanHistory for items that have left the queue
+    // (e.g. agent dispatch on a scan-history-only PASS item — silently no-op before this fix)
+    const item =
+      (queue || []).find(i => i.id === itemId) ||
+      (scanHistory || []).find(i => i.id === itemId)
     if (!item) return
 
-    const imageSource = item.imageData || item.imageThumbnail
+    // Resolve a base64 image source Gemini can consume.
+    // Preference order:
+    //   1. imageData — in-memory base64 (only present pre-KV-persistence)
+    //   2. photoUrls[primary] — durable Supabase URL, fetched + converted to data URL
+    //   3. imageThumbnail — small base64 survives KV persistence; low-res fallback
+    let imageSource: string | undefined = item.imageData
+    if (!imageSource && item.photoUrls && item.photoUrls.length > 0) {
+      const idx = item.primaryPhotoIndex ?? 0
+      const url = item.photoUrls[idx] ?? item.photoUrls[0]
+      const fetchToast = toast.loading('Fetching photo…')
+      try {
+        imageSource = await urlToDataUrl(url)
+      } catch (err) {
+        console.warn('[re-analyze] urlToDataUrl failed for', url, err)
+        toast.dismiss(fetchToast)
+        toast.error('Could not fetch photo — re-scan with camera instead')
+        return
+      }
+      toast.dismiss(fetchToast)
+    }
+    if (!imageSource) imageSource = item.imageThumbnail
     if (!imageSource) {
-      // No image — navigate to scan-result with item pre-loaded so user can see it
+      // No image anywhere — park on scan-result so the user sees the item and can re-scan
       setCurrentItem(item)
       setPipeline([])
       setScreen('scan-result')
@@ -2174,17 +2294,20 @@ function App() {
       return
     }
 
-    // Navigate to scan-result first, then trigger pipeline — only remove from queue on success
+    // Navigate to scan-result and run pipeline in-place.
+    // Passing `item` as existingItem makes handleCapture:
+    //   - preserve id, sessionId, photoUrls, primaryPhotoIndex, tags, productName
+    //   - reset decision → PENDING and listingStatus → undefined
+    //   - mirror the refreshed research into scan history AND queue in-place
     setCurrentItem(undefined)
     setPipeline([])
     setScreen('scan-result')
     try {
-      await handleCapture(imageSource, item.purchasePrice, undefined, item.condition || 'New')
-      setQueue(prev => (prev || []).filter(i => i.id !== itemId))
+      await handleCapture(imageSource, item.purchasePrice, undefined, item.condition || 'New', item)
     } catch {
-      // handleCapture already shows a toast; item stays in queue so no data is lost
+      // handleCapture surfaces its own toast; item stays in queue so no data is lost
     }
-  }, [queue, setQueue, setCurrentItem, setPipeline, setScreen, handleCapture])
+  }, [queue, scanHistory, setCurrentItem, setPipeline, setScreen, handleCapture])
 
   // Alias for agent tool dispatch — delegates to the existing reanalyze logic
   const handleRerunPipeline = handleReanalyzeItem
@@ -2882,6 +3005,7 @@ function App() {
                 }}
                 sessionId={secondaryReturnScreen.current === 'session-detail' ? selectedSessionId ?? undefined : undefined}
                 scanHistory={secondaryReturnScreen.current === 'session-detail' ? scanHistory || [] : undefined}
+                onDeleteItems={handleScanHistoryDelete}
               />
             </motion.div>
           )}

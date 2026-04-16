@@ -18,9 +18,11 @@ import {
   TrendUp,
   Copy,
   Check,
+  Package,
 } from '@phosphor-icons/react'
 import { callLLM } from '@/lib/llm-service'
 import { cn } from '@/lib/utils'
+import { getCardPhoto } from '@/lib/photo'
 import type { ScannedItem, AppSettings } from '@/types'
 
 // ── Inline chat types ──────────────────────────────────────────────────────
@@ -272,13 +274,20 @@ export function ListingDetailScreen({
           <div className="p-4 space-y-4">
             {/* Item summary strip */}
             <div className="flex gap-3">
-              {(item.imageThumbnail || item.imageData) && (
-                <img
-                  src={item.imageThumbnail || item.imageData}
-                  alt={item.productName || 'Item'}
-                  className="w-20 h-20 object-cover object-center rounded-lg border border-s2 shrink-0"
-                />
-              )}
+              {(() => {
+                const photo = getCardPhoto(item)
+                return photo ? (
+                  <img
+                    src={photo}
+                    alt={item.productName || 'Item'}
+                    className="w-20 h-20 object-cover object-center rounded-lg border border-s2 shrink-0"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-lg border border-s2 shrink-0 bg-s1 flex items-center justify-center">
+                    <Package size={24} weight="duotone" className="text-s3" />
+                  </div>
+                )
+              })()}
               <div className="flex-1 space-y-1.5 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-xs text-t3 font-mono">Cost</span>

@@ -211,6 +211,23 @@ interface SessionScreenProps {
 
 export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp, onOpenItem, onNavigateTo }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
+  // 2-step delete verification for permanent session delete: first tap arms the
+  // button (shows warning copy), second tap within 4s actually purges. Prevents
+  // accidental loss of session + all its items + all its Supabase photos.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const requestPermanentDelete = useCallback((sessionId: string) => {
+    if (pendingDeleteId === sessionId) {
+      // Second tap within arm window — execute
+      setPendingDeleteId(null)
+      onPermanentDeleteSession?.(sessionId)
+      return
+    }
+    setPendingDeleteId(sessionId)
+    // Auto-disarm after 4s if user doesn't confirm
+    setTimeout(() => {
+      setPendingDeleteId(prev => prev === sessionId ? null : prev)
+    }, 4000)
+  }, [pendingDeleteId, onPermanentDeleteSession])
   // Use props from App.tsx (single source of truth) instead of local useKV
   // This ensures deletes/updates propagate immediately
   const queue = queueProp
@@ -384,25 +401,44 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
           {deletedSessions.length > 0 && (
             <div className="p-3 bg-amber/5 border border-amber/20 rounded-xl">
               <div className="text-[10px] font-bold text-amber uppercase tracking-wide mb-2">Recently Deleted</div>
-              {deletedSessions.map(s => (
-                <div key={s.id} className="flex items-center justify-between py-1.5">
-                  <span className="text-xs text-t2 truncate flex-1">{s.name || 'Unnamed session'}</span>
-                  <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                    <button
-                      onClick={() => onRestoreSession?.(s.id)}
-                      className="text-[10px] font-bold text-b1 px-2 py-1 bg-b1/10 rounded-lg active:scale-95 transition-transform"
-                    >
-                      Restore
-                    </button>
-                    <button
-                      onClick={() => onPermanentDeleteSession?.(s.id)}
-                      className="p-1.5 rounded-lg text-red/50 hover:text-red hover:bg-red/10 active:scale-95 transition-all"
-                    >
-                      <Trash size={14} weight="bold" />
-                    </button>
+              {deletedSessions.map(s => {
+                const isArmed = pendingDeleteId === s.id
+                return (
+                  <div key={s.id} className="py-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-t2 truncate flex-1">{s.name || 'Unnamed session'}</span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        <button
+                          onClick={() => {
+                            setPendingDeleteId(null)
+                            onRestoreSession?.(s.id)
+                          }}
+                          className="text-[10px] font-bold text-b1 px-2 py-1 bg-b1/10 rounded-lg active:scale-95 transition-transform"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          onClick={() => requestPermanentDelete(s.id)}
+                          className={cn(
+                            'p-1.5 rounded-lg active:scale-95 transition-all',
+                            isArmed
+                              ? 'text-white bg-red hover:bg-red/90'
+                              : 'text-red/50 hover:text-red hover:bg-red/10'
+                          )}
+                          aria-label={isArmed ? 'Tap again to permanently delete' : 'Permanently delete session'}
+                        >
+                          <Trash size={14} weight="bold" />
+                        </button>
+                      </div>
+                    </div>
+                    {isArmed && (
+                      <p className="mt-1 text-[10px] font-bold text-red leading-snug">
+                        Tap trash again to permanently delete this session, all its scans, and all its photos. This cannot be undone.
+                      </p>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 

@@ -164,14 +164,36 @@ export interface ScannedItem {
   id: string
   timestamp: number
   imageUrl?: string
-  imageData?: string
-  imageThumbnail?: string
-  imageOptimized?: string
+  /**
+   * Photo lifecycle fields — understand the layering before touching renders or pipelines.
+   *
+   * PERSISTENCE CONTRACT:
+   * - `photoUrls` is the ONLY photo field guaranteed to survive KV persistence. It is the
+   *   durable source of truth once the user finishes the Photo Manager.
+   * - `imageData`, `additionalImageData`, `photos`, `imageOptimized` are in-memory base64.
+   *   They are stripped before persisting to KV (localStorage quota) and will be `undefined`
+   *   after reload for any item that was KV-persisted.
+   * - `imageThumbnail` and `additionalImages` are low-res thumbnails that DO survive KV —
+   *   safe to render as fallback but not Gemini-quality.
+   *
+   * RESOLUTION PRIORITY (see src/lib/photo.ts → getCardPhoto):
+   *   photoUrls[primaryPhotoIndex ?? 0] → imageThumbnail → imageData → undefined
+   *
+   * RE-ANALYZE: when `imageData` is stripped post-KV, `handleReanalyzeItem` fetches
+   *   photoUrls[primary] via urlToDataUrl() so Gemini can consume base64.
+   *
+   * DELETE CASCADE: when an item is permanently deleted, its `photoUrls` must be passed
+   *   to supabaseService.deletePhotos() — UNLESS `ebayListingId` is set (live listing;
+   *   deleting Supabase-hosted photos would break image URLs buyers see on eBay.com).
+   */
+  imageData?: string                // full base64 from capture / Gemini input; in-memory only
+  imageThumbnail?: string           // small base64 thumbnail; survives KV persistence
+  imageOptimized?: string           // compressed base64 for pipeline processing; in-memory only
   additionalImages?: string[]       // thumbnails for photos 2–5; persisted with item
   additionalImageData?: string[]    // full base64 for photos 2–5; in-memory only (stripped on KV save)
   photos?: string[]                 // ordered base64/data-URL array managed by Photo Manager; stripped on KV save
-  primaryPhotoIndex?: number        // index of eBay hero photo in photos[]; default 0
-  photoUrls?: string[]              // Supabase Storage public URLs (persisted in KV)
+  primaryPhotoIndex?: number        // index of eBay hero photo in photoUrls[]; default 0
+  photoUrls?: string[]              // Supabase Storage public URLs — DURABLE source of truth (persisted in KV)
   purchasePrice: number
   productName?: string
   description?: string

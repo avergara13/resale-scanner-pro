@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useCostTracking } from '@/hooks/use-cost-tracking'
 import { API_COST_CONFIGS } from '@/lib/cost-tracking-service'
 import { cn } from '@/lib/utils'
+import { getCardPhoto } from '@/lib/photo'
 import type { ScannedItem } from '@/types'
 
 interface CostTrackingScreenProps {
@@ -127,17 +128,20 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId 
                     className="flex items-center gap-3 p-3 rounded-xl border border-s2/60"
                     style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
                   >
-                    {item.imageThumbnail || item.imageData ? (
-                      <img
-                        src={item.imageThumbnail || item.imageData}
-                        alt={item.productName || 'Item'}
-                        className="w-10 h-10 rounded-xl object-cover flex-shrink-0 border border-s2/60"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-xl bg-s1 flex items-center justify-center flex-shrink-0 border border-s2/60">
-                        <Package size={16} className="text-t3" />
-                      </div>
-                    )}
+                    {(() => {
+                      const photo = getCardPhoto(item)
+                      return photo ? (
+                        <img
+                          src={photo}
+                          alt={item.productName || 'Item'}
+                          className="w-10 h-10 rounded-xl object-cover flex-shrink-0 border border-s2/60"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-s1 flex items-center justify-center flex-shrink-0 border border-s2/60">
+                          <Package size={16} className="text-t3" />
+                        </div>
+                      )
+                    })()}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-t1 truncate">{item.productName || 'Unknown Item'}</p>
                       <p className="text-[10px] text-t3 font-mono">
