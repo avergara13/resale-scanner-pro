@@ -1314,7 +1314,7 @@ function App() {
       return
     }
 
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = currentItem!
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = currentItem!
     const draftItem: ScannedItem = {
       ...lightweight,
       purchasePrice: Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice,
@@ -1545,7 +1545,7 @@ function App() {
       toast.error('No image to save')
       return
     }
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = currentItem!
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = currentItem!
     // NaN means the field was left empty — fall back to the analyzed price
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     const effectiveSellPrice =
@@ -1611,7 +1611,7 @@ function App() {
       return
     }
     // Strip heavy blobs — keep thumbnail for scan history display
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = currentItem!
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = currentItem!
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     // Recompute metrics if price changed — keeps stored profitMargin accurate
     let resolvedMargin = currentItem!.profitMargin
@@ -1656,7 +1656,7 @@ function App() {
       toast.error('No image to save')
       return
     }
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = currentItem!
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = currentItem!
     const effectivePrice = Number.isFinite(price) && price >= 0 ? price : currentItem!.purchasePrice
     // MAYBE items live in the working queue AND scan-history.
     // Queue lets the user reopen/edit the card indefinitely.
@@ -1720,6 +1720,10 @@ function App() {
       if (failedCount > 0) {
         toast.warning(`📷 ${failedCount} photo${failedCount > 1 ? 's' : ''} failed to upload — item saved.`)
       }
+    } else if (!supabaseService && localPhotos.length > 0) {
+      // Supabase not configured — photos cannot be persisted to remote storage.
+      // Item is saved with thumbnail only; photos will not survive a page reload.
+      toast.warning('⚠️ Photos not saved — Supabase storage is not configured.')
     }
 
     const finalPhotoUrls = [...existingUrls, ...newlyUploadedUrls]
@@ -1730,6 +1734,14 @@ function App() {
       primaryPhotoIndex: primaryIndex,
       ...(finalPhotoUrls.length > 0 && { photoUrls: finalPhotoUrls }),
     }
+    // Belt-and-suspenders: strip ALL base64 blobs before writing to KV-persisted state.
+    // Lightweight destructure upstream (handleCreateListingFromScan etc.) should already
+    // exclude these, but explicit delete guarantees no multi-MB blobs enter localStorage.
+    const _mutableFinal = finalItem as unknown as Record<string, unknown>
+    delete _mutableFinal.imageData
+    delete _mutableFinal.imageOptimized
+    delete _mutableFinal.additionalImageData
+    delete _mutableFinal.photos
 
     // Clear pending state + currentItem (now safe since user confirmed Done)
     setPendingPhotoDecision(null)
@@ -1747,7 +1759,7 @@ function App() {
         const existing = prev || []
         const idx = existing.findIndex(i => i.id === finalItem.id)
         if (idx !== -1) {
-          return existing.map((item, j) => j === idx ? { ...item, decision: 'BUY' as const, inQueue: true } : item)
+          return existing.map((item, j) => j === idx ? { ...item, decision: 'BUY' as const, inQueue: true, photoUrls: finalItem.photoUrls, primaryPhotoIndex: finalItem.primaryPhotoIndex } : item)
         }
         return existing
       })
@@ -1920,7 +1932,7 @@ function App() {
 
   // ── Agent screen: PASS scan card ──────────────────────────────────────────
   const handlePassFromAgent = useCallback((item: ScannedItem) => {
-    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = item
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, additionalImageData: _addl, ...lightweight } = item
     const passItem: ScannedItem = { ...lightweight, decision: 'PASS', inQueue: false }
     setScanHistory(prev => {
       const existing = prev || []
