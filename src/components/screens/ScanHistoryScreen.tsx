@@ -21,7 +21,10 @@ interface ScanHistoryScreenProps {
 }
 
 export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistory: scanHistoryProp, onDeleteItems }: ScanHistoryScreenProps) {
-  const [globalScanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
+  // Read-only: provides data when no scanHistoryProp is passed (non-session view).
+  // Write path goes through onDeleteItems (App-level, Supabase-photo-safe). Never
+  // call the KV setter directly — that would skip Supabase photo cleanup.
+  const [globalScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState<'all' | 'BUY' | 'MAYBE' | 'PASS' | 'PENDING'>('all')
   // 2-step delete verification: 'none' = idle, 'selected' = armed for bulk delete, 'all' = armed for clear-all.
@@ -67,15 +70,10 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
       setTimeout(() => setArmedDelete(prev => prev === 'selected' ? 'none' : prev), 4000)
       return
     }
-    const ids = Array.from(selectedIds)
-    if (onDeleteItems) {
-      onDeleteItems(ids)   // App-level handler cascades to Supabase photos
-    } else {
-      setScanHistory(prev => (prev || []).filter(i => !selectedIds.has(i.id)))
-    }
+    onDeleteItems?.(Array.from(selectedIds))
     setSelectedIds(new Set())
     setArmedDelete('none')
-  }, [armedDelete, selectedIds, onDeleteItems, setScanHistory])
+  }, [armedDelete, selectedIds, onDeleteItems])
 
   const clearAll = useCallback(() => {
     if (armedDelete !== 'all') {
@@ -83,14 +81,10 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
       setTimeout(() => setArmedDelete(prev => prev === 'all' ? 'none' : prev), 4000)
       return
     }
-    if (onDeleteItems) {
-      onDeleteItems(undefined)   // undefined = clear entire KV
-    } else {
-      setScanHistory([])
-    }
+    onDeleteItems?.(undefined)   // undefined = clear entire history KV
     setSelectedIds(new Set())
     setArmedDelete('none')
-  }, [armedDelete, onDeleteItems, setScanHistory])
+  }, [armedDelete, onDeleteItems])
 
   const formatTime = (ts: number) => {
     const d = new Date(ts)

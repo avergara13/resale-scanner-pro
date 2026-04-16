@@ -971,6 +971,20 @@ function App() {
       setSession(undefined)
       lastSyncedSession.current = ''
     }
+
+    // Snapshot photo URLs NOW (at soft-delete time) so the 60s timer never
+    // operates on a stale closure. Items can be added to queue/scanHistory
+    // during the undo window; snapshot stays consistent with the decision point.
+    const snapshotItems = [
+      ...(queue || []).filter(i => i.sessionId === sessionId),
+      ...(scanHistory || []).filter(i => i.sessionId === sessionId),
+    ]
+    const snapshotUrls = new Set<string>()
+    for (const item of snapshotItems) {
+      if (item.ebayListingId) continue
+      for (const url of item.photoUrls || []) snapshotUrls.add(url)
+    }
+
     toast('Session deleted', {
       description: 'You have 60 seconds to recover it from the Session tab.',
       action: {
@@ -984,18 +998,22 @@ function App() {
       },
       duration: 10000,
     })
-    // Hard-delete after 60 seconds if not restored — cascade to queue/scanHistory/photos
+    // Hard-delete after 60s if not restored — use snapshotted URLs to avoid stale closure
     setTimeout(() => {
       setAllSessions((prev) => {
         const sess = (prev || []).find(s => s.id === sessionId)
-        if (sess?.deletedAt) {
-          purgeSessionData(sessionId)
-          return (prev || []).filter(s => s.id !== sessionId)
+        if (!sess?.deletedAt) return prev || []
+        // Delete Supabase photos using the snapshot captured at soft-delete time
+        if (supabaseService && snapshotUrls.size > 0) {
+          void supabaseService.deletePhotos(Array.from(snapshotUrls))
         }
-        return prev || []
+        // Remove items from KV stores
+        setQueue(qPrev => (qPrev || []).filter(i => i.sessionId !== sessionId))
+        setScanHistory(hPrev => (hPrev || []).filter(i => i.sessionId !== sessionId))
+        return (prev || []).filter(s => s.id !== sessionId)
       })
     }, 60000)
-  }, [session, setSession, setAllSessions, purgeSessionData])
+  }, [session, setSession, setAllSessions, queue, scanHistory, supabaseService, setQueue, setScanHistory])
 
   const handleEndSession = useCallback(() => {
     if (session) {
@@ -2239,7 +2257,11 @@ function App() {
   }, [setQueue])
 
   const handleReanalyzeItem = useCallback(async (itemId: string) => {
-    const item = (queue || []).find(i => i.id === itemId)
+    // Search queue first; fall back to scanHistory for items that have left the queue
+    // (e.g. agent dispatch on a scan-history-only PASS item — silently no-op before this fix)
+    const item =
+      (queue || []).find(i => i.id === itemId) ||
+      (scanHistory || []).find(i => i.id === itemId)
     if (!item) return
 
     // Resolve a base64 image source Gemini can consume.
@@ -2285,7 +2307,7 @@ function App() {
     } catch {
       // handleCapture surfaces its own toast; item stays in queue so no data is lost
     }
-  }, [queue, setCurrentItem, setPipeline, setScreen, handleCapture])
+  }, [queue, scanHistory, setCurrentItem, setPipeline, setScreen, handleCapture])
 
   // Alias for agent tool dispatch — delegates to the existing reanalyze logic
   const handleRerunPipeline = handleReanalyzeItem
