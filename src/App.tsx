@@ -822,16 +822,13 @@ function App() {
         return [persistableItem, ...existing.slice(0, 499)]
       })
 
+      // Only increment itemsScanned here — decision counters (buyCount, passCount) change
+      // at the confirmed user-decision moment (handlePhotoManagerDone for BUY,
+      // handlePassFromScan for PASS, handlePassFromAgent for PASS-from-queue, etc.)
       if (activeSession?.active) {
         setSession((prev) => {
           if (!prev) return prev
-          return {
-            ...prev,
-            itemsScanned: prev.itemsScanned + 1,
-            buyCount: decision === 'BUY' ? prev.buyCount + 1 : prev.buyCount,
-            passCount: decision === 'PASS' ? prev.passCount + 1 : prev.passCount,
-            totalPotentialProfit: decision === 'BUY' ? prev.totalPotentialProfit + profitMetrics.netProfit : prev.totalPotentialProfit,
-          }
+          return { ...prev, itemsScanned: prev.itemsScanned + 1 }
         })
       }
 
@@ -1577,11 +1574,13 @@ function App() {
       if (idx !== -1) return existing.map((i, j) => j === idx ? passItem : i)
       return [passItem, ...existing.slice(0, 499)]  // fallback: prepend if somehow missing
     })
+    // Increment passCount at the confirmed user-decision moment (not at AI-recommendation time)
+    setSession(prev => prev ? { ...prev, passCount: prev.passCount + 1 } : prev)
     setCurrentItem(undefined)
     setPipeline([])
     setScreen('session')
     logActivity('Passed — logged to scan history')
-  }, [currentItem, setScanHistory, settings, setScreen])
+  }, [currentItem, setScanHistory, setSession, settings, setScreen])
 
   const handleMaybeFromScan = useCallback((price: number, notes: string) => {
     if (!currentItem?.imageData && !currentItem?.imageThumbnail) {
@@ -1632,27 +1631,33 @@ function App() {
     // Upload new local photos only — existing URLs are already on Supabase
     let newlyUploadedUrls: string[] = []
     if (supabaseService && localPhotos.length > 0) {
-      const sku = item.tags?.find(t => t.startsWith('HRBO-'))
-      if (sku) {
-        const startIndex = existingUrls.length  // offset filenames past existing photos
-        const results = await Promise.allSettled(
-          localPhotos.map((photo, i) =>
-            supabaseService.uploadPhoto(photo, sku, `${sku}-0${startIndex + i + 1}.jpg`)
-          )
+      // Guarantee a SKU exists — generate one if missing so upload is never silently skipped
+      let sku = item.tags?.find(t => t.startsWith('HRBO-'))
+      if (!sku) {
+        sku = generateSku()
+        // Patch the item so the generated SKU is persisted with it
+        pendingPhotoDecision.item = { ...pendingPhotoDecision.item, tags: [...(item.tags || []), sku] }
+      }
+      const startIndex = existingUrls.length  // offset filenames past existing photos
+      const results = await Promise.allSettled(
+        localPhotos.map((photo, i) =>
+          supabaseService.uploadPhoto(photo, sku!, `${sku}-0${startIndex + i + 1}.jpg`)
         )
-        newlyUploadedUrls = results
-          .filter(r => r.status === 'fulfilled' && r.value)
-          .map(r => (r as PromiseFulfilledResult<string>).value)
-        const failedCount = localPhotos.length - newlyUploadedUrls.length
-        if (failedCount > 0) {
-          toast.warning(`📷 ${failedCount} photo${failedCount > 1 ? 's' : ''} failed to upload — item saved.`)
-        }
+      )
+      newlyUploadedUrls = results
+        .filter(r => r.status === 'fulfilled' && r.value)
+        .map(r => (r as PromiseFulfilledResult<string>).value)
+      const failedCount = localPhotos.length - newlyUploadedUrls.length
+      if (failedCount > 0) {
+        toast.warning(`📷 ${failedCount} photo${failedCount > 1 ? 's' : ''} failed to upload — item saved.`)
       }
     }
 
     const finalPhotoUrls = [...existingUrls, ...newlyUploadedUrls]
+    // Use pendingPhotoDecision.item (may have been patched with generated SKU above)
+    const latestItem = pendingPhotoDecision.item
     const finalItem: ScannedItem = {
-      ...item,
+      ...latestItem,
       primaryPhotoIndex: primaryIndex,
       ...(finalPhotoUrls.length > 0 && { photoUrls: finalPhotoUrls }),
     }
@@ -1799,13 +1804,44 @@ function App() {
     logActivity(`${item.productName || 'Item'} restored from PASS → MAYBE`)
   }, [setScanHistory, setQueue, setAgentActiveTab, setScreen, setSession])
 
+  // ── Listing Queue: Re-scan — return a BUY item to the scan pile for re-research ──
+  // Preserves ALL enrichment data (AI analysis, market comps, photos, optimized listing).
+  // Only resets decision to MAYBE and clears listingStatus. Not available once pushed to eBay.
+  const handleReScanItem = useCallback((itemId: string) => {
+    // Update item in queue: BUY → MAYBE, clear listing pipeline state, preserve all data
+    setQueue(prev => (prev || []).map(i =>
+      i.id === itemId
+        ? { ...i, decision: 'MAYBE' as const, listingStatus: undefined }
+        : i
+    ))
+    // Mirror in scan history
+    setScanHistory(prev => (prev || []).map(i =>
+      i.id === itemId
+        ? { ...i, decision: 'MAYBE' as const, inQueue: true }
+        : i
+    ))
+    // Adjust session counter
+    setSession(prev => prev ? { ...prev, buyCount: Math.max(0, prev.buyCount - 1) } : prev)
+    // Navigate to scan pile
+    setAgentActiveTab('scans')
+    setScreen('agent')
+    toast('Returned to scan pile — tap to review or BUY again')
+    logActivity('Item returned to scan pile for re-research')
+  }, [setQueue, setScanHistory, setSession, setAgentActiveTab, setScreen])
+
   // ── Agent screen: Promote scan card → BUY (via Photo Manager) ─────────────
   const handlePromoteToBuy = useCallback((item: ScannedItem) => {
-    const existingUrls = item.photoUrls || (item.imageThumbnail ? [item.imageThumbnail] : [])
+    // After KV persistence, imageData/additionalImageData are stripped.
+    // Use photoUrls (Supabase) as the source of truth; fall back to in-memory base64 only if still present.
+    const existingUrls = item.photoUrls || []
     const localPhotos = [item.imageData, ...(item.additionalImageData || [])].filter(Boolean) as string[]
+    // If no remote URLs and no local base64, show thumbnail as display-only fallback
+    const displayFallback = existingUrls.length === 0 && localPhotos.length === 0 && item.imageThumbnail
+      ? [item.imageThumbnail]
+      : []
     setPendingPhotoDecision({
       item: { ...item, decision: 'BUY' as const, inQueue: true },
-      existingUrls,
+      existingUrls: existingUrls.length > 0 ? existingUrls : displayFallback,
       localPhotos,
       decision: 'BUY',
     })
@@ -2066,6 +2102,21 @@ function App() {
       })
     }
 
+    // Move PASS items out of queue → scan-history only (they don't belong in either active container)
+    const passItemIds = new Set<string>()
+    for (const [id, item] of updatedItemsMap) {
+      if (item.decision === 'PASS') passItemIds.add(id)
+    }
+    if (passItemIds.size > 0) {
+      setScanHistory(prev => (prev || []).map(i => {
+        const updated = updatedItemsMap.get(i.id)
+        return updated && updated.decision === 'PASS'
+          ? { ...i, ...updated, inQueue: false }
+          : i
+      }))
+      setQueue(prev => (prev || []).filter(i => !passItemIds.has(i.id)))
+    }
+
     if (session?.active && (buyCount > 0 || passCount > 0)) {
       setSession((prev) => {
         if (!prev) return prev
@@ -2098,7 +2149,7 @@ function App() {
       logActivity(`${skippedItems.length} item(s) skipped (no image)`, 'info')
     }
     logActivity(`Analyzed ${processedCount} items: ${buyCount} BUY, ${passCount} PASS`)
-  }, [queue, setQueue, settings, session, setSession, geminiService, googleLensService, ebayService])
+  }, [queue, setQueue, setScanHistory, settings, session, setSession, geminiService, googleLensService, ebayService])
 
   const handleUpdateCurrentItem = useCallback((itemId: string, updates: Partial<ScannedItem>) => {
     if (!itemId) return
@@ -2705,6 +2756,7 @@ function App() {
                 onListItem={handleListItem}
                 highlightItemId={highlightQueueItemId}
                 onHighlightClear={() => setHighlightQueueItemId(null)}
+                onReScanItem={handleReScanItem}
               />
             </motion.div>
           )}

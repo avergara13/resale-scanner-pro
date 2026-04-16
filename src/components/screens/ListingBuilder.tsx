@@ -329,24 +329,14 @@ export function ListingBuilder({
     setIsPushing(true)
     setPushError(null)
 
-    let finalPhotoUrls = [...state.photoUrls]
+    const finalPhotoUrls = [...state.photoUrls]
 
-    // Upload any raw base64 photos not yet in storage
-    const rawPhotos = [item.imageData, ...(item.additionalImageData || [])].filter(Boolean) as string[]
-    if (rawPhotos.length > 0 && finalPhotoUrls.length === 0 && onUploadPhotos) {
-      const sku = state.sku || state.model || state.title.slice(0, 20).replace(/[^A-Za-z0-9_-]+/g, '-')
-      setUploadProgress({ done: 0, total: rawPhotos.length })
-      try {
-        const uploaded = await onUploadPhotos(rawPhotos, sku)
-        setUploadProgress({ done: uploaded.length, total: rawPhotos.length })
-        if (uploaded.length > 0) {
-          finalPhotoUrls = uploaded
-          setState(s => ({ ...s, photoUrls: uploaded }))
-        }
-      } catch (e) {
-        console.warn('[ListingBuilder] photo upload error:', e)
-        // Continue with existing photoUrls even if upload failed
-      }
+    // Queue items have already been through Photo Manager — imageData is stripped from KV-persisted items.
+    // If photoUrls is empty, the item was never properly photographed; block push and prompt user to add photos.
+    if (finalPhotoUrls.length === 0) {
+      toast.error('No photos — tap Edit Photos first')
+      setIsPushing(false)
+      return
     }
     setUploadProgress(null)
 
