@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, Eye, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus, DotsThreeVertical, Camera } from '@phosphor-icons/react'
+import { Trash, Lightning, DownloadSimple, PencilSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus, DotsThreeVertical, Camera } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import { Card } from '@/components/ui/card'
@@ -9,7 +9,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { logActivity } from '@/lib/activity-log'
-import { ItemEditDialog } from '@/components/ItemEditDialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
@@ -57,7 +56,6 @@ interface QueueScreenProps {
   onDelist?: (itemId: string) => void
   personalSessionIds?: Set<string>
   onReanalyze?: (itemId: string) => void
-  onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
   /** WO-RSP-010: opens the in-app ListingBuilder — replaces onPushToNotion + onPushToEbay */
   onOpenListingBuilder?: (itemId: string) => void
@@ -73,16 +71,14 @@ interface SortableItemProps {
   allTags: ItemTag[]
   isPersonal?: boolean
   onToggleSelect: (id: string) => void
-  onEdit: (item: ScannedItem) => void
   onRemove: (id: string) => void
   onCreateListing: (id: string) => void
   onEditTags: (itemId: string, tags: string[]) => void
   onOpenSoldDialog?: (item: ScannedItem) => void
   onDelist?: (itemId: string) => void
   onReanalyze?: (itemId: string) => void
-  onOpenDetail?: (item: ScannedItem) => void
   onBuyItem?: (id: string) => void
-  /** WO-RSP-010: opens the in-app ListingBuilder */
+  /** WO-RSP-010: opens the in-app ListingBuilder — unified view + edit */
   onOpenListingBuilder?: (itemId: string) => void
   onEditPhotos?: (item: ScannedItem) => void
   onDecisionChange?: (itemId: string, decision: Decision) => void
@@ -94,14 +90,12 @@ function SortableItem({
   allTags,
   isPersonal,
   onToggleSelect,
-  onEdit,
   onRemove,
   onCreateListing,
   onEditTags,
   onOpenSoldDialog,
   onDelist,
   onReanalyze,
-  onOpenDetail,
   onBuyItem,
   onOpenListingBuilder,
   onEditPhotos,
@@ -348,25 +342,15 @@ function SortableItem({
       {/* ── Action bar — Apple-style inset pill buttons ── */}
       <div className="px-3 py-2 flex items-center gap-1.5">
         {/* Icon buttons — small pills */}
-        <button
-          onClick={() => onEdit(item)}
-          title="Edit"
-          aria-label="Edit item"
-          className="h-8 w-8 flex items-center justify-center rounded-full text-t2 bg-s1/80 hover:bg-s2 active:scale-95 transition-all"
-          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-        >
-          <PencilSimple size={13} weight="bold" />
-        </button>
-
-        {onOpenDetail && (
+        {onOpenListingBuilder && (
           <button
-            onClick={() => onOpenDetail(item)}
-            title="View detail"
-            aria-label="View detail"
-            className="h-8 w-8 flex items-center justify-center rounded-full text-b1 bg-b1/10 hover:bg-b1/20 active:scale-95 transition-all"
+            onClick={() => onOpenListingBuilder(item.id)}
+            title="View / Edit listing"
+            aria-label="View or edit listing"
+            className="h-8 w-8 flex items-center justify-center rounded-full text-t2 bg-s1/80 hover:bg-s2 active:scale-95 transition-all"
             style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           >
-            <Eye size={13} weight="bold" />
+            <PencilSimple size={13} weight="bold" />
           </button>
         )}
 
@@ -541,7 +525,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenDetail, onBuyItem, onOpenListingBuilder, onEditPhotos }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onBuyItem, onOpenListingBuilder, onEditPhotos }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -549,7 +533,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   )
   const { filters: advancedFilters, setFilters: setAdvancedFilters } = useAdvancedFilterPreference('queue-screen')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [manualName, setManualName] = useState('')
@@ -885,9 +868,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     }
   }, [sortedItems.length, previousItemCount, queueItems.length, previousFilteredCount])
 
-  const handleEdit = (item: ScannedItem) => {
-    setEditingItem(item)
-  }
 
   const handleSaveEdit = (itemId: string, updates: Partial<ScannedItem>) => {
     onEdit(itemId, updates)
@@ -1004,13 +984,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           willChange: isPulling || isRefreshing ? 'transform' : 'auto',
         }}
       >
-      <ItemEditDialog
-        item={editingItem}
-        isOpen={editingItem !== null}
-        onClose={() => setEditingItem(null)}
-        onSave={handleSaveEdit}
-        geminiService={geminiService}
-      />
       <BulkTagOperations
         isOpen={bulkTagDialogOpen}
         onClose={() => setBulkTagDialogOpen(false)}
@@ -1406,7 +1379,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       allTags={allTags || []}
                       isPersonal={!!item.sessionId && !!personalSessionIds?.has(item.sessionId)}
                       onToggleSelect={handleToggleSelect}
-                      onEdit={handleEdit}
                       onRemove={onRemove}
                       onCreateListing={onCreateListing}
                       onEditTags={(itemId, tags) => onEdit(itemId, { tags })}
@@ -1417,7 +1389,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       } : undefined}
                       onDelist={onDelist}
                       onReanalyze={onReanalyze}
-                      onOpenDetail={onOpenDetail}
                       onBuyItem={onBuyItem}
                       onOpenListingBuilder={onOpenListingBuilder}
                       onEditPhotos={onEditPhotos}
@@ -1523,16 +1494,18 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           </div>
                         )}
                         <div className="flex gap-1 items-center mt-1 md:mt-1.5">
-                          <Button
-                            size="sm"
-                            onClick={() => handleEdit(item)}
-                            variant="outline"
-                            title="Edit"
-                            aria-label="Edit item"
-                            className="h-7 w-7 md:h-8 md:w-8 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
-                          >
-                            <PencilSimple size={13} weight="bold" aria-hidden />
-                          </Button>
+                          {onOpenListingBuilder && (
+                            <Button
+                              size="sm"
+                              onClick={() => onOpenListingBuilder(item.id)}
+                              variant="outline"
+                              title="View / Edit listing"
+                              aria-label="View or edit listing"
+                              className="h-7 w-7 md:h-8 md:w-8 p-0 border border-s2 bg-transparent text-t2 hover:bg-s1 hover:text-t1"
+                            >
+                              <PencilSimple size={13} weight="bold" aria-hidden />
+                            </Button>
+                          )}
                           {item.decision === 'BUY' ? (
                             !item.optimizedListing && (
                               <Button

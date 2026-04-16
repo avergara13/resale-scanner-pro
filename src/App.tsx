@@ -20,7 +20,6 @@ import { CostTrackingScreen } from './components/screens/CostTrackingScreen'
 import { ScanHistoryScreen } from './components/screens/ScanHistoryScreen'
 import { SoldScreen } from './components/screens/SoldScreen'
 import { SessionDetailScreen } from './components/screens/SessionDetailScreen'
-import { ListingDetailScreen } from './components/screens/ListingDetailScreen'
 import { PhotoManager } from './components/screens/PhotoManager'
 import { ListingBuilder } from './components/screens/ListingBuilder'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
@@ -103,7 +102,6 @@ function App() {
   } | null>(null)
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
-  const [detailItemId, setDetailItemId] = useState<string | null>(null)
   // WO-RSP-010: ListingBuilder screen item ID
   const [listingBuilderItemId, setListingBuilderItemId] = useState<string | null>(null)
   const [liveSoldItems, setLiveSoldItems] = useState<SoldItem[]>([])
@@ -2625,26 +2623,11 @@ function App() {
                 onDelist={handleDelist}
                 personalSessionIds={personalSessionIds}
                 onReanalyze={handleReanalyzeItem}
-                onOpenDetail={(item) => setDetailItemId(item.id)}
                 onOpenListingBuilder={handleOpenListingBuilder}
                 onEditPhotos={(item) => handleOpenPhotoManager(item, 'queue')}
               />
             </motion.div>
           )}
-          {/* ListingDetailScreen — overlaid on top of queue when a detail item is selected */}
-          {detailItemId && (() => {
-            const detailItem = (queue || []).find(i => i.id === detailItemId)
-            return detailItem ? (
-              <ListingDetailScreen
-                item={detailItem}
-                onClose={() => setDetailItemId(null)}
-                onOptimize={handleOptimizeItem}
-                settings={settings}
-                onEdit={handleEditQueueItem}
-                onOpenListingBuilder={handleOpenListingBuilder}
-              />
-            ) : null
-          })()}
           {screen === 'sold' && (
             <motion.div
               key="sold"
