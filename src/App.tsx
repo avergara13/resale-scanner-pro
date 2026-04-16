@@ -1670,6 +1670,7 @@ function App() {
       })
       setScanHistory(prev => (prev || []).filter(i => i.id !== finalItem.id))
       setScreen('queue')
+      toast('✅ Added to Listings — check Queue', { action: { label: 'Go to Queue', onClick: () => setScreen('queue') } })
       logActivity('Added to queue — photos saved')
       // Run optimization after navigating so user sees the queue immediately
       if (listingOptimizationService) {
@@ -1784,6 +1785,50 @@ function App() {
     toast('Item restored to scan pile as MAYBE')
     logActivity(`${item.productName || 'Item'} restored from PASS → MAYBE`)
   }, [setScanHistory, setQueue, setAgentActiveTab, setScreen])
+
+  // ── Agent screen: Promote scan card → BUY (via Photo Manager) ─────────────
+  const handlePromoteToBuy = useCallback((item: ScannedItem) => {
+    const existingUrls = item.photoUrls || (item.imageThumbnail ? [item.imageThumbnail] : [])
+    const localPhotos = [item.imageData, ...(item.additionalImageData || [])].filter(Boolean) as string[]
+    setPendingPhotoDecision({
+      item: { ...item, decision: 'BUY' as const, inQueue: true },
+      existingUrls,
+      localPhotos,
+      decision: 'BUY',
+    })
+    setScreen('photo-manager')
+    setSession(prev => prev ? { ...prev, buyCount: prev.buyCount + 1 } : prev)
+  }, [setPendingPhotoDecision, setScreen, setSession])
+
+  // ── Agent screen: PASS scan card ──────────────────────────────────────────
+  const handlePassFromAgent = useCallback((item: ScannedItem) => {
+    const { imageData: _img, imageOptimized: _opt, photos: _photos, ...lightweight } = item
+    const passItem: ScannedItem = { ...lightweight, decision: 'PASS', inQueue: false }
+    setScanHistory(prev => {
+      const existing = prev || []
+      const idx = existing.findIndex(i => i.id === passItem.id)
+      if (idx !== -1) return existing.map((i, j) => j === idx ? passItem : i)
+      return [passItem, ...existing.slice(0, 499)]
+    })
+    setQueue(prev => (prev || []).filter(i => i.id !== item.id))
+    setSession(prev => prev ? { ...prev, passCount: prev.passCount + 1 } : prev)
+    toast('Passed — logged to scan history')
+    logActivity(`${item.productName || 'Item'} passed from scan pile`)
+  }, [setScanHistory, setQueue, setSession])
+
+  // ── Agent screen: Permanently delete scan card ────────────────────────────
+  const handleDeleteFromAgent = useCallback((itemId: string) => {
+    setQueue(prev => (prev || []).filter(i => i.id !== itemId))
+    setScanHistory(prev => (prev || []).filter(i => i.id !== itemId))
+    toast('Permanently removed')
+  }, [setQueue, setScanHistory])
+
+  // ── Agent screen: View in Queue ───────────────────────────────────────────
+  const [highlightQueueItemId, setHighlightQueueItemId] = useState<string | null>(null)
+  const handleViewInQueue = useCallback((itemId: string) => {
+    setHighlightQueueItemId(itemId)
+    setScreen('queue')
+  }, [setScreen])
 
   const handleQuickDraft = useCallback(async (imageData: string, price: number, barcodeProduct?: BarcodeProduct, condition?: string) => {
     const optimized = await optimizeAndCache(imageData)
@@ -2567,6 +2612,11 @@ function App() {
                   setOpenedFromScans(true)
                   setScreen('scan-result')
                 }}
+                onPromoteToBuy={handlePromoteToBuy}
+                onPassItem={handlePassFromAgent}
+                onDeleteItem={handleDeleteFromAgent}
+                onRestorePassItem={handleRestorePassItem}
+                onViewInQueue={handleViewInQueue}
               />
             </motion.div>
           )}
@@ -2637,6 +2687,8 @@ function App() {
                 onReanalyze={handleReanalyzeItem}
                 onOpenListingBuilder={handleOpenListingBuilder}
                 onListItem={handleListItem}
+                highlightItemId={highlightQueueItemId}
+                onHighlightClear={() => setHighlightQueueItemId(null)}
               />
             </motion.div>
           )}

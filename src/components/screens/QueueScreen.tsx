@@ -61,6 +61,10 @@ interface QueueScreenProps {
   onOpenListingBuilder?: (itemId: string) => void
   /** Quick-list: opens ListingBuilder with gate drawer pre-opened */
   onListItem?: (itemId: string) => void
+  /** Item to scroll-to and flash-highlight (from Agent "View in Queue") */
+  highlightItemId?: string | null
+  /** Clear highlight after animation completes */
+  onHighlightClear?: () => void
 }
 
 type FilterOption = 'ALL' | 'ITEMS' | 'LISTED'
@@ -71,6 +75,7 @@ interface SortableItemProps {
   isSelected: boolean
   allTags: ItemTag[]
   isPersonal?: boolean
+  isHighlighted?: boolean
   onToggleSelect: (id: string) => void
   onRemove: (id: string) => void
   onCreateListing: (id: string) => void
@@ -88,6 +93,7 @@ function SortableItem({
   isSelected,
   allTags,
   isPersonal,
+  isHighlighted,
   onToggleSelect,
   onRemove,
   onCreateListing,
@@ -145,12 +151,15 @@ function SortableItem({
   return (
     <Card
       ref={setNodeRef}
+      id={`queue-item-${item.id}`}
       style={style}
       className={cn(
         "border overflow-hidden flex flex-col gap-0 p-0 py-0 transition-colors rounded-2xl border-l-[3px]",
         isSelected ? 'border-b1' : 'border-s2/60',
         // Left border accent by card state
-        cardState === 'live' ? 'border-l-green' : cardState === 'ready' ? 'border-l-indigo-500' : 'border-l-amber'
+        cardState === 'live' ? 'border-l-green' : cardState === 'ready' ? 'border-l-indigo-500' : 'border-l-amber',
+        // Flash highlight from "View in Queue"
+        isHighlighted && 'ring-2 ring-b1 ring-opacity-80 animate-pulse'
       )}
     >
       {/* ── Gate completion bar — scores 7 required fields ── */}
@@ -450,7 +459,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onBuyItem, onOpenListingBuilder, onListItem }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onBuyItem, onOpenListingBuilder, onListItem, highlightItemId, onHighlightClear }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -474,6 +483,23 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [soldMarketplace, setSoldMarketplace] = useState<'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'>('ebay')
   const [showTrendIndicator, setShowTrendIndicator] = useState(false)
   const [locationInsightsOpen, setLocationInsightsOpen] = useState(false)
+
+  // Scroll-to + flash-highlight when arriving from "View in Queue"
+  const [flashId, setFlashId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!highlightItemId) return
+    // Small delay to let the screen render first
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`queue-item-${highlightItemId}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        setFlashId(highlightItemId)
+        setTimeout(() => setFlashId(null), 1500)
+      }
+      onHighlightClear?.()
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [highlightItemId, onHighlightClear])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1307,6 +1333,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                       isSelected={selectedIds.has(item.id)}
                       allTags={allTags || []}
                       isPersonal={!!item.sessionId && !!personalSessionIds?.has(item.sessionId)}
+                      isHighlighted={flashId === item.id}
                       onToggleSelect={handleToggleSelect}
                       onRemove={onRemove}
                       onCreateListing={onCreateListing}
