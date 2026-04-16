@@ -347,9 +347,9 @@ export function ListingBuilder({
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="absolute inset-0 flex flex-col bg-b2 overflow-hidden">
+    <div className="absolute inset-0 flex flex-col bg-bg overflow-hidden">
       {/* ── Sticky header ──────────────────────────────────────────────────── */}
-      <div className="flex-none flex items-center justify-between px-4 py-3 bg-b2/95 backdrop-blur-sm border-b border-s1 z-10">
+      <div className="flex-none flex items-center justify-between px-4 py-3 bg-bg/95 backdrop-blur-sm border-b border-s1 z-10">
         <button
           onClick={onBack}
           className="flex items-center gap-1.5 text-t2 hover:text-b1 active:scale-95 transition-all py-1"
