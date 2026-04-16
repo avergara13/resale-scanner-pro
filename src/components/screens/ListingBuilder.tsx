@@ -97,6 +97,12 @@ interface ListingBuilderProps {
   onEditPhotos?: (item: ScannedItem) => void
   /** Upload raw base64/data-URL photos to storage, return public URLs */
   onUploadPhotos?: (photos: string[], sku: string) => Promise<string[]>
+  /** Trigger AI optimization from within ListingBuilder */
+  onOptimize?: (itemId: string) => Promise<void>
+  /** Open the gate drawer immediately on mount (quick-list from queue card) */
+  initialGateOpen?: boolean
+  /** 'browse' = view/edit, 'list' = intent to push (different back behavior) */
+  mode?: 'browse' | 'list'
 }
 
 // ── Gate function ────────────────────────────────────────────────────────────
@@ -147,6 +153,9 @@ export function ListingBuilder({
   onPushed,
   onEditPhotos,
   onUploadPhotos,
+  onOptimize,
+  initialGateOpen,
+  mode = 'browse',
 }: ListingBuilderProps) {
   // ── Initialise state from item + optimizedListing ──────────────────────────
   const [state, setState] = useState<ListingBuilderState>(() => {
@@ -196,6 +205,7 @@ export function ListingBuilder({
   // ── Gate sheet ──────────────────────────────────────────────────────────────
   const [gateOpen, setGateOpen] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
+  const [isOptimizing, setIsOptimizing] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null)
   const [pushError, setPushError] = useState<string | null>(null)
 
@@ -231,8 +241,70 @@ export function ListingBuilder({
     }
   }, [item.photoUrls])
 
+  // ── Auto-open gate drawer (quick-list from queue card) ────────────────────
+  useEffect(() => {
+    if (initialGateOpen) {
+      const t = setTimeout(() => setGateOpen(true), 150)
+      return () => clearTimeout(t)
+    }
+  }, [initialGateOpen])
+
+  // ── Dirty tracking — tracks user-edited fields so AI refresh won't overwrite them
+  const dirtyFieldsRef = useRef<Set<keyof ListingBuilderState>>(new Set())
+
+  // ── Refresh state when AI optimization completes ──────────────────────────
+  const prevOptimizedAtRef = useRef<number | undefined>(item.optimizedListing?.optimizedAt)
+  useEffect(() => {
+    const newAt = item.optimizedListing?.optimizedAt
+    if (newAt && newAt !== prevOptimizedAtRef.current) {
+      prevOptimizedAtRef.current = newAt
+      const l = item.optimizedListing!
+      const dirty = dirtyFieldsRef.current
+      // Only update fields the user hasn't manually touched
+      setState(s => ({
+        ...s,
+        ...(!dirty.has('title') && l.title ? { title: l.title.slice(0, 80) } : {}),
+        ...(!dirty.has('subtitle') && l.subtitle ? { subtitle: l.subtitle.slice(0, 55) } : {}),
+        ...(!dirty.has('condition') && l.condition ? { condition: l.condition } : {}),
+        ...(!dirty.has('conditionDescription') && l.conditionDescription ? { conditionDescription: l.conditionDescription } : {}),
+        ...(!dirty.has('description') && l.description ? { description: l.description } : {}),
+        ...(!dirty.has('brand') && l.itemSpecifics?.['Brand'] ? { brand: l.itemSpecifics['Brand'] } : {}),
+        ...(!dirty.has('model') && (l.itemSpecifics?.['Model'] || l.itemSpecifics?.['Style']) ? { model: l.itemSpecifics['Model'] || l.itemSpecifics['Style'] || '' } : {}),
+        ...(!dirty.has('color') && l.itemSpecifics?.['Color'] ? { color: l.itemSpecifics['Color'] } : {}),
+        ...(!dirty.has('size') && (l.size || l.itemSpecifics?.['Size']) ? { size: l.size || l.itemSpecifics?.['Size'] || '' } : {}),
+        ...(!dirty.has('material') && l.itemSpecifics?.['Material'] ? { material: l.itemSpecifics['Material'] } : {}),
+        ...(!dirty.has('ebayCategoryId') && l.ebayCategoryId ? { ebayCategoryId: l.ebayCategoryId } : {}),
+        ...(!dirty.has('department') && l.department ? { department: l.department } : {}),
+        ...(!dirty.has('price') && l.price != null ? { price: String(l.price) } : {}),
+        ...(!dirty.has('bestOfferEnabled') ? { bestOfferEnabled: l.bestOfferEnabled ?? s.bestOfferEnabled } : {}),
+        ...(!dirty.has('shippingStrategy') && l.shippingService ? { shippingStrategy: l.shippingService } : {}),
+        ...(!dirty.has('weightOz') && l.weightOz != null ? { weightOz: String(l.weightOz) } : {}),
+        ...(!dirty.has('itemSpecifics') && l.itemSpecifics
+          ? { itemSpecifics: Object.entries(l.itemSpecifics)
+                .filter(([k, v]) => k && v && v !== 'N/A' && v !== 'null')
+                .map(([k, v]) => ({ key: k, value: v })) }
+          : {}),
+      }))
+      toast.success('AI optimization applied')
+    }
+  }, [item.optimizedListing?.optimizedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Optimize handler ──────────────────────────────────────────────────────
+  const handleOptimize = useCallback(async () => {
+    if (!onOptimize || isOptimizing) return
+    setIsOptimizing(true)
+    try {
+      await onOptimize(item.id)
+    } catch {
+      toast.error('Optimization failed')
+    } finally {
+      setIsOptimizing(false)
+    }
+  }, [onOptimize, item.id, isOptimizing])
+
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const set = useCallback(<K extends keyof ListingBuilderState>(key: K, value: ListingBuilderState[K]) => {
+    dirtyFieldsRef.current.add(key)
     setState(s => ({ ...s, [key]: value }))
   }, [])
 
@@ -351,28 +423,51 @@ export function ListingBuilder({
       {/* ── Sticky header ──────────────────────────────────────────────────── */}
       <div className="flex-none flex items-center justify-between px-4 py-3 bg-bg/95 backdrop-blur-sm border-b border-s1 z-10">
         <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-t2 hover:text-b1 active:scale-95 transition-all py-1"
+          onClick={() => {
+            if (isPushing) return // cannot leave during push
+            if (mode === 'list') toast('Changes not saved — tap the card to continue', { duration: 3000 })
+            onBack()
+          }}
+          disabled={isPushing}
+          className="flex items-center gap-1.5 text-t2 hover:text-b1 active:scale-95 transition-all py-1 disabled:opacity-40"
           style={{ touchAction: 'manipulation' }}
         >
           <ArrowLeft size={18} weight="bold" />
-          <span className="text-[13px] font-medium">Back</span>
+          <span className="text-[13px] font-medium">{isPushing ? '' : 'Back'}</span>
         </button>
 
         <div className="text-[12px] font-semibold text-t2 flex items-center gap-1.5">
+          <span className="text-[10px] text-t3 mr-1">{mode === 'list' ? 'List on eBay' : 'Edit Listing'}</span>
           {gateResult.allRequiredPass
-            ? <><CheckCircle size={14} weight="fill" className="text-green-500" />Ready to push</>
+            ? <><CheckCircle size={14} weight="fill" className="text-green-500" />Ready</>
             : <><span className="text-red-500 text-[11px]">{gateResult.required.filter(r => !r.pass).length} required</span></>
           }
         </div>
 
-        <button
-          onClick={() => setGateOpen(true)}
-          className="h-9 px-4 text-[12px] font-bold text-white rounded-full active:scale-95 transition-all flex items-center gap-1.5"
-          style={{ background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)', touchAction: 'manipulation' }}
-        >
-          Review &amp; Push
-        </button>
+        <div className="flex items-center gap-2">
+          {onOptimize && (
+            <button
+              onClick={handleOptimize}
+              disabled={isOptimizing}
+              title="Re-run AI optimization"
+              aria-label="Optimize listing with AI"
+              className="h-9 w-9 flex items-center justify-center rounded-full bg-b1/10 text-b1 hover:bg-b1/20 active:scale-95 transition-all disabled:opacity-40"
+              style={{ touchAction: 'manipulation' }}
+            >
+              {isOptimizing
+                ? <CircleNotch size={15} className="animate-spin" />
+                : <Lightning size={15} weight="bold" />
+              }
+            </button>
+          )}
+          <button
+            onClick={() => setGateOpen(true)}
+            className="h-9 px-4 text-[12px] font-bold text-white rounded-full active:scale-95 transition-all flex items-center gap-1.5"
+            style={{ background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)', touchAction: 'manipulation' }}
+          >
+            Review &amp; Push
+          </button>
+        </div>
       </div>
 
       {/* ── Scrollable body ────────────────────────────────────────────────── */}

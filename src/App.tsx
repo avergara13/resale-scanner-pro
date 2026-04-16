@@ -102,8 +102,10 @@ function App() {
   } | null>(null)
   const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, currentItemName: '' })
-  // WO-RSP-010: ListingBuilder screen item ID
+  // WO-RSP-010: ListingBuilder screen state
   const [listingBuilderItemId, setListingBuilderItemId] = useState<string | null>(null)
+  const [listingBuilderAutoGate, setListingBuilderAutoGate] = useState(false)
+  const [listingBuilderMode, setListingBuilderMode] = useState<'browse' | 'list'>('browse')
   const [liveSoldItems, setLiveSoldItems] = useState<SoldItem[]>([])
   const [soldWarnings, setSoldWarnings] = useState<string[]>([])
   const [soldLoading, setSoldLoading] = useState(false)
@@ -1078,6 +1080,16 @@ function App() {
   // RSP → ListingBuilder gate → eBay → Notion (mirrored after eBay success).
   const handleOpenListingBuilder = useCallback((itemId: string) => {
     setListingBuilderItemId(itemId)
+    setListingBuilderAutoGate(false)
+    setListingBuilderMode('browse')
+    setScreen('listing-builder')
+  }, [])
+
+  // Quick-list path: opens ListingBuilder with gate drawer pre-opened
+  const handleListItem = useCallback((itemId: string) => {
+    setListingBuilderItemId(itemId)
+    setListingBuilderAutoGate(true)
+    setListingBuilderMode('list')
     setScreen('listing-builder')
   }, [])
 
@@ -2624,7 +2636,7 @@ function App() {
                 personalSessionIds={personalSessionIds}
                 onReanalyze={handleReanalyzeItem}
                 onOpenListingBuilder={handleOpenListingBuilder}
-                onEditPhotos={(item) => handleOpenPhotoManager(item, 'queue')}
+                onListItem={handleListItem}
               />
             </motion.div>
           )}
@@ -2834,10 +2846,13 @@ function App() {
                   item={lbItem}
                   initialListing={lbItem.optimizedListing}
                   settings={settings}
-                  onBack={() => setScreen('queue')}
+                  onBack={() => { setScreen('queue'); setListingBuilderAutoGate(false); setListingBuilderMode('browse') }}
                   onPushed={handleListingPushed}
                   onEditPhotos={(item) => handleOpenPhotoManager(item, 'listing-builder' as Screen)}
                   onUploadPhotos={handleUploadPhotos}
+                  onOptimize={handleOptimizeItem}
+                  initialGateOpen={listingBuilderAutoGate}
+                  mode={listingBuilderMode}
                 />
               </motion.div>
             )
