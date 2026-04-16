@@ -1668,7 +1668,17 @@ function App() {
         if (current.some(i => i.id === finalItem.id)) return current.map(i => i.id === finalItem.id ? finalItem : i)
         return [...current, finalItem]
       })
-      setScanHistory(prev => (prev || []).filter(i => i.id !== finalItem.id))
+      // Keep in scan history as permanent ledger — update decision, don't remove
+      setScanHistory(prev => {
+        const existing = prev || []
+        const idx = existing.findIndex(i => i.id === finalItem.id)
+        if (idx !== -1) {
+          return existing.map((item, j) => j === idx ? { ...item, decision: 'BUY' as const, inQueue: true } : item)
+        }
+        return existing
+      })
+      // buyCount++ here (confirmed moment), not in handlePromoteToBuy (Photo Manager may be cancelled)
+      setSession(prev => prev ? { ...prev, buyCount: prev.buyCount + 1 } : prev)
       setScreen('queue')
       toast('✅ Added to Listings — check Queue', { action: { label: 'Go to Queue', onClick: () => setScreen('queue') } })
       logActivity('Added to queue — photos saved')
@@ -1781,10 +1791,12 @@ function App() {
     // 3. Navigate to agent/scans tab
     setAgentActiveTab('scans')
     setScreen('agent')
-    // 4. Toast
+    // 4. Adjust session counter — passCount down (maybeCount is computed as itemsScanned - buyCount - passCount)
+    setSession(prev => prev ? { ...prev, passCount: Math.max(0, prev.passCount - 1) } : prev)
+    // 5. Toast
     toast('Item restored to scan pile as MAYBE')
     logActivity(`${item.productName || 'Item'} restored from PASS → MAYBE`)
-  }, [setScanHistory, setQueue, setAgentActiveTab, setScreen])
+  }, [setScanHistory, setQueue, setAgentActiveTab, setScreen, setSession])
 
   // ── Agent screen: Promote scan card → BUY (via Photo Manager) ─────────────
   const handlePromoteToBuy = useCallback((item: ScannedItem) => {
@@ -1797,8 +1809,8 @@ function App() {
       decision: 'BUY',
     })
     setScreen('photo-manager')
-    setSession(prev => prev ? { ...prev, buyCount: prev.buyCount + 1 } : prev)
-  }, [setPendingPhotoDecision, setScreen, setSession])
+    // buyCount++ moved to handlePhotoManagerDone BUY branch (confirmed moment)
+  }, [setPendingPhotoDecision, setScreen])
 
   // ── Agent screen: PASS scan card ──────────────────────────────────────────
   const handlePassFromAgent = useCallback((item: ScannedItem) => {
@@ -1859,6 +1871,9 @@ function App() {
 
     setQueue((prev) => [...(prev || []), draftItem])
 
+    // Write PENDING placeholder to scan history — ensures ledger is complete even if batch analysis never runs
+    setScanHistory(prev => [draftItem, ...(prev || []).slice(0, 499)])
+
     if (activeSession?.active) {
       setSession((prev) => {
         if (!prev) return prev
@@ -1868,7 +1883,7 @@ function App() {
         }
       })
     }
-  }, [session, setSession, setQueue, optimizeAndCache, createSession, setAllSessions, setSelectedSessionId])
+  }, [session, setSession, setQueue, setScanHistory, optimizeAndCache, createSession, setAllSessions, setSelectedSessionId])
 
 
 
