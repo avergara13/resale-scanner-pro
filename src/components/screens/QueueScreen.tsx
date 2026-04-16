@@ -570,14 +570,14 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     }
   }, [queueItems])
   
+  // Statuses that belong in Sold tab — never show in queue
+  const DONE_STATUSES = ['sold', 'shipped', 'completed', 'returned', 'delisted']
+
   const filteredItems = queueItems.filter(item => {
     // Exclude items that have moved to the Sold tab or been delisted
-    if (item.listingStatus === 'sold' || item.listingStatus === 'shipped' || item.listingStatus === 'completed' || item.listingStatus === 'returned' || item.listingStatus === 'delisted') {
+    if (DONE_STATUSES.includes(item.listingStatus ?? '')) {
       return false
     }
-
-    // Exclude promoted items (optimizing/ready/published) from BUY tab — they belong in the listing flow
-    const isPromoted = ['optimizing', 'ready', 'published'].includes(item.listingStatus ?? '')
 
     const matchesFilter =
       filter === 'ALL' ||
@@ -674,8 +674,12 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   })
   const unanalyzedItems = queueItems.filter(item => !item.productName || item.productName === 'Quick Draft')
   
+  // Badge counts must use the same exclusions as filteredItems so the number
+  // on the tab always equals the number of cards that actually render.
   const itemsCount = queueItems.filter(item =>
-    item.decision === 'BUY' && item.listingStatus !== 'published'
+    !DONE_STATUSES.includes(item.listingStatus ?? '') &&
+    item.decision === 'BUY' &&
+    item.listingStatus !== 'published'
   ).length
   const listedCount = queueItems.filter(item =>
     item.listingStatus === 'published'
