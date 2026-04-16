@@ -33,11 +33,11 @@
 }
 
 :root {
-  --bg: oklch(0.99 0 0);
+  --bg: oklch(0.95 0.005 75);
   --fg: oklch(1 0 0);
 
-  --s1: oklch(0.96 0 0);
-  --s2: oklch(0.88 0 0);
+  --s1: oklch(1 0 0);
+  --s2: oklch(0.83 0 0);
   --s3: oklch(0.65 0 0);
   --s4: oklch(0.45 0 0);
 
@@ -90,6 +90,18 @@
   --destructive-foreground: oklch(0.97 0.02 75);
   --input: oklch(0.80 0.05 75);
   --ring: oklch(0.58 0.15 65);
+}
+
+/* Light mode: give bg-s1 inputs a visible border so fields read as fields */
+:root input.bg-s1,
+:root select.bg-s1,
+:root textarea.bg-s1 {
+  border-color: var(--s2) !important;
+}
+:root input.bg-s1:focus,
+:root select.bg-s1:focus,
+:root textarea.bg-s1:focus {
+  border-color: oklch(0.56 0.21 250 / 0.5) !important;
 }
 
 .dark {
