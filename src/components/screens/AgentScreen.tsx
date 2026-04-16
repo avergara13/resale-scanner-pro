@@ -37,6 +37,7 @@ import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { toast } from 'sonner'
 import { logActivity } from '@/lib/activity-log'
+import { getCardPhoto } from '@/lib/photo'
 import { useDeviceId } from '@/hooks/use-device-id'
 import { cn } from '@/lib/utils'
 import { getNetProfit } from '@/lib/profit-utils'
@@ -1711,13 +1712,20 @@ ${settings.userProfile.aiContext}` : ''}`
                       className="p-3 flex gap-3 items-start cursor-pointer active:opacity-80 transition-opacity"
                       style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                     >
-                      {(item.imageThumbnail || item.imageData) && (
-                        <img
-                          src={item.imageThumbnail || item.imageData}
-                          alt={item.productName || 'Item'}
-                          className="w-14 h-14 rounded-xl object-cover border border-s2/60 flex-shrink-0"
-                        />
-                      )}
+                      {(() => {
+                        const photo = getCardPhoto(item)
+                        return photo ? (
+                          <img
+                            src={photo}
+                            alt={item.productName || 'Item'}
+                            className="w-14 h-14 rounded-xl object-cover border border-s2/60 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-xl border border-s2/60 bg-s1 flex items-center justify-center flex-shrink-0">
+                            <Package size={20} weight="duotone" className="text-s3" />
+                          </div>
+                        )
+                      })()}
                       <div className="flex-1 min-w-0 space-y-1">
                         <p className="text-xs font-bold text-t1 truncate">
                           {item.productName || 'Unknown Item'}

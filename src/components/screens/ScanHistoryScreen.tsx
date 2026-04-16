@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { getCardPhoto } from '@/lib/photo'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import type { ScannedItem } from '@/types'
@@ -14,12 +15,17 @@ interface ScanHistoryScreenProps {
   onSaveAsDraft: (item: ScannedItem) => void
   sessionId?: string
   scanHistory?: ScannedItem[]
+  // Permanent delete with Supabase photo cascade owned by App.tsx.
+  // Pass nothing (undefined) to clear entire scan history.
+  onDeleteItems?: (ids?: string[]) => void
 }
 
-export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistory: scanHistoryProp }: ScanHistoryScreenProps) {
+export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistory: scanHistoryProp, onDeleteItems }: ScanHistoryScreenProps) {
   const [globalScanHistory, setScanHistory] = useKV<ScannedItem[]>('scan-history', [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState<'all' | 'BUY' | 'MAYBE' | 'PASS' | 'PENDING'>('all')
+  // 2-step delete verification: 'none' = idle, 'selected' = armed for bulk delete, 'all' = armed for clear-all.
+  const [armedDelete, setArmedDelete] = useState<'none' | 'selected' | 'all'>('none')
 
   // Use prop data when session-scoped, fall back to global KV
   const effectiveHistory = scanHistoryProp ?? globalScanHistory
@@ -54,14 +60,37 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
   }, [selectedIds.size, filteredHistory])
 
   const deleteSelected = useCallback(() => {
-    setScanHistory(prev => (prev || []).filter(i => !selectedIds.has(i.id)))
+    // 2-step verification: first tap arms (sets armedDelete='selected'),
+    // second tap within 4s commits. Prevents accidental loss of work + photos.
+    if (armedDelete !== 'selected') {
+      setArmedDelete('selected')
+      setTimeout(() => setArmedDelete(prev => prev === 'selected' ? 'none' : prev), 4000)
+      return
+    }
+    const ids = Array.from(selectedIds)
+    if (onDeleteItems) {
+      onDeleteItems(ids)   // App-level handler cascades to Supabase photos
+    } else {
+      setScanHistory(prev => (prev || []).filter(i => !selectedIds.has(i.id)))
+    }
     setSelectedIds(new Set())
-  }, [selectedIds, setScanHistory])
+    setArmedDelete('none')
+  }, [armedDelete, selectedIds, onDeleteItems, setScanHistory])
 
   const clearAll = useCallback(() => {
-    setScanHistory([])
+    if (armedDelete !== 'all') {
+      setArmedDelete('all')
+      setTimeout(() => setArmedDelete(prev => prev === 'all' ? 'none' : prev), 4000)
+      return
+    }
+    if (onDeleteItems) {
+      onDeleteItems(undefined)   // undefined = clear entire KV
+    } else {
+      setScanHistory([])
+    }
     setSelectedIds(new Set())
-  }, [setScanHistory])
+    setArmedDelete('none')
+  }, [armedDelete, onDeleteItems, setScanHistory])
 
   const formatTime = (ts: number) => {
     const d = new Date(ts)
@@ -105,25 +134,54 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
             </button>
           ))}
           {sessionScopedHistory.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearAll} className="text-red text-[10px] px-2 h-7 flex-shrink-0">
-              Clear
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAll}
+              className={cn(
+                'text-[10px] px-2 h-7 flex-shrink-0',
+                armedDelete === 'all' ? 'bg-red text-white hover:bg-red/90' : 'text-red'
+              )}
+            >
+              {armedDelete === 'all' ? 'Tap to confirm' : 'Clear'}
             </Button>
           )}
         </div>
+        {armedDelete === 'all' && (
+          <p className="mt-2 text-[10px] font-bold text-red leading-snug">
+            Tap again to permanently delete all scans + photos. This cannot be undone.
+          </p>
+        )}
       </div>
 
       {/* Bulk actions bar */}
       {selectedIds.size > 0 && (
-        <div className="px-4 py-2 bg-b1/10 border-b border-b1/20 flex items-center justify-between">
-          <button onClick={selectAll} className="flex items-center gap-2 text-xs font-bold text-b1">
-            {selectedIds.size === filteredHistory.length ? <CheckSquare size={16} /> : <Square size={16} />}
-            {selectedIds.size} selected
-          </button>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={deleteSelected} className="text-red border-red/30 h-7 text-[10px]">
-              <Trash size={12} className="mr-1" /> Delete
-            </Button>
+        <div className="px-4 py-2 bg-b1/10 border-b border-b1/20">
+          <div className="flex items-center justify-between">
+            <button onClick={selectAll} className="flex items-center gap-2 text-xs font-bold text-b1">
+              {selectedIds.size === filteredHistory.length ? <CheckSquare size={16} /> : <Square size={16} />}
+              {selectedIds.size} selected
+            </button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={deleteSelected}
+                className={cn(
+                  'h-7 text-[10px]',
+                  armedDelete === 'selected' ? 'bg-red text-white border-red hover:bg-red/90' : 'text-red border-red/30'
+                )}
+              >
+                <Trash size={12} className="mr-1" />
+                {armedDelete === 'selected' ? 'Tap to confirm' : 'Delete'}
+              </Button>
+            </div>
           </div>
+          {armedDelete === 'selected' && (
+            <p className="mt-1.5 text-[10px] font-bold text-red leading-snug">
+              Tap Delete again to permanently remove {selectedIds.size} item{selectedIds.size === 1 ? '' : 's'} + their photos. This cannot be undone.
+            </p>
+          )}
         </div>
       )}
 
@@ -179,17 +237,20 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
                       }
                     </button>
 
-                    {item.imageThumbnail || item.imageData ? (
-                      <img
-                        src={item.imageThumbnail || item.imageData}
-                        alt={item.productName || 'Scan'}
-                        className="w-12 h-12 rounded-xl object-cover bg-s1 flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-xl bg-s1 flex items-center justify-center flex-shrink-0">
-                        <Package size={20} className="text-t3" />
-                      </div>
-                    )}
+                    {(() => {
+                      const photo = getCardPhoto(item)
+                      return photo ? (
+                        <img
+                          src={photo}
+                          alt={item.productName || 'Scan'}
+                          className="w-12 h-12 rounded-xl object-cover bg-s1 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-s1 flex items-center justify-center flex-shrink-0">
+                          <Package size={20} className="text-t3" />
+                        </div>
+                      )
+                    })()}
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">

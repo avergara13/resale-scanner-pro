@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { logActivity } from '@/lib/activity-log'
+import { getCardPhoto } from '@/lib/photo'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
@@ -219,18 +220,21 @@ function SortableItem({
           onClick={() => onOpenListingBuilder?.(item.id)}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpenListingBuilder?.(item.id) }}
         >
-        {/* Thumbnail — rounded-lg to match scan cards */}
-        {(item.imageThumbnail || item.imageData) ? (
-          <img
-            src={item.imageThumbnail || item.imageData}
-            alt={item.productName || 'Item'}
-            className="w-14 h-14 object-cover object-center rounded-xl border border-s2/60 flex-shrink-0 self-start"
-          />
-        ) : (
-          <div className="w-14 h-14 rounded-xl border border-s2/60 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
-            <Package size={20} weight="duotone" className="text-s3" />
-          </div>
-        )}
+        {/* Thumbnail — resolved via getCardPhoto (photoUrls[primary] → imageThumbnail → imageData) */}
+        {(() => {
+          const photo = getCardPhoto(item)
+          return photo ? (
+            <img
+              src={photo}
+              alt={item.productName || 'Item'}
+              className="w-14 h-14 object-cover object-center rounded-xl border border-s2/60 flex-shrink-0 self-start"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-xl border border-s2/60 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
+              <Package size={20} weight="duotone" className="text-s3" />
+            </div>
+          )
+        })()}
 
         {/* Content */}
         <div className="flex-1 min-w-0 space-y-1">
@@ -1397,13 +1401,20 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                           />
                         </label>
                       </div>
-                      {(item.imageThumbnail || item.imageData) && (
-                        <img
-                          src={item.imageThumbnail || item.imageData}
-                          alt={item.productName || 'Item'}
-                          className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
-                        />
-                      )}
+                      {(() => {
+                        const photo = getCardPhoto(item)
+                        return photo ? (
+                          <img
+                            src={photo}
+                            alt={item.productName || 'Item'}
+                            className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 object-cover object-center rounded-md border border-s2 flex-shrink-0 self-start"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 sm:w-[72px] sm:h-[72px] md:w-20 md:h-20 rounded-md border border-s2 flex-shrink-0 self-start bg-s1 flex items-center justify-center">
+                            <Package size={22} weight="duotone" className="text-s3" />
+                          </div>
+                        )
+                      })()}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-0.5 md:mb-2.5">
                           <h3 className="font-bold text-t1 text-[11px] sm:text-sm md:text-base line-clamp-2 leading-snug tracking-tight">

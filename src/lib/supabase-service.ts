@@ -143,4 +143,26 @@ export class SupabaseService {
     const { data } = this.client.storage.from('listing-photos').getPublicUrl(path)
     return data.publicUrl
   }
+
+  /** Deletes photos from the listing-photos bucket by their public URLs.
+   *  Non-blocking: logs errors, never throws. Skips malformed URLs silently.
+   *  Caller MUST filter out photoUrls belonging to items with `ebayListingId` set —
+   *  live eBay listings reference these URLs; deleting them would break buyer-facing images. */
+  async deletePhotos(photoUrls: string[]): Promise<void> {
+    if (!photoUrls || photoUrls.length === 0) return
+    const MARKER = '/object/public/listing-photos/'
+    const paths = photoUrls
+      .map(url => {
+        const idx = url.indexOf(MARKER)
+        return idx === -1 ? null : url.slice(idx + MARKER.length)
+      })
+      .filter((p): p is string => p !== null && p.length > 0)
+    if (paths.length === 0) return
+    try {
+      const { error } = await this.client.storage.from('listing-photos').remove(paths)
+      if (error) console.warn('[supabase] deletePhotos error:', error)
+    } catch (e) {
+      console.warn('[supabase] deletePhotos unexpected error:', e)
+    }
+  }
 }
