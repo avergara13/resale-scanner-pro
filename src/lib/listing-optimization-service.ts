@@ -116,7 +116,14 @@ export class ListingOptimizationService {
         : {}
 
       const resolvedCategory = (typeof p.category === 'string' && p.category) || context.item.category || 'Other'
-      const categoryInfo = getCategoryInfo(resolvedCategory)
+      // Prefer the AI-provided ebayCategoryId directly (AI was given the full table).
+      // Fall back to getCategoryInfo keyword-match only if AI didn't output a valid numeric ID.
+      const aiCategoryId = typeof p.ebayCategoryId === 'string' && /^\d+$/.test(p.ebayCategoryId.trim())
+        ? p.ebayCategoryId.trim()
+        : null
+      const categoryInfo = aiCategoryId
+        ? { ...getCategoryInfo(resolvedCategory), ebayCategoryId: aiCategoryId }
+        : getCategoryInfo(resolvedCategory)
       const weightOz = context.visionResult?.estimatedWeightOz || categoryInfo.defaultWeightOz
       // USPS Ground Advantage / Priority Mail tier estimates
       const estShippingLabelCost = weightOz <= 15.99 ? 4.19 : weightOz <= 32 ? 7.90 : 12.40
@@ -294,13 +301,52 @@ SEO KEYWORDS:
 - Include synonyms and related terms
 - Mix of broad and specific keywords
 
+EBAY CATEGORY SELECTION:
+Pick the single best eBay category ID from this table based on the product type.
+Use the MOST SPECIFIC match — sneakers get 15709/55793/57929, not the generic shoe 11650.
+
+| Category | eBay ID | Notes |
+|---|---|---|
+| Men's Sneakers / Athletic Shoes | 15709 | Jordan, Nike, Adidas, Yeezy, Air Force, Dunk — 8% FVF |
+| Women's Sneakers / Athletic Shoes | 55793 | Women's athletic footwear — 8% FVF |
+| Youth / Kids Sneakers | 57929 | GS, grade school, kids shoes — 8% FVF |
+| Dress Shoes / Boots / Sandals | 11650 | Non-athletic footwear |
+| Men's Clothing | 1059 | Shirts, pants, shorts, tops |
+| Women's Clothing | 15724 | Dresses, tops, pants |
+| Hoodies / Sweatshirts | 155183 | Pullovers, crewnecks, fleece |
+| Jackets / Coats / Outerwear | 57988 | Parkas, windbreakers, blazers |
+| Hats / Caps / Beanies | 52365 | Snapbacks, fitted, trucker hats |
+| Bags / Backpacks / Purses | 169291 | Handbags, totes, duffel, sling |
+| Cell Phones / Smartphones | 9355 | iPhone, Android |
+| Video Games | 1249 | PS4/PS5/Xbox/Switch games |
+| Game Consoles | 139971 | PS5, PS4, Xbox, Nintendo Switch |
+| Computers / Electronics / Gadgets | 293 | Laptops, tablets, headphones, cameras |
+| Sports / Trading Cards | 212 | Pokemon, baseball, basketball cards |
+| LEGO Sets | 19006 | |
+| Toys / Action Figures / Board Games | 220 | Dolls, plush, Hot Wheels |
+| Collectibles / Figurines | 1 | Funko Pop, memorabilia |
+| Home & Kitchen / Appliances | 20625 | Cookware, decor |
+| Tools / Power Tools | 631 | DeWalt, Milwaukee, Makita |
+| DVDs / Blu-ray / Movies | 617 | |
+| Vinyl Records | 306 | LPs |
+| Books / Textbooks | 267 | 14.95% FVF |
+| Sports Equipment / Outdoors | 888 | Golf, bikes, camping, weights |
+| Jewelry / Watches | 281 | Necklaces, rings, earrings |
+| Grooming / Shavers / Clippers | 26676 | Andis, Wahl, Braun, Norelco |
+| Cameras & Photo Equipment | 625 | DSLR, mirrorless, GoPro |
+| Musical Instruments | 619 | Guitars, amps, keyboards |
+| Baby / Infant / Toddler Gear | 2984 | Strollers, car seats |
+| Health / Beauty / Skincare | 26395 | Supplements, makeup, cologne |
+| Vintage / Antiques / Art | 20081 | Ceramics, pottery, paintings |
+
 Return a JSON object with this exact structure:
 {
   "title": "Optimized 80-char eBay title — no pipe symbols, no category append",
   "subtitle": "Keyword-rich eBay subtitle max 55 chars — different words from title",
   "description": "Full multi-paragraph formatted description with bullets (800–2000 chars)",
   "conditionDescription": "Honest 1000-char max description of specific flaws, wear, or 'No visible flaws noted' if clean",
-  "category": "eBay category name",
+  "category": "human-readable category name from the table above",
+  "ebayCategoryId": "15709",
   "condition": "Condition from list above",
   "department": "Men | Women | Unisex | Boys | Girls | Youth | N/A",
   "size": "Item size string if applicable (e.g. '10.5 US Men\\'s', 'L', '32x34'), null if not applicable",

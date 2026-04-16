@@ -81,6 +81,9 @@ interface ListingBuilderState {
   autoDecline: string
   shippingStrategy: string
   weightOz: string
+  packageLengthIn: string
+  packageWidthIn: string
+  packageHeightIn: string
   freeShipping: boolean
   photoUrls: string[]
   compLow: number | null
@@ -195,6 +198,9 @@ export function ListingBuilder({
       autoDecline: l?.autoDeclinePrice != null ? String(l.autoDeclinePrice) : priceNum > 0 ? String(+(priceNum * 0.73).toFixed(2)) : '',
       shippingStrategy: l?.shippingService || 'USPS Ground Advantage',
       weightOz: l?.weightOz != null ? String(l.weightOz) : '',
+      packageLengthIn: '',
+      packageWidthIn: '',
+      packageHeightIn: '',
       freeShipping: item.optimizedListing?.price != null ? (item.optimizedListing.price >= 20) : false,
       photoUrls: item.photoUrls || [],
       compLow: item.marketData?.ebayPriceRange?.min ?? null,
@@ -385,6 +391,12 @@ export function ListingBuilder({
       purchasePrice: item.purchasePrice,
       shippingStrategy: state.shippingStrategy,
       weightOz: weightOzNum > 0 ? weightOzNum : undefined,
+      packageDimensions: (() => {
+        const l = parseFloat(state.packageLengthIn) || 0
+        const w = parseFloat(state.packageWidthIn) || 0
+        const h = parseFloat(state.packageHeightIn) || 0
+        return l > 0 || w > 0 || h > 0 ? { lengthIn: l, widthIn: w, heightIn: h } : undefined
+      })(),
       freeShipping: state.freeShipping,
       photoUrls: finalPhotoUrls,
       seoTitle: state.title.trim().slice(0, 80),
@@ -888,6 +900,27 @@ export function ListingBuilder({
                 placeholder="e.g. 24"
                 className="w-full h-9 px-2.5 rounded-lg bg-s1 text-[13px] text-b1 placeholder:text-t3 border border-transparent focus:border-blue-500/50 focus:outline-none transition-colors"
               />
+            </div>
+          </div>
+
+          {/* Package dimensions — optional, improves calculated shipping */}
+          <div>
+            <label className="text-[10px] text-t3 font-medium block mb-1">
+              Package Dimensions (in) <span className="text-t3/50 font-normal">L × W × H — optional, improves shipping calc</span>
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(['packageLengthIn', 'packageWidthIn', 'packageHeightIn'] as const).map((field, i) => (
+                <input
+                  key={field}
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={state[field]}
+                  onChange={e => set(field, e.target.value)}
+                  placeholder={['L', 'W', 'H'][i]}
+                  className="w-full h-9 px-2.5 rounded-lg bg-s1 text-[13px] text-b1 placeholder:text-t3 border border-transparent focus:border-blue-500/50 focus:outline-none transition-colors text-center"
+                />
+              ))}
             </div>
           </div>
 

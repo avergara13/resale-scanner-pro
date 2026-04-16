@@ -1358,6 +1358,13 @@ const server = http.createServer(async (req, res) => {
       const department = String(listingData.department || '')
       const ebayCategoryId = String(listingData.ebayCategoryId || '')
       const weightOz = typeof listingData.weightOz === 'number' ? listingData.weightOz : null
+      const pkgDims = listingData.packageDimensions && typeof listingData.packageDimensions === 'object'
+        ? {
+            lengthIn: Number(listingData.packageDimensions.lengthIn) || 0,
+            widthIn:  Number(listingData.packageDimensions.widthIn)  || 0,
+            heightIn: Number(listingData.packageDimensions.heightIn) || 0,
+          }
+        : null
       const bestOfferEnabled = listingData.bestOfferEnabled === true
       const autoAccept = typeof listingData.autoAccept === 'number' ? listingData.autoAccept : null
       const autoDecline = typeof listingData.autoDecline === 'number' ? listingData.autoDecline : null
@@ -1401,9 +1408,17 @@ const server = http.createServer(async (req, res) => {
           ...(mpn ? { mpn } : {}),
           ...(upc ? { upc: [upc] } : {}),
         },
-        ...(weightOz ? {
+        ...((weightOz || pkgDims) ? {
           packageWeightAndSize: {
-            weight: { value: weightOz, unit: 'OUNCE' },
+            ...(weightOz ? { weight: { value: weightOz, unit: 'OUNCE' } } : {}),
+            ...(pkgDims && pkgDims.lengthIn > 0 && pkgDims.widthIn > 0 && pkgDims.heightIn > 0 ? {
+              dimensions: {
+                length: pkgDims.lengthIn,
+                width:  pkgDims.widthIn,
+                height: pkgDims.heightIn,
+                unit: 'INCH',
+              },
+            } : {}),
           },
         } : {}),
       }
