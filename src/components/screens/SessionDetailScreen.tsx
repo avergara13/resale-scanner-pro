@@ -568,7 +568,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             <Button
               onClick={() => { onEndSession(); onBack() }}
               variant="outline"
-              className="w-full h-12 border-amber text-amber hover:bg-amber/10 font-medium mt-4"
+              className="w-full h-12 border-red-400/50 text-red-500 hover:bg-red-500/8 font-medium mt-4"
             >
               End Session
             </Button>
