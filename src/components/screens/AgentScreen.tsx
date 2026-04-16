@@ -342,14 +342,11 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     const buy = unique.filter(i => i.decision === 'BUY').length
     const pass = unique.filter(i => i.decision === 'PASS').length
     const maybe = unique.filter(i => i.decision === 'MAYBE').length
-    // Queue count: items currently sitting in the listing queue (inQueue flag)
-    const queueCount = sessionItems.filter(i => i.inQueue).length
     const totalProfit = unique
       .filter(i => i.decision === 'BUY')
       .reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
 
-    // Keep legacy total/pending for LLM context compatibility
-    return { total: unique.length, buy, pass, pending: maybe, maybe, queueCount, totalProfit }
+    return { total: unique.length, buy, pass, maybe, totalProfit }
   }, [sessionItems, scanHistoryKV, currentSession?.id])
 
   // Session-scoped MAYBE/PENDING scan cards for the active scan pile.
