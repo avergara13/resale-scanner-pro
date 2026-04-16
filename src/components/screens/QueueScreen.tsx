@@ -605,6 +605,9 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       return false
     }
 
+    // MAYBE and PENDING belong in the scan pile (Agent screen) — not the Listing Queue
+    if (item.decision === 'MAYBE' || item.decision === 'PENDING') return false
+
     const matchesFilter =
       filter === 'ALL' ||
       (filter === 'ITEMS' && item.decision === 'BUY' && item.listingStatus !== 'published') ||
