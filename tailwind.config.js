@@ -38,6 +38,10 @@ const defaultTheme = {
       "system-pink": "var(--system-pink)",
       "system-indigo": "var(--system-indigo)",
       "system-teal": "var(--system-teal)",
+      "chip-label-green": "var(--chip-label-green)",
+      "chip-label-orange": "var(--chip-label-orange)",
+      "chip-label-blue": "var(--chip-label-blue)",
+      "chip-label-red": "var(--chip-label-red)",
       neutral: {
         1: "var(--color-neutral-1)",
         2: "var(--color-neutral-2)",
