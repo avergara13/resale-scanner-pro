@@ -123,7 +123,7 @@ export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanH
                 onClick={() => setFilter(f)}
                 className={cn('tab-btn', filter === f && 'active')}
               >
-                {f === 'all' ? `All (${sessionScopedHistory.length})` : f}
+                {f === 'all' ? `All (${sessionScopedHistory.length})` : f === 'BUY' ? '✅ BUY' : f === 'MAYBE' ? '🤔 MAYBE' : f === 'PASS' ? '❌ PASS' : '⏳ PENDING'}
               </button>
             ))}
           </div>

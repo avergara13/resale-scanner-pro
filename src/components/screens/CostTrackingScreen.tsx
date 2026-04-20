@@ -64,7 +64,7 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId 
                 onClick={() => setPeriod(p)}
                 className={cn('tab-btn', period === p && 'active')}
               >
-                {p === 'all' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+                {p === 'today' ? '📅 Today' : p === 'all' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
               </button>
             ))}
           </div>

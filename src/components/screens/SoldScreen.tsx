@@ -274,9 +274,9 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
           <div className="tab-bar">
             {([
               ['all', 'All'],
-              ['need-label', 'Sold'],
-              ['label-ready', 'Ready'],
-              ['shipped', 'Shipped'],
+              ['need-label', '🔴 Sold'],
+              ['label-ready', '🟡 Ready'],
+              ['shipped', '✅ Shipped'],
             ] as Array<[FulfillmentFilter, string]>).map(([filter, label]) => (
               <button
                 key={filter}
