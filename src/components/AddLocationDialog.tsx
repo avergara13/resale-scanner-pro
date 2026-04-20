@@ -15,7 +15,8 @@ interface AddLocationDialogProps {
 }
 
 function createLocationId(): string {
-  return `loc-${crypto.randomUUID()}`
+  const uuid = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  return `loc-${uuid}`
 }
 
 export function AddLocationDialog({ open, onOpenChange, onSave, existingLocations = [] }: AddLocationDialogProps) {
