@@ -396,6 +396,11 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarc
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
                       className="w-full bg-white/10 text-white border border-white/20 rounded-lg h-12 pl-8 pr-4 text-base font-mono placeholder:text-white/30 outline-none focus:border-white/60"
+                      style={{
+                        WebkitBoxShadow: '0 0 0 1000px rgba(0,0,0,0.75) inset',
+                        WebkitTextFillColor: 'rgba(255,255,255,1)',
+                        caretColor: 'white',
+                      }}
                     />
                   </div>
                   
@@ -408,6 +413,10 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarc
                       value={condition}
                       onChange={(e) => setCondition(e.target.value)}
                       className="w-full bg-white/10 text-white border border-white/20 rounded-lg h-12 px-3 text-base font-medium outline-none focus:border-white/60"
+                      style={{
+                        WebkitBoxShadow: '0 0 0 1000px rgba(0,0,0,0.75) inset',
+                        WebkitTextFillColor: 'rgba(255,255,255,1)',
+                      }}
                     >
                       {CONDITIONS.map((c) => (
                         <option key={c} value={c} className="bg-black text-white">
