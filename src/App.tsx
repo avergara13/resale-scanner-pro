@@ -2739,6 +2739,7 @@ function App() {
         onNavigateToTrends={screen === 'session' ? () => setShowSessionTrends(prev => !prev) : undefined}
         showTrends={showSessionTrends}
         backLabel={screen === 'scan-result' && openedFromScans ? 'Scans' : undefined}
+        titleOverride={screen === 'session-detail' ? ((allSessions || []).find(s => s.id === selectedSessionId)?.name ?? undefined) : undefined}
         scrolled={headerScrolled}
         onBack={
           screen === 'scan-result'

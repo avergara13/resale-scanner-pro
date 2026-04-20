@@ -29,6 +29,8 @@ interface AppHeaderProps {
   showTrends?: boolean
   /** True when the screen content has scrolled past the large title threshold */
   scrolled?: boolean
+  /** Overrides the static SCREEN_TITLES entry — used for dynamic detail screen names (e.g. session label) */
+  titleOverride?: string
 }
 
 export function AppHeader({
@@ -39,8 +41,9 @@ export function AppHeader({
   backLabel,
   showTrends,
   scrolled = false,
+  titleOverride,
 }: AppHeaderProps) {
-  const title = SCREEN_TITLES[screen] || ''
+  const title = titleOverride ?? SCREEN_TITLES[screen] ?? ''
   const isRootScreen = ROOT_SCREENS.has(screen)
   const showCompactTitle = !isRootScreen || scrolled
 
