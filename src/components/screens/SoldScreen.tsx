@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowClockwise, ArrowSquareOut, CheckCircle, Package, SpinnerGap, Truck, Plus, Sparkle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowSquareOut, CheckCircle, Package, SpinnerGap, Truck, Plus, Sparkle, X, Tag as TagIcon, Archive } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import { Badge } from '@/components/ui/badge'
@@ -8,6 +8,9 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { StatusChip } from '@/components/ui/status-chip'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
@@ -61,6 +64,19 @@ const STATUS_BADGE_STYLES: Record<SoldShippingStatus, string> = {
   '🟡 Label Ready': 'bg-amber/10 text-amber border-amber/20',
   '📦 Packed': 'bg-blue-bg text-b1 border-b1/30',
   '✅ Shipped': 'bg-green/10 text-green border-green/20',
+}
+
+/**
+ * Presentational mapping — SoldShippingStatus → StatusChip tone + icon + label.
+ * Stored values (the string keys with emoji) are NEVER mutated; this map is
+ * read-only and exists solely to render the chip. New stored values fall
+ * through to a neutral chip with the raw string displayed.
+ */
+const STATUS_CHIP_MAP: Record<SoldShippingStatus, { tone: 'danger' | 'warning' | 'info' | 'success'; icon: React.ReactNode; label: string }> = {
+  '🔴 Need Label': { tone: 'danger',  icon: <Package size={14} weight="bold" />,     label: 'Need Label' },
+  '🟡 Label Ready': { tone: 'warning', icon: <TagIcon size={14} weight="bold" />,    label: 'Label Ready' },
+  '📦 Packed':      { tone: 'info',    icon: <Archive size={14} weight="bold" />,    label: 'Packed' },
+  '✅ Shipped':     { tone: 'success', icon: <CheckCircle size={14} weight="bold" />, label: 'Shipped' },
 }
 
 function formatSaleDate(value?: string | null): string {
@@ -229,12 +245,10 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
   // Loading state only applies if we have no items at all (live + manual)
   if (loading && mergedItems.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-8">
-        <SpinnerGap size={28} className="animate-spin text-b1" />
-        <div>
-          <h2 className="text-lg font-bold text-t1">Loading Live Sold Feed</h2>
-          <p className="text-sm text-t3">Reading the current Sales and Inventory data lane.</p>
-        </div>
+      <div className="h-full flex flex-col gap-2 px-3 pt-3">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-[96px] w-full rounded-2xl" />
+        ))}
       </div>
     )
   }
@@ -339,20 +353,19 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
           }}
         >
         {filteredItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[58vh] text-center px-6">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1/20 to-b2/10 border border-b1/20 flex items-center justify-center mb-5"
-              style={{ boxShadow: '0 0 24px color-mix(in oklch, var(--b1) 15%, transparent)' }}
-            >
-              <Package size={36} weight="duotone" className="text-b1" />
-            </div>
-            <h3 className="text-lg font-bold text-t1 mb-2">
-              {mergedItems.length === 0 ? 'No sales yet' : 'Nothing matches this filter'}
-            </h3>
-            <p className="text-sm text-t2 max-w-[220px] leading-relaxed">
-              {mergedItems.length === 0
-                ? 'Sales will appear here once items are marked as sold or synced from your store'
-                : 'Try a different filter tab to view your sales'}
-            </p>
+          <div className="flex items-center justify-center min-h-[58vh] px-6">
+            <EmptyState
+              className="w-full max-w-sm"
+              icon={<Package weight="duotone" />}
+              title={mergedItems.length === 0 ? 'No sales yet' : 'Nothing matches this filter'}
+              description={
+                mergedItems.length === 0
+                  ? 'Sales appear here once items are marked as sold or synced from your store.'
+                  : 'Try a different filter tab to view your sales.'
+              }
+              actionLabel={mergedItems.length === 0 ? 'Log sale manually' : undefined}
+              onAction={mergedItems.length === 0 ? () => setShowManualDialog(true) : undefined}
+            />
           </div>
         ) : (
           filteredItems.map((item) => {
@@ -385,12 +398,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
             return (
               <Card
                 key={item.salePageId}
-                className="border-s2/60 p-3 overflow-hidden"
-                style={{
-                  background: 'color-mix(in oklch, var(--fg) 88%, transparent)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                }}
+                className="material-thin border-s2/60 p-3 overflow-hidden"
               >
                 {/* ── Row 1: thumbnail + title + price ──────────────── */}
                 <div className="flex gap-3">
@@ -407,9 +415,18 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                       <div className="min-w-0 flex-1">
                         <h3 className="text-sm font-black text-t1 leading-tight line-clamp-2">{item.title}</h3>
                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                          <Badge className={cn('border text-[9px] font-bold h-5 px-1.5', STATUS_BADGE_STYLES[draft.shippingStatus])}>
-                            {draft.shippingStatus}
-                          </Badge>
+                          {(() => {
+                            const chip = STATUS_CHIP_MAP[draft.shippingStatus]
+                            return chip ? (
+                              <StatusChip tone={chip.tone} icon={chip.icon} className="h-5 px-2 text-[10px]">
+                                {chip.label}
+                              </StatusChip>
+                            ) : (
+                              <StatusChip tone="neutral" className="h-5 px-2 text-[10px]">
+                                {draft.shippingStatus}
+                              </StatusChip>
+                            )
+                          })()}
                           <span className="text-[9px] font-bold uppercase tracking-wide text-t3">{item.platform}</span>
                           {item.isManualEntry && (
                             <span className="text-[8px] font-bold uppercase tracking-wide text-b1 bg-blue-bg px-1 py-0.5 rounded">MANUAL</span>
@@ -459,35 +476,37 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                   </div>
                 )}
 
-                {/* ── Row 3: Shipped CTA (Ready items only) or status cycle ── */}
+                {/* ── Row 3: Mark-shipped tap-action (Ready/Packed only) or status cycle ── */}
                 {(draft.shippingStatus === '🟡 Label Ready' || draft.shippingStatus === '📦 Packed') ? (
-                  <button
-                    disabled={savingItemId === item.salePageId}
-                    onClick={async () => {
-                      const shippedDraft = { ...draft, shippingStatus: '✅ Shipped' as SoldShippingStatus }
-                      setDrafts(prev => ({ ...prev, [item.salePageId]: shippedDraft }))
-                      if (item.isManualEntry) {
-                        const manualId = item.salePageId.replace(/^manual-/, '')
-                        setManualSales(prev => (prev || []).map(m => m.id === manualId ? { ...m, shippingStatus: '✅ Shipped' as SoldShippingStatus } : m))
-                        logActivity('Shipped!')
-                      } else {
-                        setSavingItemId(item.salePageId)
-                        try {
-                          await onUpdateShipping(item.salePageId, { shippingStatus: '✅ Shipped' })
-                          logActivity('Marked as shipped!')
-                        } finally {
-                          setSavingItemId(null)
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      size="sm"
+                      disabled={savingItemId === item.salePageId}
+                      onClick={async () => {
+                        const shippedDraft = { ...draft, shippingStatus: '✅ Shipped' as SoldShippingStatus }
+                        setDrafts(prev => ({ ...prev, [item.salePageId]: shippedDraft }))
+                        if (item.isManualEntry) {
+                          const manualId = item.salePageId.replace(/^manual-/, '')
+                          setManualSales(prev => (prev || []).map(m => m.id === manualId ? { ...m, shippingStatus: '✅ Shipped' as SoldShippingStatus } : m))
+                          logActivity('Shipped!')
+                        } else {
+                          setSavingItemId(item.salePageId)
+                          try {
+                            await onUpdateShipping(item.salePageId, { shippingStatus: '✅ Shipped' })
+                            logActivity('Marked as shipped!')
+                          } finally {
+                            setSavingItemId(null)
+                          }
                         }
-                      }
-                    }}
-                    className="w-full mt-2 flex items-center justify-center gap-1.5 h-9 rounded-xl font-bold text-xs text-white transition-all active:scale-[0.98] disabled:opacity-50"
-                    style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
-                  >
-                    {savingItemId === item.salePageId
-                      ? <SpinnerGap size={13} className="animate-spin" />
-                      : <CheckCircle size={13} weight="bold" />}
-                    Shipped — Done
-                  </button>
+                      }}
+                      className="bg-system-green text-white hover:bg-system-green/90 gap-1.5"
+                    >
+                      {savingItemId === item.salePageId
+                        ? <SpinnerGap size={14} className="animate-spin" />
+                        : <CheckCircle size={14} weight="bold" />}
+                      Ship
+                    </Button>
+                  </div>
                 ) : draft.shippingStatus !== '✅ Shipped' ? (
                   <div className="flex gap-1.5 mt-2">
                     {SHIPPING_STATUS_OPTIONS.filter(s => s !== '✅ Shipped').map((status) => (
