@@ -208,7 +208,7 @@ interface SessionScreenProps {
   onNavigateTo?: (screen: Screen) => void
 }
 
-export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, isAgentProcessing = false, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp, onOpenItem, onNavigateTo }: SessionScreenProps) {
+export function SessionScreen({ showTrends = false, onCloseTrends, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp, onOpenItem, onNavigateTo }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   // 2-step delete verification for permanent session delete: first tap arms the
   // button (shows warning copy), second tap within 4s actually purges. Prevents

@@ -1,9 +1,8 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CheckCircle, XCircle, TrendUp, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise, Camera } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise, Camera } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -60,6 +59,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   const [editLocationType, setEditLocationType] = useState<ThriftStoreLocation['type']>('thrift-store')
   const [editingGoal, setEditingGoal] = useState(false)
   const [editGoalAmount, setEditGoalAmount] = useState('')
+  const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now())
 
   const session = useMemo(() =>
     (allSessions || []).find(s => s.id === sessionId),
@@ -139,15 +139,6 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     setEditingGoal(true)
   }, [session])
 
-  const handleDelete = useCallback(() => {
-    if (onDeleteSession) {
-      onDeleteSession(sessionId)
-    } else {
-      setAllSessions(prev => (prev || []).filter(s => s.id !== sessionId))
-    }
-    onBack()
-  }, [onDeleteSession, setAllSessions, sessionId, onBack])
-
   // Geolocation: detect nearby stores (must be before early return — hooks can't be conditional)
   const [geoLoading, setGeoLoading] = useState(false)
   const handleAutoLocation = useCallback(() => {
@@ -173,6 +164,16 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     )
   }, [startEditLocation])
 
+  useEffect(() => {
+    if (session?.endTime) return
+
+    const interval = window.setInterval(() => {
+      setCurrentTimestamp(Date.now())
+    }, 60_000)
+
+    return () => window.clearInterval(interval)
+  }, [session?.endTime])
+
   if (!session) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -191,7 +192,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`
   }
 
-  const duration = (session.endTime || Date.now()) - session.startTime
+  const duration = (session.endTime || currentTimestamp) - session.startTime
   const startDate = new Date(session.startTime)
 
   // Derive all counts from live item data — session metadata counters can lag

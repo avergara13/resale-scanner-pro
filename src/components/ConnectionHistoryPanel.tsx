@@ -16,7 +16,7 @@ import {
 } from '@phosphor-icons/react'
 import { useConnectionHealth } from '@/hooks/use-connection-health'
 import { useConnectionHistory } from '@/hooks/use-connection-history'
-import type { AppSettings, ConnectionEvent, DowntimeIncident } from '@/types'
+import type { AppSettings } from '@/types'
 import type { ConnectionStatus } from '@/hooks/use-connection-health'
 
 interface ConnectionHistoryPanelProps {
@@ -73,6 +73,7 @@ function getServiceDisplayName(service: string): string {
 export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps) {
   const { health } = useConnectionHealth({ settings, enabled: true })
   const { events, incidents, stats, clearHistory } = useConnectionHistory(health)
+  const currentTimestamp = health.lastUpdate
 
   const recentEvents = useMemo(() => {
     return events.slice(-20).reverse()
@@ -156,7 +157,7 @@ export function ConnectionHistoryPanel({ settings }: ConnectionHistoryPanelProps
                     </span>
                   </div>
                   <span className="text-xs text-s4">
-                    {formatDuration(Date.now() - incident.startTime)} ago
+                    {formatDuration(currentTimestamp - incident.startTime)} ago
                   </span>
                 </div>
                 {incident.error && (

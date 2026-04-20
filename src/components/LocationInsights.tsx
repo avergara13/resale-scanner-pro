@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
-import { MapPin, TrendUp, Star, ChartBar, Sparkle, CaretRight } from '@phosphor-icons/react'
+import { MapPin, TrendUp, Star, ChartBar, Sparkle } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { ScannedItem, LocationPerformance, ThriftStoreLocation } from '@/types'
+import type { ScannedItem, LocationPerformance } from '@/types'
 import { cn } from '@/lib/utils'
 
 interface LocationInsightsProps {

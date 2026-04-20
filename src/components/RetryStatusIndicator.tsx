@@ -26,7 +26,7 @@ export function RetryStatusIndicator({
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCountdown((prev) => {
+      setCountdown(() => {
         const next: Record<string, number> = {}
         activeRetries.forEach((retry) => {
           if (retry.nextRetryIn) {

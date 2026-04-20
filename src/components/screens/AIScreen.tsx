@@ -26,7 +26,6 @@ import { PipelinePanel } from './PipelinePanel'
 import { DecisionSignal } from './DecisionSignal'
 import { MarketDataPanel } from '../MarketDataPanel'
 import { GoogleLensResults } from '../GoogleLensResults'
-import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useCollapsePreference } from '@/hooks/use-collapse-preference'
@@ -76,8 +75,8 @@ interface AIScreenProps {
 // ─── Celebration particles ────────────────────────────────────────────────────
 
 function CelebrationParticle({ delay, index }: { delay: number; index: number }) {
-  const randomX = Math.random() * 200 - 100
-  const randomRotation = Math.random() * 720 - 360
+  const spread = ((index * 37) % 200) - 100
+  const rotation = ((index * 83) % 720) - 360
   const colors = ['#60aa82', '#c17c5f', '#555ce2', '#f0c75e']
   const color = colors[index % colors.length]
   const shapes = ['○', '●', '◆', '★', '✦', '✨']
@@ -90,10 +89,10 @@ function CelebrationParticle({ delay, index }: { delay: number; index: number })
       initial={{ opacity: 0, x: 0, y: 0, scale: 0, rotate: 0 }}
       animate={{
         opacity: [0, 1, 1, 0],
-        x: randomX,
+        x: spread,
         y: [-80, -120, -160],
         scale: [0, 1.2, 1, 0.8],
-        rotate: randomRotation,
+        rotate: rotation,
       }}
       transition={{ duration: 1.2, delay, ease: 'easeOut' }}
     >
@@ -140,9 +139,14 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
 
   useEffect(() => {
     if (overallProgress === 100 && previousProgress.current < 100) {
-      setShowCelebration(true)
+      const frame = window.requestAnimationFrame(() => {
+        setShowCelebration(true)
+      })
       const timer = setTimeout(() => setShowCelebration(false), 1500)
-      return () => clearTimeout(timer)
+      return () => {
+        window.cancelAnimationFrame(frame)
+        clearTimeout(timer)
+      }
     }
     previousProgress.current = overallProgress
   }, [overallProgress])

@@ -7,19 +7,14 @@ import {
   Sparkle,
   Plus,
   Trash,
-  DotsThreeVertical,
   PencilSimple,
   PaperPlaneRight,
-  ArrowLeft,
   CaretDown,
   CaretUp,
   Check,
   Package,
   TrendUp,
   ChartLine,
-  Lightbulb,
-  MagnifyingGlass,
-  Globe,
   Stack,
   CheckCircle,
   Warning,
@@ -44,12 +39,6 @@ import { getNetProfit } from '@/lib/profit-utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
 import { haptics } from '@/lib/haptics'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -99,25 +88,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 const EMPTY_TODOS: SharedTodo[] = []
-
-function lastMessagePreview(session: ChatSession): string {
-  const last = session.messages[session.messages.length - 1]
-  if (!last) return 'No messages yet'
-  const text = last.content.replace(/[#*_`]/g, '').trim()
-  return text.length > 60 ? text.slice(0, 60) + '…' : text
-}
-
-function relativeTime(ts: number): string {
-  const mins = Math.floor((Date.now() - ts) / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days}d ago`
-  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+const EMPTY_MESSAGES: ChatMessage[] = []
 
 function describeToolCall(call: AgentToolCall, items?: ScannedItem[]): string {
   const item = items?.find(i => i.id === call.itemId)
@@ -305,7 +276,7 @@ interface AgentScreenProps {
 
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 
-export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onCreateListing, onOptimizeItem, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onNavigateToQueue, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true, onPromoteToBuy, onPassItem, onDeleteItem, onRestorePassItem, onViewInQueue }: AgentScreenProps) {
+export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [], settings, pendingMessage, onPendingMessageHandled, onProcessingChange, onOptimizeItem, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onOpenScanItem, onOpenCamera, onStartSession, onEndSession, onEditSession, allSessions = [], scanHistory = [], profitGoals = [], isCurrentScreen = true, onPromoteToBuy, onPassItem, onDeleteItem, onRestorePassItem, onViewInQueue }: AgentScreenProps) {
   const deviceId = useDeviceId()
   const [currentSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const sessionId = currentSession?.id
@@ -332,7 +303,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [taskInput, setTaskInput] = useState('')
-  const [showTaskInput, setShowTaskInput] = useState(false)
   const [pendingToolCalls, setPendingToolCalls] = useState<AgentToolCall[] | null>(null)
   // Direct KV read for session stats (scan history props come from App.tsx, but
   // scanHistoryKV is the real-time hook for counting BUY/PASS in sessionStats)
@@ -353,7 +323,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const completedTodos = useMemo(() => (todos || []).filter(t => t.completed), [todos])
 
   const activeSession = chatSessions?.find(s => s.id === activeSessionId)
-  const chatMessages = activeSession?.messages || []
+  const chatMessages = activeSession?.messages ?? EMPTY_MESSAGES
 
   const handleRefresh = useCallback(async () => {
     await new Promise(resolve => setTimeout(resolve, 600))
@@ -556,35 +526,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     setPendingToolCalls(null)
   }, [pendingToolCalls, onRerunPipeline, onOptimizeItem, onEditItem, onBatchAnalyze, setTodos, onMarkAsSold, onMarkShipped])
 
-  const handleCreateSession = useCallback(() => {
-    // One-session model: open the existing session if it exists
-    const existing = chatSessions?.[0]
-    if (existing) {
-      setActiveSessionId(existing.id)
-      setViewMode('chat')
-      return
-    }
-    const newSession: ChatSession = {
-      id: Date.now().toString(),
-      name: 'Chat',
-      createdAt: Date.now(),
-      lastMessageAt: Date.now(),
-      messages: [],
-      isActive: true,
-    }
-    setChatSessions([newSession])
-    setActiveSessionId(newSession.id)
-    setViewMode('chat')
-  }, [chatSessions, setChatSessions, setActiveSessionId])
-
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    setChatSessions((prev) => (prev || []).filter(s => s.id !== sessionId))
-    if (activeSessionId === sessionId) {
-      setActiveSessionId(null)
-      setViewMode('list')
-    }
-  }, [activeSessionId, setChatSessions, setActiveSessionId])
-
   const handleRenameSession = useCallback(() => {
     if (!renameSessionId || !renameValue.trim()) {
       toast.error('Session name cannot be empty')
@@ -602,23 +543,6 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     setRenameValue('')
     // silent
   }, [renameSessionId, renameValue, setChatSessions])
-
-  const handleOpenRenameDialog = useCallback((sessionId: string) => {
-    const session = chatSessions?.find(s => s.id === sessionId)
-    if (session) {
-      setRenameSessionId(sessionId)
-      setRenameValue(session.name)
-      setShowRenameDialog(true)
-    }
-  }, [chatSessions])
-
-  const handleSwitchSession = useCallback((sessionId: string) => {
-    setChatSessions((prev) =>
-      (prev || []).map(s => ({ ...s, isActive: s.id === sessionId }))
-    )
-    setActiveSessionId(sessionId)
-    setViewMode('chat')
-  }, [setChatSessions, setActiveSessionId])
 
   const handleSendMessage = useCallback(async (messageText?: string) => {
     const text = messageText || input.trim()
@@ -751,7 +675,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
           try {
             await onBatchAnalyze()
             addMsg(`✅ Batch analysis complete.`)
-          } catch (error) {
+          } catch {
             addMsg(`⚠️ Batch analysis encountered errors — continuing with available data.`)
           }
         } else if (drafts.length === 0) {
@@ -950,9 +874,9 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         if (liveSoldItems.length === 0) {
           addMsg('📬 No sold items found in your Notion Sales DB yet. Once items sell and WF-01 parses the confirmation emails they\'ll appear here automatically. You can also tap **+ Log Sale** on the Sold tab to add them manually.')
         } else {
-          const { needsLabelCount, overdueCount, readyCount, shippedCount, urgentItems, totalPotentialShippingCost } = (() => {
+          const { needsLabelCount, overdueCount, readyCount, shippedCount, urgentItems } = (() => {
             // Import is at top of file — use the already-imported analyzeSoldBatch
-            const a = { needsLabelCount: 0, overdueCount: 0, readyCount: 0, shippedCount: 0, urgentItems: [] as Array<{title:string;hoursOverdue:number;platform:string}>, totalPotentialShippingCost: 0 }
+            const a = { needsLabelCount: 0, overdueCount: 0, readyCount: 0, shippedCount: 0, urgentItems: [] as Array<{title:string;hoursOverdue:number;platform:string}> }
             for (const item of liveSoldItems) {
               if (item.shippingStatus === '✅ Shipped') a.shippedCount++
               else if (item.shippingStatus === '🔴 Need Label') a.needsLabelCount++
@@ -1325,7 +1249,7 @@ ${settings.userProfile.aiContext}` : ''}`
       // but short-circuit here as well to avoid the dev-mode warning.
       if (isMountedRef.current) setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onBatchAnalyze, onEditItem, onRerunPipeline, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals, queueItems])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, liveSoldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {
@@ -1359,21 +1283,6 @@ ${settings.userProfile.aiContext}` : ''}`
     setViewMode('chat')
     setTimeout(() => inputRef.current?.focus(), 60)
   }, [])
-
-  // Clear messages and start a fresh chat within the same session
-  const handleNewChat = useCallback(() => {
-    const newSession: ChatSession = {
-      id: Date.now().toString(),
-      name: 'Chat',
-      createdAt: Date.now(),
-      lastMessageAt: Date.now(),
-      messages: [],
-      isActive: true,
-    }
-    setChatSessions([newSession])
-    setActiveSessionId(newSession.id)
-    setViewMode('chat')
-  }, [setChatSessions, setActiveSessionId])
 
   // Shared input bar — floating glass pill, sits just above the bottom nav.
   // When the soft keyboard is open, `keyboardOffset` raises the pill above it.
@@ -1536,10 +1445,6 @@ ${settings.userProfile.aiContext}` : ''}`
       </form>
     </motion.div>
   )
-
-  const sortedSessions = useMemo(() =>
-    [...(chatSessions || [])].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
-  [chatSessions])
 
   return (
     <div className="flex flex-col h-full bg-bg overflow-hidden">

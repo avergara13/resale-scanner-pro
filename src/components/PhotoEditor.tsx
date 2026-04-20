@@ -1,12 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   X, Check, ArrowsOut, Sun, CircleHalf, Drop, Sparkle, 
-  Scissors, ArrowClockwise, ArrowsDownUp, ArrowsLeftRight, 
-  Palette, CornersOut, TextT, MagicWand
+  ArrowClockwise, ArrowsDownUp, ArrowsLeftRight, 
+  Palette, CornersOut, MagicWand
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import { Card } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { photoEditorService } from '@/lib/photo-editor-service'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -43,8 +42,6 @@ export function PhotoEditor({ imageData, onSave, onCancel, geminiService }: Phot
   const [isProcessing, setIsProcessing] = useState(false)
   const [activeTab, setActiveTab] = useState('adjust')
   const [bgRemovalMode, setBgRemovalMode] = useState<'white' | 'transparent'>('white')
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-
   useEffect(() => {
     setPreview(imageData)
   }, [imageData])

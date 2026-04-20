@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, MapPin, TrendUp, TrendDown, Package, ChartBar, Trophy, Tag, CalendarBlank, CaretDown } from '@phosphor-icons/react'
+import { ArrowLeft, MapPin, TrendUp, TrendDown, Package, Trophy, Tag, CalendarBlank, CaretDown } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { ScannedItem, ThriftStoreLocation, LocationPerformance } from '@/types'
+import type { ScannedItem, LocationPerformance } from '@/types'
 import { cn } from '@/lib/utils'
 
 interface LocationInsightsScreenProps {
@@ -43,7 +43,6 @@ function getWeekEnd(weekStart: number): number {
 export function LocationInsightsScreen({ items, onBack }: LocationInsightsScreenProps) {
   const [sortBy, setSortBy] = useState<'profit' | 'buyRate' | 'scans'>('profit')
   const [showWeeklyTrends, setShowWeeklyTrends] = useState(false)
-  const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
 
   const locationPerformance = useMemo(() => {
     const locationMap = new Map<string, LocationPerformance>()

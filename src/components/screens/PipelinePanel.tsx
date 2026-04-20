@@ -1,4 +1,4 @@
-import { Eye, MagnifyingGlass, TrendUp, Calculator, CheckCircle, Lightning, Clock, Sparkle } from '@phosphor-icons/react'
+import { Eye, MagnifyingGlass, TrendUp, Calculator, CheckCircle, Lightning, Clock } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
@@ -87,7 +87,6 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
     return null
   }
 
-  const activeStepIndex = steps.findIndex(s => s.status === 'processing')
   const completedSteps = steps.filter(s => s.status === 'complete').length
   const progressPercentage = (completedSteps / steps.length) * 100
 
@@ -103,7 +102,6 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
       </div>
       {steps.map((step, index) => {
         const config = phaseConfig[step.id]
-        const Icon = config.icon
         const isProcessing = step.status === 'processing'
         const isComplete = step.status === 'complete'
         const isError = step.status === 'error'
