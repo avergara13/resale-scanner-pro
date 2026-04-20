@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { EmptyState } from '@/components/ui/empty-state'
 import { logActivity } from '@/lib/activity-log'
 import { getCardPhoto } from '@/lib/photo'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -148,9 +149,6 @@ function SortableItem({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    background: 'color-mix(in oklch, var(--fg) 88%, transparent)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
   }
 
   return (
@@ -159,7 +157,7 @@ function SortableItem({
       id={`queue-item-${item.id}`}
       style={style}
       className={cn(
-        "border overflow-hidden flex flex-col gap-0 p-0 py-0 transition-colors rounded-2xl border-l-[3px]",
+        "material-thin border overflow-hidden flex flex-col gap-0 p-0 py-0 transition-colors rounded-2xl border-l-[3px]",
         isSelected ? 'border-b1' : 'border-s2/60',
         // Left border accent by card state
         cardState === 'live' ? 'border-l-green' : cardState === 'ready' ? 'border-l-indigo-500' : 'border-l-amber',
@@ -1282,53 +1280,37 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
       </div>
 
       {filteredItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[58vh] px-6 text-center">
+        <div className="flex items-center justify-center min-h-[58vh] px-6">
           {queueItems.length === 0 && onAddManualItem ? (
-            <>
-              <button
-                onClick={() => setShowAddDialog(true)}
-                className="w-24 h-24 rounded-3xl bg-gradient-to-br from-b1 to-b2 flex items-center justify-center mb-5 shadow-lg active:scale-95 transition-all"
-                style={{ boxShadow: 'var(--send-glow)', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <Package size={44} weight="duotone" className="text-white" />
-              </button>
-              <h2 className="text-xl font-bold text-t1 mb-2">Queue is empty</h2>
-              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">
-                Tap the icon above to add an item manually, or use the camera to scan one
-              </p>
-            </>
+            <EmptyState
+              className="w-full max-w-sm"
+              icon={<Package weight="duotone" />}
+              title="Queue is empty"
+              description="Add an item manually, or use the camera to scan one."
+              actionLabel="Add item manually"
+              onAction={() => setShowAddDialog(true)}
+            />
           ) : (
-            <>
-              <div className="w-20 h-20 rounded-3xl bg-s1 flex items-center justify-center mb-5">
-                <p className="text-3xl">
-                  {searchQuery ? '🔍' : filter === 'LISTED' ? '✅' : '📦'}
-                </p>
-              </div>
-              <h2 className="text-xl font-bold text-t1 mb-2">
-                {searchQuery
+            <EmptyState
+              className="w-full max-w-sm"
+              icon={<Package weight="duotone" />}
+              title={
+                searchQuery
                   ? 'No items found'
                   : filter === 'LISTED'
                     ? 'Nothing listed yet'
                     : 'No items to list'
-                }
-              </h2>
-              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">
-                {searchQuery
+              }
+              description={
+                searchQuery
                   ? `No items match "${searchQuery}". Try a different search term.`
                   : filter === 'LISTED'
-                    ? 'Items will appear here once pushed to eBay or Notion'
-                    : 'Try selecting a different filter to view items'}
-              </p>
-              {searchQuery && (
-                <Button
-                  onClick={() => setSearchQuery('')}
-                  variant="outline"
-                  className="mt-4 border-s2 text-t2 hover:bg-s1 hover:text-t1"
-                >
-                  Clear Search
-                </Button>
-              )}
-            </>
+                    ? 'Items will appear here once pushed to eBay or Notion.'
+                    : 'Try selecting a different filter to view items.'
+              }
+              actionLabel={searchQuery ? 'Clear search' : undefined}
+              onAction={searchQuery ? () => setSearchQuery('') : undefined}
+            />
           )}
         </div>
       ) : (
