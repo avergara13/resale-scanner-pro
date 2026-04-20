@@ -42,6 +42,7 @@ import { useDeviceId } from '@/hooks/use-device-id'
 import { cn } from '@/lib/utils'
 import { getNetProfit } from '@/lib/profit-utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
+import { haptics } from '@/lib/haptics'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   DropdownMenu,
@@ -288,6 +289,9 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const [viewMode, setViewMode] = useState<'list' | 'chat'>('list')
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  // visualViewport-derived keyboard offset so the composer stays anchored above
+  // the soft keyboard on iOS Safari. 0 when keyboard closed.
+  const [keyboardOffset, setKeyboardOffset] = useState(0)
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -383,6 +387,25 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     }
     prevMessageCount.current = chatMessages.length
   }, [chatMessages])
+
+  // Track visualViewport to anchor the composer above the soft keyboard.
+  // iOS Safari shrinks window.visualViewport.height when the keyboard opens;
+  // the delta against layout viewport is the keyboard inset.
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!vv) return
+    const update = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
+      setKeyboardOffset(inset)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
 
   // Clear pending tool calls whenever the user switches to a different chat session
   useEffect(() => {
@@ -1240,7 +1263,9 @@ ${settings.userProfile.aiContext}` : ''}`
     setViewMode('chat')
   }, [setChatSessions, setActiveSessionId])
 
-  // Shared input bar — floating glass pill, sits just above the bottom nav
+  // Shared input bar — floating glass pill, sits just above the bottom nav.
+  // When the soft keyboard is open, `keyboardOffset` raises the pill above it.
+  const canSend = input.trim().length > 0 && !isProcessing
   const inputBar = (
     <motion.div
       key="chat-pill"
@@ -1252,17 +1277,22 @@ ${settings.userProfile.aiContext}` : ''}`
         position: 'fixed',
         left: 0,
         right: 0,
-        // Viewport-relative (portal renders outside will-change containing block)
-        // 54px nav height + 8px gap + safe area
-        bottom: 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
+        // Viewport-relative (portal renders outside will-change containing block).
+        // When keyboard is open (keyboardOffset > 0), anchor just above it with 8px gap.
+        // When closed, sit 62px above bottom = 54px nav + 8px gap + safe-area.
+        bottom: keyboardOffset > 0
+          ? `calc(${keyboardOffset}px + 8px)`
+          : 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
         zIndex: 50,
         padding: '0 12px',
         pointerEvents: 'none',
+        transition: 'bottom 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
       }}
     >
       <form
         onSubmit={(e) => {
           e.preventDefault()
+          if (canSend) haptics.impactLight()
           handleSendMessage()
         }}
         className="flex items-center gap-2"
@@ -1283,38 +1313,51 @@ ${settings.userProfile.aiContext}` : ''}`
           onChange={(e) => setInput(e.target.value)}
           placeholder="Message Agent..."
           disabled={isProcessing}
+          inputMode="text"
+          autoCapitalize="sentences"
+          autoCorrect="on"
+          spellCheck
+          enterKeyHint="send"
           style={{
             flex: 1,
             background: 'transparent',
             border: 'none',
             outline: 'none',
-            fontSize: '15px',
+            fontSize: '17px',
             color: 'var(--t1)',
             minWidth: 0,
           }}
         />
-        <button
-          type="submit"
-          disabled={!input.trim() || isProcessing}
-          style={{
-            width: '36px',
-            height: '36px',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '18px',
-            background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
-            boxShadow: !input.trim() || isProcessing ? 'none' : 'var(--send-glow)',
-            border: 'none',
-            cursor: 'pointer',
-            opacity: !input.trim() || isProcessing ? 0.4 : 1,
-            transition: 'opacity 0.15s, transform 0.1s, box-shadow 0.15s',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <PaperPlaneRight size={16} weight="bold" className="text-white" />
-        </button>
+        {/* Send button — fades in only when input has content (Apple Messages pattern) */}
+        <AnimatePresence initial={false}>
+          {canSend && (
+            <motion.button
+              key="send-btn"
+              type="submit"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.6 }}
+              transition={{ duration: 0.15, ease: [0.165, 0.84, 0.44, 1] }}
+              style={{
+                width: '32px',
+                height: '32px',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '16px',
+                background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
+                boxShadow: 'var(--send-glow)',
+                border: 'none',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+              aria-label="Send message"
+            >
+              <PaperPlaneRight size={15} weight="bold" className="text-white" />
+            </motion.button>
+          )}
+        </AnimatePresence>
       </form>
     </motion.div>
   )
