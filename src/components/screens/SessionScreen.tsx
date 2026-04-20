@@ -37,10 +37,7 @@ function PastSessionCard({
   const sessionStatus = isCurrentSession ? 'live' : session.active ? 'idle' : 'ended'
 
   return (
-    <Card
-      className="border-s2/60 overflow-hidden"
-      style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-    >
+    <Card className="material-thin overflow-hidden">
       <button onClick={() => setExpanded(!expanded)} className="w-full p-3 text-left active:bg-s1/50 transition-colors">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">

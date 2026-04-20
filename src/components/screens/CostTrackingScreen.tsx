@@ -71,38 +71,26 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId 
 
           {/* Summary tiles */}
           <div className="grid grid-cols-2 gap-2">
-            <div
-              className="stat-card p-3"
-              style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-            >
+            <div className="material-thin rounded-[10px] p-3">
               <p className="text-[9px] text-t3 uppercase tracking-wider mb-1">Est. Profit</p>
               <p className={cn('text-xl font-bold mono leading-tight', totalProfit >= 0 ? 'text-green' : 'text-red')}>
                 {totalProfit >= 0 ? '+' : ''}${Math.abs(totalProfit).toFixed(2)}
               </p>
               <p className="text-[10px] text-t3 mt-0.5">{buyItems.length} items</p>
             </div>
-            <div
-              className="stat-card p-3"
-              style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-            >
+            <div className="material-thin rounded-[10px] p-3">
               <p className="text-[9px] text-t3 uppercase tracking-wider mb-1">Avg ROI</p>
               <p className={cn('text-xl font-bold mono leading-tight', avgROI >= 0 ? 'text-green' : 'text-red')}>
                 {avgROI >= 0 ? '+' : ''}{avgROI}%
               </p>
               <p className="text-[10px] text-t3 mt-0.5">BUY rate {buyRate}%</p>
             </div>
-            <div
-              className="stat-card p-3"
-              style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-            >
+            <div className="material-thin rounded-[10px] p-3">
               <p className="text-[9px] text-t3 uppercase tracking-wider mb-1">Invested</p>
               <p className="text-xl font-bold mono text-t1 leading-tight">${totalInvested.toFixed(2)}</p>
               <p className="text-[10px] text-t3 mt-0.5">purchase cost</p>
             </div>
-            <div
-              className="stat-card p-3"
-              style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-            >
+            <div className="material-thin rounded-[10px] p-3">
               <p className="text-[9px] text-t3 uppercase tracking-wider mb-1">Est. Revenue</p>
               <p className="text-xl font-bold mono text-b1 leading-tight">${totalRevenue.toFixed(2)}</p>
               <p className="text-[10px] text-t3 mt-0.5">if all sell</p>
@@ -122,8 +110,7 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId 
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-s2/60"
-                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+                    className="flex items-center gap-3 p-3 rounded-xl material-thin"
                   >
                     {(() => {
                       const photo = getCardPhoto(item)
