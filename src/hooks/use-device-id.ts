@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useState } from 'react'
 
 const DEVICE_ID_KEY = 'rsp-device-id'
 
@@ -9,13 +9,20 @@ const DEVICE_ID_KEY = 'rsp-device-id'
  * collide between devices (currentSession, settings).
  */
 export function useDeviceId(): string {
-  const ref = useRef<string | null>(null)
-  if (!ref.current) {
-    ref.current = localStorage.getItem(DEVICE_ID_KEY)
-    if (!ref.current) {
-      ref.current = crypto.randomUUID()
-      localStorage.setItem(DEVICE_ID_KEY, ref.current)
+  const [deviceId] = useState(() => {
+    if (typeof window === 'undefined') {
+      return DEVICE_ID_KEY
     }
-  }
-  return ref.current
+
+    const storedDeviceId = localStorage.getItem(DEVICE_ID_KEY)
+    if (storedDeviceId) {
+      return storedDeviceId
+    }
+
+    const nextDeviceId = crypto.randomUUID()
+    localStorage.setItem(DEVICE_ID_KEY, nextDeviceId)
+    return nextDeviceId
+  })
+
+  return deviceId
 }

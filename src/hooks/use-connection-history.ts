@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import type { ConnectionHealth } from './use-connection-health'
-import type { ConnectionEvent, DowntimeIncident, ConnectionHistoryStats } from '@/types'
+import type { ConnectionEvent, DowntimeIncident } from '@/types'
 
 interface UseConnectionHistoryOptions {
   enabled?: boolean
@@ -25,10 +25,12 @@ export function useConnectionHistory(
   // useKV setters may not be referentially stable across renders (unlike useState).
   const setEventsRef = useRef(setEvents)
   const setIncidentsRef = useRef(setIncidents)
-  setEventsRef.current = setEvents
-  setIncidentsRef.current = setIncidents
-
   const cleanedRef = useRef(false)
+
+  useEffect(() => {
+    setEventsRef.current = setEvents
+    setIncidentsRef.current = setIncidents
+  }, [setEvents, setIncidents])
 
   // Run cleanup once on mount
   useEffect(() => {
@@ -142,7 +144,7 @@ export function useConnectionHistory(
     }
 
     prevHealthRef.current = health
-  }, [health?.overall, health?.gemini?.status, health?.googleLens?.status, health?.ebay?.status, health?.anthropic?.status, enabled, recordEvent])
+  }, [enabled, health, recordEvent])
 
   const calculateStats = useCallback(() => {
     const eventsList = events || []

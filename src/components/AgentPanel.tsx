@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { PaperPlaneRight, Robot, User, CircleNotch, ListChecks, ChatCircle, Plus, Check, Trash, CaretDown, CaretUp } from '@phosphor-icons/react'
+import { PaperPlaneRight, Robot, User, CircleNotch, ListChecks, Plus, Check, Trash, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import type { ChatSession, ChatMessage, SharedTodo } from '@/types'
 

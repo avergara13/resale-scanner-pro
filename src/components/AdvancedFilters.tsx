@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Funnel, X, CaretDown, CalendarBlank, CurrencyDollar, BookmarkSimple } from '@phosphor-icons/react'
+import { Funnel, CaretDown, CalendarBlank, CurrencyDollar, BookmarkSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

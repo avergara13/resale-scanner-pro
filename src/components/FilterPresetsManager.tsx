@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { X, Plus, Funnel, Copy, Trash, FloppyDisk, PencilSimple, Star } from '@phosphor-icons/react'
+import { Plus, Funnel, Copy, Trash, FloppyDisk, PencilSimple, Star } from '@phosphor-icons/react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Badge } from './ui/badge'
 import { Slider } from './ui/slider'
-import { Switch } from './ui/switch'
 import { toast } from 'sonner'
 import { logActivity } from '@/lib/activity-log'
 import { TagManager } from './TagManager'
@@ -457,7 +456,7 @@ export function FilterPresetsManager({ isOpen, onClose, onApplyPreset }: FilterP
                   <label className="text-[10px] font-bold text-[var(--t4)] uppercase tracking-wider mb-2 block">
                     Sort By
                   </label>
-                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                  <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'profit' | 'date' | 'price' | 'name')}>
                     <SelectTrigger className="h-9">
                       <SelectValue />
                     </SelectTrigger>
@@ -473,7 +472,7 @@ export function FilterPresetsManager({ isOpen, onClose, onApplyPreset }: FilterP
                   <label className="text-[10px] font-bold text-[var(--t4)] uppercase tracking-wider mb-2 block">
                     Order
                   </label>
-                  <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as any)}>
+                  <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'asc' | 'desc')}>
                     <SelectTrigger className="h-9">
                       <SelectValue />
                     </SelectTrigger>

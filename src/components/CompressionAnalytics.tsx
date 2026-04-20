@@ -24,7 +24,6 @@ export function CompressionAnalytics() {
   }
 
   const savingsPercent = Number(summary.savingsPercentage)
-  const progressColor = savingsPercent > 70 ? 'bg-green' : savingsPercent > 50 ? 'bg-amber' : 'bg-blue-bg'
 
   return (
     <div className="space-y-4">
