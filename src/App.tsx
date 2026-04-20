@@ -2700,9 +2700,17 @@ function App() {
     if (!container) return
     const onScroll = (e: Event) => {
       const target = e.target as HTMLElement
-      if (target && typeof target.scrollTop === 'number') {
-        setHeaderScrolled(target.scrollTop > 44)
+      if (!target || typeof target.scrollTop !== 'number') return
+      // Ignore events from nested scrollable regions (e.g. max-h-48 lists inside
+      // screens). Walk up from the target's parent; if any intermediate element is
+      // also scrollable before we reach our container, this is a nested scroll.
+      let node = target.parentElement
+      while (node && node !== container) {
+        const ov = getComputedStyle(node).overflowY
+        if (ov === 'auto' || ov === 'scroll') return
+        node = node.parentElement
       }
+      setHeaderScrolled(target.scrollTop > 44)
     }
     container.addEventListener('scroll', onScroll, true)
     return () => container.removeEventListener('scroll', onScroll, true)
