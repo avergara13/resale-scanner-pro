@@ -21,7 +21,7 @@ interface ScanHistoryScreenProps {
   onDeleteItems?: (ids?: string[]) => void
 }
 
-export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistory: scanHistoryProp, onDeleteItems }: ScanHistoryScreenProps) {
+export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanHistoryProp, onDeleteItems }: ScanHistoryScreenProps) {
   // Read-only: provides data when no scanHistoryProp is passed (non-session view).
   // Write path goes through onDeleteItems (App-level, Supabase-photo-safe). Never
   // call the KV setter directly — that would skip Supabase photo cleanup.

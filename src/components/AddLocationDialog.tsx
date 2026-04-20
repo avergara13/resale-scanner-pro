@@ -14,6 +14,10 @@ interface AddLocationDialogProps {
   existingLocations?: ThriftStoreLocation[]
 }
 
+function createLocationId(): string {
+  return `loc-${crypto.randomUUID()}`
+}
+
 export function AddLocationDialog({ open, onOpenChange, onSave, existingLocations = [] }: AddLocationDialogProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [selectedLocationId, setSelectedLocationId] = useState<string>('')
@@ -28,7 +32,7 @@ export function AddLocationDialog({ open, onOpenChange, onSave, existingLocation
   const handleSave = () => {
     if (isCreatingNew) {
       const location: ThriftStoreLocation = {
-        id: `loc-${Date.now()}`,
+        id: createLocationId(),
         name: newLocation.name || 'Unnamed Location',
         address: newLocation.address,
         city: newLocation.city,

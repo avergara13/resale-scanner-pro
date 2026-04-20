@@ -2,9 +2,6 @@ import { useState } from 'react'
 import { Card } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
-import { Slider } from './ui/slider'
-import { Switch } from './ui/switch'
-import { Label } from './ui/label'
 import { 
   ArrowsClockwise, 
   Clock, 
@@ -17,9 +14,6 @@ import {
 import { 
   APIEndpoint, 
   ENDPOINT_RETRY_CONFIGS,
-  getEndpointDescription,
-  getEndpointPriority,
-  formatRetryConfig 
 } from '@/lib/retry-config'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible'
 import { cn } from '@/lib/utils'
@@ -49,7 +43,7 @@ const PRIORITY_BG = {
   low: 'bg-s1',
 }
 
-export function RetryConfigPanel({ onConfigChange }: RetryConfigPanelProps) {
+export function RetryConfigPanel({ onConfigChange: _onConfigChange }: RetryConfigPanelProps) {
   const [expandedEndpoints, setExpandedEndpoints] = useState<Set<string>>(new Set())
   const [selectedPriority, setSelectedPriority] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
 

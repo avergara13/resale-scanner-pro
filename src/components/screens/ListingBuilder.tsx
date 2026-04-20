@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter,
 } from '@/components/ui/drawer'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { ScannedItem, OptimizedListing, AppSettings } from '@/types'
 
@@ -155,7 +154,6 @@ export function ListingBuilder({
   onBack,
   onPushed,
   onEditPhotos,
-  onUploadPhotos,
   onOptimize,
   initialGateOpen,
   mode = 'browse',
@@ -417,7 +415,7 @@ export function ListingBuilder({
       setPushError(msg)
       setIsPushing(false)
     }
-  }, [state, priceNum, weightOzNum, item, onPushed, onUploadPhotos])
+  }, [state, priceNum, weightOzNum, item, onPushed])
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (

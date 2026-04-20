@@ -11,10 +11,24 @@ function getSystemTheme(): Theme {
   return 'light'
 }
 
+type AmbientLightSensorInstance = {
+  illuminance: number
+  addEventListener: (type: 'reading', listener: () => void) => void
+  removeEventListener: (type: 'reading', listener: () => void) => void
+  start: () => Promise<void> | void
+  stop: () => void
+}
+
+type AmbientLightWindow = Window & {
+  AmbientLightSensor?: new () => AmbientLightSensorInstance
+}
+
 export function useTheme() {
   const [themeMode, setThemeMode] = useKV<ThemeMode>('theme-mode', 'auto')
   const [useAmbientLight, setUseAmbientLight] = useKV<boolean>('use-ambient-light', false)
-  const [actualTheme, setActualTheme] = useState<Theme>('light')
+  const [actualTheme, setActualTheme] = useState<Theme>(() => (
+    themeMode === 'auto' ? getSystemTheme() : themeMode || 'light'
+  ))
 
   useEffect(() => {
     if (themeMode === 'auto') {
@@ -23,17 +37,22 @@ export function useTheme() {
 
         const startSensor = async () => {
           try {
-            if ('AmbientLightSensor' in window) {
-              const sensor = new (window as any).AmbientLightSensor()
-              sensor.addEventListener('reading', () => {
+            const ambientWindow = window as AmbientLightWindow
+            if (ambientWindow.AmbientLightSensor) {
+              const sensor = new ambientWindow.AmbientLightSensor()
+              const handleReading = () => {
                 const lux = sensor.illuminance
                 const newTheme = lux < 50 ? 'dark' : 'light'
                 setActualTheme(newTheme)
-              })
+              }
+              sensor.addEventListener('reading', handleReading)
               await sensor.start()
-              sensorCleanup = () => sensor.stop()
+              sensorCleanup = () => {
+                sensor.removeEventListener('reading', handleReading)
+                sensor.stop()
+              }
             }
-          } catch (error) {
+          } catch {
             console.log('Ambient light sensor not available')
           }
         }
@@ -47,15 +66,23 @@ export function useTheme() {
         }
       } else {
         // Follow system preference in auto mode
-        setActualTheme(getSystemTheme())
+        const frame = window.requestAnimationFrame(() => {
+          setActualTheme(getSystemTheme())
+        })
 
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
         const handleChange = () => setActualTheme(getSystemTheme())
         mediaQuery.addEventListener('change', handleChange)
-        return () => mediaQuery.removeEventListener('change', handleChange)
+        return () => {
+          window.cancelAnimationFrame(frame)
+          mediaQuery.removeEventListener('change', handleChange)
+        }
       }
     } else if (themeMode) {
-      setActualTheme(themeMode)
+      const frame = window.requestAnimationFrame(() => {
+        setActualTheme(themeMode)
+      })
+      return () => window.cancelAnimationFrame(frame)
     }
   }, [themeMode, useAmbientLight])
 

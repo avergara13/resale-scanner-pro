@@ -17,17 +17,13 @@ import {
   XCircle,
   WarningCircle,
   Clock,
-  TrendUp,
-  TrendDown,
-  ChartBar,
   ListBullets,
-  FunnelSimple,
   Download,
 } from '@phosphor-icons/react'
 import { useConnectionHealth } from '@/hooks/use-connection-health'
 import { useConnectionHistory } from '@/hooks/use-connection-history'
 import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
-import type { AppSettings, DowntimeIncident, ConnectionEvent } from '@/types'
+import type { AppSettings, DowntimeIncident } from '@/types'
 import type { ConnectionStatus } from '@/hooks/use-connection-health'
 
 interface IncidentLogViewerProps {
@@ -115,6 +111,7 @@ function getSeverityColor(severity: string): string {
 export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
   const { health } = useConnectionHealth({ settings, enabled: true })
   const { events, incidents, stats } = useConnectionHistory(health)
+  const currentTimestamp = health.lastUpdate
   
   const { sortBy: viewMode, filter: filterService, setSortBy: setViewMode, setFilter: setFilterService } = useSortFilterPreference<ViewMode, FilterService>(
     'incident-log-viewer',
@@ -292,7 +289,7 @@ export function IncidentLogViewer({ settings }: IncidentLogViewerProps) {
 
               {filteredIncidents.map((incident) => {
                 const severity = getSeverityLevel(incident)
-                const duration = incident.duration || (Date.now() - incident.startTime)
+                const duration = incident.duration || (currentTimestamp - incident.startTime)
                 
                 return (
                   <Card key={incident.id} className="p-3 bg-s1 border-s2">

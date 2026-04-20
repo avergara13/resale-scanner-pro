@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Trash, Lightning, DownloadSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, TrendUp, TrendDown, Minus, CaretDown, Package, Plus } from '@phosphor-icons/react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { Trash, Lightning, DownloadSimple, X, Tag, ChartBar, MapPin, DotsSixVertical, ArrowCounterClockwise, CaretDown, Package, Plus } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { SessionLiveBanner } from '@/components/SessionLiveBanner'
 import { Card } from '@/components/ui/card'
@@ -22,7 +22,7 @@ import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { cn } from '@/lib/utils'
-import type { ScannedItem, CategoryPreset, ItemTag, Decision } from '@/types'
+import type { ScannedItem, CategoryPreset, ItemTag } from '@/types'
 import type { GeminiService } from '@/lib/gemini-service'
 import {
   DndContext,
@@ -58,7 +58,6 @@ interface QueueScreenProps {
   onDelist?: (itemId: string) => void
   personalSessionIds?: Set<string>
   onReanalyze?: (itemId: string) => void
-  onBuyItem?: (id: string) => void
   /** WO-RSP-010: opens the in-app ListingBuilder (card body tap + edit) */
   onOpenListingBuilder?: (itemId: string) => void
   /** Quick-list: opens ListingBuilder with gate drawer pre-opened */
@@ -86,8 +85,6 @@ interface SortableItemProps {
   onEditTags: (itemId: string, tags: string[]) => void
   onOpenSoldDialog?: (item: ScannedItem) => void
   onDelist?: (itemId: string) => void
-  onReanalyze?: (itemId: string) => void
-  onBuyItem?: (id: string) => void
   onOpenListingBuilder?: (itemId: string) => void
   onListItem?: (itemId: string) => void
   onReScanItem?: (id: string) => void
@@ -105,8 +102,6 @@ function SortableItem({
   onEditTags,
   onOpenSoldDialog,
   onDelist,
-  onReanalyze,
-  onBuyItem,
   onOpenListingBuilder,
   onListItem,
   onReScanItem,
@@ -478,7 +473,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, geminiService, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onBuyItem, onOpenListingBuilder, onListItem, highlightItemId, onHighlightClear, onReScanItem }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenListingBuilder, onListItem, highlightItemId, onHighlightClear, onReScanItem }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -495,12 +490,10 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const [presetsOpen, setPresetsOpen] = useState(false)
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
   const [allTags, setAllTags] = useKV<ItemTag[]>('all-tags', [])
-  const [previousItemCount, setPreviousItemCount] = useState<number>(queueItems.length)
-  const [previousFilteredCount, setPreviousFilteredCount] = useState<number | null>(null)
+  const previousItemCountRef = useRef(queueItems.length)
   const [soldDialogItemId, setSoldDialogItemId] = useState<string | null>(null)
   const [soldPrice, setSoldPrice] = useState('')
   const [soldMarketplace, setSoldMarketplace] = useState<'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'>('ebay')
-  const [showTrendIndicator, setShowTrendIndicator] = useState(false)
   const [locationInsightsOpen, setLocationInsightsOpen] = useState(false)
 
   // Scroll-to + flash-highlight when arriving from "View in Queue"
@@ -732,17 +725,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const listedCount = queueItems.filter(item =>
     item.listingStatus === 'published'
   ).length
-  const hasActiveAdvancedFilters =
-    (advancedFilters.tags?.length ?? 0) > 0 ||
-    (advancedFilters.locations?.length ?? 0) > 0 ||
-    (advancedFilters.categories?.length ?? 0) > 0 ||
-    !!advancedFilters.profitMarginRange ||
-    !!advancedFilters.dateRange
-
-  const hasActiveFilters = searchQuery.trim() !== ''
-    || sortBy !== 'manual'
-    || hasActiveAdvancedFilters
-
   const handleToggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const newSet = new Set(prev)
@@ -812,12 +794,11 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   }
 
   const allFilteredSelected = filteredItems.length > 0 && selectedIds.size === filteredItems.length
-  const someFilteredSelected = selectedIds.size > 0 && selectedIds.size < filteredItems.length
-
   useEffect(() => {
+    const previousItemCount = previousItemCountRef.current
     if (sortedItems.length !== previousItemCount) {
       const diff = sortedItems.length - previousItemCount
-      setPreviousItemCount(sortedItems.length)
+      previousItemCountRef.current = sortedItems.length
       
       if (diff !== 0 && previousItemCount !== queueItems.length) {
         const diffAmount = Math.abs(diff)
@@ -830,26 +811,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
         }
       }
     }
-
-    if (previousFilteredCount !== null && sortedItems.length !== previousFilteredCount) {
-      setShowTrendIndicator(true)
-      const timer = setTimeout(() => {
-        setShowTrendIndicator(false)
-        setPreviousFilteredCount(sortedItems.length)
-      }, 3000)
-      return () => clearTimeout(timer)
-    }
-    
-    if (previousFilteredCount === null && sortedItems.length > 0) {
-      setPreviousFilteredCount(sortedItems.length)
-    }
-  }, [sortedItems.length, previousItemCount, queueItems.length, previousFilteredCount])
-
-
-  const handleSaveEdit = (itemId: string, updates: Partial<ScannedItem>) => {
-    onEdit(itemId, updates)
-    // silent
-  }
+  }, [sortedItems.length, queueItems.length])
 
   const handleRemoveFilter = (filterKey: keyof AdvancedFilterOptions, value?: string) => {
     const newFilters = { ...advancedFilters }
@@ -910,7 +872,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
 
     try {
       const currentQueue = await window.spark?.kv?.get<ScannedItem[]>('queue')
-      const currentTags = await window.spark?.kv?.get<ItemTag[]>('all-tags')
+      await window.spark?.kv?.get<ItemTag[]>('all-tags')
 
       if (currentQueue && queueItems !== currentQueue) {
         // silent refresh
@@ -1347,8 +1309,6 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
                         setSoldMarketplace('ebay')
                       } : undefined}
                       onDelist={onDelist}
-                      onReanalyze={onReanalyze}
-                      onBuyItem={onBuyItem}
                       onOpenListingBuilder={onOpenListingBuilder}
                       onListItem={onListItem}
                       onReScanItem={onReScanItem}
