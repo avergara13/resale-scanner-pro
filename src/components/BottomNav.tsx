@@ -25,15 +25,11 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-40"
+      className="fixed bottom-0 left-0 right-0 z-40 bg-system-background/88 backdrop-blur-xl border-t border-separator"
       style={{
         paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 4px)',
         paddingLeft: 'env(safe-area-inset-left, 0px)',
         paddingRight: 'env(safe-area-inset-right, 0px)',
-        background: 'color-mix(in oklch, var(--bg) 88%, transparent)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '1px solid color-mix(in oklch, var(--fg) 12%, transparent)',
         borderRadius: '20px 20px 0 0',
         boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.12)',
       }}
@@ -63,7 +59,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               className={cn(
                 'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200',
                 !isDisabled && 'active:scale-90',
-                isActive ? 'text-b1' : 'text-t3',
+                isActive ? 'text-system-blue' : 'text-tertiary-label',
                 isDisabled && 'opacity-20 cursor-default'
               )}
               style={{
@@ -84,7 +80,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
                 {item.label}
               </span>
               {isActive && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-b1" />
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-system-blue" />
               )}
             </button>
           )
@@ -124,7 +120,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               className={cn(
                 'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200',
                 !isDisabled && 'active:scale-90',
-                isActive ? 'text-b1' : 'text-t3',
+                isActive ? 'text-system-blue' : 'text-tertiary-label',
                 isDisabled && 'opacity-20 cursor-default'
               )}
               style={{
@@ -145,7 +141,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
                 {item.label}
               </span>
               {isActive && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-b1" />
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-system-blue" />
               )}
             </button>
           )
