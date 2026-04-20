@@ -3,7 +3,8 @@ import { useKV } from '@github/spark/hooks'
 import { Trash, FloppyDisk, CheckSquare, Square, Clock, Package } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { StatusChip } from '@/components/ui/status-chip'
+import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 import { getCardPhoto } from '@/lib/photo'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
@@ -200,13 +201,11 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
           }}
         >
           {filteredHistory.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[55vh] text-center px-6">
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-b1/20 to-b2/10 border border-b1/20 flex items-center justify-center mb-5">
-                <Clock size={36} weight="duotone" className="text-b1" />
-              </div>
-              <h3 className="text-lg font-bold text-t1 mb-2">No scan history</h3>
-              <p className="text-sm text-t2 max-w-[220px] leading-relaxed">Scans will appear here as you use the AI camera</p>
-            </div>
+            <EmptyState
+              icon={<Clock weight="regular" />}
+              title="No scan history"
+              description="Scans will appear here as you use the AI camera."
+            />
           ) : (
             filteredHistory.map(item => {
               const isSelected = selectedIds.has(item.id)
@@ -214,14 +213,9 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
                 <Card
                   key={item.id}
                   className={cn(
-                    'p-3 border transition-all',
-                    isSelected ? 'border-b1' : 'border-s2/60'
+                    'p-3 transition-all',
+                    isSelected ? 'border border-b1 bg-b1/5' : 'border border-s2/60 material-thin'
                   )}
-                  style={
-                    isSelected
-                      ? { background: 'color-mix(in oklch, var(--b1) 8%, var(--fg))' }
-                      : { background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }
-                  }
                 >
                   <div className="flex items-start gap-3">
                     <button onClick={() => toggleSelect(item.id)} className="mt-0.5 flex-shrink-0">
@@ -252,17 +246,16 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
                           <p className="text-sm font-semibold text-t1 truncate">{item.productName || 'Unknown Item'}</p>
                           <p className="text-[10px] text-t3 mt-0.5">{formatTime(item.timestamp)}</p>
                         </div>
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            'text-[9px] font-bold flex-shrink-0',
-                            item.decision === 'BUY' ? 'bg-green/10 text-green border border-green/20' :
-                            item.decision === 'PASS' ? 'bg-red/10 text-red border border-red/20' :
-                            'bg-amber/10 text-amber border border-amber/20'
-                          )}
+                        <StatusChip
+                          tone={
+                            item.decision === 'BUY' ? 'success' :
+                            item.decision === 'PASS' ? 'danger' :
+                            'warning'
+                          }
+                          className="h-5 px-2 text-[10px] flex-shrink-0"
                         >
                           {item.decision}
-                        </Badge>
+                        </StatusChip>
                       </div>
 
                       <div className="flex items-center gap-3 mt-1.5">
