@@ -60,29 +60,31 @@ import {
 import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, AgentToolCall, SoldItem } from '@/types'
 
 interface QuickAction {
-  emoji: string
+  icon: React.ReactNode
   label: string
   prompt: string
 }
 
+// Icon-backed pills (PKT-20260420-008). Tap prefills the composer so the user
+// can tweak the prompt before sending — never auto-sends.
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    emoji: '📸',
+    icon: <Camera size={16} weight="bold" />,
     label: 'Scan Item',
     prompt: 'open camera to scan a new item',
   },
   {
-    emoji: '🚀',
+    icon: <Sparkle size={16} weight="bold" />,
     label: 'Full Pipeline',
     prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion',
   },
   {
-    emoji: '📬',
+    icon: <Package size={16} weight="bold" />,
     label: 'Need Shipping',
     prompt: 'Which sold items need shipping labels right now? Show me overdue items first, then the best carrier and estimated cost for each.',
   },
   {
-    emoji: '📊',
+    icon: <ChartLine size={16} weight="bold" />,
     label: 'Session Stats',
     prompt: "What's my current session status? Show stats, profit goal progress, and recent items.",
   },
@@ -1243,10 +1245,14 @@ ${settings.userProfile.aiContext}` : ''}`
   }, [pendingMessage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleQuickAction = useCallback((prompt: string) => {
-    // Send immediately — don't pre-fill the floating input bar (which lives in App.tsx
-    // and has its own state, so setInput here would never reach the send button)
-    handleSendMessage(prompt)
-  }, [handleSendMessage])
+    // Prefill the composer so the user can tweak before sending (PKT-20260420-008).
+    // Switching to chat view lets them see the composer; focusing the input after
+    // a tick lets React render the new view first. Haptic matches iOS selection UX.
+    haptics.selection()
+    setInput(prompt)
+    setViewMode('chat')
+    setTimeout(() => inputRef.current?.focus(), 60)
+  }, [])
 
   // Clear messages and start a fresh chat within the same session
   const handleNewChat = useCallback(() => {
@@ -1519,16 +1525,18 @@ ${settings.userProfile.aiContext}` : ''}`
                 I know your queue, scans, sessions, and goals.
               </p>
             </div>
-            <div className="px-4 pb-24 grid grid-cols-2 gap-3">
+            <div className="px-4 pb-24 grid grid-cols-2 gap-2.5">
               {QUICK_ACTIONS.map(action => (
                 <button
                   key={action.label}
                   onClick={() => handleQuickAction(action.prompt)}
-                  className="flex flex-col items-start gap-2.5 p-4 bg-s1 border border-s2 rounded-2xl text-left active:scale-95 active:opacity-70 transition-transform"
+                  className="material-thin flex items-center gap-2.5 px-4 py-3 border border-separator/60 rounded-full text-left active:scale-[0.97] active:opacity-75 transition-transform"
                   style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                 >
-                  <span className="text-2xl leading-none">{action.emoji}</span>
-                  <span className="text-[12px] font-bold text-t1 leading-snug">{action.label}</span>
+                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-b1/12 text-b1 flex-shrink-0">
+                    {action.icon}
+                  </span>
+                  <span className="text-[13px] font-semibold text-t1 leading-tight truncate">{action.label}</span>
                 </button>
               ))}
             </div>
@@ -1557,16 +1565,18 @@ ${settings.userProfile.aiContext}` : ''}`
                     I know your queue, scans, sessions, and goals.
                   </p>
                 </div>
-                <div className="px-4 pb-24 grid grid-cols-2 gap-3">
+                <div className="px-4 pb-24 grid grid-cols-2 gap-2.5">
                   {QUICK_ACTIONS.map(action => (
                     <button
                       key={action.label}
                       onClick={() => handleQuickAction(action.prompt)}
-                      className="flex flex-col items-start gap-2.5 p-4 bg-s1 border border-s2 rounded-2xl text-left active:scale-95 active:opacity-70 transition-transform"
+                      className="material-thin flex items-center gap-2.5 px-4 py-3 border border-separator/60 rounded-full text-left active:scale-[0.97] active:opacity-75 transition-transform"
                       style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                     >
-                      <span className="text-2xl leading-none">{action.emoji}</span>
-                      <span className="text-[12px] font-bold text-t1 leading-snug">{action.label}</span>
+                      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-b1/12 text-b1 flex-shrink-0">
+                        {action.icon}
+                      </span>
+                      <span className="text-[13px] font-semibold text-t1 leading-tight truncate">{action.label}</span>
                     </button>
                   ))}
                 </div>
