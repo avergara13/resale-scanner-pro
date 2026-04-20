@@ -28,8 +28,9 @@ export function useKV<T>(key: string, initialValue: T): [T, Dispatch<SetStateAct
   const initialValueRef = useRef(initialValue)
   const [value, setValue] = useState<T>(() => readStoredValue(storageKey, initialValue))
 
-  // Keep initialValueRef updated without depending on initialValue identity
-  initialValueRef.current = initialValue
+  useEffect(() => {
+    initialValueRef.current = initialValue
+  }, [initialValue])
 
   useEffect(() => {
     const stored = readStoredValue(storageKey, initialValueRef.current)

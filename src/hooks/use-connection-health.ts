@@ -267,7 +267,7 @@ export function useConnectionHealth({
   checkInterval = DEFAULT_CHECK_INTERVAL,
   enabled = true,
 }: UseConnectionHealthOptions = {}) {
-  const [health, setHealth] = useState<ConnectionHealth>({
+  const [health, setHealth] = useState<ConnectionHealth>(() => ({
     gemini: {
       name: 'Gemini AI',
       status: 'checking',
@@ -294,7 +294,7 @@ export function useConnectionHealth({
     },
     overall: 'checking',
     lastUpdate: Date.now(),
-  })
+  }))
 
   // Extract individual keys as stable primitives to avoid re-render loops
   // when the settings object reference changes
@@ -371,15 +371,20 @@ export function useConnectionHealth({
   useEffect(() => {
     if (!enabled) return
 
-    checkHealth()
+    const initialCheckTimeout = window.setTimeout(() => {
+      void checkHealth()
+    }, 0)
 
     if (checkInterval <= 0) {
-      return
+      return () => window.clearTimeout(initialCheckTimeout)
     }
 
     const interval = setInterval(checkHealth, checkInterval)
 
-    return () => clearInterval(interval)
+    return () => {
+      window.clearTimeout(initialCheckTimeout)
+      clearInterval(interval)
+    }
   }, [checkHealth, checkInterval, enabled])
 
   return {

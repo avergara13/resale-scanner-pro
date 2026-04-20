@@ -266,7 +266,7 @@ export function DetectionHistoryViewer() {
                           <div className="text-xs font-medium text-t1">
                             Detected Products ({entry.detectedProducts.length})
                           </div>
-                          {entry.detectedProducts.map((product, idx) => {
+                          {entry.detectedProducts.map((product) => {
                             const isAccepted = entry.acceptedProducts?.includes(product.id)
                             const isRejected = entry.rejectedProducts?.includes(product.id)
 

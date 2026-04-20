@@ -1,4 +1,4 @@
-import { GearSix, ChartLine, ArrowLeft } from '@phosphor-icons/react'
+import { ChevronLeft, Settings, TrendingUp } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import type { Screen } from '@/types'
 
@@ -41,46 +41,47 @@ export function AppHeader({
   const isRootScreen = ROOT_SCREENS.has(screen)
 
   return (
-    <header className="sticky top-0 z-30 flex-shrink-0 bg-system-background/88 backdrop-blur-xl border-b border-separator">
-      {/* Single row — title left, action buttons right */}
-      <div className="flex items-center justify-between px-4 h-11">
-        {/* Left zone: back button (detail screens) + title */}
+    <header className="material-chrome sticky top-0 z-30 flex-shrink-0 border-b border-separator safe-area-x">
+      <div className="flex h-11 items-center justify-between px-4">
         <div className="flex items-center gap-2 min-w-0">
           {!isRootScreen && onBack && (
             <button
               onClick={onBack}
-              className="flex items-center gap-1 h-10 px-1 rounded-lg text-system-blue hover:bg-system-fill transition-colors active:opacity-60 -ml-2 flex-shrink-0"
+              className="ml-[-0.5rem] inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-system-blue transition-colors hover:bg-system-fill active:opacity-60"
               style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
             >
-              <ArrowLeft size={18} weight="bold" />
+              <ChevronLeft size={22} strokeWidth={2.25} />
               {backLabel && (
-                <span className="text-[13px] font-medium">{backLabel}</span>
+                <span className="max-w-20 truncate text-footnote font-medium">{backLabel}</span>
               )}
             </button>
           )}
-          <span className="text-[17px] font-semibold tracking-tight text-label truncate">
+          <span className="truncate font-sans text-headline text-label">
             {title}
           </span>
         </div>
 
-        {/* Right zone: action buttons */}
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {onNavigateToTrends && (
             <button
               onClick={onNavigateToTrends}
-              className="w-9 h-9 flex items-center justify-center rounded-lg text-tertiary-label hover:text-label hover:bg-system-fill transition-colors"
+              className="inline-flex size-11 items-center justify-center rounded-full text-tertiary-label transition-colors hover:bg-system-fill hover:text-label"
               aria-label="Trends"
             >
-              <ChartLine size={18} weight={showTrends ? 'fill' : 'bold'} className={showTrends ? 'text-system-blue' : ''} />
+              <TrendingUp
+                size={22}
+                strokeWidth={2}
+                className={showTrends ? 'text-system-blue' : undefined}
+              />
             </button>
           )}
           <ThemeToggle />
           <button
             onClick={onNavigateToSettings}
-            className="w-9 h-9 flex items-center justify-center rounded-lg text-tertiary-label hover:text-label hover:bg-system-fill transition-colors"
+            className="inline-flex size-11 items-center justify-center rounded-full text-tertiary-label transition-colors hover:bg-system-fill hover:text-label"
             aria-label="Settings"
           >
-            <GearSix size={18} weight="bold" />
+            <Settings size={22} strokeWidth={2} />
           </button>
         </div>
       </div>

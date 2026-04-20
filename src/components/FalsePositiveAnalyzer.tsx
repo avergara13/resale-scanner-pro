@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  ChartBar,
   Warning,
   CheckCircle,
   XCircle,
@@ -21,7 +20,6 @@ import {
 import {
   createFalsePositiveAnalyzer,
   type DetectionCorrection,
-  type FalsePositiveReport,
   type FalsePositivePattern,
 } from '@/lib/false-positive-analyzer'
 import { toast } from 'sonner'
@@ -80,7 +78,7 @@ export function FalsePositiveAnalyzerPanel() {
           setCorrections(data.corrections)
         }
         logActivity('Analysis data imported')
-      } catch (error) {
+      } catch {
         toast.error('Failed to import data')
       }
     }

@@ -260,3 +260,56 @@ Phase 3 active.
 ## Reference
 
 Read `CONTEXT.md` before substantial work. It is the authoritative project-specific context file for this repo.
+
+## Design System
+
+### Token Architecture (PR1 + PR7)
+
+- Semantic color tokens: `--label`, `--secondary-label`, `--tertiary-label`, `--quaternary-label`, `--system-background`, `--secondary-system-background`, `--tertiary-system-background`, `--system-grouped-background`, `--system-fill`, `--separator`, `--system-blue`, `--system-green`, `--system-red`, `--system-orange`, `--system-yellow`, `--system-purple`, `--system-pink`, `--system-indigo`, `--system-teal`
+- Typography scale: `large-title` (34px) through `caption-2` (11px), all named in `rem`, all mapped through the SF Pro / system font stack in `src/index.css`
+- Motion tokens: `--ease-spring`, `--ease-spring-bounce`, `--ease-out-quart`
+- Duration tokens: `--duration-fast` (100ms), `--duration-medium` (200ms), `--duration-slow` (350ms), `--duration-sheet` (280ms), `--duration-spin` (spinner timing)
+- Materials: `.material-ultra-thin`, `.material-thin`, `.material-regular`, `.material-thick`, `.material-chrome`
+- Status-chip contrast tokens: `--chip-label-green`, `--chip-label-orange`, `--chip-label-blue`, `--chip-label-red`
+
+### Material Hierarchy
+
+- `.material-ultra-thin`: floating badges and minor chrome
+- `.material-thin`: cards and lightweight overlays
+- `.material-regular`: drawers, sheets, medium-emphasis surfaces
+- `.material-thick`: modal/dialog content
+- `.material-chrome`: top/bottom app chrome and sticky system bars
+
+### Primitive Components
+
+- `Button`: shared action primitive with 44px minimum tap floor. `variant="link"` is for inline text actions only; use `variant="ghost"` with `size="sm"` for standalone low-emphasis actions.
+- `Card`: primary container surface. Prefer material-backed cards over one-off screen wrappers.
+- `Badge`: simple small labels and counters.
+- `Input`: standard text/numeric field primitive. Use `inputMode`, `enterKeyHint`, and related HTML attributes at the callsite.
+- `Switch`: iOS-style pill toggle.
+- `Drawer` / `Sheet` / `Dialog`: shared overlay primitives. Use the shipped material classes; do not create screen-local overlay chrome.
+- `Skeleton`: loading placeholder.
+- `EmptyState`: icon + headline + description + optional action for empty lists/states.
+- `ActivityIndicator`: spinner primitive driven by `--duration-spin`.
+- `GroupedRow`: grouped-list row primitive for Settings-style list surfaces.
+- `SectionHeader`: uppercase grouped-section label.
+- `StatusChip`: semantic status treatment with WCAG-safe label tokens.
+- `MaterialSurface`: wrapper for applying the approved material hierarchy without inline blur styles.
+
+### Haptics
+
+- `src/lib/haptics.ts` is the single source of truth.
+- Exported patterns: `selection()`, `impactLight()`, `impactMedium()`, `impactHeavy()`, `notifSuccess()`, `notifWarning()`, `notifError()`
+- Current behavior: feature-detected `navigator.vibrate()` only. iOS Safari is a no-op by design in this pass; Android/PWA can benefit today. Native bridge work is a future task, not an inline workaround.
+
+## Hard Rules
+
+- Never use inline `backdropFilter`; use the shipped `.material-*` classes.
+- Never use inline `color-mix()` in components; define a token or utility class in `src/index.css` first.
+- Never hardcode px color values in app UI; use semantic tokens.
+- Never hardcode one-off spacing when the named scale already covers the need.
+- New primitive: add it to `src/components/ui/` first, then consume it.
+- New token: add it to `src/index.css` first, then consume it.
+- Agent screen tool-call chips must use `describeToolCall()` labels only.
+- Agent thinking indicator must preserve the 600ms minimum display duration.
+- Swipe gestures for Queue / Sold / Scan History remain deferred. Current note: `dnd-kit` + Framer Motion transform conflict is unresolved; track follow-up work on a separate branch rather than solving it inline during polish maintenance.

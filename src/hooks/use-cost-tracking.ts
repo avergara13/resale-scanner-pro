@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { CostTrackingPeriod, CostAlert, CostBudget } from '@/types'
 import { createCostTrackingService } from '@/lib/cost-tracking-service'
 
@@ -10,7 +9,7 @@ export function useCostTracking(period: 'today' | 'week' | 'month' | 'all' = 'mo
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const costService = createCostTrackingService()
+  const costService = useMemo(() => createCostTrackingService(), [])
 
   const refreshData = useCallback(async () => {
     try {
@@ -31,21 +30,21 @@ export function useCostTracking(period: 'today' | 'week' | 'month' | 'all' = 'mo
     } finally {
       setIsLoading(false)
     }
-  }, [period])
+  }, [costService, period])
 
   useEffect(() => {
     refreshData()
-  }, [refreshData])
+  }, [costService, refreshData])
 
   const acknowledgeAlert = useCallback(async (alertId: string) => {
     await costService.acknowledgeAlert(alertId)
     await refreshData()
-  }, [refreshData])
+  }, [costService, refreshData])
 
   const createBudget = useCallback(async (budget: CostBudget) => {
     await costService.setBudget(budget)
     await refreshData()
-  }, [refreshData])
+  }, [costService, refreshData])
 
   return {
     costData,

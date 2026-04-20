@@ -1407,17 +1407,8 @@ ${settings.userProfile.aiContext}` : ''}`
           if (canSend) haptics.impactLight()
           handleSendMessage()
         }}
-        className="flex items-center gap-2"
-        style={{
-          pointerEvents: 'auto',
-          background: 'var(--glass-bg)',
-          backdropFilter: 'saturate(180%) blur(24px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(24px)',
-          border: '0.5px solid var(--glass-border)',
-          boxShadow: 'var(--glass-shadow)',
-          borderRadius: '22px',
-          padding: '6px 6px 6px 16px',
-        }}
+        className="material-chrome flex items-center gap-2 rounded-[22px] border border-border/80 px-4 py-1.5 shadow-[var(--glass-shadow)]"
+        style={{ pointerEvents: 'auto' }}
       >
         <input
           ref={inputRef}
@@ -1458,7 +1449,7 @@ ${settings.userProfile.aiContext}` : ''}`
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: '16px',
-                background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
+                background: 'var(--b1)',
                 boxShadow: 'var(--send-glow)',
                 border: 'none',
                 cursor: 'pointer',
@@ -1503,17 +1494,8 @@ ${settings.userProfile.aiContext}` : ''}`
           ])
           setTaskInput('')
         }}
-        className="flex items-center gap-2"
-        style={{
-          pointerEvents: 'auto',
-          background: 'var(--glass-bg)',
-          backdropFilter: 'saturate(180%) blur(24px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(24px)',
-          border: '0.5px solid var(--glass-border)',
-          boxShadow: 'var(--glass-shadow)',
-          borderRadius: '22px',
-          padding: '6px 6px 6px 16px',
-        }}
+        className="material-chrome flex items-center gap-2 rounded-[22px] border border-border/80 px-4 py-1.5 shadow-[var(--glass-shadow)]"
+        style={{ pointerEvents: 'auto' }}
       >
         <input
           value={taskInput}
@@ -1913,8 +1895,7 @@ ${settings.userProfile.aiContext}` : ''}`
                 return (
                   <Card
                     key={item.id}
-                    className="border-s2/60 flex flex-col gap-0 overflow-hidden"
-                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+                    className="material-thin border-s2/60 flex flex-col gap-0 overflow-hidden"
                   >
                     {/* ── Tappable info row → opens scan-result ── */}
                     <div
@@ -1986,8 +1967,8 @@ ${settings.userProfile.aiContext}` : ''}`
                       {/* BUY — routes through Photo Manager */}
                       <button
                         onClick={() => onPromoteToBuy?.(item)}
-                        className="flex-1 h-8 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white active:scale-[0.98] active:opacity-90 transition-all rounded-xl mx-1.5"
-                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                        className="mx-1.5 flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl bg-system-green text-[11px] font-bold text-white transition-all active:scale-[0.98] active:opacity-90"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                       >
                         <ShoppingCart size={13} weight="bold" />
                         BUY

@@ -10,7 +10,6 @@ import { toast } from 'sonner'
 import { logActivity } from '@/lib/activity-log'
 import { useFilterPresets, type FilterPreset } from '@/hooks/use-filter-presets'
 import type { AdvancedFilterOptions } from './AdvancedFilters'
-import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 
 // Guards against `RangeError: Invalid time value` from date-fns when a
@@ -37,8 +36,6 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
   const [newPresetName, setNewPresetName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const [customizingId, setCustomizingId] = useState<string | null>(null)
-  
   const { presets, savePreset, deletePreset, applyPreset, renamePreset, duplicatePreset } = useFilterPresets()
 
   const handleSavePreset = () => {
@@ -99,7 +96,6 @@ export function FilterPresetsDialog({ currentFilters, onApplyPreset, trigger }: 
   }
 
   const handleCustomizePreset = (preset: FilterPreset) => {
-    setCustomizingId(preset.id)
     onApplyPreset(preset.filters)
     setIsOpen(false)
     logActivity(`Customize "${preset.name}" and save as new preset`, 'info')

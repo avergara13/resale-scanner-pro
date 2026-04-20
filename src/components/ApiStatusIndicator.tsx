@@ -63,7 +63,7 @@ export function ApiStatusIndicator({
   compact = false,
   liveUpdates = true,
   checkInterval = 30000,
-  onStatusChange,
+  onStatusChange: _onStatusChange,
   activeRetries = [],
 }: ApiStatusIndicatorProps) {
   const { health, checkHealth, isChecking } = useConnectionHealth({
@@ -232,7 +232,7 @@ function ServiceStatusRow({
   name,
   status,
   latency,
-  configured,
+  configured: _configured,
   critical,
   error,
 }: ServiceStatusRowProps) {

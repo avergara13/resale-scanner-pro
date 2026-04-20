@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowClockwise, ArrowSquareOut, CheckCircle, Package, SpinnerGap, Truck, Plus, Sparkle, X, Tag as TagIcon, Archive } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { SessionLiveBanner } from '@/components/SessionLiveBanner'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -58,13 +57,6 @@ const LABEL_PROVIDER_OPTIONS = [
 ]
 
 const PLATFORM_OPTIONS = ['eBay', 'Mercari', 'Poshmark', 'Facebook Marketplace', 'Depop', 'Grailed', 'Whatnot', 'Other']
-
-const STATUS_BADGE_STYLES: Record<SoldShippingStatus, string> = {
-  '🔴 Need Label': 'bg-red/10 text-red border-red/20',
-  '🟡 Label Ready': 'bg-amber/10 text-amber border-amber/20',
-  '📦 Packed': 'bg-blue-bg text-b1 border-b1/30',
-  '✅ Shipped': 'bg-green/10 text-green border-green/20',
-}
 
 /**
  * Presentational mapping — SoldShippingStatus → StatusChip tone + icon + label.
@@ -135,7 +127,7 @@ function manualSaleToSoldItem(entry: ManualSaleEntry): SoldItem {
   }
 }
 
-export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, onRefresh, onUpdateShipping }: SoldScreenProps) {
+export function SoldScreen({ soldItems, loading, error, warnings: _warnings, lastSyncedAt: _lastSyncedAt, onRefresh, onUpdateShipping }: SoldScreenProps) {
   // Manual sales live in local KV — persist offline, merge with live Notion feed on render
   const [manualSales, setManualSales] = useKV<ManualSaleEntry[]>('manual-sold-items', [])
   const [fulfillmentFilter, setFulfillmentFilter] = useState<FulfillmentFilter>('all')
@@ -218,11 +210,6 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
     }
   }
 
-  const lastSyncedLabel = useMemo(() => {
-    if (!lastSyncedAt) return null
-    return new Date(lastSyncedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  }, [lastSyncedAt])
-
   const handlePullRefresh = useCallback(async () => {
     onRefresh()
     await new Promise(resolve => setTimeout(resolve, 800))
@@ -280,15 +267,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
   return (
     <div className="h-full flex flex-col bg-bg">
       {/* ── Sticky Header — glass, banner, tabs ─────────────────────────── */}
-      <div
-        className="sticky top-0 z-10"
-        style={{
-          background: 'color-mix(in oklch, var(--fg) 85%, transparent)',
-          backdropFilter: 'saturate(180%) blur(24px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(24px)',
-          borderBottom: '0.5px solid color-mix(in oklch, var(--s2) 50%, transparent)',
-        }}
-      >
+      <div className="material-chrome sticky top-0 z-10 border-b border-separator">
         {/* Live session banner — above tab bar, matching Agent/Listings layout */}
         <SessionLiveBanner />
         <div className="px-3 pt-2 pb-2">
@@ -312,10 +291,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
       </div>
 
       {/* ── Slim stats strip — matches Agent inline style ─────────────── */}
-      <div
-        className="px-3 border-b border-s1/60 flex-shrink-0"
-        style={{ background: 'color-mix(in oklch, var(--fg) 85%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', height: '38px', display: 'flex', alignItems: 'center', overflow: 'hidden' }}
-      >
+      <div className="material-thin flex h-[38px] flex-shrink-0 items-center overflow-hidden border-b border-s1/60 px-3">
         <div className="flex items-center gap-2 flex-1 text-[10px]">
           <span className="text-t1 font-black">{mergedItems.length} <span className="font-normal text-t3">Sold</span></span>
           <span className="text-red font-black">{batchStats.needsLabelCount} <span className="font-normal text-t3">Need Label</span></span>
@@ -455,8 +431,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
                 {/* ── Row 2: AI Shipping Recommendation banner ──────── */}
                 {draft.shippingStatus !== '✅ Shipped' && recommendation.bestQuote && (
                   <div
-                    className="mt-3 rounded-xl border border-b1/25 px-3 py-2 flex items-start gap-2"
-                    style={{ background: 'color-mix(in oklch, var(--blue-bg) 80%, transparent)' }}
+                    className="mt-3 flex items-start gap-2 rounded-xl border border-b1/25 bg-blue-bg/80 px-3 py-2"
                   >
                     <Sparkle size={14} weight="fill" className="text-b1 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
@@ -564,7 +539,7 @@ export function SoldScreen({ soldItems, loading, error, warnings, lastSyncedAt, 
 
                 {/* ── Row 5: Expanded editor ────────────────────────── */}
                 {isExpanded && (
-                  <div className="mt-2 space-y-3 rounded-xl border border-s2/40 p-3" style={{ background: 'color-mix(in oklch, var(--s1) 50%, transparent)' }}>
+                  <div className="mt-2 space-y-3 rounded-xl border border-s2/40 bg-secondary-system-background/80 p-3">
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
                         <Label className="text-[9px] uppercase tracking-wide text-t3">Ship From ZIP</Label>

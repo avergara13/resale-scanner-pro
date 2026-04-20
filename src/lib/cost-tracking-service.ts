@@ -139,25 +139,29 @@ export class CostTrackingService {
   async getCostTrackingPeriod(period: 'today' | 'week' | 'month' | 'all'): Promise<CostTrackingPeriod> {
     const now = Date.now()
     let startDate: number
-    let endDate = now
+    const endDate = now
 
     switch (period) {
-      case 'today':
+      case 'today': {
         startDate = new Date().setHours(0, 0, 0, 0)
         break
-      case 'week':
+      }
+      case 'week': {
         const weekAgo = new Date()
         weekAgo.setDate(weekAgo.getDate() - 7)
         startDate = weekAgo.getTime()
         break
-      case 'month':
+      }
+      case 'month': {
         const monthAgo = new Date()
         monthAgo.setMonth(monthAgo.getMonth() - 1)
         startDate = monthAgo.getTime()
         break
-      case 'all':
+      }
+      case 'all': {
         startDate = 0
         break
+      }
     }
 
     const logs = await this.getLogsForPeriod(startDate, endDate)
@@ -236,7 +240,7 @@ export class CostTrackingService {
     return budgets.filter(b => b.active)
   }
 
-  async checkBudgets(service: ApiService, cost: number): Promise<void> {
+  async checkBudgets(service: ApiService, _cost: number): Promise<void> {
     const budgets = await this.getActiveBudgets()
     
     for (const budget of budgets) {
@@ -289,22 +293,25 @@ export class CostTrackingService {
   private getBudgetPeriodDates(budget: CostBudget): { startDate: number; endDate: number } {
     const now = Date.now()
     let startDate: number
-    let endDate = now
+    const endDate = now
 
     switch (budget.period) {
-      case 'daily':
+      case 'daily': {
         startDate = new Date().setHours(0, 0, 0, 0)
         break
-      case 'weekly':
+      }
+      case 'weekly': {
         const weekAgo = new Date()
         weekAgo.setDate(weekAgo.getDate() - 7)
         startDate = weekAgo.getTime()
         break
-      case 'monthly':
+      }
+      case 'monthly': {
         const monthAgo = new Date()
         monthAgo.setMonth(monthAgo.getMonth() - 1)
         startDate = monthAgo.getTime()
         break
+      }
     }
 
     return { startDate, endDate }

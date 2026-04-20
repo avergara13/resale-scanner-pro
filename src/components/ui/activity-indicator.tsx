@@ -11,7 +11,7 @@ function ActivityIndicator({
     <LoaderCircle
       aria-hidden="true"
       className={cn(
-        "size-4 animate-spin text-secondary-label duration-1000",
+        "size-4 animate-spin text-secondary-label [animation-duration:var(--duration-spin)]",
         className
       )}
       {...props}

@@ -35,6 +35,11 @@ const buttonVariants = cva(
   }
 )
 
+/**
+ * Shared button primitive.
+ * Use `variant="link"` only for inline text actions.
+ * For standalone low-emphasis actions, prefer `variant="ghost"` with `size="sm"`.
+ */
 function Button({
   className,
   variant,
