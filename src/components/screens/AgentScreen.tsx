@@ -57,6 +57,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from '@/components/ui/sheet'
 import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, AgentToolCall, SoldItem } from '@/types'
 
 interface QuickAction {
@@ -399,8 +407,50 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     return [...buyItems, ...passItems].sort((a, b) => b.timestamp - a.timestamp)
   }, [queueItems, scanHistory, currentSession?.id])
 
-  // Delete confirmation state
+  // Context memory chips (PKT-20260420-008) — surfaced in empty states to
+  // reassure the user that the agent actually has their queue / sold / goal
+  // data loaded. Only renders non-zero values so an empty app stays quiet.
+  const contextChips = useMemo(() => {
+    const chips: { key: string; icon: React.ReactNode; label: string }[] = []
+    if (queueItems.length > 0) {
+      chips.push({
+        key: 'queue',
+        icon: <Stack size={12} weight="bold" />,
+        label: `${queueItems.length} in queue`,
+      })
+    }
+    const unshipped = soldItems.filter(s => !s.trackingNumber).length
+    if (unshipped > 0) {
+      chips.push({
+        key: 'ship',
+        icon: <Package size={12} weight="bold" />,
+        label: `${unshipped} to ship`,
+      })
+    }
+    const goal = currentSession?.profitGoal
+    if (goal && goal > 0) {
+      chips.push({
+        key: 'goal',
+        icon: <TrendUp size={12} weight="bold" />,
+        label: `Goal $${goal}`,
+      })
+    }
+    if (sessionScans.length > 0) {
+      chips.push({
+        key: 'scans',
+        icon: <Camera size={12} weight="bold" />,
+        label: `${sessionScans.length} scanned`,
+      })
+    }
+    return chips
+  }, [queueItems.length, soldItems, currentSession?.profitGoal, sessionScans.length])
+
+  // Delete confirmation state — drives the bottom sheet
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const pendingDeleteItem = useMemo(
+    () => confirmDeleteId ? sessionScans.find(i => i.id === confirmDeleteId) : null,
+    [confirmDeleteId, sessionScans]
+  )
 
   const prevMessageCount = useRef(chatMessages.length)
   const agentHasMounted = useRef(false)
@@ -1576,9 +1626,22 @@ ${settings.userProfile.aiContext}` : ''}`
                 <Robot size={38} weight="duotone" className="text-white" />
               </div>
               <h2 className="text-[22px] font-black text-t1 mb-2 tracking-tight">Session Assistant</h2>
-              <p className="text-sm text-t3 leading-relaxed max-w-[220px]">
+              <p className="text-sm text-t3 leading-relaxed max-w-[240px]">
                 I know your queue, scans, sessions, and goals.
               </p>
+              {contextChips.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-1.5 mt-3 max-w-[280px]">
+                  {contextChips.map(chip => (
+                    <span
+                      key={chip.key}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-b1/10 border border-b1/20 text-[11px] font-semibold text-t1"
+                    >
+                      <span className="text-b1">{chip.icon}</span>
+                      {chip.label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="px-4 pb-24 grid grid-cols-2 gap-2.5">
               {QUICK_ACTIONS.map(action => (
@@ -1616,9 +1679,22 @@ ${settings.userProfile.aiContext}` : ''}`
                     <Robot size={38} weight="duotone" className="text-white" />
                   </div>
                   <h2 className="text-[22px] font-black text-t1 mb-2 tracking-tight">Session Assistant</h2>
-                  <p className="text-sm text-t3 leading-relaxed max-w-[220px]">
+                  <p className="text-sm text-t3 leading-relaxed max-w-[240px]">
                     I know your queue, scans, sessions, and goals.
                   </p>
+                  {contextChips.length > 0 && (
+                    <div className="flex flex-wrap justify-center gap-1.5 mt-3 max-w-[280px]">
+                      {contextChips.map(chip => (
+                        <span
+                          key={chip.key}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-b1/10 border border-b1/20 text-[11px] font-semibold text-t1"
+                        >
+                          <span className="text-b1">{chip.icon}</span>
+                          {chip.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="px-4 pb-24 grid grid-cols-2 gap-2.5">
                   {QUICK_ACTIONS.map(action => (
@@ -1916,35 +1992,15 @@ ${settings.userProfile.aiContext}` : ''}`
                         BUY
                       </button>
                       <div className="w-px h-5 bg-s2 flex-shrink-0" />
-                      {/* Delete — with confirm */}
-                      {confirmDeleteId === item.id ? (
-                        <div className="flex items-center gap-1 px-2">
-                          <button
-                            onClick={() => { onDeleteItem?.(item.id); setConfirmDeleteId(null) }}
-                            className="text-[10px] font-bold text-red hover:underline"
-                            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                          >
-                            Remove
-                          </button>
-                          <span className="text-t3 text-[10px]">|</span>
-                          <button
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="text-[10px] font-bold text-t3 hover:underline"
-                            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDeleteId(item.id)}
-                          className="w-12 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
-                          title="Permanently remove"
-                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                        >
-                          <Trash size={14} weight="bold" />
-                        </button>
-                      )}
+                      {/* Delete — opens a bottom confirmation sheet */}
+                      <button
+                        onClick={() => { haptics.notifWarning(); setConfirmDeleteId(item.id) }}
+                        className="w-12 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
+                        title="Permanently remove"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <Trash size={14} weight="bold" />
+                      </button>
                     </div>
                   </Card>
                 )
@@ -2106,6 +2162,47 @@ ${settings.userProfile.aiContext}` : ''}`
         </AnimatePresence>,
         document.body
       )}
+
+      {/* Destructive confirmation sheet for permanent scan removal (PKT-20260420-008).
+          Slides up from the bottom — replaces the inline tap-to-arm pattern
+          with a clearer, less error-prone iOS-style action sheet. */}
+      <Sheet
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null) }}
+      >
+        <SheetContent side="bottom" className="rounded-t-3xl p-0">
+          <SheetHeader>
+            <SheetTitle>Remove this scan?</SheetTitle>
+            <SheetDescription>
+              {pendingDeleteItem?.productName
+                ? `"${pendingDeleteItem.productName}" and its photos will be deleted permanently. This cannot be undone.`
+                : 'This scan and its photos will be deleted permanently. This cannot be undone.'}
+            </SheetDescription>
+          </SheetHeader>
+          <SheetFooter>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!confirmDeleteId) return
+                haptics.notifSuccess()
+                onDeleteItem?.(confirmDeleteId)
+                setConfirmDeleteId(null)
+              }}
+              className="w-full h-11"
+            >
+              <Trash size={16} weight="bold" className="mr-1.5" />
+              Remove permanently
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmDeleteId(null)}
+              className="w-full h-11"
+            >
+              Cancel
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Rename dialog */}
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
