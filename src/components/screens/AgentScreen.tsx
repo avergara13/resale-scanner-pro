@@ -66,24 +66,24 @@ interface QuickAction {
 // can tweak the prompt before sending — never auto-sends.
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    icon: <Camera size={16} weight="bold" />,
-    label: 'Scan Item',
-    prompt: 'open camera to scan a new item',
-  },
-  {
-    icon: <Sparkle size={16} weight="bold" />,
-    label: 'Full Pipeline',
-    prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion',
+    icon: <ChartLine size={16} weight="bold" />,
+    label: '📊 Session Recap',
+    prompt: "Give me a full session recap: total scans today, BUY rate, potential profit, items still pending, and whether I'm on track for my profit goal.",
   },
   {
     icon: <Package size={16} weight="bold" />,
-    label: 'Need Shipping',
-    prompt: 'Which sold items need shipping labels right now? Show me overdue items first, then the best carrier and estimated cost for each.',
+    label: '📦 Ship Now',
+    prompt: 'Which sold items still need shipping labels? Show me the most urgent first, with the best carrier recommendation and estimated cost for each.',
   },
   {
-    icon: <ChartLine size={16} weight="bold" />,
-    label: 'Session Stats',
-    prompt: "What's my current session status? Show stats, profit goal progress, and recent items.",
+    icon: <TrendUp size={16} weight="bold" />,
+    label: '📈 Best Flips',
+    prompt: 'Which items in my queue have the highest estimated ROI? Rank them and tell me what to list first to maximize profit.',
+  },
+  {
+    icon: <Sparkle size={16} weight="bold" />,
+    label: '✨ Smart Picks',
+    prompt: "Based on my scan history and profit data, what types of items should I be targeting today? Give me 3–5 specific categories or brands with the best ROI potential.",
   },
 ]
 
