@@ -1457,11 +1457,11 @@ ${settings.userProfile.aiContext}` : ''}`
       />
 
       {/* ── Chrome: tab bar + stats bar — flex-shrink-0 keeps it out of scroll ── */}
-      <div className="flex-shrink-0 z-20 bg-fg">
+      <div className="flex-shrink-0 z-20 bg-bg">
         {/* Premium live session banner — shared component, self-contained */}
         <SessionLiveBanner />
-        <div className="pt-2 pb-2 border-b border-s1">
-          <div className="tab-bar px-3">
+        <div className="px-4 pt-2 pb-2 border-b border-s1">
+          <div className="tab-bar">
             <button
               onClick={() => setActiveTab('chat')}
               className={cn('tab-btn', activeTab === 'chat' && 'active')}
