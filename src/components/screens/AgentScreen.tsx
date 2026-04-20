@@ -43,7 +43,7 @@ import { cn } from '@/lib/utils'
 import { getNetProfit } from '@/lib/profit-utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
 import { haptics } from '@/lib/haptics'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -294,6 +294,11 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   // visualViewport-derived keyboard offset so the composer stays anchored above
   // the soft keyboard on iOS Safari. 0 when keyboard closed.
   const [keyboardOffset, setKeyboardOffset] = useState(0)
+  // Thinking indicator visibility — stays on for at least 600ms even if the
+  // response arrives faster, so the indicator doesn't flicker on cached hits.
+  const [showThinking, setShowThinking] = useState(false)
+  const thinkingShownAtRef = useRef(0)
+  const prefersReducedMotion = useReducedMotion()
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -408,6 +413,23 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       vv.removeEventListener('scroll', update)
     }
   }, [])
+
+  // Drive the thinking-indicator visibility with a 600ms minimum display.
+  // When isProcessing flips on, show immediately and stamp the start time.
+  // When it flips off, wait out any remaining time before hiding so cached
+  // responses don't cause a sub-100ms flash of the indicator.
+  useEffect(() => {
+    if (isProcessing) {
+      setShowThinking(true)
+      thinkingShownAtRef.current = Date.now()
+      return
+    }
+    if (!showThinking) return
+    const elapsed = Date.now() - thinkingShownAtRef.current
+    const remaining = Math.max(0, 600 - elapsed)
+    const t = setTimeout(() => setShowThinking(false), remaining)
+    return () => clearTimeout(t)
+  }, [isProcessing]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear pending tool calls whenever the user switches to a different chat session
   useEffect(() => {
@@ -1684,28 +1706,47 @@ ${settings.userProfile.aiContext}` : ''}`
                   </motion.div>
                 )}
 
-                {isProcessing && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex gap-2.5 items-end justify-start"
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0"
-                      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                {/* Option B thinking indicator (PKT-20260420-008): "Thinking..." +
+                    three 4px dots that pulse 0.3→1→0.3 on a 1.2s cycle with 200ms
+                    stagger. Minimum 600ms display so cached hits don't flash. For
+                    users with prefers-reduced-motion, dots stay static at 0.7. */}
+                <AnimatePresence>
+                  {showThinking && (
+                    <motion.div
+                      key="thinking"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex gap-2.5 items-end justify-start"
                     >
-                      <Robot size={16} weight="bold" className="text-white" />
-                    </div>
-                    <div className="bg-s1 border border-s2 rounded-[20px] rounded-bl-md px-4 py-3.5">
-                      <div className="flex gap-1.5 items-center">
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '160ms' }} />
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '320ms' }} />
+                      <div
+                        className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0"
+                        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                      >
+                        <Robot size={16} weight="bold" className="text-white" />
                       </div>
-                    </div>
-                  </motion.div>
-                )}
+                      <div className="bg-s1 border border-s2 rounded-[20px] rounded-bl-md px-4 py-3 flex items-center gap-2">
+                        <span className="text-[13px] font-medium text-t2">Thinking</span>
+                        <div className="flex gap-1 items-center">
+                          {[0, 1, 2].map((i) => (
+                            <motion.span
+                              key={i}
+                              className="w-1 h-1 rounded-full bg-t2"
+                              animate={prefersReducedMotion ? { opacity: 0.7 } : { opacity: [0.3, 1, 0.3] }}
+                              transition={prefersReducedMotion ? undefined : {
+                                duration: 1.2,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                                delay: i * 0.2,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <div ref={messagesEndRef} />
               </div>
