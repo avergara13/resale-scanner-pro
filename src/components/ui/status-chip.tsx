@@ -9,10 +9,12 @@ type StatusChipProps = ComponentProps<"span"> & {
 }
 
 const toneClassMap = {
-  info: "border-primary/15 bg-primary/12 text-primary",
-  success: "border-system-green/15 bg-system-green/12 text-system-green",
-  warning: "border-system-orange/15 bg-system-orange/12 text-system-orange",
-  danger: "border-destructive/15 bg-destructive/12 text-destructive",
+  // text-chip-label-* tokens darken 45% toward black in light mode for WCAG AA (≥4.5:1)
+  // contrast against the 12%-opacity tinted background; full color restored in dark mode.
+  info: "border-primary/15 bg-primary/12 text-chip-label-blue",
+  success: "border-system-green/15 bg-system-green/12 text-chip-label-green",
+  warning: "border-system-orange/15 bg-system-orange/12 text-chip-label-orange",
+  danger: "border-destructive/15 bg-destructive/12 text-chip-label-red",
   neutral: "border-border bg-system-fill text-secondary-label",
 } as const
 
