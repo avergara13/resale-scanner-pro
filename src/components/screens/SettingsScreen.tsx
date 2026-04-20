@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { SectionHeader } from '@/components/ui/section-header'
 import {
   Select,
   SelectContent,
@@ -32,7 +33,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, Target, ArrowCounterClockwise, Bug, CaretDown, CaretUp } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Info, Eye, EyeClosed, ClockCounterClockwise, ArrowCounterClockwise, Bug, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { DEBUG_LOG_KEY, type DebugEntry, type DebugLevel } from '@/lib/debug-log'
 import { ApiStatusIndicator } from '../ApiStatusIndicator'
 import { ConnectionHistoryPanel } from '../ConnectionHistoryPanel'
@@ -42,7 +43,7 @@ import { FalsePositiveAnalyzerPanel } from '../FalsePositiveAnalyzer'
 import { TagPresetsManager } from '../TagPresetsManager'
 import { CompressionAnalytics } from '../CompressionAnalytics'
 import { RetryConfigPanel } from '../RetryConfigPanel'
-import type { AppSettings, ItemTag } from '@/types'
+import type { AppSettings, ImageQualityPreset, ItemTag, UserProfile } from '@/types'
 
 interface SettingsScreenProps {
   settings: AppSettings
@@ -154,24 +155,19 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
   const hasKey = (key?: string) => key && key.length > 8
 
-  const getStatusIcon = (hasValue: boolean) => {
-    if (hasValue) return <CheckCircle className="text-green" weight="fill" />
-    return <XCircle className="text-s3" weight="fill" />
-  }
-
   const aiConfigured = !!(hasKey(settings.geminiApiKey) || hasKey(settings.openaiApiKey) || hasKey(settings.anthropicApiKey))
   const googleConfigured = !!hasKey(settings.googleApiKey)
   const ebayConfigured = !!(hasKey(settings.ebayApiKey) && hasKey(settings.ebayAppId))
   const supabaseConfigured = !!(hasKey(settings.supabaseUrl) && hasKey(settings.supabaseKey))
   const notionConfigured = !!hasKey(settings.notionApiKey)
+  const currentUserProfile: Partial<UserProfile> = settings.userProfile || {}
 
   return (
     <div
       id="scr-settings"
-      className="flex flex-col h-full overflow-y-auto overflow-x-hidden"
+      className="flex h-full flex-col overflow-x-hidden overflow-y-auto bg-system-grouped-background"
     >
-      {/* ── Status Bar ── */}
-      <div className="px-4 py-2 border-b border-s2 bg-fg">
+      <div className="material-chrome px-4 py-3 border-b border-separator">
         <div className="flex items-center gap-4 overflow-x-auto scrollbar-none">
           {([
             ['AI', aiConfigured],
@@ -180,25 +176,30 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             ['Database', supabaseConfigured],
             ['Notion', notionConfigured],
           ] as [string, boolean][]).map(([label, ok]) => (
-            <div key={label} className="flex items-center gap-1.5 flex-shrink-0">
-              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ok ? 'bg-green' : 'bg-s3'}`} />
-              <span className={`text-[11px] font-semibold ${ok ? 'text-t1' : 'text-t3'}`}>{label}</span>
-            </div>
+            <Badge
+              key={label}
+              variant="outline"
+              className={cn(
+                'min-h-7 px-3 text-footnote font-semibold flex-shrink-0',
+                ok
+                  ? 'border-system-green/20 bg-system-green/10 text-chip-label-green'
+                  : 'border-border bg-secondary-system-background text-secondary-label'
+              )}
+            >
+              {label}
+            </Badge>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 px-3 py-4">
-        <div className="space-y-3 pb-24 w-full max-w-full">
+      <div className="flex-1 px-4 py-4">
+        <div className="space-y-4 pb-24 w-full max-w-full">
 
-          {/* ═══════════ MY PROFILE — Device operator identity ═══════════ */}
-          <div className="border border-b1/20 rounded-lg px-3 py-3 bg-fg space-y-3">
-            <p className="text-sm font-semibold text-t1 uppercase tracking-wide flex items-center gap-2">
-              <span className="text-base">👤</span> My Profile
-            </p>
+          <SectionHeader title="Profile" />
+          <div className="settings-group px-4 py-4 space-y-4">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-[10px] text-t3 uppercase tracking-wider">Name</Label>
+                <Label className="text-footnote text-secondary-label uppercase tracking-wide">Name</Label>
                 <Input
                   value={settings.userProfile?.operatorName || ''}
                   onChange={(e) => {
@@ -209,33 +210,46 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     const existingId = settings.userProfile?.operatorName
                       ? settings.userProfile.operatorId
                       : undefined
-                    onUpdate({ userProfile: { ...settings.userProfile, operatorId: existingId || e.target.value.toLowerCase().replace(/\s+/g, '-').slice(0, 20), operatorName: e.target.value, operatorInitial: e.target.value.slice(0, 1).toUpperCase() || settings.userProfile?.operatorInitial || '' } as any })
+                    onUpdate({
+                      userProfile: {
+                        ...currentUserProfile,
+                        operatorId: existingId || e.target.value.toLowerCase().replace(/\s+/g, '-').slice(0, 20),
+                        operatorName: e.target.value,
+                        operatorInitial: e.target.value.slice(0, 1).toUpperCase() || settings.userProfile?.operatorInitial || '',
+                      } as UserProfile,
+                    })
                   }}
                   placeholder="Angel"
-                  className="h-8 text-sm mt-1"
+                  className="mt-1"
                 />
               </div>
               <div>
-                <Label className="text-[10px] text-t3 uppercase tracking-wider">Initials</Label>
+                <Label className="text-footnote text-secondary-label uppercase tracking-wide">Initials</Label>
                 <Input
                   value={settings.userProfile?.operatorInitial || ''}
-                  onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, operatorInitial: e.target.value.toUpperCase().slice(0, 3) } as any })}
+                  onChange={(e) =>
+                    onUpdate({
+                      userProfile: {
+                        ...currentUserProfile,
+                        operatorInitial: e.target.value.toUpperCase().slice(0, 3),
+                      } as UserProfile,
+                    })
+                  }
                   placeholder="AV"
                   maxLength={3}
-                  className="h-8 text-sm mt-1 uppercase"
+                  className="mt-1 uppercase"
                 />
               </div>
             </div>
-            {/* AI Context Notes — collapsible */}
             <div>
               <button
                 onClick={() => setAiContextExpanded(p => !p)}
-                className="w-full flex items-center justify-between"
+                className="flex w-full items-center justify-between rounded-2xl px-1 py-1 text-left"
               >
-                <Label className="text-[10px] text-t3 uppercase tracking-wider pointer-events-none">AI Context Notes</Label>
+                <Label className="pointer-events-none text-footnote text-secondary-label uppercase tracking-wide">AI Context Notes</Label>
                 <span className="flex items-center gap-1 text-t3">
                   {!aiContextExpanded && settings.userProfile?.aiContext && (
-                    <span className="text-[9px] text-t2 truncate max-w-[160px]">{settings.userProfile.aiContext}</span>
+                    <span className="max-w-[160px] truncate text-caption-1 text-secondary-label">{settings.userProfile.aiContext}</span>
                   )}
                   {aiContextExpanded ? <CaretUp size={10} weight="bold" /> : <CaretDown size={10} weight="bold" />}
                 </span>
@@ -244,42 +258,45 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 <div className="mt-1.5">
                   <textarea
                     value={settings.userProfile?.aiContext || ''}
-                    onChange={(e) => onUpdate({ userProfile: { ...settings.userProfile, aiContext: e.target.value } as any })}
+                    onChange={(e) =>
+                      onUpdate({
+                        userProfile: {
+                          ...currentUserProfile,
+                          aiContext: e.target.value,
+                        } as UserProfile,
+                      })
+                    }
                     placeholder="I focus on electronics and sneakers. Min 35% margin. Ship within 2 days."
                     rows={3}
                     autoFocus
-                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                    className="w-full rounded-2xl border border-input bg-card px-4 py-3 text-callout text-label placeholder:text-muted-foreground shadow-sm resize-none focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/25"
                   />
-                  <p className="text-[9px] text-t3 mt-1">Injected into every AI prompt — helps the agent give personalized advice</p>
+                  <p className="mt-1 text-caption-1 text-secondary-label">Injected into every AI prompt to personalize advice and workflow suggestions.</p>
                 </div>
               )}
             </div>
             {settings.userProfile?.operatorName && (
-              <p className="text-[10px] text-t3 flex items-center gap-1.5">
+              <p className="flex items-center gap-1.5 text-footnote text-secondary-label">
                 <span className="inline-block w-2 h-2 rounded-full bg-b1" />
                 Active as <strong className="text-t1">{settings.userProfile.operatorName}</strong>
-                {settings.userProfile.operatorInitial && <span className="text-[9px] text-b1 font-bold bg-b1/10 px-1.5 py-0.5 rounded">{settings.userProfile.operatorInitial}</span>}
+                {settings.userProfile.operatorInitial && <span className="rounded-full bg-b1/10 px-2 py-0.5 text-caption-1 font-bold text-b1">{settings.userProfile.operatorInitial}</span>}
               </p>
             )}
           </div>
 
-          <Accordion type="multiple" defaultValue={[]} className="space-y-3">
+          <Accordion type="multiple" defaultValue={[]} className="space-y-4">
 
             {/* ════════════════════════════════════════════════════════
                 SECTION 1 — CONNECTIONS (API Keys & Integrations)
                ════════════════════════════════════════════════════════ */}
-            <AccordionItem value="connections" className="border border-b1/20 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🔑 Connections
+            <AccordionItem value="connections" className="settings-group overflow-hidden px-0">
+              <AccordionTrigger className="px-4 py-3 text-headline font-semibold text-label hover:no-underline">
+                Connections
               </AccordionTrigger>
-              <AccordionContent className="space-y-6 pt-2 w-full max-w-full">
+              <AccordionContent className="space-y-6 px-4 pb-4 pt-1 w-full max-w-full">
 
-                {/* ── AI ── */}
                 <div className="space-y-4">
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${aiConfigured ? 'bg-green' : 'bg-s3'}`} />
-                    AI Model
-                  </p>
+                  <SectionHeader title="AI Model" detail={aiConfigured ? 'Configured' : 'Needs setup'} />
 
                   <div>
                     <Label htmlFor="ai-model" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
@@ -377,10 +394,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 {/* ── Google Cloud ── */}
                 <div className="space-y-4">
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${googleConfigured ? 'bg-green' : 'bg-s3'}`} />
-                    Google Cloud — Product Identification
-                  </p>
+                  <SectionHeader title="Google Cloud" detail={googleConfigured ? 'Configured' : 'Needs setup'} />
 
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -465,10 +479,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 {/* ── eBay ── */}
                 <div className="space-y-4">
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${ebayConfigured ? 'bg-green' : 'bg-s3'}`} />
-                    eBay — Market Pricing
-                  </p>
+                  <SectionHeader title="eBay" detail={ebayConfigured ? 'Configured' : 'Needs setup'} />
 
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -598,10 +609,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 {/* ── Database & Integrations ── */}
                 <div className="space-y-4">
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3 flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${supabaseConfigured ? 'bg-green' : 'bg-s3'}`} />
-                    Database & Integrations
-                  </p>
+                  <SectionHeader title="Database & Integrations" detail={supabaseConfigured ? 'Configured' : 'Needs setup'} />
 
                   <div>
                     <Label htmlFor="supabase-url" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
@@ -638,10 +646,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                   <Separator className="bg-s1" />
 
-                  <div className="flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${notionConfigured ? 'bg-green' : 'bg-s3'}`} />
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Notion</p>
-                  </div>
+                  <SectionHeader title="Notion" detail={notionConfigured ? 'Configured' : 'Needs setup'} />
 
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -683,7 +688,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                   <Separator className="bg-s1" />
 
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Automation</p>
+                  <SectionHeader title="Automation" />
 
                   <div>
                     <Label htmlFor="n8n-webhook" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
@@ -706,11 +711,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             {/* ════════════════════════════════════════════════════════
                 SECTION 2 — BUSINESS RULES
                ════════════════════════════════════════════════════════ */}
-            <AccordionItem value="business" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                💰 Business Rules
+            <AccordionItem value="business" className="settings-group overflow-hidden px-0">
+              <AccordionTrigger className="px-4 py-3 text-headline font-semibold text-label hover:no-underline">
+                Business Rules
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
+              <AccordionContent className="space-y-4 px-4 pb-4 pt-1 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <p className="text-xs text-t2 leading-relaxed">
                     These values drive BUY/PASS decisions and profit calculations on every scan.
@@ -804,16 +809,16 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             {/* ════════════════════════════════════════════════════════
                 SECTION 3 — PREFERENCES (Features + Theme + Image)
                ════════════════════════════════════════════════════════ */}
-            <AccordionItem value="preferences" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🎛️ Preferences
+            <AccordionItem value="preferences" className="settings-group overflow-hidden px-0">
+              <AccordionTrigger className="px-4 py-3 text-headline font-semibold text-label hover:no-underline">
+                Preferences
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
+              <AccordionContent className="space-y-5 px-4 pb-4 pt-1 w-full max-w-full">
 
-                {/* Feature Toggles */}
-                <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Features</p>
+                <SectionHeader title="Features" />
 
-                <div className="flex items-center justify-between py-1.5">
+                <div className="settings-group settings-row-divider overflow-hidden">
+                <div className="flex min-h-11 items-center justify-between px-4 py-3">
                   <div>
                     <Label htmlFor="agentic-mode" className="text-sm text-t1 font-medium">Agentic Mode</Label>
                     <p className="text-xs text-t2 mt-0.5">AI agents assist throughout workflow</p>
@@ -821,7 +826,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   <Switch id="agentic-mode" checked={settings.agenticMode} onCheckedChange={(checked) => onUpdate({ agenticMode: checked })} />
                 </div>
 
-                <div className="flex items-center justify-between py-1.5">
+                <div className="flex min-h-11 items-center justify-between px-4 py-3">
                   <div>
                     <Label htmlFor="live-search" className="text-sm text-t1 font-medium">Live Search</Label>
                     <p className="text-xs text-t2 mt-0.5">Real-time Google Search & Maps data</p>
@@ -829,7 +834,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   <Switch id="live-search" checked={settings.liveSearchEnabled} onCheckedChange={(checked) => onUpdate({ liveSearchEnabled: checked })} />
                 </div>
 
-                <div className="flex items-center justify-between py-1.5">
+                <div className="flex min-h-11 items-center justify-between px-4 py-3">
                   <div>
                     <Label htmlFor="lens-in-batch" className="text-sm text-t1 font-medium">Google Lens in Batch</Label>
                     <p className="text-xs text-t2 mt-0.5">Run visual search during batch analysis</p>
@@ -837,7 +842,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   <Switch id="lens-in-batch" checked={settings.enableLensInBatch !== false} onCheckedChange={(checked) => onUpdate({ enableLensInBatch: checked })} />
                 </div>
 
-                <div className="flex items-center justify-between py-1.5">
+                <div className="flex min-h-11 items-center justify-between px-4 py-3">
                   <div>
                     <Label htmlFor="lens-confidence" className="text-sm text-t1 font-medium">Lens Skip Confidence</Label>
                     <p className="text-xs text-t2 mt-0.5">Skip Lens when AI confidence exceeds (0–1)</p>
@@ -850,11 +855,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                     step={0.05}
                     value={settings.lensSkipConfidence ?? 0.85}
                     onChange={(e) => onUpdate({ lensSkipConfidence: parseFloat(e.target.value) || 0.85 })}
-                    className="w-20 h-8 text-sm text-right"
+                    className="w-24 text-right"
                   />
                 </div>
 
-                <div className="flex items-center justify-between py-1.5">
+                <div className="flex min-h-11 items-center justify-between px-4 py-3">
                   <div>
                     <Label htmlFor="voice-enabled" className="text-sm text-t1 font-medium">Voice Input</Label>
                     <p className="text-xs text-t2 mt-0.5">Voice commands and dictation</p>
@@ -862,7 +867,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   <Switch id="voice-enabled" checked={settings.voiceEnabled} onCheckedChange={(checked) => onUpdate({ voiceEnabled: checked })} />
                 </div>
 
-                <div className="flex items-center justify-between py-1.5">
+                <div className="flex min-h-11 items-center justify-between px-4 py-3">
                   <div>
                     <Label htmlFor="auto-capture" className="text-sm text-t1 font-medium">Auto-Capture</Label>
                     <p className="text-xs text-t2 mt-0.5">Analyze immediately after photo</p>
@@ -870,18 +875,18 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   <Switch id="auto-capture" checked={settings.autoCapture} onCheckedChange={(checked) => onUpdate({ autoCapture: checked })} />
                 </div>
 
-                <div className="flex items-center justify-between py-1.5">
+                <div className="flex min-h-11 items-center justify-between px-4 py-3">
                   <div>
                     <Label htmlFor="api-notifications" className="text-sm text-t1 font-medium">API Connection Alerts</Label>
                     <p className="text-xs text-t2 mt-0.5">Show alerts when APIs go offline</p>
                   </div>
                   <Switch id="api-notifications" checked={settings.apiNotificationsEnabled || false} onCheckedChange={(checked) => onUpdate({ apiNotificationsEnabled: checked })} />
                 </div>
+                </div>
 
                 <Separator className="bg-s2" />
 
-                {/* Theme */}
-                <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Appearance</p>
+                <SectionHeader title="Appearance" />
 
                 <div className="space-y-3">
                   <div>
@@ -920,13 +925,12 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <Separator className="bg-s2" />
 
-                {/* Image Quality */}
-                <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Image Quality</p>
+                <SectionHeader title="Image Quality" />
 
                 <div className="space-y-3">
                   <Select
                     value={settings.imageQuality?.preset || 'balanced'}
-                    onValueChange={(value) => onUpdate({ imageQuality: { preset: value as any } })}
+                    onValueChange={(value) => onUpdate({ imageQuality: { preset: value as ImageQualityPreset } })}
                   >
                     <SelectTrigger id="image-quality-preset" className="w-full">
                       <SelectValue />
@@ -967,8 +971,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
 
                 <Separator className="bg-s2" />
 
-                {/* Compression Analytics */}
-                <p className="text-[11px] font-bold uppercase tracking-widest text-t3">Compression Analytics</p>
+                <SectionHeader title="Compression Analytics" />
                 <CompressionAnalytics />
               </AccordionContent>
             </AccordionItem>
@@ -976,11 +979,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             {/* ════════════════════════════════════════════════════════
                 SECTION 4 — TAG PRESETS
                ════════════════════════════════════════════════════════ */}
-            <AccordionItem value="tags" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                🏷️ Tag Presets
+            <AccordionItem value="tags" className="settings-group overflow-hidden px-0">
+              <AccordionTrigger className="px-4 py-3 text-headline font-semibold text-label hover:no-underline">
+                Tag Presets
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-2 w-full max-w-full">
+              <AccordionContent className="space-y-4 px-4 pb-4 pt-1 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <p className="text-xs text-t2 leading-relaxed">
                     Create preset tag collections for common product categories. Apply presets quickly when editing items in the queue.
@@ -998,11 +1001,11 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
             {/* ════════════════════════════════════════════════════════
                 SECTION 5 — DIAGNOSTICS (All monitoring panels)
                ════════════════════════════════════════════════════════ */}
-            <AccordionItem value="diagnostics" className="border border-s2 rounded-lg px-3 bg-fg">
-              <AccordionTrigger className="text-sm font-semibold text-t1 uppercase tracking-wide hover:no-underline">
-                📡 Diagnostics
+            <AccordionItem value="diagnostics" className="settings-group overflow-hidden px-0">
+              <AccordionTrigger className="px-4 py-3 text-headline font-semibold text-label hover:no-underline">
+                Diagnostics
               </AccordionTrigger>
-              <AccordionContent className="space-y-3 pt-2 w-full max-w-full">
+              <AccordionContent className="space-y-3 px-4 pb-4 pt-1 w-full max-w-full">
                 <div className="p-3 bg-s1 border border-s2 rounded-md">
                   <p className="text-xs text-t2 leading-relaxed">
                     Monitor API health, connection history, retry policies, incident logs, and detection accuracy.
@@ -1012,7 +1015,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 <Accordion type="multiple" defaultValue={[]} className="space-y-2">
 
                   {/* Health */}
-                  <AccordionItem value="health" className="border border-green/20 rounded-lg px-3 bg-fg">
+                  <AccordionItem value="health" className="settings-group overflow-hidden px-0">
                     <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
@@ -1025,7 +1028,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   </AccordionItem>
 
                   {/* Connection History */}
-                  <AccordionItem value="history" className="border border-s2 rounded-lg px-3 bg-fg">
+                  <AccordionItem value="history" className="settings-group overflow-hidden px-0">
                     <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
                       📊 Connection History
                     </AccordionTrigger>
@@ -1035,7 +1038,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   </AccordionItem>
 
                   {/* Retry Config */}
-                  <AccordionItem value="retry" className="border border-s2 rounded-lg px-3 bg-fg">
+                  <AccordionItem value="retry" className="settings-group overflow-hidden px-0">
                     <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
                       🔄 Retry Configuration
                     </AccordionTrigger>
@@ -1045,7 +1048,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   </AccordionItem>
 
                   {/* Incidents */}
-                  <AccordionItem value="incidents" className="border border-s2 rounded-lg px-3 bg-fg">
+                  <AccordionItem value="incidents" className="settings-group overflow-hidden px-0">
                     <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
                       🚨 Incident Logs
                     </AccordionTrigger>
@@ -1055,7 +1058,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   </AccordionItem>
 
                   {/* Detection History */}
-                  <AccordionItem value="detection" className="border border-s2 rounded-lg px-3 bg-fg">
+                  <AccordionItem value="detection" className="settings-group overflow-hidden px-0">
                     <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
                       📸 Detection History
                     </AccordionTrigger>
@@ -1065,7 +1068,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   </AccordionItem>
 
                   {/* False Positive Analysis */}
-                  <AccordionItem value="false-positives" className="border border-s2 rounded-lg px-3 bg-fg">
+                  <AccordionItem value="false-positives" className="settings-group overflow-hidden px-0">
                     <AccordionTrigger className="text-xs font-semibold text-t1 uppercase tracking-wide hover:no-underline py-2.5">
                       🎯 False Positive Analysis
                     </AccordionTrigger>
@@ -1081,7 +1084,8 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
           </Accordion>
 
           {/* ── Activity + Debug Console ── */}
-          <div className="rounded-2xl border border-s2 bg-fg overflow-hidden">
+          <SectionHeader title="Activity & Debug" />
+          <div className="settings-group overflow-hidden">
             {/* Tab bar */}
             <div className="flex border-b border-s2">
               <button

@@ -1,7 +1,9 @@
-import { ChartBar, Stack, Tag, Robot, Camera } from '@phosphor-icons/react'
+import type { LucideIcon } from 'lucide-react'
+import { BarChart3, Camera, Layers3, Receipt, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Screen } from '@/types'
 import type { CaptureState } from '@/hooks/use-capture-state'
+import { haptics } from '@/lib/haptics'
 
 interface BottomNavProps {
   currentScreen: Screen
@@ -13,28 +15,37 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureState = 'idle', sessionMode = false }: BottomNavProps) {
-  const leftItems: Array<{ id: Screen; icon: any; label: string }> = [
-    { id: 'session', icon: ChartBar, label: 'Session' },
-    { id: 'agent', icon: Robot, label: 'Agent' },
+  const leftItems: Array<{ id: Screen; icon: LucideIcon; label: string }> = [
+    { id: 'session', icon: BarChart3, label: 'Session' },
+    { id: 'agent', icon: Sparkles, label: 'Agent' },
   ]
-  const rightItems: Array<{ id: Screen; icon: any; label: string }> = [
-    { id: 'queue', icon: Stack, label: 'Listings' },
-    { id: 'sold', icon: Tag, label: 'Sold' },
+  const rightItems: Array<{ id: Screen; icon: LucideIcon; label: string }> = [
+    { id: 'queue', icon: Layers3, label: 'Listings' },
+    { id: 'sold', icon: Receipt, label: 'Sold' },
   ]
+
+  const handleNavigate = (screen: Screen, disabled: boolean) => {
+    if (disabled) {
+      return
+    }
+
+    if (screen !== currentScreen) {
+      haptics.selection()
+    }
+
+    onNavigate(screen)
+  }
 
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-0 left-0 right-0 z-40 bg-system-background/88 backdrop-blur-xl border-t border-separator"
+      className="material-chrome safe-area-x fixed bottom-0 left-0 right-0 z-40 border-t border-separator"
       style={{
         paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 4px)',
-        paddingLeft: 'env(safe-area-inset-left, 0px)',
-        paddingRight: 'env(safe-area-inset-right, 0px)',
         borderRadius: '20px 20px 0 0',
         boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.12)',
       }}
     >
-      {/* 5-column grid — each slot is exactly 1/5 of the nav width, pixel-perfect on every iPhone */}
       <div
         className="h-[52px]"
         style={{
@@ -54,11 +65,11 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
           return (
             <button
               key={item.id}
-              onClick={() => !isDisabled && onNavigate(item.id)}
+              onClick={() => handleNavigate(item.id, isDisabled)}
               disabled={isDisabled}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200',
-                !isDisabled && 'active:scale-90',
+                'relative flex min-h-[49px] flex-col items-center justify-center gap-0.5 transition-all duration-fast ease-spring',
+                !isDisabled && 'active:scale-[0.96]',
                 isActive ? 'text-system-blue' : 'text-tertiary-label',
                 isDisabled && 'opacity-20 cursor-default'
               )}
@@ -69,24 +80,23 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               }}
             >
               <Icon
-                size={22}
-                weight={isActive ? 'fill' : 'regular'}
-                className="transition-all duration-200"
+                size={24}
+                strokeWidth={2}
+                className={cn(
+                  'transition-transform duration-fast ease-spring',
+                  isActive && 'scale-110'
+                )}
               />
               <span className={cn(
-                'text-[10px] leading-none tracking-tight transition-all duration-200',
-                isActive ? 'font-semibold opacity-100' : 'font-medium opacity-55'
+                'overflow-hidden text-caption-1 leading-none transition-all duration-fast ease-spring',
+                isActive ? 'max-h-4 opacity-100 font-semibold' : 'max-h-0 opacity-0'
               )}>
                 {item.label}
               </span>
-              {isActive && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-system-blue" />
-              )}
             </button>
           )
         })}
 
-        {/* Camera — center column, perfectly flush in the bar */}
         <button
           onClick={onCameraOpen}
           className={cn(
@@ -103,7 +113,7 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
             WebkitTapHighlightColor: 'transparent'
           }}
         >
-          <Camera size={20} weight="bold" className="text-white relative z-10" />
+          <Camera size={20} strokeWidth={2.5} className="text-white relative z-10" />
         </button>
 
         {rightItems.map((item) => {
@@ -115,11 +125,11 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
           return (
             <button
               key={item.id}
-              onClick={() => !isDisabled && onNavigate(item.id)}
+              onClick={() => handleNavigate(item.id, isDisabled)}
               disabled={isDisabled}
               className={cn(
-                'relative flex flex-col items-center justify-center gap-[3px] transition-all duration-200',
-                !isDisabled && 'active:scale-90',
+                'relative flex min-h-[49px] flex-col items-center justify-center gap-0.5 transition-all duration-fast ease-spring',
+                !isDisabled && 'active:scale-[0.96]',
                 isActive ? 'text-system-blue' : 'text-tertiary-label',
                 isDisabled && 'opacity-20 cursor-default'
               )}
@@ -130,19 +140,19 @@ export function BottomNav({ currentScreen, onNavigate, onCameraOpen, captureStat
               }}
             >
               <Icon
-                size={22}
-                weight={isActive ? 'fill' : 'regular'}
-                className="transition-all duration-200"
+                size={24}
+                strokeWidth={2}
+                className={cn(
+                  'transition-transform duration-fast ease-spring',
+                  isActive && 'scale-110'
+                )}
               />
               <span className={cn(
-                'text-[10px] leading-none tracking-tight transition-all duration-200',
-                isActive ? 'font-semibold opacity-100' : 'font-medium opacity-55'
+                'overflow-hidden text-caption-1 leading-none transition-all duration-fast ease-spring',
+                isActive ? 'max-h-4 opacity-100 font-semibold' : 'max-h-0 opacity-0'
               )}>
                 {item.label}
               </span>
-              {isActive && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-system-blue" />
-              )}
             </button>
           )
         })}

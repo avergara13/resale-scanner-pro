@@ -425,12 +425,11 @@ export function AIScreen({
                         <div
                           key={p.platform}
                           className={cn(
-                            'relative rounded-xl px-2 py-2 border text-left',
+                            'relative rounded-xl px-2 py-2 border text-left material-thin',
                             p.recommended
                               ? 'border-green/30 bg-green/5'
                               : 'border-s2/60 bg-fg/5'
                           )}
-                          style={{ backdropFilter: 'blur(8px)' }}
                         >
                           {p.recommended && (
                             <span className="absolute top-1 right-1 text-[7px] font-black text-green tracking-wide uppercase">BEST</span>
@@ -473,22 +472,19 @@ export function AIScreen({
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
-                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
-                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
+                        <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
                           <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Buy Price</p>
                           <p className="text-base sm:text-lg font-mono font-bold text-t1">
                             ${currentItem.purchasePrice.toFixed(2)}
                           </p>
                         </div>
-                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
-                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
+                        <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
                           <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Sell Price</p>
                           <p className="text-base sm:text-lg font-mono font-bold text-t1">
                             ${currentItem.estimatedSellPrice?.toFixed(2) || '--'}
                           </p>
                         </div>
-                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
-                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
+                        <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
                           <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
                           <p
                             className={cn(
@@ -503,8 +499,7 @@ export function AIScreen({
                             {currentItem.profitMargin?.toFixed(1) || '--'}%
                           </p>
                         </div>
-                        <div className="p-2.5 sm:p-3 rounded-lg border border-s2/60"
-                          style={{ background: 'color-mix(in oklch, var(--bg) 85%, transparent)' }}>
+                        <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
                           <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
                           <p className="text-base sm:text-lg font-mono font-bold text-t1">
                             {currentItem.profitMargin != null && currentItem.estimatedSellPrice
@@ -969,8 +964,7 @@ export function AIScreen({
                 <Button
                   onClick={handleAddToQueue}
                   disabled={!canSaveDraft || decision === 'PENDING'}
-                  className="flex-1 h-11 rounded-xl text-white font-bold shadow-sm shadow-green/20 disabled:opacity-40 disabled:cursor-not-allowed text-sm active:scale-[0.97] transition-all"
-                  style={{ background: 'linear-gradient(135deg, var(--green) 0%, color-mix(in oklch, var(--green) 80%, var(--b1)) 100%)' }}
+                  className="flex-1 h-11 rounded-xl border border-system-green/20 bg-system-green text-white font-bold shadow-sm shadow-green/20 disabled:opacity-40 disabled:cursor-not-allowed text-sm active:scale-[0.97] transition-all hover:bg-system-green/90"
                 >
                   <ShoppingCart size={16} weight="bold" className="mr-2" />
                   Add to Queue
