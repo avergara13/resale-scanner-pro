@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { ArrowLeft, Star, X, Image, ArrowsClockwise } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -287,11 +288,11 @@ export function PhotoManager({
         {/* Photo grid */}
         <div className="px-4 pt-4 pb-2">
           {slots.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-xl border-2 border-dashed border-s2/60">
-              <Image size={36} weight="thin" className="text-t3" />
-              <p className="text-sm text-t3">No photos yet</p>
-              <p className="text-xs text-t3/70">Add photos using the buttons below</p>
-            </div>
+            <EmptyState
+              icon={<Image weight="thin" />}
+              title="No photos yet"
+              description="Add photos using the buttons below"
+            />
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {slots.map((slot, idx) => (
