@@ -113,7 +113,7 @@ export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanH
 
   return (
     <div className="flex flex-col h-full bg-bg">
-      <div className="px-4 pt-3 pb-3 border-b border-s2 bg-fg">
+      <div className="px-4 pt-3 pb-3 border-b border-s1 bg-bg">
         {/* Filter tabs + Clear All — uses shared .tab-bar/.tab-btn for consistency */}
         <div className="flex items-center gap-2">
           <div className="tab-bar flex-1">
@@ -123,7 +123,7 @@ export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanH
                 onClick={() => setFilter(f)}
                 className={cn('tab-btn', filter === f && 'active')}
               >
-                {f === 'all' ? `All (${sessionScopedHistory.length})` : f}
+                {f === 'all' ? `All (${sessionScopedHistory.length})` : f === 'BUY' ? '✅ BUY' : f === 'MAYBE' ? '🤔 MAYBE' : f === 'PASS' ? '❌ PASS' : '⏳ PENDING'}
               </button>
             ))}
           </div>
