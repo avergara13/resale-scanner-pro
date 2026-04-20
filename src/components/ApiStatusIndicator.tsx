@@ -80,7 +80,7 @@ export function ApiStatusIndicator({
         <button
           onClick={() => !isChecking && checkHealth()}
           disabled={isChecking}
-          className="flex items-center gap-1.5 group cursor-pointer disabled:cursor-wait"
+          className="material-thin flex min-h-9 items-center gap-2 rounded-full border border-separator/70 px-2.5 py-1.5 group cursor-pointer disabled:cursor-wait"
           title={`Overall Status: ${getStatusText(health.overall)} - Click to refresh`}
         >
           <div className="flex items-center gap-1">
@@ -127,13 +127,13 @@ export function ApiStatusIndicator({
             />
           </div>
           {liveUpdates && (
-            <Pulse size={10} weight="fill" className="text-green animate-pulse opacity-60" />
+            <Pulse size={10} weight="fill" className="text-system-green animate-pulse opacity-60" />
           )}
         </button>
         {hasRetries && (
-          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-amber/10 rounded-md" title={`${activeRetries.length} active retries`}>
-            <ArrowClockwise size={10} weight="bold" className="text-amber animate-spin" />
-            <span className="text-[9px] font-bold text-amber">{activeRetries.length}</span>
+          <div className="inline-flex min-h-7 items-center gap-1 rounded-full border border-system-orange/15 bg-system-orange/10 px-2 py-1" title={`${activeRetries.length} active retries`}>
+            <ArrowClockwise size={11} weight="bold" className="text-chip-label-orange animate-spin" />
+            <span className="text-caption-1 font-semibold text-chip-label-orange">{activeRetries.length}</span>
           </div>
         )}
       </div>
@@ -141,14 +141,14 @@ export function ApiStatusIndicator({
   }
 
   return (
-    <div className="bg-s1 border border-s2 rounded-lg p-3 space-y-2">
+    <div className="material-thin space-y-3 rounded-2xl border border-separator/70 p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-xs font-bold uppercase tracking-wide text-s4">Connection Health</h3>
+          <h3 className="text-footnote font-semibold uppercase tracking-[0.12em] text-secondary-label">Connection Health</h3>
           {liveUpdates && (
             <div className="flex items-center gap-1">
-              <Pulse size={8} weight="fill" className="text-green animate-pulse" />
-              <span className="text-[9px] text-s3 uppercase tracking-wide">LIVE</span>
+              <Pulse size={8} weight="fill" className="text-system-green animate-pulse" />
+              <span className="text-caption-1 uppercase tracking-[0.14em] text-secondary-label">Live</span>
             </div>
           )}
         </div>
@@ -204,12 +204,12 @@ export function ApiStatusIndicator({
       </div>
 
       {health.lastUpdate && (
-        <div className="pt-2 border-t border-s2 flex items-center justify-between">
-          <p className="text-[9px] text-s3 uppercase tracking-wide">
+        <div className="flex items-center justify-between border-t border-separator/70 pt-3">
+          <p className="text-caption-1 uppercase tracking-[0.12em] text-secondary-label">
             Last checked: {new Date(health.lastUpdate).toLocaleTimeString()}
           </p>
           {checkInterval && (
-            <p className="text-[9px] text-s3 font-mono">
+            <p className="text-caption-1 font-mono text-secondary-label">
               Every {Math.round(checkInterval / 1000)}s
             </p>
           )}
@@ -237,20 +237,20 @@ function ServiceStatusRow({
   error,
 }: ServiceStatusRowProps) {
   return (
-    <div className="flex items-center justify-between gap-2 group min-w-0">
+    <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-separator/55 bg-system-fill/35 px-3 py-2">
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {getStatusIcon(status, 14)}
         <div className="flex flex-col gap-0.5 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium">{name}</span>
+            <span className="text-subheadline font-medium text-label">{name}</span>
             {critical && (
-              <span className="text-[8px] px-1 py-0.5 bg-red/10 text-red rounded uppercase tracking-wide font-bold">
+              <span className="rounded-full border border-system-red/15 bg-system-red/10 px-2 py-0.5 text-caption-2 font-bold uppercase tracking-[0.14em] text-chip-label-red">
                 Critical
               </span>
             )}
           </div>
           {error && status === 'offline' && (
-            <span className="text-[9px] text-red/80 font-mono truncate">{error}</span>
+            <span className="truncate font-mono text-caption-1 text-chip-label-red">{error}</span>
           )}
         </div>
       </div>
@@ -258,8 +258,8 @@ function ServiceStatusRow({
         {latency !== undefined && status !== 'offline' && (
           <span
             className={cn(
-              'text-[10px] font-mono px-1.5 py-0.5 rounded',
-              latency < 1000 ? 'bg-green/10 text-green' : 'bg-amber/10 text-amber'
+              'rounded-full px-2 py-1 text-caption-1 font-mono',
+              latency < 1000 ? 'bg-green/10 text-chip-label-green' : 'bg-amber/10 text-chip-label-orange'
             )}
           >
             {latency}ms
@@ -267,11 +267,11 @@ function ServiceStatusRow({
         )}
         <span
           className={cn(
-            'text-[10px] font-mono uppercase tracking-wide min-w-[42px] text-right',
-            status === 'healthy' && 'text-green',
-            status === 'degraded' && 'text-amber',
+            'min-w-[48px] text-right font-mono text-caption-1 uppercase tracking-[0.12em]',
+            status === 'healthy' && 'text-chip-label-green',
+            status === 'degraded' && 'text-chip-label-orange',
             status === 'checking' && 'text-s3',
-            status === 'offline' && 'text-red'
+            status === 'offline' && 'text-chip-label-red'
           )}
         >
           {getStatusText(status)}
