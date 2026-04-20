@@ -452,10 +452,7 @@ export function AIScreen({
               {/* ── 1. Quick Summary — only when we have real pricing data ── */}
               {hasDecision && currentItem && hasPriceData && (
                 <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
-                  <Card
-                    className="mt-3 sm:mt-4 p-3 sm:p-4 border-s2/60 overflow-hidden"
-                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-                  >
+                  <Card className="mt-3 sm:mt-4 p-3 sm:p-4 border-s2/60 overflow-hidden material-thin">
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
@@ -524,10 +521,7 @@ export function AIScreen({
               {/* ── 2. Listing draft form — always visible once pipeline is done ── */}
               {pipelineComplete && !listingAdded && (
                 <Collapsible open={formOpen} onOpenChange={setFormOpen}>
-                  <Card
-                    className="mt-3 p-3 sm:p-4 border-s2/60"
-                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-                  >
+                  <Card className="mt-3 p-3 sm:p-4 border-s2/60 material-thin">
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
@@ -783,10 +777,7 @@ export function AIScreen({
               {/* ── 3. Photos — collapsible multi-photo strip ── */}
               {(currentItem?.imageData || currentItem?.imageThumbnail) && (
                 <Collapsible open={imageOpen} onOpenChange={setImageOpen}>
-                  <Card
-                    className="mt-3 sm:mt-4 p-3 sm:p-4 border-s2/60 overflow-hidden"
-                    style={{ background: 'color-mix(in oklch, var(--fg) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-                  >
+                  <Card className="mt-3 sm:mt-4 p-3 sm:p-4 border-s2/60 overflow-hidden material-thin">
                     <CollapsibleTrigger className="w-full">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
