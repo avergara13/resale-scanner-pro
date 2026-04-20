@@ -476,7 +476,8 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       }
     }
     prevMessageCount.current = chatMessages.length
-  }, [chatMessages])
+    // pullToRefresh.containerRef is a stable ref — only chatMessages should retrigger.
+  }, [chatMessages]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track visualViewport to anchor the composer above the soft keyboard.
   // iOS Safari shrinks window.visualViewport.height when the keyboard opens;
