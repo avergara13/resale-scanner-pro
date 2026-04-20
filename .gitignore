@@ -35,3 +35,4 @@ pids
 
 .claude/worktrees/
 .claude/**/settings.local.json
+output/
