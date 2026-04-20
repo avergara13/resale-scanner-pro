@@ -114,20 +114,19 @@ export function ScanHistoryScreen({ onBack, onSaveAsDraft, sessionId, scanHistor
   return (
     <div className="flex flex-col h-full bg-bg">
       <div className="px-4 pt-3 pb-3 border-b border-s2 bg-fg">
-        {/* Filter tabs + Clear All */}
-        <div className="flex items-center gap-1.5">
-          {(['all', 'BUY', 'MAYBE', 'PASS', 'PENDING'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={cn(
-                'flex-1 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all',
-                filter === f ? 'bg-b1 text-white' : 'bg-s1 text-t3'
-              )}
-            >
-              {f === 'all' ? `All (${sessionScopedHistory.length})` : f}
-            </button>
-          ))}
+        {/* Filter tabs + Clear All — uses shared .tab-bar/.tab-btn for consistency */}
+        <div className="flex items-center gap-2">
+          <div className="tab-bar flex-1">
+            {(['all', 'BUY', 'MAYBE', 'PASS', 'PENDING'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={cn('tab-btn', filter === f && 'active')}
+              >
+                {f === 'all' ? `All (${sessionScopedHistory.length})` : f}
+              </button>
+            ))}
+          </div>
           {sessionScopedHistory.length > 0 && (
             <Button
               variant="ghost"

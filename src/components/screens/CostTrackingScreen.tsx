@@ -56,16 +56,13 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId 
       <div className="flex-1 overflow-y-auto pb-24">
         <div className="px-4 pt-4 space-y-4">
 
-          {/* Period selector */}
-          <div className="flex gap-1 bg-s1 p-1 rounded-xl">
+          {/* Period selector — shared .tab-bar/.tab-btn */}
+          <div className="tab-bar">
             {(['today', 'week', 'month', 'all'] as Period[]).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={cn(
-                  'flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all',
-                  period === p ? 'bg-fg text-t1 shadow-sm' : 'text-t3 hover:text-t2'
-                )}
+                className={cn('tab-btn', period === p && 'active')}
               >
                 {p === 'all' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
               </button>
