@@ -42,7 +42,8 @@ import { useDeviceId } from '@/hooks/use-device-id'
 import { cn } from '@/lib/utils'
 import { getNetProfit } from '@/lib/profit-utils'
 import { callLLM, researchProduct } from '@/lib/llm-service'
-import { motion, AnimatePresence } from 'framer-motion'
+import { haptics } from '@/lib/haptics'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,32 +57,42 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from '@/components/ui/sheet'
 import type { ChatSession, ChatMessage, ScannedItem, AppSettings, Session, ProfitGoal, SharedTodo, AgentToolCall, SoldItem } from '@/types'
 
 interface QuickAction {
-  emoji: string
+  icon: React.ReactNode
   label: string
   prompt: string
 }
 
+// Icon-backed pills (PKT-20260420-008). Tap prefills the composer so the user
+// can tweak the prompt before sending — never auto-sends.
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    emoji: '📸',
+    icon: <Camera size={16} weight="bold" />,
     label: 'Scan Item',
     prompt: 'open camera to scan a new item',
   },
   {
-    emoji: '🚀',
+    icon: <Sparkle size={16} weight="bold" />,
     label: 'Full Pipeline',
     prompt: 'Run full pipeline: analyze all drafts, optimize BUY listings, and push to Notion',
   },
   {
-    emoji: '📬',
+    icon: <Package size={16} weight="bold" />,
     label: 'Need Shipping',
     prompt: 'Which sold items need shipping labels right now? Show me overdue items first, then the best carrier and estimated cost for each.',
   },
   {
-    emoji: '📊',
+    icon: <ChartLine size={16} weight="bold" />,
     label: 'Session Stats',
     prompt: "What's my current session status? Show stats, profit goal progress, and recent items.",
   },
@@ -123,6 +134,27 @@ function describeToolCall(call: AgentToolCall, items?: ScannedItem[]): string {
     case 'mark_shipped': return `Mark shipped: ${name}${call.trackingNumber ? ` — tracking ${call.trackingNumber}` : ''}`
     case 'add_remove_from_queue': return call.queueAction === 'remove' ? `Remove from queue: ${name}` : `Add to queue: ${name}`
     default: return call.tool
+  }
+}
+
+// Icon per tool for the pending-action trust chips (PKT-20260420-008). Giving
+// each pending action a recognizable icon makes it easier for the user to scan
+// the list and confirm at a glance.
+function toolCallIcon(call: AgentToolCall) {
+  switch (call.tool) {
+    case 'rerun_pipeline': return <ArrowClockwise size={14} weight="bold" />
+    case 'create_listing': return <Stack size={14} weight="bold" />
+    case 'update_item': return <PencilSimple size={14} weight="bold" />
+    case 'batch_analyze_queue': return <Stack size={14} weight="bold" />
+    case 'add_task': return <Plus size={14} weight="bold" />
+    case 'complete_task': return <Check size={14} weight="bold" />
+    case 'clear_tasks': return <Trash size={14} weight="bold" />
+    case 'mark_as_sold': return <ShoppingCart size={14} weight="bold" />
+    case 'mark_shipped': return <Package size={14} weight="bold" />
+    case 'add_remove_from_queue': return call.queueAction === 'remove'
+      ? <X size={14} weight="bold" />
+      : <Plus size={14} weight="bold" />
+    default: return <Sparkle size={14} weight="bold" />
   }
 }
 
@@ -288,6 +320,14 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
   const [viewMode, setViewMode] = useState<'list' | 'chat'>('list')
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  // visualViewport-derived keyboard offset so the composer stays anchored above
+  // the soft keyboard on iOS Safari. 0 when keyboard closed.
+  const [keyboardOffset, setKeyboardOffset] = useState(0)
+  // Thinking indicator visibility — stays on for at least 600ms even if the
+  // response arrives faster, so the indicator doesn't flicker on cached hits.
+  const [showThinking, setShowThinking] = useState(false)
+  const thinkingShownAtRef = useRef(0)
+  const prefersReducedMotion = useReducedMotion()
   const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -367,8 +407,50 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     return [...buyItems, ...passItems].sort((a, b) => b.timestamp - a.timestamp)
   }, [queueItems, scanHistory, currentSession?.id])
 
-  // Delete confirmation state
+  // Context memory chips (PKT-20260420-008) — surfaced in empty states to
+  // reassure the user that the agent actually has their queue / sold / goal
+  // data loaded. Only renders non-zero values so an empty app stays quiet.
+  const contextChips = useMemo(() => {
+    const chips: { key: string; icon: React.ReactNode; label: string }[] = []
+    if (queueItems.length > 0) {
+      chips.push({
+        key: 'queue',
+        icon: <Stack size={12} weight="bold" />,
+        label: `${queueItems.length} in queue`,
+      })
+    }
+    const unshipped = soldItems.filter(s => !s.trackingNumber).length
+    if (unshipped > 0) {
+      chips.push({
+        key: 'ship',
+        icon: <Package size={12} weight="bold" />,
+        label: `${unshipped} to ship`,
+      })
+    }
+    const goal = currentSession?.profitGoal
+    if (goal && goal > 0) {
+      chips.push({
+        key: 'goal',
+        icon: <TrendUp size={12} weight="bold" />,
+        label: `Goal $${goal}`,
+      })
+    }
+    if (sessionScans.length > 0) {
+      chips.push({
+        key: 'scans',
+        icon: <Camera size={12} weight="bold" />,
+        label: `${sessionScans.length} scanned`,
+      })
+    }
+    return chips
+  }, [queueItems.length, soldItems, currentSession?.profitGoal, sessionScans.length])
+
+  // Delete confirmation state — drives the bottom sheet
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const pendingDeleteItem = useMemo(
+    () => confirmDeleteId ? sessionScans.find(i => i.id === confirmDeleteId) : null,
+    [confirmDeleteId, sessionScans]
+  )
 
   const prevMessageCount = useRef(chatMessages.length)
   const agentHasMounted = useRef(false)
@@ -379,10 +461,59 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       return
     }
     if (chatMessages.length > prevMessageCount.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      // iOS Mail / Messages pattern: only auto-scroll if the user is already
+      // near the bottom (<100px). If they've scrolled up to read earlier
+      // context, let them stay put — incoming messages should not yank their
+      // viewport. User-sent messages still always scroll (they expect that).
+      const lastMsg = chatMessages[chatMessages.length - 1]
+      const isOwnMessage = lastMsg?.role === 'user'
+      const container = pullToRefresh.containerRef.current
+      const distanceFromBottom = container
+        ? container.scrollHeight - container.scrollTop - container.clientHeight
+        : 0
+      if (isOwnMessage || distanceFromBottom < 100) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }
     }
     prevMessageCount.current = chatMessages.length
-  }, [chatMessages])
+    // pullToRefresh.containerRef is a stable ref — only chatMessages should retrigger.
+  }, [chatMessages]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Track visualViewport to anchor the composer above the soft keyboard.
+  // iOS Safari shrinks window.visualViewport.height when the keyboard opens;
+  // the delta against layout viewport is the keyboard inset.
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!vv) return
+    const update = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0))
+      setKeyboardOffset(inset)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+
+  // Drive the thinking-indicator visibility with a 600ms minimum display.
+  // When isProcessing flips on, show immediately and stamp the start time.
+  // When it flips off, wait out any remaining time before hiding so cached
+  // responses don't cause a sub-100ms flash of the indicator.
+  useEffect(() => {
+    if (isProcessing) {
+      setShowThinking(true)
+      thinkingShownAtRef.current = Date.now()
+      return
+    }
+    if (!showThinking) return
+    const elapsed = Date.now() - thinkingShownAtRef.current
+    const remaining = Math.max(0, 600 - elapsed)
+    const t = setTimeout(() => setShowThinking(false), remaining)
+    return () => clearTimeout(t)
+  }, [isProcessing]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear pending tool calls whenever the user switches to a different chat session
   useEffect(() => {
@@ -1220,10 +1351,14 @@ ${settings.userProfile.aiContext}` : ''}`
   }, [pendingMessage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleQuickAction = useCallback((prompt: string) => {
-    // Send immediately — don't pre-fill the floating input bar (which lives in App.tsx
-    // and has its own state, so setInput here would never reach the send button)
-    handleSendMessage(prompt)
-  }, [handleSendMessage])
+    // Prefill the composer so the user can tweak before sending (PKT-20260420-008).
+    // Switching to chat view lets them see the composer; focusing the input after
+    // a tick lets React render the new view first. Haptic matches iOS selection UX.
+    haptics.selection()
+    setInput(prompt)
+    setViewMode('chat')
+    setTimeout(() => inputRef.current?.focus(), 60)
+  }, [])
 
   // Clear messages and start a fresh chat within the same session
   const handleNewChat = useCallback(() => {
@@ -1240,7 +1375,9 @@ ${settings.userProfile.aiContext}` : ''}`
     setViewMode('chat')
   }, [setChatSessions, setActiveSessionId])
 
-  // Shared input bar — floating glass pill, sits just above the bottom nav
+  // Shared input bar — floating glass pill, sits just above the bottom nav.
+  // When the soft keyboard is open, `keyboardOffset` raises the pill above it.
+  const canSend = input.trim().length > 0 && !isProcessing
   const inputBar = (
     <motion.div
       key="chat-pill"
@@ -1252,17 +1389,22 @@ ${settings.userProfile.aiContext}` : ''}`
         position: 'fixed',
         left: 0,
         right: 0,
-        // Viewport-relative (portal renders outside will-change containing block)
-        // 54px nav height + 8px gap + safe area
-        bottom: 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
+        // Viewport-relative (portal renders outside will-change containing block).
+        // When keyboard is open (keyboardOffset > 0), anchor just above it with 8px gap.
+        // When closed, sit 62px above bottom = 54px nav + 8px gap + safe-area.
+        bottom: keyboardOffset > 0
+          ? `calc(${keyboardOffset}px + 8px)`
+          : 'calc(62px + max(env(safe-area-inset-bottom, 0px), 0px))',
         zIndex: 50,
         padding: '0 12px',
         pointerEvents: 'none',
+        transition: 'bottom 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
       }}
     >
       <form
         onSubmit={(e) => {
           e.preventDefault()
+          if (canSend) haptics.impactLight()
           handleSendMessage()
         }}
         className="flex items-center gap-2"
@@ -1283,38 +1425,51 @@ ${settings.userProfile.aiContext}` : ''}`
           onChange={(e) => setInput(e.target.value)}
           placeholder="Message Agent..."
           disabled={isProcessing}
+          inputMode="text"
+          autoCapitalize="sentences"
+          autoCorrect="on"
+          spellCheck
+          enterKeyHint="send"
           style={{
             flex: 1,
             background: 'transparent',
             border: 'none',
             outline: 'none',
-            fontSize: '15px',
+            fontSize: '17px',
             color: 'var(--t1)',
             minWidth: 0,
           }}
         />
-        <button
-          type="submit"
-          disabled={!input.trim() || isProcessing}
-          style={{
-            width: '36px',
-            height: '36px',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '18px',
-            background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
-            boxShadow: !input.trim() || isProcessing ? 'none' : 'var(--send-glow)',
-            border: 'none',
-            cursor: 'pointer',
-            opacity: !input.trim() || isProcessing ? 0.4 : 1,
-            transition: 'opacity 0.15s, transform 0.1s, box-shadow 0.15s',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <PaperPlaneRight size={16} weight="bold" className="text-white" />
-        </button>
+        {/* Send button — fades in only when input has content (Apple Messages pattern) */}
+        <AnimatePresence initial={false}>
+          {canSend && (
+            <motion.button
+              key="send-btn"
+              type="submit"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.6 }}
+              transition={{ duration: 0.15, ease: [0.165, 0.84, 0.44, 1] }}
+              style={{
+                width: '32px',
+                height: '32px',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '16px',
+                background: 'linear-gradient(145deg, var(--b1) 0%, var(--b2) 100%)',
+                boxShadow: 'var(--send-glow)',
+                border: 'none',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+              aria-label="Send message"
+            >
+              <PaperPlaneRight size={15} weight="bold" className="text-white" />
+            </motion.button>
+          )}
+        </AnimatePresence>
       </form>
     </motion.div>
   )
@@ -1472,20 +1627,35 @@ ${settings.userProfile.aiContext}` : ''}`
                 <Robot size={38} weight="duotone" className="text-white" />
               </div>
               <h2 className="text-[22px] font-black text-t1 mb-2 tracking-tight">Session Assistant</h2>
-              <p className="text-sm text-t3 leading-relaxed max-w-[220px]">
+              <p className="text-sm text-t3 leading-relaxed max-w-[240px]">
                 I know your queue, scans, sessions, and goals.
               </p>
+              {contextChips.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-1.5 mt-3 max-w-[280px]">
+                  {contextChips.map(chip => (
+                    <span
+                      key={chip.key}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-b1/10 border border-b1/20 text-[11px] font-semibold text-t1"
+                    >
+                      <span className="text-b1">{chip.icon}</span>
+                      {chip.label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="px-4 pb-24 grid grid-cols-2 gap-3">
+            <div className="px-4 pb-24 grid grid-cols-2 gap-2.5">
               {QUICK_ACTIONS.map(action => (
                 <button
                   key={action.label}
                   onClick={() => handleQuickAction(action.prompt)}
-                  className="flex flex-col items-start gap-2.5 p-4 bg-s1 border border-s2 rounded-2xl text-left active:scale-95 active:opacity-70 transition-transform"
+                  className="material-thin flex items-center gap-2.5 px-4 py-3 border border-separator/60 rounded-full text-left active:scale-[0.97] active:opacity-75 transition-transform"
                   style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                 >
-                  <span className="text-2xl leading-none">{action.emoji}</span>
-                  <span className="text-[12px] font-bold text-t1 leading-snug">{action.label}</span>
+                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-b1/12 text-b1 flex-shrink-0">
+                    {action.icon}
+                  </span>
+                  <span className="text-[13px] font-semibold text-t1 leading-tight truncate">{action.label}</span>
                 </button>
               ))}
             </div>
@@ -1510,20 +1680,35 @@ ${settings.userProfile.aiContext}` : ''}`
                     <Robot size={38} weight="duotone" className="text-white" />
                   </div>
                   <h2 className="text-[22px] font-black text-t1 mb-2 tracking-tight">Session Assistant</h2>
-                  <p className="text-sm text-t3 leading-relaxed max-w-[220px]">
+                  <p className="text-sm text-t3 leading-relaxed max-w-[240px]">
                     I know your queue, scans, sessions, and goals.
                   </p>
+                  {contextChips.length > 0 && (
+                    <div className="flex flex-wrap justify-center gap-1.5 mt-3 max-w-[280px]">
+                      {contextChips.map(chip => (
+                        <span
+                          key={chip.key}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-b1/10 border border-b1/20 text-[11px] font-semibold text-t1"
+                        >
+                          <span className="text-b1">{chip.icon}</span>
+                          {chip.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="px-4 pb-24 grid grid-cols-2 gap-3">
+                <div className="px-4 pb-24 grid grid-cols-2 gap-2.5">
                   {QUICK_ACTIONS.map(action => (
                     <button
                       key={action.label}
                       onClick={() => handleQuickAction(action.prompt)}
-                      className="flex flex-col items-start gap-2.5 p-4 bg-s1 border border-s2 rounded-2xl text-left active:scale-95 active:opacity-70 transition-transform"
+                      className="material-thin flex items-center gap-2.5 px-4 py-3 border border-separator/60 rounded-full text-left active:scale-[0.97] active:opacity-75 transition-transform"
                       style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                     >
-                      <span className="text-2xl leading-none">{action.emoji}</span>
-                      <span className="text-[12px] font-bold text-t1 leading-snug">{action.label}</span>
+                      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-b1/12 text-b1 flex-shrink-0">
+                        {action.icon}
+                      </span>
+                      <span className="text-[13px] font-semibold text-t1 leading-tight truncate">{action.label}</span>
                     </button>
                   ))}
                 </div>
@@ -1587,7 +1772,9 @@ ${settings.userProfile.aiContext}` : ''}`
                   )
                 })}
 
-                {/* Pending tool call confirmation card */}
+                {/* Pending tool-call trust chips (PKT-20260420-008).
+                    Each pending action renders as an icon-backed chip so the
+                    user can scan the batch at a glance before confirming. */}
                 {pendingToolCalls && pendingToolCalls.length > 0 && !isProcessing && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -1598,22 +1785,27 @@ ${settings.userProfile.aiContext}` : ''}`
                       <Robot size={18} weight="bold" className="text-white" />
                     </div>
                     <div className="bg-s1 border border-s2 rounded-2xl px-4 py-3 max-w-[80%]">
-                      <div className="flex items-center gap-1.5 mb-2">
+                      <div className="flex items-center gap-1.5 mb-2.5">
                         <Warning size={14} weight="fill" className="text-t1" />
-                        <span className="text-xs font-bold text-t1">Confirm Actions</span>
+                        <span className="text-xs font-bold text-t1">
+                          Confirm {pendingToolCalls.length === 1 ? 'action' : `${pendingToolCalls.length} actions`}
+                        </span>
                       </div>
-                      <ul className="space-y-1 mb-3">
+                      <div className="flex flex-wrap gap-1.5 mb-3">
                         {pendingToolCalls.map((call, i) => (
-                          <li key={i} className="text-xs text-t2 flex items-start gap-1.5">
-                            <span className="text-b1 mt-0.5 flex-shrink-0">•</span>
-                            <span>{describeToolCall(call, queueItems)}</span>
-                          </li>
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-b1/10 border border-b1/20 text-[11px] font-medium text-t1 max-w-full"
+                          >
+                            <span className="text-b1 flex-shrink-0">{toolCallIcon(call)}</span>
+                            <span className="truncate">{describeToolCall(call, queueItems)}</span>
+                          </span>
                         ))}
-                      </ul>
+                      </div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={handleConfirmToolCalls}
+                          onClick={() => { haptics.impactMedium(); handleConfirmToolCalls() }}
                           className="h-7 px-3 text-xs"
                         >
                           Run
@@ -1631,28 +1823,47 @@ ${settings.userProfile.aiContext}` : ''}`
                   </motion.div>
                 )}
 
-                {isProcessing && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex gap-2.5 items-end justify-start"
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0"
-                      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                {/* Option B thinking indicator (PKT-20260420-008): "Thinking..." +
+                    three 4px dots that pulse 0.3→1→0.3 on a 1.2s cycle with 200ms
+                    stagger. Minimum 600ms display so cached hits don't flash. For
+                    users with prefers-reduced-motion, dots stay static at 0.7. */}
+                <AnimatePresence>
+                  {showThinking && (
+                    <motion.div
+                      key="thinking"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex gap-2.5 items-end justify-start"
                     >
-                      <Robot size={16} weight="bold" className="text-white" />
-                    </div>
-                    <div className="bg-s1 border border-s2 rounded-[20px] rounded-bl-md px-4 py-3.5">
-                      <div className="flex gap-1.5 items-center">
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '160ms' }} />
-                        <span className="w-2 h-2 bg-b1 rounded-full animate-bounce" style={{ animationDelay: '320ms' }} />
+                      <div
+                        className="w-8 h-8 rounded-full bg-gradient-to-br from-b1 to-b2 flex items-center justify-center flex-shrink-0"
+                        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                      >
+                        <Robot size={16} weight="bold" className="text-white" />
                       </div>
-                    </div>
-                  </motion.div>
-                )}
+                      <div className="bg-s1 border border-s2 rounded-[20px] rounded-bl-md px-4 py-3 flex items-center gap-2">
+                        <span className="text-[13px] font-medium text-t2">Thinking</span>
+                        <div className="flex gap-1 items-center">
+                          {[0, 1, 2].map((i) => (
+                            <motion.span
+                              key={i}
+                              className="w-1 h-1 rounded-full bg-t2"
+                              animate={prefersReducedMotion ? { opacity: 0.7 } : { opacity: [0.3, 1, 0.3] }}
+                              transition={prefersReducedMotion ? undefined : {
+                                duration: 1.2,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                                delay: i * 0.2,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 <div ref={messagesEndRef} />
               </div>
@@ -1782,35 +1993,15 @@ ${settings.userProfile.aiContext}` : ''}`
                         BUY
                       </button>
                       <div className="w-px h-5 bg-s2 flex-shrink-0" />
-                      {/* Delete — with confirm */}
-                      {confirmDeleteId === item.id ? (
-                        <div className="flex items-center gap-1 px-2">
-                          <button
-                            onClick={() => { onDeleteItem?.(item.id); setConfirmDeleteId(null) }}
-                            className="text-[10px] font-bold text-red hover:underline"
-                            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                          >
-                            Remove
-                          </button>
-                          <span className="text-t3 text-[10px]">|</span>
-                          <button
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="text-[10px] font-bold text-t3 hover:underline"
-                            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDeleteId(item.id)}
-                          className="w-12 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
-                          title="Permanently remove"
-                          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-                        >
-                          <Trash size={14} weight="bold" />
-                        </button>
-                      )}
+                      {/* Delete — opens a bottom confirmation sheet */}
+                      <button
+                        onClick={() => { haptics.notifWarning(); setConfirmDeleteId(item.id) }}
+                        className="w-12 h-10 flex items-center justify-center text-t3 hover:text-red hover:bg-red/10 active:opacity-60 transition-colors"
+                        title="Permanently remove"
+                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <Trash size={14} weight="bold" />
+                      </button>
                     </div>
                   </Card>
                 )
@@ -1972,6 +2163,47 @@ ${settings.userProfile.aiContext}` : ''}`
         </AnimatePresence>,
         document.body
       )}
+
+      {/* Destructive confirmation sheet for permanent scan removal (PKT-20260420-008).
+          Slides up from the bottom — replaces the inline tap-to-arm pattern
+          with a clearer, less error-prone iOS-style action sheet. */}
+      <Sheet
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null) }}
+      >
+        <SheetContent side="bottom" className="rounded-t-3xl p-0">
+          <SheetHeader>
+            <SheetTitle>Remove this scan?</SheetTitle>
+            <SheetDescription>
+              {pendingDeleteItem?.productName
+                ? `"${pendingDeleteItem.productName}" and its photos will be deleted permanently. This cannot be undone.`
+                : 'This scan and its photos will be deleted permanently. This cannot be undone.'}
+            </SheetDescription>
+          </SheetHeader>
+          <SheetFooter>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!confirmDeleteId) return
+                haptics.notifSuccess()
+                onDeleteItem?.(confirmDeleteId)
+                setConfirmDeleteId(null)
+              }}
+              className="w-full h-11"
+            >
+              <Trash size={16} weight="bold" className="mr-1.5" />
+              Remove permanently
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmDeleteId(null)}
+              className="w-full h-11"
+            >
+              Cancel
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Rename dialog */}
       <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
