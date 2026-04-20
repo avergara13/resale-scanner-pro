@@ -678,16 +678,16 @@ input, textarea, select {
 }
 
 /* Shared segmented tab-bar — Apple liquid-glass segmented control.
-   Use via <div class="tab-bar"><button class="tab-btn active">…</button>…</div>.
-   Track uses thin material for a glassy base; active thumb uses chrome material
-   with a subtle border + shadow so it floats cleanly on the track. */
+   Track: --s1 (grey semantic token) + blur so it reads as frosted glass on any
+   background. Active thumb: --fg (elevated surface) + shadow for clear visual
+   lift. This is the iOS segmented control formula: grey glass track, white pill. */
 .tab-bar {
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: var(--material-thin-bg);
-  backdrop-filter: saturate(180%) blur(30px);
-  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  background: var(--s1);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
   border: 0.5px solid var(--material-border);
   border-radius: 12px;
 }
@@ -714,9 +714,8 @@ input, textarea, select {
 
 .tab-btn.active {
   color: var(--t1);
-  background: var(--material-chrome-bg);
-  border: 0.5px solid var(--material-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0.5px 1px rgba(0, 0, 0, 0.04);
+  background: var(--fg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0.5px 2px rgba(0, 0, 0, 0.06);
 }
 
 .tab-btn:active {
