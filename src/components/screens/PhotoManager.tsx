@@ -260,7 +260,7 @@ export function PhotoManager({
       />
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-s2/40">
+      <div className="material-chrome sticky top-0 z-10 flex items-center gap-3 border-b border-separator px-4 py-3">
         <button
           onClick={onBack}
           className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-s1 active:scale-95 transition-all text-t2"
@@ -269,16 +269,16 @@ export function PhotoManager({
           <ArrowLeft size={20} weight="bold" />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-black tracking-tight text-t1 leading-tight">Listing Photos</h1>
+          <h1 className="text-title-3 font-semibold tracking-tight text-t1 leading-tight">Listing Photos</h1>
           {(itemName || sku) && (
-            <p className="text-[11px] text-t3 truncate mt-0.5">
+            <p className="mt-0.5 truncate text-footnote text-t3">
               {[itemName, sku].filter(Boolean).join(' · ')}
             </p>
           )}
         </div>
         <span className={cn(
-          'text-[11px] font-bold px-2 py-0.5 rounded-full',
-          slots.length >= MAX_PHOTOS ? 'bg-red/10 text-red' : 'bg-s1 text-t3'
+          'rounded-full px-2.5 py-1 text-caption-1 font-semibold',
+          slots.length >= MAX_PHOTOS ? 'border border-system-red/15 bg-system-red/10 text-chip-label-red' : 'border border-separator/70 bg-system-fill text-secondary-label'
         )}>
           {slots.length} / {MAX_PHOTOS}
         </span>
@@ -349,7 +349,7 @@ export function PhotoManager({
 
                   {/* Primary label under first photo */}
                   {primaryIndex === idx && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-amber/80 text-white text-[9px] font-bold text-center py-0.5 uppercase tracking-wide">
+                    <div className="absolute bottom-0 left-0 right-0 bg-system-orange/90 py-1 text-center text-caption-1 font-bold uppercase tracking-[0.14em] text-white">
                       Primary
                     </div>
                   )}
@@ -394,7 +394,7 @@ export function PhotoManager({
           {slots.length > 0 && (
             <button
               onClick={() => retakeInputRef.current?.click()}
-              className="w-full h-10 flex items-center justify-center gap-2 rounded-xl text-t3 hover:text-t2 hover:bg-s1 text-xs font-medium transition-all active:scale-98"
+              className="w-full h-10 flex items-center justify-center gap-2 rounded-xl text-t3 hover:text-t2 hover:bg-s1 text-footnote font-medium transition-all active:scale-98"
             >
               <ArrowsClockwise size={14} weight="regular" />
               Retake Scan Photo (replaces photo 1)

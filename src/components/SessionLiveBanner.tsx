@@ -12,46 +12,33 @@ export function SessionLiveBanner() {
   const sessionLabel = currentSession.name || `Session #${String(currentSession.sessionNumber ?? 1).padStart(3, '0')}`
 
   return (
-    <div
-      className="flex items-center leading-none gap-1.5 px-3 py-1.5 overflow-hidden"
-      style={{
-        background: 'color-mix(in oklch, var(--green) 7%, var(--fg))',
-        borderLeft: '2px solid var(--green)',
-        borderBottom: '1px solid color-mix(in oklch, var(--green) 20%, transparent)',
-      }}
-    >
-      {/* Sonar ping dot */}
-      <span className="relative flex-shrink-0" style={{ width: 8, height: 8 }}>
-        <span className="absolute inset-0 rounded-full bg-green animate-ping opacity-50" />
-        <span className="relative block w-2 h-2 rounded-full bg-green" />
+    <div className="material-thin flex min-h-10 items-center gap-2 overflow-hidden border-b border-system-green/20 px-4 py-2">
+      <span className="relative h-2.5 w-2.5 flex-shrink-0">
+        <span className="absolute inset-0 rounded-full bg-system-green animate-ping opacity-50" />
+        <span className="relative block h-2.5 w-2.5 rounded-full bg-system-green" />
       </span>
 
-      {/* LIVE label */}
-      <span className="text-[9px] font-black text-green tracking-[0.15em] uppercase flex-shrink-0">LIVE</span>
+      <span className="text-caption-1 font-bold uppercase tracking-[0.18em] text-chip-label-green flex-shrink-0">Live</span>
 
-      {/* Divider */}
-      <span className="w-px h-3 bg-green/30 flex-shrink-0" />
+      <span className="h-4 w-px bg-system-green/20 flex-shrink-0" />
 
-      {/* Session name */}
-      <span className="text-[11px] font-bold text-green font-mono flex-shrink-0 max-w-[90px] truncate">
+      <span className="max-w-[112px] flex-shrink-0 truncate font-mono text-footnote font-semibold text-label">
         {sessionLabel}
       </span>
 
-      {/* Operator name */}
       {currentSession.operatorName && (
-        <span className="text-[10px] text-t3 truncate flex-1 min-w-0">{currentSession.operatorName}</span>
+        <span className="min-w-0 flex-1 truncate text-footnote text-secondary-label">{currentSession.operatorName}</span>
       )}
 
-      {/* Stats */}
-      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-        <span className="text-[10px] font-bold text-green">{currentSession.buyCount}</span>
-        <span className="text-[10px] text-t3">buy</span>
-        <span className="text-[10px] text-s3 mx-0.5">·</span>
-        <span className="text-[10px] font-bold text-red">{currentSession.passCount}</span>
-        <span className="text-[10px] text-t3">pass</span>
-        <span className="text-[10px] text-s3 mx-0.5">·</span>
-        <span className="text-[10px] font-bold text-amber">{maybeCount}</span>
-        <span className="text-[10px] text-t3">maybe</span>
+      <div className="ml-auto flex items-center gap-1.5 flex-shrink-0 text-caption-1">
+        <span className="font-semibold text-chip-label-green">{currentSession.buyCount}</span>
+        <span className="text-secondary-label">buy</span>
+        <span className="text-tertiary-label">·</span>
+        <span className="font-semibold text-chip-label-red">{currentSession.passCount}</span>
+        <span className="text-secondary-label">pass</span>
+        <span className="text-tertiary-label">·</span>
+        <span className="font-semibold text-chip-label-orange">{maybeCount}</span>
+        <span className="text-secondary-label">maybe</span>
       </div>
     </div>
   )
