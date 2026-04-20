@@ -1,15 +1,14 @@
-import { Play, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, TrendUp, ArrowLeft } from '@phosphor-icons/react'
+import { Play, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, TrendUp, ArrowLeft, ListMagnifyingGlass } from '@phosphor-icons/react'
 import { useState, useCallback, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
 import { LocationInsights } from '../LocationInsights'
-import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useKV } from '@github/spark/hooks'
-import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { useDeviceId } from '@/hooks/use-device-id'
 import type { Session, ScannedItem, ProfitGoal, Screen } from '@/types'
 
@@ -260,47 +259,11 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
     return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`
   }
 
-  const handleRefresh = useCallback(async () => {
-    await new Promise(resolve => setTimeout(resolve, 600))
-  }, [])
-
-  const {
-    containerRef,
-    isPulling,
-    isRefreshing,
-    pullDistance,
-    progress,
-    shouldTrigger,
-  } = usePullToRefresh({
-    onRefresh: handleRefresh,
-    threshold: 80,
-    maxPullDistance: 150,
-    enabled: true,
-  })
-
   return (
     <div
-      ref={containerRef}
       id="scr-session"
       className="h-full overflow-y-auto scrollable-content overscroll-y-contain"
     >
-      <PullToRefreshIndicator
-        isPulling={isPulling}
-        isRefreshing={isRefreshing}
-        pullDistance={pullDistance}
-        progress={progress}
-        shouldTrigger={shouldTrigger}
-      />
-
-      {/* Content wrapper: GPU-composited transform instead of paddingTop reflow */}
-      <div
-        style={{
-          transform: `translateY(${isPulling ? pullDistance : isRefreshing ? 60 : 0}px)`,
-          transition: isPulling ? 'none' : 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-          willChange: isPulling || isRefreshing ? 'transform' : 'auto',
-        }}
-      >
-
       <div className="px-4 pt-3 pb-6">
 
       {showTrends ? (
@@ -527,10 +490,20 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessag
               </div>
             )
           })()}
+
+          {/* Empty state — first-run / all sessions deleted */}
+          {(allSessions || []).length === 0 && deletedSessions.length === 0 && (
+            <EmptyState
+              icon={<ListMagnifyingGlass weight="regular" />}
+              title="No sessions yet"
+              description="Start a new session to begin tracking scans, buys, and profits."
+              actionLabel="Start New Session"
+              onAction={onStartSession}
+            />
+          )}
         </div>
       )}
       </div>
-      </div> {/* end content transform wrapper */}
     </div>
   )
 }
