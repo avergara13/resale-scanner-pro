@@ -129,6 +129,27 @@ function describeToolCall(call: AgentToolCall, items?: ScannedItem[]): string {
   }
 }
 
+// Icon per tool for the pending-action trust chips (PKT-20260420-008). Giving
+// each pending action a recognizable icon makes it easier for the user to scan
+// the list and confirm at a glance.
+function toolCallIcon(call: AgentToolCall) {
+  switch (call.tool) {
+    case 'rerun_pipeline': return <ArrowClockwise size={14} weight="bold" />
+    case 'create_listing': return <Stack size={14} weight="bold" />
+    case 'update_item': return <PencilSimple size={14} weight="bold" />
+    case 'batch_analyze_queue': return <Stack size={14} weight="bold" />
+    case 'add_task': return <Plus size={14} weight="bold" />
+    case 'complete_task': return <Check size={14} weight="bold" />
+    case 'clear_tasks': return <Trash size={14} weight="bold" />
+    case 'mark_as_sold': return <ShoppingCart size={14} weight="bold" />
+    case 'mark_shipped': return <Package size={14} weight="bold" />
+    case 'add_remove_from_queue': return call.queueAction === 'remove'
+      ? <X size={14} weight="bold" />
+      : <Plus size={14} weight="bold" />
+    default: return <Sparkle size={14} weight="bold" />
+  }
+}
+
 // Static system instructions — module-level constant, allocated once.
 // Gemini API caches identical prefixes across calls, so keeping this
 // stable and at the front of every prompt reduces per-request cost.
@@ -390,7 +411,19 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       return
     }
     if (chatMessages.length > prevMessageCount.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      // iOS Mail / Messages pattern: only auto-scroll if the user is already
+      // near the bottom (<100px). If they've scrolled up to read earlier
+      // context, let them stay put — incoming messages should not yank their
+      // viewport. User-sent messages still always scroll (they expect that).
+      const lastMsg = chatMessages[chatMessages.length - 1]
+      const isOwnMessage = lastMsg?.role === 'user'
+      const container = pullToRefresh.containerRef.current
+      const distanceFromBottom = container
+        ? container.scrollHeight - container.scrollTop - container.clientHeight
+        : 0
+      if (isOwnMessage || distanceFromBottom < 100) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }
     }
     prevMessageCount.current = chatMessages.length
   }, [chatMessages])
@@ -1662,7 +1695,9 @@ ${settings.userProfile.aiContext}` : ''}`
                   )
                 })}
 
-                {/* Pending tool call confirmation card */}
+                {/* Pending tool-call trust chips (PKT-20260420-008).
+                    Each pending action renders as an icon-backed chip so the
+                    user can scan the batch at a glance before confirming. */}
                 {pendingToolCalls && pendingToolCalls.length > 0 && !isProcessing && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -1673,22 +1708,27 @@ ${settings.userProfile.aiContext}` : ''}`
                       <Robot size={18} weight="bold" className="text-white" />
                     </div>
                     <div className="bg-s1 border border-s2 rounded-2xl px-4 py-3 max-w-[80%]">
-                      <div className="flex items-center gap-1.5 mb-2">
+                      <div className="flex items-center gap-1.5 mb-2.5">
                         <Warning size={14} weight="fill" className="text-t1" />
-                        <span className="text-xs font-bold text-t1">Confirm Actions</span>
+                        <span className="text-xs font-bold text-t1">
+                          Confirm {pendingToolCalls.length === 1 ? 'action' : `${pendingToolCalls.length} actions`}
+                        </span>
                       </div>
-                      <ul className="space-y-1 mb-3">
+                      <div className="flex flex-wrap gap-1.5 mb-3">
                         {pendingToolCalls.map((call, i) => (
-                          <li key={i} className="text-xs text-t2 flex items-start gap-1.5">
-                            <span className="text-b1 mt-0.5 flex-shrink-0">•</span>
-                            <span>{describeToolCall(call, queueItems)}</span>
-                          </li>
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-b1/10 border border-b1/20 text-[11px] font-medium text-t1 max-w-full"
+                          >
+                            <span className="text-b1 flex-shrink-0">{toolCallIcon(call)}</span>
+                            <span className="truncate">{describeToolCall(call, queueItems)}</span>
+                          </span>
                         ))}
-                      </ul>
+                      </div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={handleConfirmToolCalls}
+                          onClick={() => { haptics.impactMedium(); handleConfirmToolCalls() }}
                           className="h-7 px-3 text-xs"
                         >
                           Run
