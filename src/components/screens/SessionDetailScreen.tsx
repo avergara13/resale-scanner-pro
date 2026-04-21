@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CheckCircle, XCircle, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise, Camera, TrendUp } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise, Camera } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -462,8 +462,8 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               <div>
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">RATE</p>
                 <div className="flex items-baseline gap-1.5">
-                  <p className="text-2xl font-bold mono text-b1">{buyRate}%</p>
-                  <TrendUp size={16} weight="fill" className="text-b1" />
+                  <p className="text-2xl font-bold mono text-b1">{buyRate}</p>
+                  <span className="text-base font-bold mono text-b1">%</span>
                 </div>
               </div>
             </div>
