@@ -202,7 +202,12 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   const liveBuyCount = buyItems.length
   const livePassCount = passItems.length
   const totalScans = sessionItems.length
-  const buyRate = totalScans > 0 ? Math.round((liveBuyCount / totalScans) * 100) : 0
+  // BUY Rate: denominator is decided items only (BUY + PASS + MAYBE).
+  // PENDING items (still being analyzed) are excluded — they haven't been
+  // decided yet and would skew the rate down if included in the denominator.
+  // This makes RATE directly verifiable from the three numbers on the tally card.
+  const totalDecisioned = liveBuyCount + livePassCount + maybeCount
+  const buyRate = totalDecisioned > 0 ? Math.round((liveBuyCount / totalDecisioned) * 100) : 0
   const estimatedProfit = buyItems.reduce((s, i) => s + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
   const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
   // ROI — mirrors CostTrackingScreen.tsx exactly so numbers are always in sync
