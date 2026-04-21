@@ -2791,6 +2791,7 @@ function App() {
                 scanHistory={scanHistory || []}
                 onOpenItem={handleOpenItemFromSession}
                 onNavigateTo={(s) => { secondaryReturnScreen.current = screen; setScreen(s) }}
+                settings={settings}
               />
             </motion.div>
           )}
@@ -3011,6 +3012,7 @@ function App() {
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
                 sessionId={secondaryReturnScreen.current === 'session-detail' ? selectedSessionId ?? undefined : undefined}
+                settings={settings}
               />
             </motion.div>
           )}
@@ -3069,6 +3071,7 @@ function App() {
                 currentOperatorId={settings?.userProfile?.operatorId}
                 onRestoreItem={handleRestorePassItem}
                 onOpenPhotoManager={(item) => handleOpenPhotoManager(item, 'session-detail')}
+                settings={settings}
               />
             </motion.div>
           )}

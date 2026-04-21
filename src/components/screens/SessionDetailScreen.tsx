@@ -18,8 +18,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { logActivity } from '@/lib/activity-log'
+import { getEstimatedNetProfit } from '@/lib/profit-utils'
 import { cn } from '@/lib/utils'
-import type { Session, ScannedItem, ThriftStoreLocation, Screen } from '@/types'
+import type { Session, ScannedItem, ThriftStoreLocation, Screen, AppSettings } from '@/types'
 
 interface SessionDetailScreenProps {
   sessionId: string
@@ -40,9 +41,11 @@ interface SessionDetailScreenProps {
   onRestoreItem?: (item: ScannedItem) => void
   /** Open Photo Manager for any item (Entry Point C). */
   onOpenPhotoManager?: (item: ScannedItem) => void
+  /** Business-rule settings — drives fee-aware profit projections (eBay rates, shipping, etc.) */
+  settings?: AppSettings
 }
 
-export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo, currentOperatorId, onRestoreItem, onOpenPhotoManager }: SessionDetailScreenProps) {
+export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo, currentOperatorId, onRestoreItem, onOpenPhotoManager, settings }: SessionDetailScreenProps) {
   const [allSessionsFallback, setAllSessionsFallback] = useKV<Session[]>('all-sessions', [])
   const allSessions = allSessionsProp ?? allSessionsFallback
   const setAllSessions = onUpdateSessions ?? setAllSessionsFallback
@@ -197,13 +200,24 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
 
   // Derive all counts from live item data — session metadata counters can lag
   const buyItems = sessionItems.filter(i => i.decision === 'BUY')
-  const passItems = sessionItems.filter(i => i.decision === 'PASS')
-  const maybeCount = sessionItems.filter(i => i.decision === 'MAYBE').length
   const liveBuyCount = buyItems.length
-  const livePassCount = passItems.length
+  const livePassCount = sessionItems.filter(i => i.decision === 'PASS').length
+  const maybeCount = sessionItems.filter(i => i.decision === 'MAYBE').length
   const totalScans = sessionItems.length
-  const buyRate = totalScans > 0 ? Math.round((liveBuyCount / totalScans) * 100) : 0
-  const estimatedProfit = buyItems.reduce((s, i) => s + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
+  // BUY Rate: denominator is decided items only (BUY + PASS + MAYBE).
+  // PENDING items (still being analyzed) are excluded — they haven't been
+  // decided yet and would skew the rate down if included in the denominator.
+  // This makes RATE directly verifiable from the three numbers on the tally card.
+  const totalDecisioned = liveBuyCount + livePassCount + maybeCount
+  const buyRate = totalDecisioned > 0 ? Math.round((liveBuyCount / totalDecisioned) * 100) : 0
+  const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
+  // Fee-aware net profit projection — applies platform fee schedule (eBay default) and
+  // settings-driven rates (ebayFeePercent, ebayAdFeePercent, defaultShippingCost, shippingMaterialsCost).
+  // Each item uses its own preferredPlatform so Mercari/Poshmark/Whatnot/FB items are
+  // costed correctly rather than over-counted with eBay rates.
+  const estimatedProfit = buyItems.reduce((s, i) => s + getEstimatedNetProfit(i, settings).netProfit, 0)
+  // ROI — fee-adjusted profit / invested capital (mirrors CostTrackingScreen.tsx)
+  const avgROI = totalInvested > 0 ? Math.round((estimatedProfit / totalInvested) * 100) : 0
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
@@ -385,7 +399,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </Card>
           )}
 
-          {/* Stats row — matches active session layout */}
+          {/* Stats row — Invested · Scans · ROI (all three tap into relevant detail screens) */}
           <div className="flex gap-2 mb-4">
             <div
               onClick={() => onNavigateTo?.('cost-tracking')}
@@ -394,10 +408,10 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
               )}
             >
-              <div className="text-base font-bold text-green leading-tight">
-                ${estimatedProfit.toFixed(2)}
+              <div className="text-base font-bold mono text-t1 leading-tight">
+                ${totalInvested.toFixed(2)}
               </div>
-              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Est. Profit</div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Invested</div>
             </div>
             <div
               onClick={() => onNavigateTo?.('scan-history')}
@@ -406,17 +420,31 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
               )}
             >
-              <div className="text-base font-bold text-t1 leading-tight">{totalScans}</div>
+              <div className="text-base font-bold mono text-t1 leading-tight">{totalScans}</div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
-            <div className="stat-card flex-1 p-3">
-              <div className="text-base font-bold text-b1 leading-tight">{buyRate}%</div>
-              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">BUY Rate</div>
+            <div
+              onClick={() => onNavigateTo?.('cost-tracking')}
+              className={cn(
+                'stat-card flex-1 p-3 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+            >
+              <div className={cn('text-base font-bold mono leading-tight', avgROI >= 0 ? 'text-green' : 'text-red')}>
+                {avgROI >= 0 ? '+' : ''}{avgROI}%
+              </div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">ROI</div>
             </div>
           </div>
 
-          {/* BUY / PASS card — matches active session */}
-          <Card className="p-6 mb-4">
+          {/* Tally card — BUY · PASS · MAYBE · RATE. Whole card taps into Scan History. */}
+          <Card
+            className={cn(
+              'p-6 mb-4 transition-colors',
+              onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+            )}
+            onClick={() => onNavigateTo?.('scan-history')}
+          >
             <div className="flex items-center justify-between mb-4">
               {session.active ? (
                 <Badge variant="secondary" className="bg-green/15 text-green border border-green/30 px-3 py-1 uppercase text-xs font-bold flex items-center gap-1.5">
@@ -430,33 +458,46 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               )}
               <span className="text-sm mono text-t3">{formatDuration(duration)}</span>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
+            <div className="flex justify-around">
+              <div className="flex flex-col items-center">
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY</p>
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-1">
                   <p className="text-2xl font-bold mono text-green">{liveBuyCount}</p>
-                  <CheckCircle size={20} weight="fill" className="text-green" />
+                  <CheckCircle size={16} weight="fill" className="text-green" />
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col items-center">
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">PASS</p>
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-1">
                   <p className="text-2xl font-bold mono text-red">{livePassCount}</p>
-                  <XCircle size={20} weight="fill" className="text-red" />
+                  <XCircle size={16} weight="fill" className="text-red" />
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col items-center">
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">MAYBE</p>
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-1">
                   <p className="text-2xl font-bold mono text-amber">{maybeCount}</p>
-                  <Question size={20} weight="fill" className="text-amber" />
+                  <Question size={16} weight="fill" className="text-amber" />
+                </div>
+              </div>
+              <div className="flex flex-col items-center">
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">RATE</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-2xl font-bold mono text-b1">{buyRate}</p>
+                  <span className="text-base font-bold mono text-b1">%</span>
                 </div>
               </div>
             </div>
           </Card>
 
-          {/* Potential Profit card — matches active session */}
-          <Card className="p-6 mb-4">
+          {/* Potential Profit card — taps into Cost Tracking for full breakdown */}
+          <Card
+            className={cn(
+              'p-6 mb-4 transition-colors',
+              onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+            )}
+            onClick={() => onNavigateTo?.('cost-tracking')}
+          >
             <h3 className="text-sm font-semibold text-t3 uppercase tracking-wide mb-3">Potential Profit</h3>
             <p className="text-4xl font-bold mono text-t1">
               ${estimatedProfit.toFixed(2)}
