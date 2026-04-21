@@ -416,8 +416,14 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </div>
           </div>
 
-          {/* BUY / PASS card — matches active session */}
-          <Card className="p-6 mb-4">
+          {/* BUY / PASS card — taps into Scan History */}
+          <Card
+            className={cn(
+              'p-6 mb-4 transition-colors',
+              onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+            )}
+            onClick={() => onNavigateTo?.('scan-history')}
+          >
             <div className="flex items-center justify-between mb-4">
               {session.active ? (
                 <Badge variant="secondary" className="bg-green/15 text-green border border-green/30 px-3 py-1 uppercase text-xs font-bold flex items-center gap-1.5">
