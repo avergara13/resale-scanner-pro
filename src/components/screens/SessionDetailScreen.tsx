@@ -456,8 +456,14 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </div>
           </Card>
 
-          {/* Potential Profit card — matches active session */}
-          <Card className="p-6 mb-4">
+          {/* Potential Profit card — taps into Cost Tracking for full breakdown */}
+          <Card
+            className={cn(
+              'p-6 mb-4 transition-colors',
+              onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+            )}
+            onClick={() => onNavigateTo?.('cost-tracking')}
+          >
             <h3 className="text-sm font-semibold text-t3 uppercase tracking-wide mb-3">Potential Profit</h3>
             <p className="text-4xl font-bold mono text-t1">
               ${estimatedProfit.toFixed(2)}

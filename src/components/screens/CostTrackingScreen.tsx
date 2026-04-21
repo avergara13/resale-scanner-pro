@@ -21,7 +21,10 @@ const PERIOD_LABELS: Record<Period, string> = { today: 'Today', week: 'Week', mo
 const PERIOD_MS: Record<Period, number> = { today: 86_400_000, week: 604_800_000, month: 2_592_000_000, all: Infinity }
 
 export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId }: CostTrackingScreenProps) {
-  const [period, setPeriod] = useState<Period>('today')
+  // When scoped to a specific session, default to 'all' so the numbers match
+  // the Potential Profit card on SessionDetailScreen exactly (no time-cutoff drift).
+  // When launched from the global nav (no sessionId), default to 'today'.
+  const [period, setPeriod] = useState<Period>(sessionId ? 'all' : 'today')
   const [showApiCosts, setShowApiCosts] = useState(false)
   const { costData, isLoading, refreshData } = useCostTracking(period)
 
