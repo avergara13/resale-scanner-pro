@@ -58,7 +58,10 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId,
   // Matches SessionDetailScreen.tsx so both screens always show the same number.
   const totalProfit = buyItems.reduce((s, i) => s + getEstimatedNetProfit(i, settings).netProfit, 0)
   const avgROI = totalInvested > 0 ? Math.round((totalProfit / totalInvested) * 100) : 0
-  const buyRate = allPeriodItems.length > 0 ? Math.round((buyItems.length / allPeriodItems.length) * 100) : 0
+  // BUY rate denominator: decided items only (BUY + PASS + MAYBE), excludes PENDING.
+  // Matches SessionDetailScreen + SessionScreen so the same rate appears everywhere.
+  const decisionedCount = allPeriodItems.filter(i => i.decision === 'BUY' || i.decision === 'PASS' || i.decision === 'MAYBE').length
+  const buyRate = decisionedCount > 0 ? Math.round((buyItems.length / decisionedCount) * 100) : 0
 
   return (
     <div className="flex flex-col h-full bg-bg">

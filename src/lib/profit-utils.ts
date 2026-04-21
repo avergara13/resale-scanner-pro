@@ -50,7 +50,8 @@ export function getEstimatedNetProfit(
   let materialsCost: number
 
   if (platform === 'ebay') {
-    // eBay: all four rates are user-configurable via Business Rules settings
+    // eBay: FVF%, ad%, default shipping, and materials are user-configurable via
+    // Business Rules settings. Per-order fee ($0.30) is fixed by eBay and not surfaced.
     feePercent    = settings?.ebayFeePercent    ?? 12.9
     perOrderFee   = 0.30
     adFeePercent  = settings?.ebayAdFeePercent  ?? 3.0
