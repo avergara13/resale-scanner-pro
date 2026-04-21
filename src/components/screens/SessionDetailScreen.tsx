@@ -205,6 +205,8 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   const buyRate = totalScans > 0 ? Math.round((liveBuyCount / totalScans) * 100) : 0
   const estimatedProfit = buyItems.reduce((s, i) => s + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
   const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
+  // ROI — mirrors CostTrackingScreen.tsx exactly so numbers are always in sync
+  const avgROI = totalInvested > 0 ? Math.round((estimatedProfit / totalInvested) * 100) : 0
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
@@ -410,9 +412,17 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               <div className="text-base font-bold mono text-t1 leading-tight">{totalScans}</div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
-            <div className="stat-card flex-1 p-3">
-              <div className="text-base font-bold mono text-b1 leading-tight">{buyRate}%</div>
-              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">BUY Rate</div>
+            <div
+              onClick={() => onNavigateTo?.('cost-tracking')}
+              className={cn(
+                'stat-card flex-1 p-3 transition-colors',
+                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
+              )}
+            >
+              <div className={cn('text-base font-bold mono leading-tight', avgROI >= 0 ? 'text-green' : 'text-red')}>
+                {avgROI >= 0 ? '+' : ''}{avgROI}%
+              </div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">ROI</div>
             </div>
           </div>
 
