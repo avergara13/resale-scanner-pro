@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { CheckCircle, XCircle, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise, Camera } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Package, PencilSimple, Check, X, CaretRight, ChatCircle, Question, ArrowCounterClockwise, Camera, TrendUp } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -395,7 +395,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
               )}
             >
-              <div className="text-base font-bold text-t1 leading-tight">
+              <div className="text-base font-bold mono text-t1 leading-tight">
                 ${totalInvested.toFixed(2)}
               </div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Invested</div>
@@ -407,11 +407,11 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
               )}
             >
-              <div className="text-base font-bold text-t1 leading-tight">{totalScans}</div>
+              <div className="text-base font-bold mono text-t1 leading-tight">{totalScans}</div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
             <div className="stat-card flex-1 p-3">
-              <div className="text-base font-bold text-b1 leading-tight">{buyRate}%</div>
+              <div className="text-base font-bold mono text-b1 leading-tight">{buyRate}%</div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">BUY Rate</div>
             </div>
           </div>
@@ -437,26 +437,33 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               )}
               <span className="text-sm mono text-t3">{formatDuration(duration)}</span>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-2">
               <div>
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY</p>
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-1.5">
                   <p className="text-2xl font-bold mono text-green">{liveBuyCount}</p>
-                  <CheckCircle size={20} weight="fill" className="text-green" />
+                  <CheckCircle size={16} weight="fill" className="text-green" />
                 </div>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">PASS</p>
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-1.5">
                   <p className="text-2xl font-bold mono text-red">{livePassCount}</p>
-                  <XCircle size={20} weight="fill" className="text-red" />
+                  <XCircle size={16} weight="fill" className="text-red" />
                 </div>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">MAYBE</p>
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-1.5">
                   <p className="text-2xl font-bold mono text-amber">{maybeCount}</p>
-                  <Question size={20} weight="fill" className="text-amber" />
+                  <Question size={16} weight="fill" className="text-amber" />
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-t3 mb-1">RATE</p>
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-2xl font-bold mono text-b1">{buyRate}%</p>
+                  <TrendUp size={16} weight="fill" className="text-b1" />
                 </div>
               </div>
             </div>
