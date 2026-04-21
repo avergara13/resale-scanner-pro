@@ -204,6 +204,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   const totalScans = sessionItems.length
   const buyRate = totalScans > 0 ? Math.round((liveBuyCount / totalScans) * 100) : 0
   const estimatedProfit = buyItems.reduce((s, i) => s + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
+  const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
@@ -385,7 +386,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </Card>
           )}
 
-          {/* Stats row — matches active session layout */}
+          {/* Stats row — Invested · Scans · BUY Rate (spend / volume / quality) */}
           <div className="flex gap-2 mb-4">
             <div
               onClick={() => onNavigateTo?.('cost-tracking')}
@@ -394,10 +395,10 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
               )}
             >
-              <div className="text-base font-bold text-green leading-tight">
-                ${estimatedProfit.toFixed(2)}
+              <div className="text-base font-bold text-t1 leading-tight">
+                ${totalInvested.toFixed(2)}
               </div>
-              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Est. Profit</div>
+              <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Invested</div>
             </div>
             <div
               onClick={() => onNavigateTo?.('scan-history')}
