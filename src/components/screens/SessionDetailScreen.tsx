@@ -200,10 +200,9 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
 
   // Derive all counts from live item data — session metadata counters can lag
   const buyItems = sessionItems.filter(i => i.decision === 'BUY')
-  const passItems = sessionItems.filter(i => i.decision === 'PASS')
-  const maybeCount = sessionItems.filter(i => i.decision === 'MAYBE').length
   const liveBuyCount = buyItems.length
-  const livePassCount = passItems.length
+  const livePassCount = sessionItems.filter(i => i.decision === 'PASS').length
+  const maybeCount = sessionItems.filter(i => i.decision === 'MAYBE').length
   const totalScans = sessionItems.length
   // BUY Rate: denominator is decided items only (BUY + PASS + MAYBE).
   // PENDING items (still being analyzed) are excluded — they haven't been
@@ -400,7 +399,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </Card>
           )}
 
-          {/* Stats row — Invested · Scans · BUY Rate (spend / volume / quality) */}
+          {/* Stats row — Invested · Scans · ROI (all three tap into relevant detail screens) */}
           <div className="flex gap-2 mb-4">
             <div
               onClick={() => onNavigateTo?.('cost-tracking')}
@@ -438,7 +437,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </div>
           </div>
 
-          {/* BUY / PASS card — taps into Scan History */}
+          {/* Tally card — BUY · PASS · MAYBE · RATE. Whole card taps into Scan History. */}
           <Card
             className={cn(
               'p-6 mb-4 transition-colors',

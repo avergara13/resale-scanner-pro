@@ -114,7 +114,8 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId,
                 Inventory — {PERIOD_LABELS[period]} ({buyItems.length})
               </h3>
               {buyItems.map(item => {
-                const profit = (item.estimatedSellPrice || 0) - item.purchasePrice
+                // Fee-aware net profit per row so totals sum to what's shown at the top.
+                const profit = getEstimatedNetProfit(item, settings).netProfit
                 const margin = item.profitMargin || 0
                 return (
                   <div
