@@ -1,138 +1,202 @@
-# Resale Scanner Pro
+<p align="center">
+  <img src="./assets/readme/logo.png" alt="Resale Scanner Pro" width="160" />
+</p>
 
-Resale Scanner Pro is a mobile-first agentic workflow app for resellers.
+<h1 align="center">Resale Scanner Pro</h1>
 
-I originally built it to automate listing creation. It has since grown into a
-full sourcing-to-sale operating system: scan an item in the field, research
-comps, estimate profit, decide whether to buy, generate listing assets, and
-move the item into a publishing and fulfillment workflow.
+<p align="center">
+  <strong>One scan. Identify, price, decide, list, ship — from the field.</strong>
+</p>
 
-This is the first product deployment coming out of the Loft OS agentic system.
-It is in launch-phase tuning now and approaching full release.
+<p align="center">
+  <a href="https://resale-scanner-pro-production.up.railway.app">🔗 Live app</a> ·
+  <a href="./AGENTS.md">Engineering protocol</a> ·
+  <a href="./CLAUDE.md">Agent workflow</a> ·
+  <a href="./PRD.md">Product record</a>
+</p>
 
-Live app: [resale-scanner-pro-production.up.railway.app](https://resale-scanner-pro-production.up.railway.app)
+---
 
-## What the product does
+## Why this exists
 
-Resale Scanner Pro is designed for the actual resale workflow, not just the
-listing step.
+The most expensive time in a reselling business is the gap between finding an item in the field and turning it into a priced, listed, profit-modeled SKU. Today that gap is spread across five apps — camera, comps lookup, spreadsheet, listing tool, shipping portal — and every handoff loses information.
 
-- scan and identify items while sourcing
-- run AI-assisted research across comps, market data, and profitability
-- make fast BUY/PASS decisions in the field
-- generate optimized listing content from approved items
-- hand listings into inventory and publishing workflows
-- track sold, shipping, and completion status after the sale
+Resale Scanner Pro collapses the stack into a single mobile surface. One scan produces an identification, a market read, a BUY/PASS call, a ready-to-publish listing, and a back-office record. AI runs the judgment-heavy steps. Structured pipelines run the operational ones. A production database holds everything that needs to survive the session.
 
-## Workflow
+---
+
+## Status — 2026-04-21
+
+**Shipped**
+
+- Live production app on Railway, auto-deploy on merge to `main`
+- eBay Developer Program approved · production OAuth · live Sell API listings
+- RSP Phase 3 — end-to-end scan → list → push pipeline (2026-04-16)
+- iPhone Polish Program — 12-PR Apple-native UI/UX pass (2026-04-20)
+- PWA home-screen install — dark-gradient edge-to-edge iOS icon (2026-04-21)
+- WF-09 Sale Alert automation — n8n → Notion back office
+
+**In flight**
+
+- Multi-marketplace publishing (Mercari · Poshmark · Depop)
+- In-app shipping label purchase (Pirate Ship · Shippo)
+
+---
+
+## Built with agents
+
+This repo is the first production product shipped out of **Loft OS** — a home-grown agentic development system.
+
+| Agent | Role |
+| --- | --- |
+| **CA** — Claude (strategy) | Architecture, planning, Notion orchestration, governance writes |
+| **CE-VS** — Copilot in VS Code | Repo changes, infra, Railway, Supabase migrations |
+| **SA-VS** — Claude Code | Autonomous build sessions, parallel work orders, deep codebase changes |
+| **Owner** | Plan approval, PR approval, merge approval, ED walkthroughs |
+
+The humans run the gates; the agents run the loops. Every agent output — code change, Notion write, deploy log — links back to a numbered Work Order (`WO-RSP-###`) or Active Workstream (`WS-##`), so the full development history is queryable. This README was refreshed through the same pipeline.
+
+---
+
+## The pipeline
 
 ```text
-source item -> scan -> analyze -> research comps -> decide BUY/PASS -> optimize listing -> publish/handoff -> track sold + shipping
+STORE ─► 📸 scan ─► 🧠 Gemini Vision ID ──► 📊 market research ──► 💰 profit math
+                                                                          │
+                                                          ┌──────── BUY / MAYBE / PASS
+                                                          │
+                                                          ▼
+                                            📦 Photo Manager (Supabase Storage)
+                                                          │
+                                                          ▼
+                                              📝 Listing Queue (7-section editor)
+                                                          │
+                                                          ▼
+                                 🤖 AI enrichment: title · description · condition
+                                    · category · item specifics · pricing
+                                                          │
+                                                          ▼
+                                    ✅ 9 required checks + 5 warnings gate
+                                                          │
+                                                          ▼
+                                     🛒 Confirm & Push → eBay Sell API (live)
+                                                          │
+                                                          ▼
+                                   🗃️ Notion back-office record written on confirm
+                                                          │
+                                                          ▼
+                                       📮 Pack → ship → sale alert → close loop
 ```
 
-The goal is simple: reduce the time between finding an item and turning it into
-an informed resale decision with a usable listing workflow behind it.
+> **Two containers, one rule.** The *Scan / Research* pile holds `PENDING` + `MAYBE` items — everything reversible, `PASS` kept with Restore, re-scan available until push. The *Listing Queue* holds `BUY` items only — optimize, gate, push. No mixing. **Notion is the back office** — it receives the confirmed record *after* eBay confirms, carrying the real Item Number, Listing URL, ROI, Gross Profit, Break Even, Net Payout, and 24 KPIs. The app runs the workflow. Notion runs the business.
 
-## What is shipping now
-
-The current product already includes the main operating surfaces:
-
-- **Mobile-first scanning workflow** for quick item capture during sourcing
-- **AI-assisted analysis pipeline** for product identification, price research,
-  and profit estimation
-- **Agent workspace** for natural-language actions across scans, listings, and
-  sold-item workflows
-- **Queue and session management** to organize work by sourcing session and
-  listing state
-- **Listing optimization** for titles, descriptions, pricing, and item details
-- **Inventory publishing handoff** through Notion and downstream workflow wiring
-- **Sold and shipping operations** for sale logging, tracking, and post-sale
-  follow-through
+---
 
 ## Live product views
 
-Current production screenshots from the Railway deploy:
+<p align="center">
+  <img src="./assets/readme/agent.png" alt="Agent workspace — Session Assistant with natural-language actions" width="280" />
+</p>
 
-| Session workflow | Agent workspace |
-| --- | --- |
-| ![Resale Scanner Pro session view](./assets/readme/session.png) | ![Resale Scanner Pro agent view](./assets/readme/agent.png) |
+The **Agent workspace** is the product's natural-language command surface. It knows the live session, the queue, every scan, and the sold pile — and exposes one-tap actions (*Session Recap*, *Ship Now*, *Best Flips*, *Smart Picks*) on top of a full chat layer. Point it at the day and it answers: *what should I list next, what's overdue to ship, which item flips hardest, which scans am I sleeping on.*
 
-## Honest status
+| Live session | Listing Queue | Shipping Center |
+| --- | --- | --- |
+| ![Live session dashboard](./assets/readme/session.png) | ![Listing Queue with optimization gate](./assets/readme/listings.png) | ![Sold / Shipping Center](./assets/readme/sold.png) |
 
-This app is far beyond a prototype, but it is not positioned here as a
-fully-autonomous black box.
+Full Apple-native UI pass complete — large-title collapse, liquid-glass tab bars, material-thin surfaces, semantic design tokens, haptics, safe-area respect, optical typography scale. Three ED walkthroughs passed during the polish program.
 
-What is already real:
-
-- the scanning, research, decision, queue, optimization, and sold/shipping
-  layers
-- the agent surface that can operate across those workflows
-- the deployable production app running on Railway
-
-What is still being hardened:
-
-- deeper downstream marketplace publishing automation
-- continued agent expansion across the resale workflow
-- launch polish and production tuning before full release
-
-That distinction matters. The value of the product is already visible, and the
-automation surface is growing fast, but the README should reflect the current
-system truth instead of promising more than the live product does today.
-
-## Why it is interesting
-
-For resellers, the product reduces the most expensive form of waste in the
-business: slow decisions, weak research, and listing friction.
-
-For engineers, this repo is interesting because it sits at the boundary between
-an AI product and an AI workflow system:
-
-- real product UI, not just a demo agent
-- applied multimodal + research workflow design
-- structured listing generation and operator handoff
-- post-listing operational workflows like sold status and shipping
-- production deployment as part of the larger Loft OS system
+---
 
 ## Product surfaces
 
-The app currently centers around a few core screens and flows:
+| Screen | What it does |
+| --- | --- |
+| **Session** | Sourcing run management — goals, spend, active pile, session performance |
+| **Scanner / AI Analysis** | Camera capture → Gemini Vision ID → comps → BUY/PASS signal |
+| **Agent** | Natural-language command surface across scans, listings, sold items, research |
+| **Listing Queue** | BUY pile — optimize listing, run the gate, push to eBay |
+| **Sold / Shipping Center** | Post-sale tracking, label purchase, Pirate Ship rate card, Notion sync |
+| **Cost Tracking** | AI cost model per scan · per listing · per session · per month |
+| **Settings** | API keys, business rules, Notion DB bindings, agent behavior |
 
-- **Session**: manage sourcing runs, goals, and session performance
-- **Scanner / AI analysis**: capture item data and evaluate resale potential
-- **Agent**: run guided actions across the queue, listings, research, and sold
-  items
-- **Queue**: review BUY items, optimize listings, and push inventory forward
-- **Sold**: manage post-sale status, shipping, and follow-through
-- **Settings**: configure APIs, business rules, and workflow integrations
+---
 
 ## Stack
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | React + TypeScript + Vite |
-| UI | Mobile-first PWA with Tailwind and Radix-based primitives |
-| AI | Gemini-powered analysis, research, and listing optimization flows |
-| Data / workflow | Notion integration, downstream n8n workflow hooks, Supabase-ready surfaces |
-| Deployment | Railway |
+| Frontend | React 18 + TypeScript + Vite + Tailwind + Radix primitives |
+| Mobile | PWA with iOS home-screen install, standalone display, dark splash |
+| Backend | Node + Express (`server.js`) on Railway |
+| Database | Supabase Postgres (`zfbaijiynnwxasyyqglg`) — `scans`, `ebay_tokens`, `listing-photos` bucket |
+| Auth / RLS | Supabase service-role + anon policies, singleton token row pattern |
+| AI — Vision & Research | Google Gemini 2.0 Flash |
+| AI — Copy & Listing Optimization | Anthropic Claude API |
+| Marketplace | eBay Sell API (production OAuth, Fulfillment / Return / Payment policies) |
+| Automation | n8n workflows (WF-08 Deploy log, WF-09 Sale Alert) |
+| Governance | Notion databases (Checksum Registry, Governed Work Mirror, Active Workstreams) |
+| CI / Deploy | GitHub Actions → Railway (`deploy/production`) |
+
+---
+
+## Architecture — Core vs Shell
+
+The app is split into two layers with very different stability contracts, and that split is what lets AI design tools rebuild the UI without ever touching the pipeline.
+
+The **Core** is stable: the Express backend (`server.js`), the service layer (`src/lib/*.ts`), the type contracts (`src/types/index.ts`), and the wiring script (`scripts/apply-wiring.mjs`). It is guarded by fatal backend integrity checks plus the `tsc` and `lint` gates in CI.
+
+The **Shell** is interchangeable: `src/App.tsx`, the screen components, and the UI primitives. A design tool can redesign any of it. When a new shell lands, `apply-wiring.mjs` re-injects service wiring, the `tsc` + `lint` gates surface broken prop contracts, and the remaining anchor-miss warnings become the manual reconnection punch list. The backend, data model, and business logic never move.
+
+---
+
+## Engineering protocol
+
+Every change — human, Claude, or Codex — follows the same six phases: **Plan → Execute → PR Gate → PR → Review → Merge Gate**. The Owner approves the plan, the PR, and the merge. Deploy gates run in order on every PR: `apply-wiring.mjs`, then `tsc --noEmit`, then `lint`. Railway redeploys on merge; the event writes to Notion via WF-08. Every merge writes a **Checksum Registry** entry (`{CHECKSUM:RSP/YYYY-MM-DD/PRxxx-slug}`) — historical versions are never overwritten, they transition to `⚪ Superseded`. Full protocol in [`AGENTS.md`](./AGENTS.md).
+
+---
 
 ## Run locally
 
 ```bash
+git clone https://github.com/avergara13/resale-scanner-pro.git
+cd resale-scanner-pro
 npm install
 npm run dev
 ```
 
-If you need the Google integrations configured locally, use
-[GOOGLE_CLOUD_SETUP.md](./GOOGLE_CLOUD_SETUP.md).
+The app runs on `http://localhost:5173`. For Gemini Vision locally, see [`GOOGLE_CLOUD_SETUP.md`](./GOOGLE_CLOUD_SETUP.md). All production secrets live in Railway environment variables — never commit `.env*` files.
 
-## Related docs
+---
 
-- [CONTRIBUTING.md](./CONTRIBUTING.md) for repo standards and PR format
-- [GOOGLE_CLOUD_SETUP.md](./GOOGLE_CLOUD_SETUP.md) for local Google API setup
-- [PRD.md](./PRD.md) for the broader product planning record
+## Repository docs
 
-## Live direction
+| Doc | Purpose |
+| --- | --- |
+| [`AGENTS.md`](./AGENTS.md) | Canonical engineering protocol, PR standards, deploy gates |
+| [`CLAUDE.md`](./CLAUDE.md) | Claude-specific operating instructions, branch strategy, governance rules |
+| [`CONTEXT.md`](./CONTEXT.md) | Project context, handoff notes, Notion pointers |
+| [`PRD.md`](./PRD.md) | Product requirements and decision log |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Repo standards, PR format, commit conventions |
+| [`GOOGLE_CLOUD_SETUP.md`](./GOOGLE_CLOUD_SETUP.md) | Local Gemini / Google API setup |
 
-Resale Scanner Pro is the first launch lane coming out of the Loft OS agentic
-system. It is not the end state. It is the first serious product proving the
-system in the real world.
+---
+
+## What's next
+
+- **Multi-marketplace publishing** — extend the listing pipeline beyond eBay (Mercari, Poshmark, Depop)
+- **In-app shipping label purchase** — Pirate Ship + Shippo rate cards wired into the Sold screen
+- **Autonomous sourcing agents** — extend SA-VS beyond dev into live sourcing triage
+
+---
+
+## License
+
+Proprietary — source available for portfolio review. Not licensed for redistribution or commercial use. See [`LICENSE`](./LICENSE).
+
+---
+
+<p align="center">
+  <sub>Resale Scanner Pro · first product out of Loft OS · built by Angel Vergara<br/>
+  <em>Hobbyst Resale · Vergara Inc</em></sub>
+</p>
