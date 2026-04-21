@@ -5,6 +5,11 @@ import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter,
 } from '@/components/ui/drawer'
 import { cn } from '@/lib/utils'
+import {
+  computeBreakEven,
+  runListingGate,
+  type GateResult,
+} from '@/lib/listing-gate'
 import type { ScannedItem, OptimizedListing, AppSettings } from '@/types'
 
 // ── Canonical Notion condition options (must match DB exactly) ──────────────
@@ -29,31 +34,13 @@ const SHIPPING_STRATEGY_OPTIONS = [
 
 const DEPARTMENT_OPTIONS = ['N/A', 'Men', 'Women', 'Unisex', 'Boys', 'Girls', 'Youth']
 
-// ── Break-even helper (mirrors server.js formula) ────────────────────────────
-function computeBreakEven(purchasePrice: number, weightOzNum: number): number {
-  const shipping = weightOzNum <= 0 ? 7.90 : weightOzNum <= 15.99 ? 4.19 : weightOzNum <= 32 ? 7.90 : 12.40
-  const combinedFeeRate = (13.25 + 3.0) / 100
-  return (purchasePrice + shipping + 0.75 + 0.30) / (1 - combinedFeeRate)
-}
-
+// ── Net profit helper (form-local) ───────────────────────────────────────────
+// Break-even and gate logic live in src/lib/listing-gate.ts (shared with QueueScreen).
 function computeNetProfit(price: number, purchasePrice: number, weightOzNum: number): number {
   const shipping = weightOzNum <= 0 ? 7.90 : weightOzNum <= 15.99 ? 4.19 : weightOzNum <= 32 ? 7.90 : 12.40
   const ebayFee = price * 0.1325
   const adFee = price * 0.03
   return price - purchasePrice - shipping - 0.75 - 0.30 - ebayFee - adFee
-}
-
-// ── Gate types ───────────────────────────────────────────────────────────────
-interface GateItem {
-  id: string
-  label: string
-  pass: boolean
-}
-
-interface GateResult {
-  required: GateItem[]
-  warnings: GateItem[]
-  allRequiredPass: boolean
 }
 
 // ── ListingBuilder state ──────────────────────────────────────────────────────
@@ -108,32 +95,27 @@ interface ListingBuilderProps {
 }
 
 // ── Gate function ────────────────────────────────────────────────────────────
+// Thin adapter over the shared canonical gate in src/lib/listing-gate.ts.
+// Keep this here (rather than inlining the call) so the rest of ListingBuilder
+// continues to call runGate(state, purchasePrice) with the same signature.
 function runGate(state: ListingBuilderState, purchasePrice: number): GateResult {
-  const priceNum = parseFloat(state.price) || 0
-  const weightOzNum = parseFloat(state.weightOz) || 0
-  const breakEven = computeBreakEven(purchasePrice, weightOzNum)
-
-  const required: GateItem[] = [
-    { id: 'title', label: 'Title present and ≤80 chars', pass: !!state.title.trim() && state.title.length <= 80 },
-    { id: 'title-pipe', label: 'No pipe symbols (|) in title', pass: !state.title.includes('|') },
-    { id: 'condition', label: 'Condition set', pass: !!state.condition },
-    { id: 'description', label: 'Description ≥400 chars', pass: state.description.length >= 400 },
-    { id: 'photo', label: 'At least 1 photo', pass: state.photoUrls.length >= 1 },
-    { id: 'price', label: 'Listing Price > 0', pass: priceNum > 0 },
-    { id: 'price-breakeven', label: `Price > Break Even ($${breakEven.toFixed(2)})`, pass: priceNum > breakEven },
-    { id: 'category', label: 'eBay category set (not "Other")', pass: !!state.ebayCategoryId && state.ebayCategoryId !== '99' },
-    { id: 'brand', label: 'Brand not blank', pass: !!state.brand.trim() },
-  ]
-
-  const warnings: GateItem[] = [
-    { id: 'upc', label: 'No UPC/EAN — catalog match reduced', pass: !!state.upc.trim() },
-    { id: 'subtitle', label: 'No subtitle — search visibility reduced', pass: !state.subtitleEnabled || !!state.subtitle.trim() },
-    { id: 'comps', label: 'No comp data — price unverified', pass: state.compLow != null || state.compHigh != null },
-    { id: 'specifics', label: 'Item Specifics empty', pass: state.itemSpecifics.some(s => s.key.trim() && s.value.trim()) },
-    { id: 'photos-count', label: 'Only 1 photo (eBay recommends 8+)', pass: state.photoUrls.length >= 8 },
-  ]
-
-  return { required, warnings, allRequiredPass: required.every(r => r.pass) }
+  return runListingGate({
+    title: state.title,
+    condition: state.condition,
+    description: state.description,
+    photoCount: state.photoUrls.length,
+    price: parseFloat(state.price) || 0,
+    purchasePrice,
+    weightOz: parseFloat(state.weightOz) || 0,
+    brand: state.brand,
+    ebayCategoryId: state.ebayCategoryId,
+    upc: state.upc,
+    subtitleEnabled: state.subtitleEnabled,
+    subtitle: state.subtitle,
+    compLow: state.compLow,
+    compHigh: state.compHigh,
+    specificsCount: state.itemSpecifics.filter(s => s.key.trim() && s.value.trim()).length,
+  })
 }
 
 // ── Section header component ─────────────────────────────────────────────────

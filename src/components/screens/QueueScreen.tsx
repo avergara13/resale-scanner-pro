@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { EmptyState } from '@/components/ui/empty-state'
 import { logActivity } from '@/lib/activity-log'
 import { getCardPhoto } from '@/lib/photo'
+import { runListingGate, gateInputFromItem } from '@/lib/listing-gate'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AdvancedFilters, type AdvancedFilterOptions } from '@/components/AdvancedFilters'
 import { ActiveFiltersSummary } from '@/components/ActiveFiltersSummary'
@@ -124,20 +125,13 @@ function SortableItem({
     ? 'ready'
     : 'unoptimized'
 
-  // Gate completion score (7 required fields) — replaces old 6-field completion %
+  // Gate completion score — canonical 9-required-check gate shared with ListingBuilder.
+  // Previously used a local 7-check subset which drifted from the real gate; now both
+  // screens read the same numbers from src/lib/listing-gate.ts.
   const gateScore = useMemo(() => {
     if (item.decision !== 'BUY' || item.listingStatus === 'published') return null
-    const l = item.optimizedListing
-    const checks = [
-      !!(l?.title || item.productName)?.trim() && ((l?.title || item.productName) || '').length <= 80,  // title
-      !!(l?.condition || item.condition),                                                                // condition
-      (l?.description || item.description || '').length >= 400,                                          // description
-      (item.photoUrls?.length || item.additionalImageData?.length || item.imageData ? 1 : 0) >= 1,      // photo
-      (l?.price || item.estimatedSellPrice || 0) > 0,                                                   // price
-      !!(l?.itemSpecifics?.['Brand'] || item.productName?.match(/^([A-Z][a-zA-Z&]{1,19})(?:\s|$)/)?.[1]), // brand
-      !!(l?.ebayCategoryId) && l?.ebayCategoryId !== '99',                                               // category
-    ]
-    return { passed: checks.filter(Boolean).length, total: 7 }
+    const result = runListingGate(gateInputFromItem(item))
+    return { passed: result.passedCount, total: result.totalCount }
   }, [item])
 
   const style = {
@@ -167,9 +161,9 @@ function SortableItem({
             className="h-full transition-all duration-500"
             style={{
               width: `${(gateScore.passed / gateScore.total) * 100}%`,
-              background: gateScore.passed >= 7
+              background: gateScore.passed >= 9
                 ? 'var(--green)'
-                : gateScore.passed >= 4
+                : gateScore.passed >= 5
                 ? 'var(--amber)'
                 : 'var(--red)',
             }}
@@ -245,7 +239,7 @@ function SortableItem({
               {gateScore && (
                 <span className={cn(
                   "font-mono font-bold text-[8px] px-1 py-0.5 rounded",
-                  gateScore.passed >= 7 ? 'text-green' : gateScore.passed >= 4 ? 'text-amber' : 'text-red'
+                  gateScore.passed >= 9 ? 'text-green' : gateScore.passed >= 5 ? 'text-amber' : 'text-red'
                 )}>
                   {gateScore.passed}/{gateScore.total}
                 </span>
@@ -300,7 +294,7 @@ function SortableItem({
             {gateScore && (
               <span className={cn(
                 "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full",
-                gateScore.passed >= 7 ? 'text-green' : gateScore.passed >= 4 ? 'text-amber' : 'text-red'
+                gateScore.passed >= 9 ? 'text-green' : gateScore.passed >= 5 ? 'text-amber' : 'text-red'
               )}>
                 {gateScore.passed}/{gateScore.total}
               </span>
