@@ -2791,6 +2791,7 @@ function App() {
                 scanHistory={scanHistory || []}
                 onOpenItem={handleOpenItemFromSession}
                 onNavigateTo={(s) => { secondaryReturnScreen.current = screen; setScreen(s) }}
+                settings={settings}
               />
             </motion.div>
           )}
