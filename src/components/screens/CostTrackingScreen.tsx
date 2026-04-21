@@ -5,22 +5,25 @@ import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useCostTracking } from '@/hooks/use-cost-tracking'
 import { API_COST_CONFIGS } from '@/lib/cost-tracking-service'
+import { getEstimatedNetProfit } from '@/lib/profit-utils'
 import { cn } from '@/lib/utils'
 import { getCardPhoto } from '@/lib/photo'
-import type { ScannedItem } from '@/types'
+import type { ScannedItem, AppSettings } from '@/types'
 
 interface CostTrackingScreenProps {
   onBack: () => void
   queueItems?: ScannedItem[]
   scanHistory?: ScannedItem[]
   sessionId?: string
+  /** Business-rule settings — drives fee-aware profit projections */
+  settings?: AppSettings
 }
 
 type Period = 'today' | 'week' | 'month' | 'all'
 const PERIOD_LABELS: Record<Period, string> = { today: 'Today', week: 'Week', month: 'Month', all: 'All Time' }
 const PERIOD_MS: Record<Period, number> = { today: 86_400_000, week: 604_800_000, month: 2_592_000_000, all: Infinity }
 
-export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId }: CostTrackingScreenProps) {
+export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId, settings }: CostTrackingScreenProps) {
   // When scoped to a specific session, default to 'all' so the numbers match
   // the Potential Profit card on SessionDetailScreen exactly (no time-cutoff drift).
   // When launched from the global nav (no sessionId), default to 'today'.
@@ -49,8 +52,11 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId 
   }, [queueItems, scanHistory, cutoff, sessionId])
 
   const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
+  // Gross revenue = sum of estimated sell prices (what items are listed for)
   const totalRevenue = buyItems.reduce((s, i) => s + (i.estimatedSellPrice || 0), 0)
-  const totalProfit = totalRevenue - totalInvested
+  // Fee-aware net profit — deducts platform fees, shipping, materials per item.
+  // Matches SessionDetailScreen.tsx so both screens always show the same number.
+  const totalProfit = buyItems.reduce((s, i) => s + getEstimatedNetProfit(i, settings).netProfit, 0)
   const avgROI = totalInvested > 0 ? Math.round((totalProfit / totalInvested) * 100) : 0
   const buyRate = allPeriodItems.length > 0 ? Math.round((buyItems.length / allPeriodItems.length) * 100) : 0
 

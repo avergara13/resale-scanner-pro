@@ -18,8 +18,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { logActivity } from '@/lib/activity-log'
+import { getEstimatedNetProfit } from '@/lib/profit-utils'
 import { cn } from '@/lib/utils'
-import type { Session, ScannedItem, ThriftStoreLocation, Screen } from '@/types'
+import type { Session, ScannedItem, ThriftStoreLocation, Screen, AppSettings } from '@/types'
 
 interface SessionDetailScreenProps {
   sessionId: string
@@ -40,9 +41,11 @@ interface SessionDetailScreenProps {
   onRestoreItem?: (item: ScannedItem) => void
   /** Open Photo Manager for any item (Entry Point C). */
   onOpenPhotoManager?: (item: ScannedItem) => void
+  /** Business-rule settings — drives fee-aware profit projections (eBay rates, shipping, etc.) */
+  settings?: AppSettings
 }
 
-export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo, currentOperatorId, onRestoreItem, onOpenPhotoManager }: SessionDetailScreenProps) {
+export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndSession, onReopenSession, allSessions: allSessionsProp, onUpdateSessions, queueItems, scanHistory: scanHistoryProp, onOpenItem, onOpenChat, onNavigateTo, currentOperatorId, onRestoreItem, onOpenPhotoManager, settings }: SessionDetailScreenProps) {
   const [allSessionsFallback, setAllSessionsFallback] = useKV<Session[]>('all-sessions', [])
   const allSessions = allSessionsProp ?? allSessionsFallback
   const setAllSessions = onUpdateSessions ?? setAllSessionsFallback
@@ -208,9 +211,13 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   // This makes RATE directly verifiable from the three numbers on the tally card.
   const totalDecisioned = liveBuyCount + livePassCount + maybeCount
   const buyRate = totalDecisioned > 0 ? Math.round((liveBuyCount / totalDecisioned) * 100) : 0
-  const estimatedProfit = buyItems.reduce((s, i) => s + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
   const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
-  // ROI — mirrors CostTrackingScreen.tsx exactly so numbers are always in sync
+  // Fee-aware net profit projection — applies platform fee schedule (eBay default) and
+  // settings-driven rates (ebayFeePercent, ebayAdFeePercent, defaultShippingCost, shippingMaterialsCost).
+  // Each item uses its own preferredPlatform so Mercari/Poshmark/Whatnot/FB items are
+  // costed correctly rather than over-counted with eBay rates.
+  const estimatedProfit = buyItems.reduce((s, i) => s + getEstimatedNetProfit(i, settings).netProfit, 0)
+  // ROI — fee-adjusted profit / invested capital (mirrors CostTrackingScreen.tsx)
   const avgROI = totalInvested > 0 ? Math.round((estimatedProfit / totalInvested) * 100) : 0
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
