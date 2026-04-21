@@ -437,31 +437,31 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               )}
               <span className="text-sm mono text-t3">{formatDuration(duration)}</span>
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              <div>
+            <div className="flex justify-around">
+              <div className="flex flex-col items-center">
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">BUY</p>
-                <div className="flex items-baseline gap-1.5">
+                <div className="flex items-baseline gap-1">
                   <p className="text-2xl font-bold mono text-green">{liveBuyCount}</p>
                   <CheckCircle size={16} weight="fill" className="text-green" />
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col items-center">
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">PASS</p>
-                <div className="flex items-baseline gap-1.5">
+                <div className="flex items-baseline gap-1">
                   <p className="text-2xl font-bold mono text-red">{livePassCount}</p>
                   <XCircle size={16} weight="fill" className="text-red" />
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col items-center">
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">MAYBE</p>
-                <div className="flex items-baseline gap-1.5">
+                <div className="flex items-baseline gap-1">
                   <p className="text-2xl font-bold mono text-amber">{maybeCount}</p>
                   <Question size={16} weight="fill" className="text-amber" />
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col items-center">
                 <p className="text-xs uppercase tracking-wide text-t3 mb-1">RATE</p>
-                <div className="flex items-baseline gap-1.5">
+                <div className="flex items-baseline gap-1">
                   <p className="text-2xl font-bold mono text-b1">{buyRate}</p>
                   <span className="text-base font-bold mono text-b1">%</span>
                 </div>
