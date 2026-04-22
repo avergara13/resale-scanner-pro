@@ -1,6 +1,6 @@
 import { Eye, MagnifyingGlass, TrendUp, Calculator, CheckCircle, Lightning, Clock } from '@phosphor-icons/react'
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { PipelineStep } from '@/types'
 
@@ -83,12 +83,47 @@ function AnimatedPercentage({ targetValue, isActive }: { targetValue: number; is
 }
 
 export function PipelinePanel({ steps }: PipelinePanelProps) {
+  // Peak progress since the last scan reset. Framer-motion smoothly animates
+  // the height of the progress bar, so any regression — even for a single
+  // frame — is visible to the user as a rubber-band backwards jump. We clamp
+  // the rendered value to max(current, peak) so the bar never regresses
+  // mid-scan. Reset to 0 when the steps array empties (new scan starting).
+  const peakRef = useRef(0)
+  const prevLengthRef = useRef(0)
+
   if (steps.length === 0) {
+    peakRef.current = 0
+    prevLengthRef.current = 0
     return null
   }
 
-  const completedSteps = steps.filter(s => s.status === 'complete').length
-  const progressPercentage = (completedSteps / steps.length) * 100
+  // Warn in dev if the caller grows the steps array mid-scan — that's what
+  // used to cause the 59% → 40% regression: denominator went from 5 to 6
+  // between frames. Phases should be pre-allocated once per scan.
+  if (import.meta.env.DEV && prevLengthRef.current > 0 && steps.length !== prevLengthRef.current) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[PipelinePanel] steps.length changed mid-scan (${prevLengthRef.current} → ${steps.length}). ` +
+        `Pre-allocate all phases before the scan starts to keep progress monotonic.`,
+    )
+  }
+  prevLengthRef.current = steps.length
+
+  // Weighted progress: partial credit for the step currently processing so
+  // the bar advances smoothly between phase boundaries instead of jumping
+  // 20% chunks. error counts as "done-ish" for progress purposes — the bar
+  // filling while an error card shows is the correct signal.
+  const weighted = steps.reduce((acc, s) => {
+    if (s.status === 'complete' || s.status === 'error') return acc + 1
+    if (s.status === 'processing') {
+      const p = typeof s.progress === 'number' ? s.progress : 0
+      return acc + Math.max(0, Math.min(100, p)) / 100
+    }
+    return acc
+  }, 0)
+  const raw = (weighted / steps.length) * 100
+  const progressPercentage = Math.max(raw, peakRef.current)
+  peakRef.current = progressPercentage
 
   return (
     <div id="ai-pipeline" className="space-y-1.5 sm:space-y-2 relative">

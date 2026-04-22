@@ -810,7 +810,12 @@ function App() {
         // Re-analyze / replace-primary preserve existing productName — user may have edited it.
         // Fresh scan falls through to AI-derived name.
         productName: effectiveExistingItem?.productName || visionResult?.productName || barcodeProduct?.title || mockProductName,
-        description: visionResult?.description || barcodeProduct?.description || 'Product analysis unavailable',
+        // Leave empty when both vision and barcode produced nothing — the pipeline
+        // already has a real decision, so writing the "Product analysis unavailable"
+        // sentinel here used to leak into the Scan Result UI as if the whole scan
+        // had failed. Batch-analyze detects un-enriched drafts via productName and
+        // !description below (see handleBatchAnalyze).
+        description: visionResult?.description || barcodeProduct?.description || '',
         category: visionResult?.category || barcodeProduct?.category || 'General',
         estimatedSellPrice: sellPrice > 0 ? sellPrice : undefined,
         profitMargin: sellPrice > 0 ? profitMetrics.profitMargin : undefined,
@@ -2078,6 +2083,7 @@ function App() {
     const unanalyzedItems = (queue || []).filter(item =>
       !item.productName ||
       item.productName === 'Quick Draft' ||
+      !item.description ||
       item.description === 'Product analysis unavailable'
     )
     
