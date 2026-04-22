@@ -217,12 +217,12 @@ export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanH
               return (
                 <SwipeableRow
                   key={item.id}
-                  leftAction={{
+                  leftAction={onDeleteItems ? {
                     icon: <Trash size={16} weight="bold" />,
                     label: 'Delete',
                     color: 'bg-red-500',
-                    onTrigger: () => onDeleteItems?.([item.id]),
-                  }}
+                    onTrigger: () => onDeleteItems([item.id]),
+                  } : undefined}
                   rightAction={canSaveDraft ? {
                     icon: <FloppyDisk size={16} weight="bold" />,
                     label: 'Save Draft',
