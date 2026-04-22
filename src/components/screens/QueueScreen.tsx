@@ -24,7 +24,8 @@ import { useSortFilterPreference } from '@/hooks/use-sort-filter-preference'
 import { useAdvancedFilterPreference } from '@/hooks/use-advanced-filter-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { cn } from '@/lib/utils'
-import type { ScannedItem, CategoryPreset, ItemTag } from '@/types'
+import type { ScannedItem, CategoryPreset, ItemTag, AppSettings } from '@/types'
+import { getEstimatedNetProfit } from '@/lib/profit-utils'
 import type { GeminiService } from '@/lib/gemini-service'
 import {
   DndContext,
@@ -70,6 +71,8 @@ interface QueueScreenProps {
   onHighlightClear?: () => void
   /** Re-scan: return a BUY item to the scan pile for re-research */
   onReScanItem?: (id: string) => void
+  /** Business-rule settings — required for fee-aware profit totals (Location Insights). */
+  settings?: AppSettings
 }
 
 type FilterOption = 'ALL' | 'ITEMS' | 'LISTED'
@@ -493,7 +496,7 @@ function SortableItem({
   )
 }
 
-export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenListingBuilder, onListItem, highlightItemId, onHighlightClear, onReScanItem }: QueueScreenProps) {
+export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onReorder, onBatchAnalyze, onAddManualItem, isBatchAnalyzing, onNavigateToTagAnalytics, onNavigateToLocationInsights, onMarkAsSold, onDelist, personalSessionIds, onReanalyze, onOpenListingBuilder, onListItem, highlightItemId, onHighlightClear, onReScanItem, settings }: QueueScreenProps) {
   const { sortBy, filter, setSortBy, setFilter } = useSortFilterPreference<SortOption, FilterOption>(
     'queue-screen',
     'manual',
@@ -1498,7 +1501,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
           {availableLocations.length > 0 && (() => {
             const totalProfit = queueItems
               .filter(item => item.location && item.decision === 'BUY' && (!item.sessionId || !personalSessionIds?.has(item.sessionId)))
-              .reduce((sum, item) => sum + ((item.estimatedSellPrice || 0) - item.purchasePrice), 0)
+              .reduce((sum, item) => sum + getEstimatedNetProfit(item, settings).netProfit, 0)
             
             const avgProfitPerStore = availableLocations.length > 0 
               ? totalProfit / availableLocations.length 

@@ -3026,6 +3026,7 @@ function App() {
                 highlightItemId={highlightQueueItemId}
                 onHighlightClear={() => setHighlightQueueItemId(null)}
                 onReScanItem={handleReScanItem}
+                settings={settings}
               />
             </motion.div>
           )}

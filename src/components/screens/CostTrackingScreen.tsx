@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useCostTracking } from '@/hooks/use-cost-tracking'
 import { API_COST_CONFIGS } from '@/lib/cost-tracking-service'
 import { getEstimatedNetProfit } from '@/lib/profit-utils'
+import { useBuyMetrics, getPeriodItems } from '@/lib/use-buy-metrics'
 import { cn } from '@/lib/utils'
 import { getCardPhoto } from '@/lib/photo'
 import type { ScannedItem, AppSettings } from '@/types'
@@ -35,33 +36,26 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId,
     return period === 'all' ? 0 : Date.now() - PERIOD_MS[period]
   }, [period])
 
-  const { buyItems, allPeriodItems } = useMemo(() => {
-    const all = [...(queueItems || []), ...(scanHistory || [])]
-    const seen = new Set<string>()
-    const unique = all.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true })
-    const periodItems = unique.filter(i => {
-      if (sessionId && i.sessionId !== sessionId) return false
-      return i.timestamp >= cutoff
-    })
-    return {
-      allPeriodItems: periodItems,
-      buyItems: periodItems
-        .filter(i => i.decision === 'BUY')
-        .sort((a, b) => (b.profitMargin || 0) - (a.profitMargin || 0)),
-    }
-  }, [queueItems, scanHistory, cutoff, sessionId])
+  const periodItems = useMemo(
+    () => getPeriodItems(queueItems, scanHistory, cutoff, sessionId),
+    [queueItems, scanHistory, cutoff, sessionId]
+  )
 
-  const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
-  // Gross revenue = sum of estimated sell prices (what items are listed for)
-  const totalRevenue = buyItems.reduce((s, i) => s + (i.estimatedSellPrice || 0), 0)
-  // Fee-aware net profit — deducts platform fees, shipping, materials per item.
-  // Matches SessionDetailScreen.tsx so both screens always show the same number.
-  const totalProfit = buyItems.reduce((s, i) => s + getEstimatedNetProfit(i, settings).netProfit, 0)
-  const avgROI = totalInvested > 0 ? Math.round((totalProfit / totalInvested) * 100) : 0
-  // BUY rate denominator: decided items only (BUY + PASS + MAYBE), excludes PENDING.
-  // Matches SessionDetailScreen + SessionScreen so the same rate appears everywhere.
-  const decisionedCount = allPeriodItems.filter(i => i.decision === 'BUY' || i.decision === 'PASS' || i.decision === 'MAYBE').length
-  const buyRate = decisionedCount > 0 ? Math.round((buyItems.length / decisionedCount) * 100) : 0
+  const {
+    buyItems: unsortedBuyItems,
+    totalInvested,
+    totalRevenue,
+    estimatedProfit: totalProfit,
+    avgROI,
+    buyRate,
+    hasROI,
+  } = useBuyMetrics(periodItems, settings)
+
+  // Sort by profit margin for the inventory list display only
+  const buyItems = useMemo(
+    () => [...unsortedBuyItems].sort((a, b) => (b.profitMargin || 0) - (a.profitMargin || 0)),
+    [unsortedBuyItems]
+  )
 
   return (
     <div className="flex flex-col h-full bg-bg">
@@ -92,8 +86,8 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId,
             </div>
             <div className="material-thin rounded-[10px] p-3">
               <p className="text-[9px] text-t3 uppercase tracking-wider mb-1">Avg ROI</p>
-              <p className={cn('text-xl font-bold mono leading-tight', avgROI >= 0 ? 'text-green' : 'text-red')}>
-                {avgROI >= 0 ? '+' : ''}{avgROI}%
+              <p className={cn('text-xl font-bold mono leading-tight', !hasROI ? 'text-t3' : avgROI >= 0 ? 'text-green' : 'text-red')}>
+                {!hasROI ? '—' : `${avgROI >= 0 ? '+' : ''}${avgROI}%`}
               </p>
               <p className="text-[10px] text-t3 mt-0.5">BUY rate {buyRate}%</p>
             </div>
