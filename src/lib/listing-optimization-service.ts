@@ -3,6 +3,7 @@ import { callLLM } from './llm-service'
 import { getCategoryInfo } from './ebay-category-table'
 import { calculateProfitFallback } from './ebay-service'
 import type { GeminiVisionResponse } from './gemini-service'
+import { fetchCategoryAspects, pickImportantAspects, aspectsToPromptBlock } from './ebay-taxonomy-service'
 
 /**
  * Sanitize a user-supplied string before interpolating it into an LLM prompt.
@@ -76,7 +77,19 @@ export class ListingOptimizationService {
     }
 
     try {
-      const prompt = this.buildOptimizationPrompt(context)
+      // Pull eBay's official item-specifics schema for the best-guess category
+      // so the LLM gets real aspect names/values instead of guessing. If the
+      // taxonomy proxy is unavailable, aspectsBlock stays empty and the LLM
+      // falls back to its own inference — no regression.
+      const guessedCategoryId = getCategoryInfo(context.item.category || '').ebayCategoryId
+      let aspectsBlock = ''
+      if (guessedCategoryId) {
+        const aspects = await fetchCategoryAspects(guessedCategoryId)
+        if (aspects) {
+          aspectsBlock = aspectsToPromptBlock(pickImportantAspects(aspects))
+        }
+      }
+      const prompt = this.buildOptimizationPrompt(context, aspectsBlock)
       const response = await callLLM(prompt, {
         task: 'listing',
         geminiApiKey: this.geminiApiKey,
@@ -194,7 +207,7 @@ export class ListingOptimizationService {
     }
   }
 
-  private buildOptimizationPrompt(context: ListingOptimizationContext) {
+  private buildOptimizationPrompt(context: ListingOptimizationContext, aspectsBlock = '') {
     const { item, marketData, competitorTitles, brandInfo } = context
 
     // Numbers are safe; strings all go through sanitizeForPrompt() to neutralize
@@ -287,6 +300,7 @@ TAGS:
 ITEM SPECIFICS:
 - Pre-fill as many item specifics as possible from the Vision Analysis, Google Lens results, and competitor titles
 - At minimum include: Brand, Model/Style, Condition, Color, Size (if applicable), Material (if applicable)
+${aspectsBlock ? `\n${aspectsBlock}\n- For any [REQUIRED] aspect above, you MUST supply a value in itemSpecifics (use the exact aspect name as the JSON key).\n- For SELECTION_ONLY aspects, pick a value from the listed allowed values verbatim.\n` : ''}
 
 PRICING:
 - Base price on SOLD comps from the market data above — not asking prices or MSRP
