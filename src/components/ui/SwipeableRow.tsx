@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { motion, useMotionValue, useTransform, useReducedMotion, type PanInfo } from 'framer-motion'
+import { animate, motion, useMotionValue, useTransform, useReducedMotion, type PanInfo } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 // SwipeableRow wraps a row (typically a Card) with horizontal-swipe actions.
@@ -64,6 +64,19 @@ export function SwipeableRow({
   // state and cause visual glitches on Queue rows. This way the node stays
   // stable and we just stop responding to new pan input.
 
+  const snapToOrigin = () => {
+    if (prefersReducedMotion) {
+      x.set(0)
+      return
+    }
+
+    void animate(x, 0, {
+      type: 'spring',
+      stiffness: 500,
+      damping: 40,
+    })
+  }
+
   const handleDragEnd = (_: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
     const offset = info.offset.x
     if (offset <= -threshold && rightAction) {
@@ -72,15 +85,15 @@ export function SwipeableRow({
       // Snap back after the action fires so the row returns to rest. If the
       // action removed the row from the list it unmounts before this runs —
       // harmless either way.
-      x.set(0)
+      snapToOrigin()
       setCommitting(false)
     } else if (offset >= threshold && leftAction) {
       setCommitting(true)
       leftAction.onTrigger()
-      x.set(0)
+      snapToOrigin()
       setCommitting(false)
     } else {
-      x.set(0)
+      snapToOrigin()
     }
   }
 
