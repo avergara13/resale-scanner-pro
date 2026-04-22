@@ -642,31 +642,42 @@ export function AIScreen({
                           </div>
                         </div>
 
-                        {/* ── Price range pills — tap to fill Sell $ from market data ── */}
+                        {/* ── Price range pills — tap to fill Sell $ from market data ──
+                            Prefer the trimmed p10/p90 band over literal min/max; a single
+                            outlier at 50× the median used to push the "High" chip into
+                            orbit and destroy user trust. Falls back to min/max only when
+                            the sample was too thin to percentile-rank. */}
                         {(currentItem?.lensAnalysis?.priceRange || currentItem?.estimatedSellPrice || currentItem?.marketData?.ebayPriceRange) && (
                           <div className="flex items-center gap-1.5 flex-wrap -mt-0.5">
                             <span className="text-[9px] text-t3 font-medium uppercase tracking-wide shrink-0">
                               Range:
                             </span>
-                            {/* eBay min / max */}
-                            {currentItem?.marketData?.ebayPriceRange && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => setEstSellPrice(currentItem!.marketData!.ebayPriceRange!.min.toFixed(2))}
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
-                                >
-                                  Low ${currentItem.marketData.ebayPriceRange.min.toFixed(0)}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEstSellPrice(currentItem!.marketData!.ebayPriceRange!.max.toFixed(2))}
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
-                                >
-                                  High ${currentItem.marketData.ebayPriceRange.max.toFixed(0)}
-                                </button>
-                              </>
-                            )}
+                            {/* eBay trimmed band (p10/p90) or min/max fallback */}
+                            {currentItem?.marketData?.ebayPriceRange && (() => {
+                              const p10 = currentItem.marketData.ebayP10
+                              const p90 = currentItem.marketData.ebayP90
+                              const useBand = p10 !== undefined && p90 !== undefined && p90 > 0
+                              const low = useBand ? p10! : currentItem.marketData.ebayPriceRange.min
+                              const high = useBand ? p90! : currentItem.marketData.ebayPriceRange.max
+                              return (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEstSellPrice(low.toFixed(2))}
+                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                  >
+                                    Low ${low.toFixed(0)}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEstSellPrice(high.toFixed(2))}
+                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                  >
+                                    High ${high.toFixed(0)}
+                                  </button>
+                                </>
+                              )
+                            })()}
                             {/* Lens avg (only when no eBay range to avoid duplicates) */}
                             {currentItem?.lensAnalysis?.priceRange && !currentItem?.marketData?.ebayPriceRange && (
                               <>

@@ -1,4 +1,8 @@
 import { logDebug } from '@/lib/debug-log'
+import { computeMarketStats, type SampleQuality } from '@/lib/market-stats'
+
+const SOLD_COMPS_LIMIT = 100
+const BROWSE_LIMIT = 50
 
 export interface EbayMarketData {
   soldItems: Array<{
@@ -22,11 +26,26 @@ export interface EbayMarketData {
   medianSoldPrice: number
   soldCount: number
   activeCount: number
+  /** Kept sold-count after outlier trim. `soldCount - trimmedSoldCount` were dropped. */
+  trimmedSoldCount: number
   sellThroughRate: number
+  /** Min/max of the *trimmed* sold set — was literal min/max of raw sold+active. */
   priceRange: {
     min: number
     max: number
   }
+  /**
+   * 10th / 90th percentile of the trimmed sold set. `undefined` when the
+   * trimmed sample was thin (<5 points) — see market-stats.ts header.
+   */
+  p10?: number
+  p90?: number
+  /** Per-source truncation so UIs only mark `+` on the metric that was capped. */
+  soldPageLimited: boolean
+  activePageLimited: boolean
+  /** Derived: `soldPageLimited || activePageLimited`. Legacy convenience. */
+  pageLimited: boolean
+  sampleQuality: SampleQuality
   recommendedPrice: number
 }
 
@@ -53,49 +72,39 @@ export class EbayService {
         this.fetchSoldComps(keywords, categoryId),
         this.fetchViaBrowseProxy(keywords, categoryId),
       ])
-      const soldItems = sold.length > 0 ? sold : browse.soldItems
+      const soldItems = sold.items.length > 0 ? sold.items : browse.soldItems
       const activeListings = browse.activeListings
 
       const soldPrices = soldItems.map(item => item.price).filter(p => p > 0)
       const activePrices = activeListings.map(item => item.price).filter(p => p > 0)
 
-      const averageSoldPrice = soldPrices.length > 0
-        ? soldPrices.reduce((sum, price) => sum + price, 0) / soldPrices.length
-        : 0
-
-      // Correct median: average the two middle values for even-length arrays
-      const sortedPrices = [...soldPrices].sort((a, b) => a - b)
-      const mid = Math.floor(sortedPrices.length / 2)
-      const medianSoldPrice = sortedPrices.length === 0
-        ? 0
-        : sortedPrices.length % 2 === 1
-          ? sortedPrices[mid]
-          : (sortedPrices[mid - 1] + sortedPrices[mid]) / 2
-
-      const soldCount = soldItems.length
-      const activeCount = activeListings.length
-      const sellThroughRate = (soldCount + activeCount) > 0
-        ? (soldCount / (soldCount + activeCount)) * 100
-        : 0
-
-      const allPrices = [...soldPrices, ...activePrices]
-      const priceRange = {
-        min: allPrices.length > 0 ? Math.min(...allPrices) : 0,
-        max: allPrices.length > 0 ? Math.max(...allPrices) : 0,
-      }
-
-      const recommendedPrice = medianSoldPrice > 0 ? medianSoldPrice : averageSoldPrice
+      // Aggregation is centralised in market-stats.ts so every caller gets
+      // the same trimmed-mean/median/p10/p90 contract. See that module's
+      // header for the outlier rule (3 × MAD) and edge cases.
+      const stats = computeMarketStats({
+        soldPrices,
+        activePrices,
+        soldPageLimited: sold.pageLimited,
+        activePageLimited: browse.pageLimited,
+      })
 
       return {
         soldItems,
         activeListings,
-        averageSoldPrice,
-        medianSoldPrice,
-        soldCount,
-        activeCount,
-        sellThroughRate,
-        priceRange,
-        recommendedPrice,
+        averageSoldPrice: stats.averageSoldPrice,
+        medianSoldPrice: stats.medianSoldPrice,
+        soldCount: stats.soldCount,
+        activeCount: stats.activeCount,
+        trimmedSoldCount: stats.trimmedSoldCount,
+        sellThroughRate: stats.sellThroughRate,
+        priceRange: stats.priceRange,
+        p10: stats.p10,
+        p90: stats.p90,
+        soldPageLimited: stats.soldPageLimited,
+        activePageLimited: stats.activePageLimited,
+        pageLimited: stats.pageLimited,
+        sampleQuality: stats.sampleQuality,
+        recommendedPrice: stats.recommendedPrice,
       }
     } catch (error) {
       logDebug('eBay market data fetch failed', 'error', 'ebay', { message: (error as Error).message })
@@ -106,16 +115,16 @@ export class EbayService {
   private async fetchSoldComps(
     keywords: string,
     categoryId?: string,
-  ): Promise<EbayMarketData['soldItems']> {
+  ): Promise<{ items: EbayMarketData['soldItems']; pageLimited: boolean }> {
     try {
       const resp = await fetch('/api/ebay/sold-comps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: keywords, categoryId, limit: 100, daysBack: 90 }),
+        body: JSON.stringify({ query: keywords, categoryId, limit: SOLD_COMPS_LIMIT, daysBack: 90 }),
       })
       if (!resp.ok) {
         logDebug('eBay sold-comps non-200 — using Browse approximation', 'warn', 'ebay', { status: resp.status })
-        return []
+        return { items: [], pageLimited: false }
       }
       const data = await resp.json() as {
         items?: Array<{
@@ -128,7 +137,7 @@ export class EbayService {
           thumbnail?: string
         }>
       }
-      return Array.isArray(data.items)
+      const items = Array.isArray(data.items)
         ? data.items.map(it => ({
             title: it.title,
             price: it.price,
@@ -139,9 +148,10 @@ export class EbayService {
             thumbnail: it.thumbnail || '',
           }))
         : []
+      return { items, pageLimited: items.length >= SOLD_COMPS_LIMIT }
     } catch (error) {
       logDebug('eBay sold-comps unreachable — using Browse approximation', 'warn', 'ebay', { message: (error as Error).message })
-      return []
+      return { items: [], pageLimited: false }
     }
   }
 
@@ -150,11 +160,11 @@ export class EbayService {
       const resp = await fetch('/api/ebay/market-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: keywords, categoryId, limit: 50 }),
+        body: JSON.stringify({ query: keywords, categoryId, limit: BROWSE_LIMIT }),
       })
       if (!resp.ok) {
         logDebug('eBay Browse proxy non-200 — falling back to Gemini market data', 'warn', 'ebay', { status: resp.status })
-        return { soldItems: [], activeListings: [] }
+        return { soldItems: [], activeListings: [], pageLimited: false }
       }
       const data = await resp.json() as {
         items?: Array<{
@@ -189,10 +199,14 @@ export class EbayService {
         itemWebUrl: it.itemWebUrl || '',
         thumbnail: it.thumbnail || '',
       }))
-      return { soldItems, activeListings: listings }
+      return {
+        soldItems,
+        activeListings: listings,
+        pageLimited: items.length >= BROWSE_LIMIT,
+      }
     } catch (error) {
       logDebug('eBay Browse proxy unreachable — falling back to Gemini market data', 'warn', 'ebay', { message: (error as Error).message })
-      return { soldItems: [], activeListings: [] }
+      return { soldItems: [], activeListings: [], pageLimited: false }
     }
   }
 

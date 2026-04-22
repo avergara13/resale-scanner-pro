@@ -337,10 +337,22 @@ export interface MarketData {
   ebayMedianSold?: number
   ebayActiveListings?: number
   ebaySoldCount?: number
+  /** Sold count after 3×MAD outlier trim. `ebaySoldCount - ebayTrimmedSoldCount` = dropped. */
+  ebayTrimmedSoldCount?: number
   ebayPriceRange?: {
     min: number
     max: number
   }
+  /** 10th/90th percentile of trimmed sold prices — preferred for range chips. */
+  ebayP10?: number
+  ebayP90?: number
+  /** Per-source page-limit flags — apply `+` only to the metric that was capped. */
+  ebaySoldPageLimited?: boolean
+  ebayActivePageLimited?: boolean
+  /** Derived: true if either eBay fetch hit its page limit. Legacy convenience. */
+  ebayPageLimited?: boolean
+  /** Data-quality signal: 'thin' = <5 samples, 'skewed' = wide avg/median gap, 'ok' = trust median. */
+  ebaySampleQuality?: 'thin' | 'skewed' | 'ok'
   ebaySellThroughRate?: number
   ebayRecentSales?: Array<{
     title: string
