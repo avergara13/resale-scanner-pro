@@ -272,14 +272,20 @@ export function AIScreen({
   const hasDecision = pipeline.some(p => p.id === 'decision' && p.status === 'complete')
     || (currentItem?.decision === 'BUY' || currentItem?.decision === 'PASS')
 
-  const isPipelineRunning = pipeline.length > 0 && pipeline.some(p => p.status === 'processing')
+  // Single source of truth for scan phase. Computed from the pipeline array so that
+  // exactly one footer/CTA region renders at any time. The previous pair of
+  // independent booleans (isPipelineRunning + pipelineComplete) could both be
+  // false during a transient window — no step 'processing' but some still 'pending' —
+  // which dropped the UI into the 'no pipeline yet' draft footer mid-scan.
+  type ScanPhase = 'idle' | 'running' | 'complete'
+  const scanPhase: ScanPhase = pipeline.length === 0
+    ? (currentItem ? 'complete' : 'idle')  // reopened item → treat as complete
+    : pipeline.every(p => p.status === 'complete' || p.status === 'error')
+      ? 'complete'
+      : 'running'  // any 'pending' or 'processing' step keeps us in running
 
-  // pipelineComplete: true when the pipeline has finished ALL work (any decision,
-  // including PENDING) OR when viewing a reopened item (no active pipeline).
-  // This gates the Listing Draft and action bar so they appear once the AI is done.
-  const pipelineComplete = pipeline.length === 0
-    ? !!(currentItem)  // reopened item — always ready
-    : !isPipelineRunning && pipeline.every(p => p.status === 'complete' || p.status === 'error')
+  const isPipelineRunning = scanPhase === 'running'
+  const pipelineComplete = scanPhase === 'complete'
 
   // hasPriceData: we have real market pricing to show in Quick Summary
   const hasPriceData = !!(currentItem?.estimatedSellPrice && currentItem.estimatedSellPrice > 0)
@@ -334,7 +340,10 @@ export function AIScreen({
     if (shippingCost === '' && settings?.defaultShippingCost) {
       setShippingCost(String(settings.defaultShippingCost))
     }
-    if (description === '' && currentItem.description) {
+    // 'Product analysis unavailable' is an internal sentinel used by
+    // handleBatchAnalyze to detect un-enriched quick drafts; never pre-fill it
+    // into the user-facing input — it would read as a decision when it isn't.
+    if (description === '' && currentItem.description && currentItem.description !== 'Product analysis unavailable') {
       setDescription(currentItem.description)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -872,8 +881,11 @@ export function AIScreen({
       </div>
 
       {/* ── Bottom action bar ── */}
+      {/* Footer is driven by scanPhase (derived above). Exactly one branch renders:
+          'complete' → post-scan action bar (or success), 'running' → "Analyzing..."
+          pill, 'idle' → quick draft capture. No overlap is possible. */}
       <div className="flex-shrink-0 border-t border-s2 bg-fg/95 backdrop-blur-md safe-bottom">
-        {pipelineComplete ? (
+        {scanPhase === 'complete' ? (
           listingAdded ? (
             /* Success state — offer to scan another item (new photo via camera) */
             <div className="p-2.5 sm:p-3">
@@ -981,7 +993,7 @@ export function AIScreen({
               )}
             </div>
           )
-        ) : isPipelineRunning ? (
+        ) : scanPhase === 'running' ? (
           /* Pipeline in progress */
           <div className="flex items-center justify-center gap-2 h-12 text-xs text-t3 font-medium">
             <span className="w-2 h-2 rounded-full bg-b1 animate-pulse" />
