@@ -43,7 +43,8 @@ import { useRetryTracker } from './hooks/use-retry-tracker'
 import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { BarcodeProduct } from './lib/barcode-service'
-import type { Screen, ScannedItem, PipelineStep, Session, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, SoldItem, SoldShippingUpdateInput, UserProfile, ResalePlatform } from './types'
+import type { Screen, ScannedItem, PipelineStep, Session, SessionArchive, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, SoldItem, SoldShippingUpdateInput, UserProfile, ResalePlatform } from './types'
+import { ARCHIVE_KV_KEY, ensureArchived } from './lib/session-archive'
 import { cn } from './lib/utils'
 import { useDeviceId } from './hooks/use-device-id'
 
@@ -139,6 +140,10 @@ function App() {
   // Device-scoped: each device has its own active session — prevents cross-device collisions
   const [session, setSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
   const [allSessions, setAllSessions] = useKV<Session[]>('all-sessions', [])
+  // Tier-2 metrics — frozen aggregates per session. Survives session deletion
+  // so Performance Trends can render history after items are purged.
+  // See src/lib/session-archive.ts for the FREEZE-BEFORE-PURGE invariant.
+  const [sessionArchives, setSessionArchives] = useKV<SessionArchive[]>(ARCHIVE_KV_KEY, [])
   const [allTags] = useKV<ItemTag[]>('all-tags', [])
   const [profitGoals] = useKV<ProfitGoal[]>('profit-goals', [])
   const [, setActivityLog] = useKV<ActivityEntry[]>(ACTIVITY_LOG_KEY, [])
@@ -248,6 +253,30 @@ function App() {
     (allSessions || []).filter(s => s.deletedAt),
   [allSessions])
 
+  // Backfill archive rows for ended sessions that don't have one yet. Runs
+  // after a short delay so large session lists don't block startup.
+  // Safe to re-run — ensureArchived is keyed by sessionId.
+  useEffect(() => {
+    if (!allSessions?.length) return
+    const archived = new Set((sessionArchives || []).map(a => a.sessionId))
+    const needsBackfill = allSessions.filter(s => !s.active && !s.deletedAt && !archived.has(s.id))
+    if (needsBackfill.length === 0) return
+    const timer = setTimeout(() => {
+      setSessionArchives(prev => {
+        let next = prev || []
+        for (const sess of needsBackfill) {
+          const items = [
+            ...(queue || []).filter(i => i.sessionId === sess.id),
+            ...(scanHistory || []).filter(i => i.sessionId === sess.id),
+          ]
+          next = ensureArchived(next, sess, items, settings)
+        }
+        return next
+      })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [allSessions, sessionArchives, queue, scanHistory, settings, setSessionArchives])
+
   const handleRestoreSession = useCallback((sessionId: string) => {
     setAllSessions((prev) => (prev || []).map(s =>
       s.id === sessionId ? { ...s, deletedAt: undefined } : s
@@ -279,9 +308,18 @@ function App() {
   }, [queue, scanHistory, supabaseService, setQueue, setScanHistory])
 
   const handlePermanentDeleteSession = useCallback((sessionId: string) => {
+    // FREEZE-BEFORE-PURGE: archive row must exist before items are gone
+    const sess = (allSessions || []).find(s => s.id === sessionId)
+    if (sess) {
+      const items = [
+        ...(queue || []).filter(i => i.sessionId === sessionId),
+        ...(scanHistory || []).filter(i => i.sessionId === sessionId),
+      ]
+      setSessionArchives(prev => ensureArchived(prev, sess, items, settings))
+    }
     purgeSessionData(sessionId)
     setAllSessions((prev) => (prev || []).filter(s => s.id !== sessionId))
-  }, [purgeSessionData, setAllSessions])
+  }, [allSessions, queue, scanHistory, settings, setSessionArchives, purgeSessionData, setAllSessions])
 
   const simulateProgress = useCallback((stepIndex: number, duration: number) => {
     const updateInterval = 80
@@ -1061,6 +1099,8 @@ function App() {
       setAllSessions((prev) => {
         const sess = (prev || []).find(s => s.id === sessionId)
         if (!sess?.deletedAt) return prev || []
+        // FREEZE-BEFORE-PURGE: archive aggregates while items still exist
+        setSessionArchives(aPrev => ensureArchived(aPrev, sess, snapshotItems, settings))
         // Delete Supabase photos using the snapshot captured at soft-delete time
         if (supabaseService && snapshotUrls.size > 0) {
           void supabaseService.deletePhotos(Array.from(snapshotUrls))
@@ -1071,7 +1111,7 @@ function App() {
         return (prev || []).filter(s => s.id !== sessionId)
       })
     }, 60000)
-  }, [session, setSession, setAllSessions, queue, scanHistory, supabaseService, setQueue, setScanHistory])
+  }, [session, setSession, setAllSessions, queue, scanHistory, supabaseService, setQueue, setScanHistory, setSessionArchives, settings])
 
   const handleEndSession = useCallback(() => {
     if (session) {
@@ -1084,6 +1124,13 @@ function App() {
         return lean as ScannedItem
       }))
       const endedSession = { ...session, endTime: Date.now(), active: false }
+      // Freeze tier-2 aggregate now that the session is done. Archive is keyed
+      // by sessionId so end → reopen → end-again overwrites cleanly.
+      const sessionItems = [
+        ...(queue || []).filter(i => i.sessionId === session.id),
+        ...(scanHistory || []).filter(i => i.sessionId === session.id),
+      ]
+      setSessionArchives(prev => ensureArchived(prev, endedSession, sessionItems, settings))
       // Update in allSessions
       setAllSessions((prev) =>
         (prev || []).map(s => s.id === session.id ? endedSession : s)
@@ -1091,7 +1138,7 @@ function App() {
       setSession(undefined)
       logActivity('Session ended')
     }
-  }, [session, setSession, setAllSessions, setQueue])
+  }, [session, setSession, setAllSessions, setQueue, queue, scanHistory, setSessionArchives, settings])
 
   const handleReopenSession = useCallback((sessionId: string) => {
     const sess = (allSessions || []).find(s => s.id === sessionId)

@@ -416,6 +416,36 @@ export interface Session {
   operatorInitial?: string
 }
 
+/**
+ * Frozen per-session aggregate. Written on session-end or session-delete
+ * BEFORE items are purged, so Performance Trends can render history for
+ * sessions whose raw items no longer exist.
+ *
+ * Immutable once written. Bumps to `schemaVersion` require a migration
+ * path in lib/session-archive.ts.
+ */
+export interface SessionArchive {
+  schemaVersion: 1
+  sessionId: string
+  sessionNumber?: number
+  sessionName?: string
+  sessionType?: 'business' | 'personal'
+  operatorId?: string
+  storeName?: string
+  /** Bucket anchor for daily Trends charts — session startTime. */
+  startTime: number
+  endTime?: number
+  itemsScanned: number
+  buyCount: number
+  passCount: number
+  maybeCount: number
+  totalInvested: number
+  totalRevenue: number
+  estimatedProfit: number
+  avgROI: number
+  buyRate: number
+}
+
 export interface ProfitGoal {
   id: string
   type: 'daily' | 'weekly' | 'monthly' | 'custom'
