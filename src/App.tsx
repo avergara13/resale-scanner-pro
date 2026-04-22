@@ -284,11 +284,17 @@ function App() {
     const intervalId = setInterval(() => {
       currentUpdate++
       const progress = progressCurve(currentUpdate / totalUpdates)
-      
-      setPipeline(prev => prev.map((s, idx) => 
-        idx === stepIndex ? { ...s, progress: Math.min(progress, 95) } : s
-      ))
-      
+
+      // Never overwrite progress on a step that has already finished.
+      // Without this guard, a lingering interval can rewrite progress from 100 back
+      // down to <95 after completeStep/errorStep has fired, which makes the overall
+      // progress bar visibly regress during transitions.
+      setPipeline(prev => prev.map((s, idx) => {
+        if (idx !== stepIndex) return s
+        if (s.status === 'complete' || s.status === 'error') return s
+        return { ...s, progress: Math.min(progress, 95) }
+      }))
+
       if (currentUpdate >= totalUpdates) {
         clearInterval(intervalId)
       }
@@ -599,8 +605,12 @@ function App() {
       if (!ebayService || ebayAvgPrice === 0) {
         const geminiKey = settings?.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY
         if (geminiKey) {
+          // Be honest about the source: eBay is unavailable here; we're falling back
+          // to a Gemini grounded-search across public resale comps. Saying we're
+          // "Searching Mercari/Poshmark/Whatnot/StockX" is aspirational copy for
+          // integrations we haven't wired yet — implies live data we don't have.
           setPipeline(prev => prev.map((s, i) =>
-            i === 2 ? { ...s, data: 'Searching eBay, Mercari, Poshmark, Whatnot, StockX...' } : s
+            i === 2 ? { ...s, data: 'eBay unavailable — using AI market research...' } : s
           ))
           try {
             const researchText = await researchProduct(
@@ -879,7 +889,20 @@ function App() {
         })
       }
 
-      logActivity(decision === 'BUY' ? '✅ Analysis complete — it\'s a BUY!' : '❌ Analysis done — PASS')
+      // Glyph reflects decision semantics: ❌ is reserved for failures, not for
+      // a valid PASS/MAYBE verdict. PENDING means the pipeline produced no
+      // actionable result yet (no price) — flag as a soft warning.
+      const activityGlyph =
+        decision === 'BUY'   ? '✅' :
+        decision === 'MAYBE' ? '🟡' :
+        decision === 'PASS'  ? '⏭️' :
+        /* PENDING */          '⚠️'
+      const activityLabel =
+        decision === 'BUY'   ? 'Analysis complete — it\'s a BUY!' :
+        decision === 'MAYBE' ? 'Analysis done — worth a second look (MAYBE)' :
+        decision === 'PASS'  ? 'Analysis done — PASS' :
+        /* PENDING */          'Analysis done — price needed'
+      logActivity(`${activityGlyph} ${activityLabel}`)
       logDebug(`Scan complete — ${decision}`, 'info', 'scan', {
         product: updatedItem.productName,
         buyPrice: updatedItem.purchasePrice,
