@@ -2708,7 +2708,11 @@ function App() {
     const resetScroll = () => {
       window.scrollTo(0, 0)
       document.getElementById('app-container')?.scrollTo(0, 0)
-      document.querySelectorAll('.scrollable-content, [class*="overflow-y-auto"]').forEach(el => {
+      // Includes .app-scroll-container — the unified PTR scroll-region class
+      // which does NOT carry `overflow-y-auto` as a literal class token
+      // (it's applied via .app-scroll-container's CSS rule). Keep the older
+      // selectors for non-PTR regions that still use them.
+      document.querySelectorAll('.scrollable-content, .app-scroll-container, [class*="overflow-y-auto"]').forEach(el => {
         el.scrollTop = 0
       })
     }

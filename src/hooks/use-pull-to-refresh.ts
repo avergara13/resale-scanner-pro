@@ -22,16 +22,35 @@ interface UsePullToRefreshOptions {
 
 export function usePullToRefresh({
   onRefresh,
-  threshold = 80,
+  threshold: rawThreshold = 80,
   maxPullDistance = 150,
   enabled = true,
 }: UsePullToRefreshOptions) {
+  // The rubber-band curve asymptotes at maxPullDistance — it never quite
+  // reaches it. Guarantee the trigger stays reachable by clamping threshold
+  // below what the asymptote actually produces for any raw pull. Also warn
+  // in development so misconfiguration is surfaced immediately.
+  const threshold = Math.min(rawThreshold, maxPullDistance * 0.9)
+  if (import.meta.env.DEV && rawThreshold > maxPullDistance * 0.9) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[usePullToRefresh] threshold (${rawThreshold}) must stay below ` +
+      `90% of maxPullDistance (${maxPullDistance}) or the rubber-band curve ` +
+      `can't reach it. Clamped to ${threshold}.`,
+    )
+  }
+
   const [isPulling, setIsPulling] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
   const touchStartY = useRef<number>(0)
   const scrollY = useRef<number>(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  // Tracks the post-refresh "hold spinner" timeout so we can cancel it on
+  // unmount — otherwise setIsRefreshing(false) fires on an unmounted hook,
+  // logging a React warning and flaking StrictMode double-invoke tests.
+  const refreshHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isMountedRef = useRef(true)
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     if (!enabled || isRefreshing) return
@@ -89,9 +108,12 @@ export function usePullToRefresh({
         console.error('Refresh failed:', error)
       } finally {
         // Hold the spinner briefly so the refresh state is visible even on
-        // instantaneous-resolve cases (local KV refreshes, etc.).
-        setTimeout(() => {
-          setIsRefreshing(false)
+        // instantaneous-resolve cases (local KV refreshes, etc.). Stored
+        // in a ref so the unmount cleanup can clear it.
+        if (refreshHoldTimer.current) clearTimeout(refreshHoldTimer.current)
+        refreshHoldTimer.current = setTimeout(() => {
+          if (isMountedRef.current) setIsRefreshing(false)
+          refreshHoldTimer.current = null
         }, 400)
       }
     } else {
@@ -116,6 +138,19 @@ export function usePullToRefresh({
       container.removeEventListener('touchend', handleTouchEnd)
     }
   }, [enabled, handleTouchStart, handleTouchMove, handleTouchEnd])
+
+  // Cancel any pending refresh-hold timeout on unmount so setIsRefreshing
+  // doesn't fire on an unmounted hook.
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (refreshHoldTimer.current) {
+        clearTimeout(refreshHoldTimer.current)
+        refreshHoldTimer.current = null
+      }
+    }
+  }, [])
 
   const progress = Math.min(pullDistance / threshold, 1)
   const shouldTrigger = pullDistance >= threshold

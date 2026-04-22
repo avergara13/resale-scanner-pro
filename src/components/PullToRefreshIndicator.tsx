@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { haptics } from '@/lib/haptics'
 
 // iOS-native pull-to-refresh dial.
 //
@@ -43,14 +44,13 @@ export function PullToRefreshIndicator({
   const indicatorHeight = isRefreshing ? 60 : Math.max(pullDistance, 0)
 
   // Haptic tick on the rising edge of shouldTrigger — the "click" moment.
-  // navigator.vibrate is a no-op on desktop and unsupported iOS Safari, so
-  // no guard needed. Only fire once per threshold crossing.
+  // Routed through the shared haptics helper (AGENTS.md: lib/haptics.ts is
+  // the single source of truth) so future bridge/fallback changes apply
+  // uniformly across screens.
   const prevTriggered = useRef(false)
   useEffect(() => {
     if (shouldTrigger && !prevTriggered.current) {
-      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-        navigator.vibrate(10)
-      }
+      haptics.selection()
     }
     prevTriggered.current = shouldTrigger
   }, [shouldTrigger])
