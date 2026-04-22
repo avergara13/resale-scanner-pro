@@ -1604,7 +1604,7 @@ ${settings.userProfile.aiContext}` : ''}`
 
             {/* Messages — pb clears the floating input bar */}
             {chatMessages.length > 0 && (
-            <div ref={pullToRefresh.containerRef} className="flex-1 min-h-0 overflow-y-auto">
+            <div ref={pullToRefresh.containerRef} className="flex-1 min-h-0 app-scroll-container">
               <div className="px-4 py-5 space-y-3" style={{ paddingBottom: '88px' }}>
                 {chatMessages.map((msg, index) => {
                   const ts = new Date(msg.timestamp)
@@ -1764,7 +1764,7 @@ ${settings.userProfile.aiContext}` : ''}`
 
       {/* ── Scans tab ── */}
       {activeTab === 'scans' && (
-        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 overflow-y-auto scrollable-content overscroll-y-contain">
+        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 app-scroll-container">
           <div className="p-4 space-y-3 pb-6">
             {sessionScans.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center py-12 px-4">
@@ -1943,7 +1943,7 @@ ${settings.userProfile.aiContext}` : ''}`
 
       {/* ── Tasks tab ── */}
       {activeTab === 'tasks' && (
-        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 overflow-y-auto scrollable-content overscroll-y-contain">
+        <div ref={pullToRefresh.containerRef} className="flex flex-col flex-1 min-h-0 app-scroll-container">
           <div className="flex-1">
             <div className="p-4 space-y-1">
               {(todos || []).length === 0 && (

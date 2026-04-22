@@ -922,7 +922,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
     <div
       ref={containerRef}
       id="scr-queue"
-      className="h-full w-full overflow-y-auto overflow-x-hidden scrollable-content overscroll-y-contain"
+      className="h-full w-full app-scroll-container"
     >
       {/* Live session banner — sticky at top of scroll container */}
       <div style={{ position: 'sticky', top: 0, zIndex: 20 }}>
