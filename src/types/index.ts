@@ -167,6 +167,10 @@ export interface ScannedItem {
   /**
    * Photo lifecycle fields — understand the layering before touching renders or pipelines.
    *
+   * OWNERSHIP RULE: Scan creates `imageData`; commit-to-queue uploads to Supabase
+   * and populates `photoUrls`. After commit, `imageData` is cleared via
+   * `stripPersistFields()` — `photoUrls` owns the photo from that point forward.
+   *
    * PERSISTENCE CONTRACT:
    * - `photoUrls` is the ONLY photo field guaranteed to survive KV persistence. It is the
    *   durable source of truth once the user finishes the Photo Manager.

@@ -86,6 +86,17 @@ function App() {
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraMode, setCameraMode] = useState<'new-scan' | 'add-photo' | 'replace-primary' | 'listing-photo'>('new-scan')
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
+  // WS-21 Phase 2: clear stale currentItem when opening camera for a *new* scan.
+  // Without this, the prior scan's photos can flash into the Scan Result shell
+  // for the split-second before the fresh ScannedItem hydrates. `add-photo` and
+  // `replace-primary` modes deliberately keep currentItem — they need it.
+  const cameraOpenRef = useRef(false)
+  useEffect(() => {
+    if (cameraOpen && !cameraOpenRef.current && cameraMode === 'new-scan') {
+      setCurrentItem(undefined)
+    }
+    cameraOpenRef.current = cameraOpen
+  }, [cameraOpen, cameraMode])
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
   // Tracks whether the current scan-result was opened from the Agent Scans tab (Reopen)
   // vs a fresh camera scan. Used to show "← Scans" back label in the header.
@@ -1741,7 +1752,14 @@ function App() {
     localPhotos: string[],
     primaryIndex: number,
   ) => {
-    if (!pendingPhotoDecision) return
+    // WS-21 Phase 2: defensive guard — if the user navigated away mid-upload
+    // (e.g. pulled back to sessions), pendingPhotoDecision gets cleared but
+    // PhotoManager may still resolve its upload. Surface this instead of silently
+    // dropping the save so the user knows their work wasn't persisted.
+    if (!pendingPhotoDecision) {
+      toast.error('Photo save cancelled — item no longer available')
+      return
+    }
     const { item, decision, returnScreen } = pendingPhotoDecision
 
     // Upload new local photos only — existing URLs are already on Supabase
@@ -1774,6 +1792,24 @@ function App() {
     }
 
     const finalPhotoUrls = [...existingUrls, ...newlyUploadedUrls]
+
+    // WS-21 Phase 2: delete-cascade for dropped Supabase blobs.
+    // When the user turns OFF "keep existing photos" on re-scan, existingUrls
+    // comes back empty — the old blobs would otherwise orphan in storage. Diff
+    // the previous photoUrls against finalPhotoUrls and delete any URL that's
+    // no longer referenced. Skip when ebayListingId is set: live eBay listings
+    // depend on the URLs, so deleting would break the buyer-visible images.
+    const previousPhotoUrls = pendingPhotoDecision.item.photoUrls || []
+    const hasEbayListing = Boolean(pendingPhotoDecision.item.ebayListingId)
+    if (supabaseService && previousPhotoUrls.length > 0 && !hasEbayListing) {
+      const droppedUrls = previousPhotoUrls.filter(url => !finalPhotoUrls.includes(url))
+      if (droppedUrls.length > 0) {
+        // Fire-and-forget: the UI moves on regardless of the delete outcome.
+        // Upload failures already toast; silent delete failures just orphan.
+        void supabaseService.deletePhotos(droppedUrls)
+      }
+    }
+
     // Use pendingPhotoDecision.item (may have been patched with generated SKU above).
     // stripPersistFields is the canonical KV scrub — defends against any upstream handler
     // that forgot to strip (the original root cause of photos not sticking).

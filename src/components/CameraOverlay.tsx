@@ -63,6 +63,10 @@ export function CameraOverlay({ isOpen, onClose, onCapture, onQuickDraft, onBarc
       setPrice('')
       setQuickDraftMode(false)
       setCondition('New')
+      // WS-21 Phase 2: clear listing-mode photos on close so the next open starts
+      // clean. Previously stale photos from a prior listing session would linger
+      // in overlay state.
+      setListingPhotos([])
     }
     return () => {
       isMountedRef.current = false

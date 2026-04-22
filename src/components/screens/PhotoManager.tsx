@@ -65,6 +65,12 @@ export function PhotoManager({
     ...initialLocalPhotos.map((data): PhotoSlot => ({ type: 'local', data })),
   ])
   const [primaryIndex, setPrimaryIndex] = useState(initialPrimaryIndex)
+  // WS-21 Phase 2: re-scan of an existing listing — explicit keep-vs-replace choice.
+  // Default OFF (start fresh). User opts in to preserve the old Supabase photos.
+  // Only meaningful when editing a listing that actually has existing URLs.
+  const hasExistingUrls = initialExistingUrls.length > 0
+  const showKeepExistingToggle = mode === 'edit' && hasExistingUrls
+  const [keepExisting, setKeepExisting] = useState(false)
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null)
@@ -216,19 +222,41 @@ export function PhotoManager({
   const handleDone = useCallback(async () => {
     setIsUploading(true)
     setUploadError(null)
-    const existingUrls = slots.filter(s => s.type === 'existing').map(s => (s as { type: 'existing'; url: string }).url)
+    // WS-21 Phase 2: when the keep-existing toggle is OFF (edit mode default),
+    // drop existing URLs so the save overwrites the listing's photos with only
+    // the new local captures. Downstream delete-cascade handles the old photos.
+    const existingUrls = showKeepExistingToggle && !keepExisting
+      ? []
+      : slots.filter(s => s.type === 'existing').map(s => (s as { type: 'existing'; url: string }).url)
     const localPhotos = slots.filter(s => s.type === 'local').map(s => (s as { type: 'local'; data: string }).data)
+    // primaryIndex is measured against the full slot list. When we drop the
+    // existing slots (keep-existing toggle OFF), the remaining localPhotos
+    // array indexes over a reordered subset — so we remap by counting how
+    // many existing slots sat *before* the primary, not total. Handles the
+    // case where drag-reorder interleaves existing and local slots like
+    // [local, existing, local, existing] with primary somewhere in the middle.
+    const dropExisting = showKeepExistingToggle && !keepExisting
+    const existingBeforePrimary = dropExisting
+      ? slots.slice(0, primaryIndex).filter(s => s.type === 'existing').length
+      : 0
+    const primarySlot = slots[primaryIndex]
+    // If the primary slot itself was an existing URL being dropped, fall back to
+    // the first remaining local (index 0) — the user saw a dimmed slot and
+    // accepted the replacement.
+    const remappedPrimaryIndex = dropExisting && primarySlot?.type === 'existing'
+      ? 0
+      : Math.max(0, primaryIndex - existingBeforePrimary)
     // Count total uploads for progress (only local photos need uploading)
     setUploadProgress({ done: 0, total: localPhotos.length })
     try {
-      await onDone(existingUrls, localPhotos, primaryIndex)
+      await onDone(existingUrls, localPhotos, remappedPrimaryIndex)
     } catch {
       setUploadError('Upload failed — listing saved without photos. You can retry from the listing card.')
     } finally {
       setIsUploading(false)
       setUploadProgress(null)
     }
-  }, [slots, primaryIndex, onDone])
+  }, [slots, primaryIndex, onDone, showKeepExistingToggle, keepExisting])
 
   // ── Done button label ─────────────────────────────────────────────────────────
 
@@ -285,6 +313,40 @@ export function PhotoManager({
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {/* WS-21 Phase 2: keep-existing-photos toggle for re-scan (edit mode).
+            Default OFF so re-scans start fresh; user opts in to preserve. */}
+        {showKeepExistingToggle && (
+          <div className="mx-4 mt-3 p-3 rounded-xl border border-s2/40 bg-fg flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-t1">
+                Keep {initialExistingUrls.length} existing photo{initialExistingUrls.length !== 1 ? 's' : ''}?
+              </p>
+              <p className="text-xs text-t3 mt-0.5">
+                {keepExisting
+                  ? 'Existing photos will be preserved and new ones added.'
+                  : 'Existing photos will be replaced by this scan.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={keepExisting}
+              onClick={() => setKeepExisting(v => !v)}
+              className={cn(
+                'relative w-11 h-6 rounded-full flex-shrink-0 transition-colors',
+                keepExisting ? 'bg-b1' : 'bg-s2/60'
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform',
+                  keepExisting ? 'translate-x-5' : 'translate-x-0.5'
+                )}
+              />
+            </button>
+          </div>
+        )}
+
         {/* Photo grid */}
         <div className="px-4 pt-4 pb-2">
           {slots.length === 0 ? (
@@ -295,7 +357,9 @@ export function PhotoManager({
             />
           ) : (
             <div className="grid grid-cols-3 gap-2">
-              {slots.map((slot, idx) => (
+              {slots.map((slot, idx) => {
+                const willBeDropped = showKeepExistingToggle && !keepExisting && slot.type === 'existing'
+                return (
                 <div
                   key={idx}
                   draggable
@@ -310,7 +374,8 @@ export function PhotoManager({
                       : primaryIndex === idx
                         ? 'border-amber'
                         : 'border-s2/40',
-                    dragIndex === idx && 'opacity-50'
+                    dragIndex === idx && 'opacity-50',
+                    willBeDropped && 'opacity-40 grayscale'
                   )}
                 >
                   {/* Thumbnail */}
@@ -354,7 +419,8 @@ export function PhotoManager({
                     </div>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
