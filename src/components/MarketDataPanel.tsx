@@ -42,6 +42,16 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
     return null
   }
 
+  const countSuffix = marketData.ebayPageLimited ? '+' : ''
+  // The mean/median gap already drove the `skewed` flag in market-stats.ts,
+  // but the 'thin' state also deserves a visible signal — few samples = low
+  // confidence, and the user should know before trusting the range chip.
+  const showQualityWarning =
+    marketData.ebaySampleQuality === 'skewed' || marketData.ebaySampleQuality === 'thin'
+  const qualityLabel = marketData.ebaySampleQuality === 'thin'
+    ? 'Thin sample — wide spread'
+    : 'Wide spread — using median'
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className="p-3 sm:p-4 border-s2 bg-fg mt-3 sm:mt-4 overflow-hidden">
@@ -62,13 +72,8 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
           </div>
         </CollapsibleTrigger>
 
+        {/* Median leads — it's the trustworthy anchor. Avg is secondary. */}
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
-          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
-            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Avg Sold</p>
-            <p className="text-base sm:text-lg font-mono font-bold text-t1">
-              {formatPrice(marketData.ebayAvgSold)}
-            </p>
-          </div>
           <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
             <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Median</p>
             <p className="text-base sm:text-lg font-mono font-bold text-t1">
@@ -76,14 +81,32 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
             </p>
           </div>
           <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
+            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Avg Sold</p>
+            <p className="text-base sm:text-lg font-mono font-bold text-t1">
+              {formatPrice(marketData.ebayAvgSold)}
+            </p>
+          </div>
+          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
             <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Sold</p>
-            <p className="text-base sm:text-lg font-mono font-bold text-green">{marketData.ebaySoldCount}</p>
+            <p className="text-base sm:text-lg font-mono font-bold text-green">
+              {marketData.ebaySoldCount}{countSuffix}
+            </p>
           </div>
           <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
             <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Active</p>
-            <p className="text-base sm:text-lg font-mono font-bold text-amber">{marketData.ebayActiveListings}</p>
+            <p className="text-base sm:text-lg font-mono font-bold text-amber">
+              {marketData.ebayActiveListings}{countSuffix}
+            </p>
           </div>
         </div>
+
+        {showQualityWarning && (
+          <div className="mt-2 px-2 py-1 rounded-md bg-amber/10 border border-amber/30">
+            <p className="text-[10px] sm:text-xs text-amber font-medium">
+              {qualityLabel}
+            </p>
+          </div>
+        )}
 
         <CollapsibleContent className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
 
@@ -91,9 +114,15 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
         <div className="p-2.5 sm:p-3 rounded-lg bg-bg border border-s2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Price Range</p>
+              <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">
+                {marketData.ebayP10 !== undefined && marketData.ebayP90 !== undefined
+                  ? 'Typical Range (p10–p90)'
+                  : 'Price Range'}
+              </p>
               <p className="text-xs sm:text-sm font-mono font-medium text-t1">
-                {formatPrice(marketData.ebayPriceRange.min)} - {formatPrice(marketData.ebayPriceRange.max)}
+                {marketData.ebayP10 !== undefined && marketData.ebayP90 !== undefined && marketData.ebayP90 > 0
+                  ? `${formatPrice(marketData.ebayP10)} - ${formatPrice(marketData.ebayP90)}`
+                  : `${formatPrice(marketData.ebayPriceRange.min)} - ${formatPrice(marketData.ebayPriceRange.max)}`}
               </p>
             </div>
             {marketData.ebaySellThroughRate !== undefined && (

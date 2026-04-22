@@ -580,7 +580,12 @@ function App() {
               ebayMedianSold: searchResults.medianSoldPrice,
               ebayActiveListings: searchResults.activeCount,
               ebaySoldCount: searchResults.soldCount,
+              ebayTrimmedSoldCount: searchResults.trimmedSoldCount,
               ebayPriceRange: searchResults.priceRange,
+              ebayP10: searchResults.p10,
+              ebayP90: searchResults.p90,
+              ebayPageLimited: searchResults.pageLimited,
+              ebaySampleQuality: searchResults.sampleQuality,
               ebaySellThroughRate: searchResults.sellThroughRate,
               ebayRecentSales: searchResults.soldItems.slice(0, 10),
               ebayActiveItems: searchResults.activeListings.slice(0, 10),
@@ -589,10 +594,14 @@ function App() {
 
             ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : 0
 
+            // Pipeline label: show the honest "50+" suffix when the API hit
+            // its page limit, and lead with median (not mean) — median is the
+            // trustworthy anchor once outliers are in the set.
+            const soldSuffix = searchResults.pageLimited ? '+' : ''
             setPipeline(prev => prev.map((s, i) =>
               i === 2 ? {
                 ...s,
-                data: `Found ${searchResults.soldCount} sold, ${searchResults.activeCount} active. Avg: $${searchResults.averageSoldPrice.toFixed(2)}`
+                data: `Found ${searchResults.soldCount}${soldSuffix} sold, ${searchResults.activeCount}${soldSuffix} active. Median: $${searchResults.medianSoldPrice.toFixed(2)}`
               } : s
             ))
           },
@@ -2160,7 +2169,12 @@ function App() {
               ebayMedianSold: searchResults.medianSoldPrice,
               ebayActiveListings: searchResults.activeCount,
               ebaySoldCount: searchResults.soldCount,
+              ebayTrimmedSoldCount: searchResults.trimmedSoldCount,
               ebayPriceRange: searchResults.priceRange,
+              ebayP10: searchResults.p10,
+              ebayP90: searchResults.p90,
+              ebayPageLimited: searchResults.pageLimited,
+              ebaySampleQuality: searchResults.sampleQuality,
               ebaySellThroughRate: searchResults.sellThroughRate,
               ebayRecentSales: searchResults.soldItems.slice(0, 10),
               ebayActiveItems: searchResults.activeListings.slice(0, 10),

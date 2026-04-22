@@ -217,12 +217,30 @@ export class ListingOptimizationService {
 
     // Numbers are safe; strings all go through sanitizeForPrompt() to neutralize
     // prompt-injection from untrusted vision/OCR/user input.
+    //
+    // Median leads; the raw mean is dropped entirely from the prompt because
+    // unfiltered eBay data is heavy-tailed — the mean was misleading Gemini
+    // into quoting prices 5–10× above what items actually sell for. The p10/p90
+    // band replaces literal min/max to keep the AI's confidence interval tied
+    // to real market density instead of a single outlier listing.
+    const qualityNote = marketData?.ebaySampleQuality === 'thin'
+      ? '\n- NOTE: sample is thin (<5 sold comps) — widen confidence interval and lean toward the median.'
+      : marketData?.ebaySampleQuality === 'skewed'
+        ? '\n- NOTE: sample is skewed (wide mean/median gap) — trust the median over any listed average.'
+        : ''
+    const pageNote = marketData?.ebayPageLimited
+      ? '\n- NOTE: eBay API page-limited — true sold count is higher than shown.'
+      : ''
+    const bandLine = marketData?.ebayP10 !== undefined && marketData?.ebayP90 !== undefined && marketData.ebayP90 > 0
+      ? `\n- Typical price band (p10–p90): $${marketData.ebayP10.toFixed(2)} – $${marketData.ebayP90.toFixed(2)}`
+      : ''
+
     const marketContext = marketData ? `
 Market Data:
-- Average sold price: $${marketData.ebayAvgSold?.toFixed(2) || 'N/A'}
+- Median sold price: $${marketData.ebayMedianSold?.toFixed(2) || 'N/A'}${bandLine}
 - Sell-through rate: ${marketData.ebaySellThroughRate?.toFixed(1) || 'N/A'}%
-- Active listings: ${marketData.ebayActiveListings || 0}
-- Recent sales: ${marketData.ebaySoldCount || 0}
+- Active listings: ${marketData.ebayActiveListings || 0}${marketData.ebayPageLimited ? '+' : ''}
+- Sold count: ${marketData.ebaySoldCount || 0}${marketData.ebayPageLimited ? '+' : ''}${qualityNote}${pageNote}
 ${marketData.ebayRecentSales?.slice(0, 3).map(sale => `  - "${sanitizeForPrompt(sale.title, 120)}" sold for $${sale.price}`).join('\n') || ''}
 ` : ''
 
