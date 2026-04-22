@@ -18,7 +18,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { logActivity } from '@/lib/activity-log'
-import { getEstimatedNetProfit } from '@/lib/profit-utils'
+import { useSessionMetrics } from '@/lib/use-session-metrics'
 import { cn } from '@/lib/utils'
 import type { Session, ScannedItem, ThriftStoreLocation, Screen, AppSettings } from '@/types'
 
@@ -198,26 +198,18 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   const duration = (session.endTime || currentTimestamp) - session.startTime
   const startDate = new Date(session.startTime)
 
-  // Derive all counts from live item data — session metadata counters can lag
-  const buyItems = sessionItems.filter(i => i.decision === 'BUY')
-  const liveBuyCount = buyItems.length
-  const livePassCount = sessionItems.filter(i => i.decision === 'PASS').length
-  const maybeCount = sessionItems.filter(i => i.decision === 'MAYBE').length
+  const {
+    buyItems,
+    buyCount: liveBuyCount,
+    passCount: livePassCount,
+    maybeCount,
+    buyRate,
+    totalInvested,
+    estimatedProfit,
+    avgROI,
+    hasROI,
+  } = useSessionMetrics(sessionItems, settings)
   const totalScans = sessionItems.length
-  // BUY Rate: denominator is decided items only (BUY + PASS + MAYBE).
-  // PENDING items (still being analyzed) are excluded — they haven't been
-  // decided yet and would skew the rate down if included in the denominator.
-  // This makes RATE directly verifiable from the three numbers on the tally card.
-  const totalDecisioned = liveBuyCount + livePassCount + maybeCount
-  const buyRate = totalDecisioned > 0 ? Math.round((liveBuyCount / totalDecisioned) * 100) : 0
-  const totalInvested = buyItems.reduce((s, i) => s + i.purchasePrice, 0)
-  // Fee-aware net profit projection — applies platform fee schedule (eBay default) and
-  // settings-driven rates (ebayFeePercent, ebayAdFeePercent, defaultShippingCost, shippingMaterialsCost).
-  // Each item uses its own preferredPlatform so Mercari/Poshmark/Whatnot/FB items are
-  // costed correctly rather than over-counted with eBay rates.
-  const estimatedProfit = buyItems.reduce((s, i) => s + getEstimatedNetProfit(i, settings).netProfit, 0)
-  // ROI — fee-adjusted profit / invested capital (mirrors CostTrackingScreen.tsx)
-  const avgROI = totalInvested > 0 ? Math.round((estimatedProfit / totalInvested) * 100) : 0
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [
     { value: 'goodwill', label: 'Goodwill' },
@@ -430,8 +422,8 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
               )}
             >
-              <div className={cn('text-base font-bold mono leading-tight', avgROI >= 0 ? 'text-green' : 'text-red')}>
-                {avgROI >= 0 ? '+' : ''}{avgROI}%
+              <div className={cn('text-base font-bold mono leading-tight', !hasROI ? 'text-t3' : avgROI >= 0 ? 'text-green' : 'text-red')}>
+                {!hasROI ? '—' : `${avgROI >= 0 ? '+' : ''}${avgROI}%`}
               </div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">ROI</div>
             </div>

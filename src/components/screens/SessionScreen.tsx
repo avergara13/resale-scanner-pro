@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
-import { getEstimatedNetProfit } from '@/lib/profit-utils'
+import { computeSessionMetrics } from '@/lib/use-session-metrics'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
@@ -119,8 +119,8 @@ function PastSessionCard({
               )}
             >
               <p className="text-caption-1 uppercase tracking-[0.12em] text-t3">ROI</p>
-              <p className={cn('text-footnote font-bold font-mono', roi >= 0 ? 'text-green' : 'text-red')}>
-                {roi >= 0 ? '+' : ''}{roi}%
+              <p className={cn('text-footnote font-bold font-mono', buyCount === 0 ? 'text-t3' : roi >= 0 ? 'text-green' : 'text-red')}>
+                {buyCount === 0 ? '—' : `${roi >= 0 ? '+' : ''}${roi}%`}
               </p>
             </div>
             <div className="material-thin rounded-xl border border-s2/40 p-3">
@@ -411,26 +411,16 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
                 <div className="space-y-2">
                   {openSessions.slice().reverse().map(s => {
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
-                    const buyItems = sessionItems.filter(i => i.decision === 'BUY')
-                    const passItems = sessionItems.filter(i => i.decision === 'PASS')
-                    const maybeCount = sessionItems.filter(i => i.decision === 'MAYBE').length
                     const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
-                    // Fee-aware net profit projection — matches SessionDetailScreen + CostTrackingScreen
-                    const totalProfit = buyItems.reduce((sum, i) => sum + getEstimatedNetProfit(i, settings).netProfit, 0)
-                    const totalInvested = buyItems.reduce((sum, i) => sum + i.purchasePrice, 0)
-                    const roi = totalInvested > 0 ? Math.round((totalProfit / totalInvested) * 100) : 0
-                    const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
+                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, buyRate } = computeSessionMetrics(sessionItems, settings)
                     const duration = (s.endTime || Date.now()) - s.startTime
-                    // BUY Rate: denominator is decided items only (BUY + PASS + MAYBE), excludes PENDING
-                    const totalDecisioned = buyItems.length + passItems.length + maybeCount
-                    const buyRate = totalDecisioned > 0 ? Math.round((buyItems.length / totalDecisioned) * 100) : 0
                     return (
                       <PastSessionCard
                         key={s.id}
                         session={s}
                         items={sessionItems}
-                        buyCount={buyItems.length}
-                        passCount={passItems.length}
+                        buyCount={buyCount}
+                        passCount={passCount}
                         listedCount={listedItems.length}
                         totalProfit={totalProfit}
                         roi={roi}
@@ -461,26 +451,16 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
                 <div className="space-y-2">
                   {pastSessions.slice().reverse().map(s => {
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
-                    const buyItems = sessionItems.filter(i => i.decision === 'BUY')
-                    const passItems = sessionItems.filter(i => i.decision === 'PASS')
-                    const maybeCount = sessionItems.filter(i => i.decision === 'MAYBE').length
                     const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
-                    // Fee-aware net profit projection — matches SessionDetailScreen + CostTrackingScreen
-                    const totalProfit = buyItems.reduce((sum, i) => sum + getEstimatedNetProfit(i, settings).netProfit, 0)
-                    const totalInvested = buyItems.reduce((sum, i) => sum + i.purchasePrice, 0)
-                    const roi = totalInvested > 0 ? Math.round((totalProfit / totalInvested) * 100) : 0
-                    const bestFind = buyItems.length > 0 ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best) : null
+                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, buyRate } = computeSessionMetrics(sessionItems, settings)
                     const duration = (s.endTime || Date.now()) - s.startTime
-                    // BUY Rate: denominator is decided items only (BUY + PASS + MAYBE), excludes PENDING
-                    const totalDecisioned = buyItems.length + passItems.length + maybeCount
-                    const buyRate = totalDecisioned > 0 ? Math.round((buyItems.length / totalDecisioned) * 100) : 0
                     return (
                       <PastSessionCard
                         key={s.id}
                         session={s}
                         items={sessionItems}
-                        buyCount={buyItems.length}
-                        passCount={passItems.length}
+                        buyCount={buyCount}
+                        passCount={passCount}
                         listedCount={listedItems.length}
                         totalProfit={totalProfit}
                         roi={roi}
