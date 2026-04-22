@@ -109,6 +109,15 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
   }
   prevLengthRef.current = steps.length
 
+  // Re-analyze replaces the pipeline in place (5 complete steps → 5 pending
+  // steps) without emptying it first. If we don't detect that transition,
+  // peakRef stays at 100 from the previous run and pins the bar at 100% for
+  // the whole next scan. Treat an all-pending pipeline as a fresh run.
+  const isFreshRun = steps.every(s => s.status === 'pending')
+  if (isFreshRun) {
+    peakRef.current = 0
+  }
+
   // Weighted progress: partial credit for the step currently processing so
   // the bar advances smoothly between phase boundaries instead of jumping
   // 20% chunks. error counts as "done-ish" for progress purposes — the bar
