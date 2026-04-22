@@ -93,7 +93,15 @@ async function callGemini(
       topK: 40,
       topP: 0.95,
       maxOutputTokens: maxTokens,
-      ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
+      // Gemini 2.5 Flash defaults to "thinking" mode — the model burns output
+      // tokens on internal reasoning before emitting the response. For JSON
+      // tasks (listing optimizer, structured extraction) this truncates the
+      // JSON mid-string and trips "Unterminated string" in JSON.parse, forcing
+      // a fallback listing. Disabling thinking reclaims the full maxTokens
+      // budget for the actual response. Chat / creative tasks keep thinking.
+      ...(jsonMode
+        ? { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
+        : {}),
     },
   }
   // Gemini caches systemInstruction across requests with identical prefixes,
