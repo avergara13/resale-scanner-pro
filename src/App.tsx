@@ -2949,6 +2949,7 @@ function App() {
                 onPermanentDeleteSession={handlePermanentDeleteSession}
                 queueItems={queue || []}
                 scanHistory={scanHistory || []}
+                sessionArchives={sessionArchives || []}
                 onOpenItem={handleOpenItemFromSession}
                 onNavigateTo={(s) => { secondaryReturnScreen.current = screen; setScreen(s) }}
                 settings={settings}
