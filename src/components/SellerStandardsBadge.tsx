@@ -41,8 +41,8 @@ function formatMetricValue(value: number | string | undefined): string {
   if (value == null) return ''
   if (typeof value === 'number') {
     // Rates come back as fractions (0.012 = 1.2%). Counts come back as whole
-    // numbers > 1. Heuristic: values under 1 are rates; format as percent.
-    if (value < 1 && value > 0) return `${(value * 100).toFixed(1)}%`
+    // numbers > 1. Heuristic: values from 0 up to 1 are rates; format as percent.
+    if (value >= 0 && value < 1) return `${(value * 100).toFixed(1)}%`
     return Number.isInteger(value) ? String(value) : value.toFixed(2)
   }
   return String(value)
