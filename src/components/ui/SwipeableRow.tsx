@@ -143,6 +143,7 @@ export function SwipeableRow({
 
       <motion.div
         drag={disabled || committing || !isSwipeEnabled ? false : 'x'}
+        dragDirectionLock
         dragConstraints={{ left: -MAX_DRAG, right: MAX_DRAG }}
         dragElastic={0.15}
         dragMomentum={false}

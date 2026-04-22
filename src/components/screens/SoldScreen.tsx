@@ -371,7 +371,7 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
       {/* ── Scrollable list ───────────────────────────────────────────── */}
       <div
         ref={soldContainerRef}
-        className="flex-1 overflow-y-auto scrollable-content overscroll-y-contain"
+        className="flex-1 overflow-y-auto overflow-x-hidden scrollable-content overscroll-y-contain"
       >
         <PullToRefreshIndicator
           isPulling={isPulling}
