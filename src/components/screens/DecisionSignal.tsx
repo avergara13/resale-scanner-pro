@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import type { ScannedItem, Decision } from '@/types'
 
@@ -8,6 +8,11 @@ interface DecisionSignalProps {
 }
 
 export function DecisionSignal({ decision, item }: DecisionSignalProps) {
+  // WS-21 Phase 3: honor prefers-reduced-motion — swap spring for an instant
+  // fade-in so the card still enters cleanly but without the scale bounce.
+  // Call the hook before any early return to satisfy rules-of-hooks.
+  const shouldReduceMotion = useReducedMotion()
+
   // PENDING is a pre-pipeline internal state — never render a final-decision card for it
   if (decision === 'PENDING') return null
 
@@ -17,9 +22,9 @@ export function DecisionSignal({ decision, item }: DecisionSignalProps) {
 
   return (
     <motion.div
-      initial={{ scale: 0.5, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: 'spring', bounce: 0.4 }}
+      initial={shouldReduceMotion ? { opacity: 0 } : { scale: 0.5, opacity: 0 }}
+      animate={shouldReduceMotion ? { opacity: 1 } : { scale: 1, opacity: 1 }}
+      transition={shouldReduceMotion ? { duration: 0.15 } : { type: 'spring', bounce: 0.4 }}
       id="decision-signal"
       className={cn(
         'mt-4 py-5 rounded-2xl flex flex-col items-center justify-center font-black border-4 shadow-xl',

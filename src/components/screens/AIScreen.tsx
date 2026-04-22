@@ -15,8 +15,9 @@ import {
   ClipboardText,
   Camera,
 } from '@phosphor-icons/react'
-import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion'
+import { motion, useMotionValue, useTransform, animate, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { haptics } from '@/lib/haptics'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
@@ -74,10 +75,28 @@ interface AIScreenProps {
 
 // ─── Celebration particles ────────────────────────────────────────────────────
 
+/**
+ * Resolve a CSS custom-property name to its computed `oklch(...)` string.
+ * Falls back to a sensible default when the DOM isn't available (SSR / tests).
+ * We compute at render-time so light/dark mode swaps pick up automatically.
+ */
+function tokenColor(varName: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
+  return v || fallback
+}
+
 function CelebrationParticle({ delay, index }: { delay: number; index: number }) {
   const spread = ((index * 37) % 200) - 100
   const rotation = ((index * 83) % 720) - 360
-  const colors = ['#60aa82', '#c17c5f', '#555ce2', '#f0c75e']
+  // WS-21 Phase 3: swap hardcoded hex → tokens so particles honor theme.
+  // getComputedStyle returns the raw `oklch(...)` string from --green/--amber/--b1.
+  const colors = [
+    tokenColor('--green', 'oklch(0.60 0.17 145)'),
+    tokenColor('--amber', 'oklch(0.75 0.15 75)'),
+    tokenColor('--b1', 'oklch(0.56 0.21 250)'),
+    tokenColor('--system-yellow', 'oklch(0.85 0.17 95)'),
+  ]
   const color = colors[index % colors.length]
   const shapes = ['○', '●', '◆', '★', '✦', '✨']
   const shape = shapes[index % shapes.length]
@@ -102,6 +121,12 @@ function CelebrationParticle({ delay, index }: { delay: number; index: number })
 }
 
 function CelebrationEffect() {
+  // WS-21 Phase 3: honor prefers-reduced-motion. Completely skip the particle
+  // effect — a static glow is already carried by the pipeline card, so absence
+  // of confetti still reads as "complete." 20× infinite scale/rotate/opacity
+  // animations are the most likely motion-sensitivity trigger in the app.
+  const shouldReduceMotion = useReducedMotion()
+  if (shouldReduceMotion) return null
   return (
     <div className="absolute inset-0 pointer-events-none overflow-visible z-50">
       {Array.from({ length: 20 }).map((_, i) => (
@@ -114,6 +139,10 @@ function CelebrationEffect() {
 // ─── Overall progress bar ─────────────────────────────────────────────────────
 
 function OverallProgress({ steps }: { steps: PipelineStep[] }) {
+  // WS-21 Phase 3: gate infinite animations on prefers-reduced-motion.
+  // This bar runs during every scan (not just celebrations), so it's the
+  // most-triggered motion surface for sensitive users.
+  const shouldReduceMotion = useReducedMotion()
   const overallProgress = useMemo(() => {
     if (steps.length === 0) return 0
     let totalProgress = 0
@@ -197,17 +226,19 @@ function OverallProgress({ steps }: { steps: PipelineStep[] }) {
           initial={{ width: '0%' }}
           animate={{
             width: `${overallProgress}%`,
-            backgroundPosition: isProcessing ? ['0% 50%', '100% 50%', '0% 50%'] : '0% 50%',
+            backgroundPosition: isProcessing && !shouldReduceMotion
+              ? ['0% 50%', '100% 50%', '0% 50%']
+              : '0% 50%',
           }}
           transition={{
             width: { duration: 0.6, ease: 'easeOut' },
-            backgroundPosition: isProcessing
+            backgroundPosition: isProcessing && !shouldReduceMotion
               ? { duration: 2, ease: 'linear', repeat: Infinity }
               : { duration: 0 },
           }}
           style={{ backgroundSize: '200% 100%' }}
         >
-          {isProcessing && (
+          {isProcessing && !shouldReduceMotion && (
             <div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent"
               style={{ animation: 'shimmer-sweep 1.5s ease-in-out infinite' }}
@@ -264,6 +295,22 @@ export function AIScreen({
   const [imageOpen, setImageOpen] = useCollapsePreference('ai-image', false)
   const [confirmPass, setConfirmPass] = useState(false)
   const { isListening, startListening, isSupported } = useVoiceInput()
+  // WS-21 Phase 3: Apple-native interaction polish.
+  const shouldReduceMotion = useReducedMotion()
+  // Add to Queue: lock the button while the commit is inflight so a double-tap
+  // can't submit twice. Ref-backed so the guard read is synchronous — a pure
+  // useState reads from closure and can miss a simultaneous double-dispatch in
+  // the same microtask. The matching state flag drives the disabled prop.
+  const isAddingRef = useRef(false)
+  const [isAddingToQueue, setIsAddingToQueue] = useState(false)
+  // Platform selector: 400 ms post-tap lock. Prevents rapid re-taps from
+  // spam-firing state changes (each one can kick a recalc upstream).
+  const platformLockUntilRef = useRef(0)
+  // Photo delete: which additional index is currently fading out (pointer-
+  // events-none for the fade window). Primary delete uses -1. Ref-backed for
+  // a synchronous guard read matching the other inflight locks on this screen.
+  const deletingPhotoRef = useRef<number | null>(null)
+  const [deletingPhotoIdx, setDeletingPhotoIdx] = useState<number | null>(null)
 
   // hasDecision: true only when we have a FINALIZED decision (BUY or PASS).
   // PENDING is the initial value every new scan starts with — including it here
@@ -368,17 +415,72 @@ export function AIScreen({
   })
 
   const handleAddToQueue = useCallback(() => {
-    onCreateListing(parseFloat(buyPrice) || 0, description, {
-      productName: itemName || undefined,
-      category: category || undefined,
-      condition: condition || undefined,
-      description: description || undefined,
-      estimatedSellPrice: parseFloat(estSellPrice) > 0 ? parseFloat(estSellPrice) : undefined,
-      shippingCost: parseFloat(shippingCost) > 0 ? parseFloat(shippingCost) : undefined,
-      platform,
-    })
-    setListingAdded(true)
+    // WS-21 Phase 3: inflight guard — ref read is synchronous so back-to-back
+    // dispatches in the same microtask can't both pass. Also fires medium
+    // haptic to confirm the commit action.
+    if (isAddingRef.current) return
+    isAddingRef.current = true
+    setIsAddingToQueue(true)
+    haptics.impactMedium()
+    try {
+      onCreateListing(parseFloat(buyPrice) || 0, description, {
+        productName: itemName || undefined,
+        category: category || undefined,
+        condition: condition || undefined,
+        description: description || undefined,
+        estimatedSellPrice: parseFloat(estSellPrice) > 0 ? parseFloat(estSellPrice) : undefined,
+        shippingCost: parseFloat(shippingCost) > 0 ? parseFloat(shippingCost) : undefined,
+        platform,
+      })
+      setListingAdded(true)
+    } finally {
+      // onCreateListing is sync-fire-and-forget in the shell; release the lock
+      // after a short window so rapid double-tap is still blocked, but the
+      // button is usable again by the time the user finishes reading the
+      // success banner and navigates away.
+      setTimeout(() => {
+        isAddingRef.current = false
+        setIsAddingToQueue(false)
+      }, 400)
+    }
   }, [buyPrice, description, itemName, category, condition, estSellPrice, shippingCost, platform, onCreateListing])
+
+  // WS-21 Phase 3: platform selector with 400 ms lock + debounced haptic.
+  const handleSelectPlatform = useCallback((id: string) => {
+    const now = Date.now()
+    if (now < platformLockUntilRef.current) return
+    if (id === platform) return
+    platformLockUntilRef.current = now + 400
+    haptics.selectionDebounced()
+    setPlatform(id)
+  }, [platform])
+
+  // WS-21 Phase 3: photo delete with 1 s opacity-fade. Prevents double-click
+  // races while the delete resolves upstream. Synchronous ref guard + state
+  // for rendering the fade.
+  const handleAdditionalPhotoDelete = useCallback((idx: number) => {
+    if (deletingPhotoRef.current !== null) return
+    deletingPhotoRef.current = idx
+    setDeletingPhotoIdx(idx)
+    haptics.selection()
+    onDeletePhoto?.(idx)
+    setTimeout(() => {
+      deletingPhotoRef.current = null
+      setDeletingPhotoIdx(null)
+    }, 1000)
+  }, [onDeletePhoto])
+
+  const handlePrimaryPhotoDelete = useCallback(() => {
+    if (deletingPhotoRef.current !== null) return
+    deletingPhotoRef.current = -1
+    setDeletingPhotoIdx(-1)
+    haptics.selection()
+    onDeletePrimaryPhoto?.()
+    setTimeout(() => {
+      deletingPhotoRef.current = null
+      setDeletingPhotoIdx(null)
+    }, 1000)
+  }, [onDeletePrimaryPhoto])
 
   return (
     <div className="flex flex-col w-full h-full bg-bg">
@@ -653,6 +755,9 @@ export function AIScreen({
                               Range:
                             </span>
                             {/* eBay trimmed band (p10/p90) or min/max fallback */}
+                            {/* WS-21 Phase 3: flex-1 for equal widths; active:scale-[0.99]
+                                + 120 ms transition for press micro-animation;
+                                selectionDebounced haptic suppresses rapid re-tap spam. */}
                             {currentItem?.marketData?.ebayPriceRange && (() => {
                               const p10 = currentItem.marketData.ebayP10
                               const p90 = currentItem.marketData.ebayP90
@@ -663,15 +768,15 @@ export function AIScreen({
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => setEstSellPrice(low.toFixed(2))}
-                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                    onClick={() => { haptics.selectionDebounced(); setEstSellPrice(low.toFixed(2)) }}
+                                    className="flex-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 active:scale-[0.99] transition-all duration-[120ms]"
                                   >
                                     Low ${low.toFixed(0)}
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => setEstSellPrice(high.toFixed(2))}
-                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                    onClick={() => { haptics.selectionDebounced(); setEstSellPrice(high.toFixed(2)) }}
+                                    className="flex-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 active:scale-[0.99] transition-all duration-[120ms]"
                                   >
                                     High ${high.toFixed(0)}
                                   </button>
@@ -683,22 +788,22 @@ export function AIScreen({
                               <>
                                 <button
                                   type="button"
-                                  onClick={() => setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.min.toFixed(2))}
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                  onClick={() => { haptics.selectionDebounced(); setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.min.toFixed(2)) }}
+                                  className="flex-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 active:scale-[0.99] transition-all duration-[120ms]"
                                 >
                                   Low ${currentItem.lensAnalysis.priceRange.min.toFixed(0)}
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.average.toFixed(2))}
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1/80 text-t2 active:bg-s2 transition-colors"
+                                  onClick={() => { haptics.selectionDebounced(); setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.average.toFixed(2)) }}
+                                  className="flex-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1/80 text-t2 active:bg-s2 active:scale-[0.99] transition-all duration-[120ms]"
                                 >
                                   Avg ${currentItem.lensAnalysis.priceRange.average.toFixed(0)}
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.max.toFixed(2))}
-                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 transition-colors"
+                                  onClick={() => { haptics.selectionDebounced(); setEstSellPrice(currentItem!.lensAnalysis!.priceRange!.max.toFixed(2)) }}
+                                  className="flex-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-s1 text-t2 active:bg-s2 active:scale-[0.99] transition-all duration-[120ms]"
                                 >
                                   High ${currentItem.lensAnalysis.priceRange.max.toFixed(0)}
                                 </button>
@@ -708,8 +813,8 @@ export function AIScreen({
                             {currentItem?.estimatedSellPrice && (
                               <button
                                 type="button"
-                                onClick={() => setEstSellPrice(currentItem!.estimatedSellPrice!.toFixed(2))}
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-b1/15 text-b1 active:bg-b1/25 transition-colors"
+                                onClick={() => { haptics.selectionDebounced(); setEstSellPrice(currentItem!.estimatedSellPrice!.toFixed(2)) }}
+                                className="flex-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-b1/15 dark:bg-b1/20 text-b1 active:bg-b1/25 active:scale-[0.99] transition-all duration-[120ms]"
                               >
                                 AI ${currentItem.estimatedSellPrice.toFixed(0)}
                               </button>
@@ -757,9 +862,9 @@ export function AIScreen({
                             {PLATFORMS.map(p => (
                               <button
                                 key={p.id}
-                                onClick={() => setPlatform(p.id)}
+                                onClick={() => handleSelectPlatform(p.id)}
                                 className={cn(
-                                  'px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors',
+                                  'px-2.5 py-1 rounded-lg text-xs font-medium border transition-all active:scale-[0.98]',
                                   platform === p.id
                                     ? 'bg-b1 text-white border-b1'
                                     : 'bg-bg text-t2 border-s2 hover:border-b1/50',
@@ -821,7 +926,14 @@ export function AIScreen({
                     <CollapsibleContent className="mt-3">
                       <div className="flex items-start gap-2 overflow-x-auto pb-1">
                         {/* Primary photo */}
-                        <div className="relative flex-shrink-0">
+                        {/* WS-21 Phase 3: fade + pointer-events-none during delete so
+                            a double-click can't fire the handler twice. */}
+                        <div
+                          className={cn(
+                            'relative flex-shrink-0 transition-opacity duration-300',
+                            deletingPhotoIdx === -1 && 'opacity-40 pointer-events-none',
+                          )}
+                        >
                           <img
                             src={currentItem.imageData || currentItem.imageThumbnail}
                             alt="Primary photo"
@@ -831,8 +943,9 @@ export function AIScreen({
                             Main
                           </span>
                           <button
-                            onClick={() => onDeletePrimaryPhoto?.()}
-                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                            onClick={handlePrimaryPhotoDelete}
+                            disabled={deletingPhotoIdx !== null}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors disabled:opacity-40"
                             style={{ touchAction: 'manipulation' }}
                           >
                             <XCircle size={12} weight="fill" className="text-white" />
@@ -841,15 +954,22 @@ export function AIScreen({
 
                         {/* Additional photos */}
                         {(currentItem.additionalImages || []).map((thumb, idx) => (
-                          <div key={idx} className="relative flex-shrink-0">
+                          <div
+                            key={idx}
+                            className={cn(
+                              'relative flex-shrink-0 transition-opacity duration-300',
+                              deletingPhotoIdx === idx && 'opacity-40 pointer-events-none',
+                            )}
+                          >
                             <img
                               src={thumb}
                               alt={`Photo ${idx + 2}`}
                               className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-s2"
                             />
                             <button
-                              onClick={() => onDeletePhoto?.(idx)}
-                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                              onClick={() => handleAdditionalPhotoDelete(idx)}
+                              disabled={deletingPhotoIdx !== null}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors disabled:opacity-40"
                               style={{ touchAction: 'manipulation' }}
                             >
                               <XCircle size={12} weight="fill" className="text-white" />
@@ -860,7 +980,7 @@ export function AIScreen({
                         {/* Add photo button — hidden when at max 5 */}
                         {(1 + (currentItem.additionalImages?.length || 0)) < 5 && (
                           <button
-                            onClick={() => onAddPhoto?.()}
+                            onClick={() => { haptics.selection(); onAddPhoto?.() }}
                             className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl border-2 border-dashed border-s2 flex flex-col items-center justify-center gap-1 hover:bg-s1 transition-colors active:scale-[0.97]"
                             style={{ touchAction: 'manipulation' }}
                           >
@@ -901,7 +1021,7 @@ export function AIScreen({
             /* Success state — offer to scan another item (new photo via camera) */
             <div className="p-2.5 sm:p-3">
               <Button
-                onClick={() => onOpenCamera?.()}
+                onClick={() => { haptics.selection(); onOpenCamera?.() }}
                 className="w-full h-11 rounded-xl bg-b1 hover:bg-b2 text-white font-semibold text-sm active:scale-[0.97] transition-all"
               >
                 <Scan size={15} weight="bold" className="mr-1.5" />
@@ -915,6 +1035,7 @@ export function AIScreen({
               {formHasChanges && (
                 <Button
                   onClick={() => {
+                    haptics.selection()
                     onRecalculate?.(
                       Number.isFinite(buyPriceFloat) ? buyPriceFloat : 0,
                       Number.isFinite(sellPriceFloat) && sellPriceFloat > 0 ? sellPriceFloat : undefined,
@@ -929,9 +1050,12 @@ export function AIScreen({
               )}
 
               {/* Row 1: secondary actions */}
+              {/* WS-21 Phase 3: haptics on every decision-class tap.
+                  Selection for navigational taps, impactMedium for state-commit
+                  actions (entering Pass confirm, Add to Queue). */}
               <div className="flex gap-2">
                 <Button
-                  onClick={() => onRescan?.()}
+                  onClick={() => { haptics.selection(); onRescan?.() }}
                   variant="outline"
                   className="flex-shrink-0 h-10 px-3 rounded-xl border border-s2 text-t2 hover:text-t1 hover:bg-s1 font-semibold text-xs active:scale-[0.97] transition-all"
                 >
@@ -943,21 +1067,21 @@ export function AIScreen({
                   <>
                     <Button
                       variant="outline"
-                      onClick={() => setConfirmPass(false)}
+                      onClick={() => { haptics.selection(); setConfirmPass(false) }}
                       className="flex-1 h-10 rounded-xl text-xs text-t3 border border-s2 hover:bg-s1 active:scale-[0.97] transition-all"
                     >
                       Cancel
                     </Button>
                     <Button
-                      onClick={() => { onPassItem(parseFloat(buyPrice) || 0, description); setConfirmPass(false) }}
-                      className="flex-1 h-10 rounded-xl text-xs font-bold bg-red hover:opacity-90 text-white border-0 active:scale-[0.97] transition-all"
+                      onClick={() => { haptics.selection(); onPassItem(parseFloat(buyPrice) || 0, description); setConfirmPass(false) }}
+                      className="flex-1 h-10 rounded-xl text-xs font-bold bg-red hover:opacity-90 hover:ring-1 hover:ring-red/30 focus-visible:ring-1 focus-visible:ring-red/30 text-white border-0 active:scale-[0.97] transition-all"
                     >
                       Confirm Pass
                     </Button>
                   </>
                 ) : (
                   <Button
-                    onClick={() => setConfirmPass(true)}
+                    onClick={() => { haptics.impactMedium(); setConfirmPass(true) }}
                     disabled={!canSaveDraft}
                     variant="outline"
                     className="flex-1 h-10 rounded-xl border border-red/40 text-red hover:bg-red/10 font-semibold text-xs sm:text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
@@ -968,7 +1092,7 @@ export function AIScreen({
                 )}
                 {!confirmPass && onMaybeItem && (
                   <Button
-                    onClick={() => onMaybeItem(parseFloat(buyPrice) || 0, description)}
+                    onClick={() => { haptics.selection(); onMaybeItem(parseFloat(buyPrice) || 0, description) }}
                     disabled={!canSaveDraft}
                     variant="outline"
                     className="flex-1 h-10 rounded-xl border border-amber-400/50 text-amber-500 hover:bg-amber-400/10 font-semibold text-xs sm:text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
@@ -978,10 +1102,10 @@ export function AIScreen({
                   </Button>
                 )}
               </div>
-              {/* Row 2: camera + primary CTA — CTA locked when PENDING */}
+              {/* Row 2: camera + primary CTA — CTA locked when PENDING or inflight */}
               <div className="flex gap-2">
                 <button
-                  onClick={() => onOpenCamera?.()}
+                  onClick={() => { haptics.selection(); onOpenCamera?.() }}
                   className="w-11 h-11 flex-shrink-0 rounded-xl border border-s2 text-t2 hover:text-t1 hover:bg-s1 flex items-center justify-center active:scale-[0.97] transition-all"
                   style={{ touchAction: 'manipulation' }}
                   title="Open camera"
@@ -990,7 +1114,7 @@ export function AIScreen({
                 </button>
                 <Button
                   onClick={handleAddToQueue}
-                  disabled={!canSaveDraft || decision === 'PENDING'}
+                  disabled={!canSaveDraft || decision === 'PENDING' || isAddingToQueue}
                   className="flex-1 h-11 rounded-xl border border-system-green/20 bg-system-green text-white font-bold shadow-sm shadow-green/20 disabled:opacity-40 disabled:cursor-not-allowed text-sm active:scale-[0.97] transition-all hover:bg-system-green/90"
                 >
                   <ShoppingCart size={16} weight="bold" className="mr-2" />

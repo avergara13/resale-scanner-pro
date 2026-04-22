@@ -86,6 +86,17 @@ function App() {
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraMode, setCameraMode] = useState<'new-scan' | 'add-photo' | 'replace-primary' | 'listing-photo'>('new-scan')
   const [currentItem, setCurrentItem] = useState<ScannedItem | undefined>()
+  // WS-21 Phase 2: clear stale currentItem when opening camera for a *new* scan.
+  // Without this, the prior scan's photos can flash into the Scan Result shell
+  // for the split-second before the fresh ScannedItem hydrates. `add-photo` and
+  // `replace-primary` modes deliberately keep currentItem — they need it.
+  const cameraOpenRef = useRef(false)
+  useEffect(() => {
+    if (cameraOpen && !cameraOpenRef.current && cameraMode === 'new-scan') {
+      setCurrentItem(undefined)
+    }
+    cameraOpenRef.current = cameraOpen
+  }, [cameraOpen, cameraMode])
   const [pipeline, setPipeline] = useState<PipelineStep[]>([])
   // Tracks whether the current scan-result was opened from the Agent Scans tab (Reopen)
   // vs a fresh camera scan. Used to show "← Scans" back label in the header.
@@ -1740,12 +1751,22 @@ function App() {
     existingUrls: string[],
     localPhotos: string[],
     primaryIndex: number,
+    slotOrder: Array<'existing' | 'local'>,
   ) => {
-    if (!pendingPhotoDecision) return
+    // WS-21 Phase 2: defensive guard — if the user navigated away mid-upload
+    // (e.g. pulled back to sessions), pendingPhotoDecision gets cleared but
+    // PhotoManager may still resolve its upload. Surface this instead of silently
+    // dropping the save so the user knows their work wasn't persisted.
+    if (!pendingPhotoDecision) {
+      toast.error('Photo save cancelled — item no longer available')
+      return
+    }
     const { item, decision, returnScreen } = pendingPhotoDecision
 
-    // Upload new local photos only — existing URLs are already on Supabase
-    let newlyUploadedUrls: string[] = []
+    // Upload new local photos only — existing URLs are already on Supabase.
+    // Preserve per-index results so we can reconstruct finalPhotoUrls in the
+    // exact drag-reordered slot sequence (slotOrder) rather than existing-then-new.
+    let uploadedByIndex: (string | null)[] = localPhotos.map(() => null)
     if (supabaseService && localPhotos.length > 0) {
       // Guarantee a SKU exists — generate one if missing so upload is never silently skipped
       let sku = item.tags?.find(t => t.startsWith('HRBO-'))
@@ -1760,10 +1781,10 @@ function App() {
           supabaseService.uploadPhoto(photo, sku!, `${sku}-0${startIndex + i + 1}.jpg`)
         )
       )
-      newlyUploadedUrls = results
-        .filter(r => r.status === 'fulfilled' && r.value)
-        .map(r => (r as PromiseFulfilledResult<string>).value)
-      const failedCount = localPhotos.length - newlyUploadedUrls.length
+      uploadedByIndex = results.map(r =>
+        r.status === 'fulfilled' && r.value ? r.value : null
+      )
+      const failedCount = uploadedByIndex.filter(v => !v).length
       if (failedCount > 0) {
         toast.warning(`📷 ${failedCount} photo${failedCount > 1 ? 's' : ''} failed to upload — item saved.`)
       }
@@ -1773,7 +1794,37 @@ function App() {
       toast.warning('⚠️ Photos not saved — Supabase storage is not configured.')
     }
 
-    const finalPhotoUrls = [...existingUrls, ...newlyUploadedUrls]
+    // Reconstruct finalPhotoUrls in drag-reordered slot sequence.
+    // Walk slotOrder, pulling from existingUrls or uploadedByIndex in turn.
+    // Failed uploads produce a null entry which flatMap skips cleanly.
+    let eIdx = 0
+    let lIdx = 0
+    const finalPhotoUrls = slotOrder.flatMap((type): string[] => {
+      if (type === 'existing') {
+        const url = existingUrls[eIdx++]
+        return url ? [url] : []
+      }
+      const uploaded = uploadedByIndex[lIdx++]
+      return uploaded ? [uploaded] : []
+    })
+
+    // WS-21 Phase 2: delete-cascade for dropped Supabase blobs.
+    // When the user turns OFF "keep existing photos" on re-scan, existingUrls
+    // comes back empty — the old blobs would otherwise orphan in storage. Diff
+    // the previous photoUrls against finalPhotoUrls and delete any URL that's
+    // no longer referenced. Skip when ebayListingId is set: live eBay listings
+    // depend on the URLs, so deleting would break the buyer-visible images.
+    const previousPhotoUrls = pendingPhotoDecision.item.photoUrls || []
+    const hasEbayListing = Boolean(pendingPhotoDecision.item.ebayListingId)
+    if (supabaseService && previousPhotoUrls.length > 0 && !hasEbayListing) {
+      const droppedUrls = previousPhotoUrls.filter(url => !finalPhotoUrls.includes(url))
+      if (droppedUrls.length > 0) {
+        // Fire-and-forget: the UI moves on regardless of the delete outcome.
+        // Upload failures already toast; silent delete failures just orphan.
+        void supabaseService.deletePhotos(droppedUrls)
+      }
+    }
+
     // Use pendingPhotoDecision.item (may have been patched with generated SKU above).
     // stripPersistFields is the canonical KV scrub — defends against any upstream handler
     // that forgot to strip (the original root cause of photos not sticking).

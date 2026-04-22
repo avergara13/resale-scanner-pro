@@ -1,5 +1,5 @@
 import { Eye, MagnifyingGlass, TrendUp, Calculator, CheckCircle, Lightning, Clock } from '@phosphor-icons/react'
-import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
+import { motion, useMotionValue, useTransform, animate, useReducedMotion } from 'framer-motion'
 import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { PipelineStep } from '@/types'
@@ -83,6 +83,11 @@ function AnimatedPercentage({ targetValue, isActive }: { targetValue: number; is
 }
 
 export function PipelinePanel({ steps }: PipelinePanelProps) {
+  // WS-21 Phase 3: honor prefers-reduced-motion. We gate the *infinite* loops
+  // (gradient pulse, shimmer sweep, floating particles, icon rotations) behind
+  // this flag. The static green glow and gradient backgrounds stay — those are
+  // the "video game lighting" aesthetic the user loves and they don't animate.
+  const shouldReduceMotion = useReducedMotion()
   // Peak progress since the last scan reset. Framer-motion smoothly animates
   // the height of the progress bar, so any regression — even for a single
   // frame — is visible to the user as a rubber-band backwards jump. We clamp
@@ -166,7 +171,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
               isError && 'error'
             )}
           >
-            {isProcessing && (
+            {isProcessing && !shouldReduceMotion && (
               <>
                 <motion.div
                   className={cn(
@@ -217,6 +222,16 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                 ))}
               </>
             )}
+            {/* Reduced-motion fallback: a single static gradient so the card
+                still reads as "in progress" without any repeating animation. */}
+            {isProcessing && shouldReduceMotion && (
+              <div
+                className={cn(
+                  'absolute inset-0 bg-gradient-to-br opacity-25 blur-sm',
+                  config.gradient,
+                )}
+              />
+            )}
             
             {isComplete && (
               <>
@@ -254,7 +269,7 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                     isError && 'bg-red text-white border-red shadow-[0_0_16px_oklch(0.55_0.22_25_/_0.5)]'
                   )}
                 >
-                  {isProcessing && (
+                  {isProcessing && !shouldReduceMotion && (
                     <motion.div
                       className="absolute inset-0 rounded-full bg-b1/20"
                       animate={{
@@ -270,19 +285,23 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                   )}
                   {isComplete ? (
                     <motion.div
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ duration: 0.5, type: 'spring', bounce: 0.5 }}
+                      initial={shouldReduceMotion ? { scale: 1 } : { scale: 0, rotate: -180 }}
+                      animate={shouldReduceMotion ? { scale: 1 } : { scale: 1, rotate: 0 }}
+                      transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.5, type: 'spring', bounce: 0.5 }}
                     >
                       <CheckCircle className="w-[14px] h-[14px] sm:w-[15px] sm:h-[15px] md:w-4 md:h-4" weight="fill" />
                     </motion.div>
                   ) : isProcessing ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                    >
+                    shouldReduceMotion ? (
                       <Lightning className="w-[14px] h-[14px] sm:w-[15px] sm:h-[15px] md:w-4 md:h-4" weight="fill" />
-                    </motion.div>
+                    ) : (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                      >
+                        <Lightning className="w-[14px] h-[14px] sm:w-[15px] sm:h-[15px] md:w-4 md:h-4" weight="fill" />
+                      </motion.div>
+                    )
                   ) : (
                     <Clock className="w-[12px] h-[12px] sm:w-[13px] sm:h-[13px] md:w-[14px] md:h-[14px]" weight="bold" />
                   )}
@@ -367,39 +386,45 @@ export function PipelinePanel({ steps }: PipelinePanelProps) {
                       ease: 'easeOut',
                       times: config.progressTiming
                     },
-                    backgroundPosition: {
-                      duration: config.duration * 1.2,
-                      ease: 'linear',
-                      repeat: Infinity
-                    }
+                    ...(shouldReduceMotion ? {} : {
+                      backgroundPosition: {
+                        duration: config.duration * 1.2,
+                        ease: 'linear',
+                        repeat: Infinity
+                      }
+                    })
                   }}
                 >
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                    animate={{
-                      x: ['-100%', '200%']
-                    }}
-                    transition={{
-                      duration: config.duration * 0.6,
-                      ease: 'easeInOut',
-                      repeat: Infinity
-                    }}
-                  />
-                  <motion.div
-                    className="absolute inset-0"
-                    animate={{
-                      boxShadow: [
-                        '0 0 8px oklch(0.50 0.18 250 / 0.4)',
-                        '0 0 16px oklch(0.68 0.18 75 / 0.6)',
-                        '0 0 8px oklch(0.50 0.18 250 / 0.4)'
-                      ]
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      ease: 'easeInOut',
-                      repeat: Infinity
-                    }}
-                  />
+                  {!shouldReduceMotion && (
+                    <>
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                        animate={{
+                          x: ['-100%', '200%']
+                        }}
+                        transition={{
+                          duration: config.duration * 0.6,
+                          ease: 'easeInOut',
+                          repeat: Infinity
+                        }}
+                      />
+                      <motion.div
+                        className="absolute inset-0"
+                        animate={{
+                          boxShadow: [
+                            '0 0 8px oklch(0.50 0.18 250 / 0.4)',
+                            '0 0 16px oklch(0.68 0.18 75 / 0.6)',
+                            '0 0 8px oklch(0.50 0.18 250 / 0.4)'
+                          ]
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          ease: 'easeInOut',
+                          repeat: Infinity
+                        }}
+                      />
+                    </>
+                  )}
                 </motion.div>
               </motion.div>
             )}

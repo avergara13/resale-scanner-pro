@@ -30,8 +30,9 @@ export interface PhotoManagerProps {
   /** App.tsx handles upload + queue add + navigation.
    *  Photo Manager shows a spinner while this promise is pending.
    *  Pass existing URLs back unchanged; new local photos need uploading.
-   *  Called with (orderedSlots, primaryIndex) where orderedSlots preserves type info. */
-  onDone: (existingUrls: string[], localPhotos: string[], primaryIndex: number) => Promise<void>
+   *  slotOrder encodes the drag-reordered interleaving so App.tsx can reconstruct
+   *  finalPhotoUrls in the correct slot sequence instead of grouping existing-then-new. */
+  onDone: (existingUrls: string[], localPhotos: string[], primaryIndex: number, slotOrder: Array<'existing' | 'local'>) => Promise<void>
   onBack: () => void
   /** Called when user taps "Use Listing Camera". App opens the camera overlay and calls
    *  onCapturedPhotoConsumed after passing the result back via capturedPhoto. */
@@ -65,6 +66,12 @@ export function PhotoManager({
     ...initialLocalPhotos.map((data): PhotoSlot => ({ type: 'local', data })),
   ])
   const [primaryIndex, setPrimaryIndex] = useState(initialPrimaryIndex)
+  // WS-21 Phase 2: re-scan of an existing listing — explicit keep-vs-replace choice.
+  // Default OFF (start fresh). User opts in to preserve the old Supabase photos.
+  // Only meaningful when editing a listing that actually has existing URLs.
+  const hasExistingUrls = initialExistingUrls.length > 0
+  const showKeepExistingToggle = mode === 'edit' && hasExistingUrls
+  const [keepExisting, setKeepExisting] = useState(false)
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null)
@@ -214,23 +221,49 @@ export function PhotoManager({
   // ── Done ──────────────────────────────────────────────────────────────────────
 
   const handleDone = useCallback(async () => {
+    const dropExisting = showKeepExistingToggle && !keepExisting
+    // Copilot: block Done when dropping all existing photos with no new ones to replace them
+    const localCount = slots.filter(s => s.type === 'local').length
+    if (dropExisting && localCount === 0) {
+      toast.error('Add at least one photo to replace the existing ones, or turn on "Keep existing photos".')
+      return
+    }
     setIsUploading(true)
     setUploadError(null)
-    const existingUrls = slots.filter(s => s.type === 'existing').map(s => (s as { type: 'existing'; url: string }).url)
-    const localPhotos = slots.filter(s => s.type === 'local').map(s => (s as { type: 'local'; data: string }).data)
-    // Count total uploads for progress (only local photos need uploading)
+    // Derive ordered arrays from keptSlots so drag-reorder interleaving between
+    // existing and new photos is preserved end-to-end. App.tsx uses slotOrder to
+    // reconstruct finalPhotoUrls in the same sequence rather than grouping existing-then-new.
+    const keptSlots = dropExisting ? slots.filter(s => s.type === 'local') : slots
+    const existingUrls = keptSlots
+      .filter(s => s.type === 'existing')
+      .map(s => (s as { type: 'existing'; url: string }).url)
+    const localPhotos = keptSlots
+      .filter(s => s.type === 'local')
+      .map(s => (s as { type: 'local'; data: string }).data)
+    const slotOrder = keptSlots.map(s => s.type) as Array<'existing' | 'local'>
+    // Remap primaryIndex into keptSlots space
+    const existingBeforePrimary = dropExisting
+      ? slots.slice(0, primaryIndex).filter(s => s.type === 'existing').length
+      : 0
+    const primarySlot = slots[primaryIndex]
+    const remappedPrimaryIndex = dropExisting && primarySlot?.type === 'existing'
+      ? 0
+      : Math.max(0, primaryIndex - existingBeforePrimary)
     setUploadProgress({ done: 0, total: localPhotos.length })
     try {
-      await onDone(existingUrls, localPhotos, primaryIndex)
+      await onDone(existingUrls, localPhotos, remappedPrimaryIndex, slotOrder)
     } catch {
       setUploadError('Upload failed — listing saved without photos. You can retry from the listing card.')
     } finally {
       setIsUploading(false)
       setUploadProgress(null)
     }
-  }, [slots, primaryIndex, onDone])
+  }, [slots, primaryIndex, onDone, showKeepExistingToggle, keepExisting])
 
-  // ── Done button label ─────────────────────────────────────────────────────────
+  // ── Done button label + block state ──────────────────────────────────────────
+
+  const doneBlocked = showKeepExistingToggle && !keepExisting &&
+    slots.filter(s => s.type === 'local').length === 0
 
   const doneLabel =
     mode === 'buy' ? 'Save Photos & Add to Listings' :
@@ -285,6 +318,40 @@ export function PhotoManager({
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {/* WS-21 Phase 2: keep-existing-photos toggle for re-scan (edit mode).
+            Default OFF so re-scans start fresh; user opts in to preserve. */}
+        {showKeepExistingToggle && (
+          <div className="mx-4 mt-3 p-3 rounded-xl border border-s2/40 bg-fg flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-t1">
+                Keep {initialExistingUrls.length} existing photo{initialExistingUrls.length !== 1 ? 's' : ''}?
+              </p>
+              <p className="text-xs text-t3 mt-0.5">
+                {keepExisting
+                  ? 'Existing photos will be preserved and new ones added.'
+                  : 'Existing photos will be replaced by this scan.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={keepExisting}
+              onClick={() => setKeepExisting(v => !v)}
+              className={cn(
+                'relative w-11 h-6 rounded-full flex-shrink-0 transition-colors',
+                keepExisting ? 'bg-b1' : 'bg-s2/60'
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform',
+                  keepExisting ? 'translate-x-5' : 'translate-x-0.5'
+                )}
+              />
+            </button>
+          </div>
+        )}
+
         {/* Photo grid */}
         <div className="px-4 pt-4 pb-2">
           {slots.length === 0 ? (
@@ -295,7 +362,9 @@ export function PhotoManager({
             />
           ) : (
             <div className="grid grid-cols-3 gap-2">
-              {slots.map((slot, idx) => (
+              {slots.map((slot, idx) => {
+                const willBeDropped = showKeepExistingToggle && !keepExisting && slot.type === 'existing'
+                return (
                 <div
                   key={idx}
                   draggable
@@ -310,7 +379,8 @@ export function PhotoManager({
                       : primaryIndex === idx
                         ? 'border-amber'
                         : 'border-s2/40',
-                    dragIndex === idx && 'opacity-50'
+                    dragIndex === idx && 'opacity-50',
+                    willBeDropped && 'opacity-40 grayscale'
                   )}
                 >
                   {/* Thumbnail */}
@@ -354,7 +424,8 @@ export function PhotoManager({
                     </div>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -437,9 +508,14 @@ export function PhotoManager({
 
       {/* Done button */}
       <div className="px-4 pb-6 pt-2 border-t border-s2/40">
+        {doneBlocked && (
+          <p className="text-xs text-red text-center mb-2">
+            Add at least one new photo to replace the existing ones.
+          </p>
+        )}
         <Button
           onClick={handleDone}
-          disabled={isUploading}
+          disabled={isUploading || doneBlocked}
           className="w-full h-14 bg-b1 text-white hover:bg-b1/90 text-sm font-bold rounded-xl transition-all active:scale-98 disabled:opacity-70"
         >
           {isUploading ? (
