@@ -97,6 +97,8 @@ export function SwipeableRow({
     }
   }
 
+  const isSwipeEnabled = Boolean(leftAction || rightAction)
+
   return (
     <div className={cn('relative overflow-hidden', className)}>
       {/* Left-edge action trail — revealed on swipe right */}
@@ -136,7 +138,7 @@ export function SwipeableRow({
       )}
 
       <motion.div
-        drag={disabled || committing ? false : 'x'}
+        drag={disabled || committing || !isSwipeEnabled ? false : 'x'}
         dragConstraints={{ left: -MAX_DRAG, right: MAX_DRAG }}
         dragElastic={0.15}
         dragMomentum={false}
