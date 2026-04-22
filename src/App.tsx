@@ -584,6 +584,8 @@ function App() {
               ebayPriceRange: searchResults.priceRange,
               ebayP10: searchResults.p10,
               ebayP90: searchResults.p90,
+              ebaySoldPageLimited: searchResults.soldPageLimited,
+              ebayActivePageLimited: searchResults.activePageLimited,
               ebayPageLimited: searchResults.pageLimited,
               ebaySampleQuality: searchResults.sampleQuality,
               ebaySellThroughRate: searchResults.sellThroughRate,
@@ -594,14 +596,15 @@ function App() {
 
             ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : 0
 
-            // Pipeline label: show the honest "50+" suffix when the API hit
-            // its page limit, and lead with median (not mean) — median is the
-            // trustworthy anchor once outliers are in the set.
-            const soldSuffix = searchResults.pageLimited ? '+' : ''
+            // Pipeline label: show the honest "50+" suffix *only* on the
+            // metric that actually hit its page limit — sold and active can
+            // be truncated independently. Lead with median (not mean).
+            const soldSuffix = searchResults.soldPageLimited ? '+' : ''
+            const activeSuffix = searchResults.activePageLimited ? '+' : ''
             setPipeline(prev => prev.map((s, i) =>
               i === 2 ? {
                 ...s,
-                data: `Found ${searchResults.soldCount}${soldSuffix} sold, ${searchResults.activeCount}${soldSuffix} active. Median: $${searchResults.medianSoldPrice.toFixed(2)}`
+                data: `Found ${searchResults.soldCount}${soldSuffix} sold, ${searchResults.activeCount}${activeSuffix} active. Median: $${searchResults.medianSoldPrice.toFixed(2)}`
               } : s
             ))
           },
@@ -2173,6 +2176,8 @@ function App() {
               ebayPriceRange: searchResults.priceRange,
               ebayP10: searchResults.p10,
               ebayP90: searchResults.p90,
+              ebaySoldPageLimited: searchResults.soldPageLimited,
+              ebayActivePageLimited: searchResults.activePageLimited,
               ebayPageLimited: searchResults.pageLimited,
               ebaySampleQuality: searchResults.sampleQuality,
               ebaySellThroughRate: searchResults.sellThroughRate,

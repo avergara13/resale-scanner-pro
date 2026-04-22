@@ -42,7 +42,11 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
     return null
   }
 
-  const countSuffix = marketData.ebayPageLimited ? '+' : ''
+  // Per-metric suffix — sold and active can be truncated independently.
+  // Fall back to the legacy combined flag when per-source flags aren't set
+  // (e.g. older persisted items that predate WS-21 Phase 1).
+  const soldSuffix = (marketData.ebaySoldPageLimited ?? marketData.ebayPageLimited) ? '+' : ''
+  const activeSuffix = (marketData.ebayActivePageLimited ?? marketData.ebayPageLimited) ? '+' : ''
   // The mean/median gap already drove the `skewed` flag in market-stats.ts,
   // but the 'thin' state also deserves a visible signal — few samples = low
   // confidence, and the user should know before trusting the range chip.
@@ -89,13 +93,13 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
           <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
             <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Sold</p>
             <p className="text-base sm:text-lg font-mono font-bold text-green">
-              {marketData.ebaySoldCount}{countSuffix}
+              {marketData.ebaySoldCount}{soldSuffix}
             </p>
           </div>
           <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
             <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Active</p>
             <p className="text-base sm:text-lg font-mono font-bold text-amber">
-              {marketData.ebayActiveListings}{countSuffix}
+              {marketData.ebayActiveListings}{activeSuffix}
             </p>
           </div>
         </div>

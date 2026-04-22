@@ -34,10 +34,16 @@ export interface EbayMarketData {
     min: number
     max: number
   }
-  /** 10th / 90th percentile of the trimmed sold set. Use for range chips. */
-  p10: number
-  p90: number
-  /** True if either source hit its page limit — displayed counts are a floor. */
+  /**
+   * 10th / 90th percentile of the trimmed sold set. `undefined` when the
+   * trimmed sample was thin (<5 points) — see market-stats.ts header.
+   */
+  p10?: number
+  p90?: number
+  /** Per-source truncation so UIs only mark `+` on the metric that was capped. */
+  soldPageLimited: boolean
+  activePageLimited: boolean
+  /** Derived: `soldPageLimited || activePageLimited`. Legacy convenience. */
   pageLimited: boolean
   sampleQuality: SampleQuality
   recommendedPrice: number
@@ -94,6 +100,8 @@ export class EbayService {
         priceRange: stats.priceRange,
         p10: stats.p10,
         p90: stats.p90,
+        soldPageLimited: stats.soldPageLimited,
+        activePageLimited: stats.activePageLimited,
         pageLimited: stats.pageLimited,
         sampleQuality: stats.sampleQuality,
         recommendedPrice: stats.recommendedPrice,

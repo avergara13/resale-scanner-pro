@@ -20,9 +20,14 @@ export interface MarketStats {
   averageSoldPrice: number
   /** Median of the trimmed sold set. The most trustworthy "typical" price. */
   medianSoldPrice: number
-  /** 10th / 90th percentile of the trimmed sold set. Use for range chips. */
-  p10: number
-  p90: number
+  /**
+   * 10th / 90th percentile of the trimmed sold set. `undefined` when the
+   * trimmed sample is thin (<5 points) — on tiny samples linear-interpolation
+   * pulls extremes inward and hides real spread exactly when uncertainty is
+   * highest. Consumers must gate band-preferred UI on the typeof check.
+   */
+  p10?: number
+  p90?: number
   /** Literal min/max of the trimmed sold set — for compat with existing UI. */
   priceRange: { min: number; max: number }
   soldCount: number
@@ -30,7 +35,14 @@ export interface MarketStats {
   /** Kept sold-count after MAD trim. `soldCount - trimmedSoldCount` = dropped. */
   trimmedSoldCount: number
   sellThroughRate: number
-  /** True if either fetch hit its API page limit — the "count" is a floor, not a true total. */
+  /**
+   * Per-source truncation flags. Tracked separately so the UI can render `+`
+   * only on the metric that was actually capped — collapsing both into one
+   * boolean misleads users when (say) sold=100+ but active=15 is the true total.
+   */
+  soldPageLimited: boolean
+  activePageLimited: boolean
+  /** Derived convenience: `soldPageLimited || activePageLimited`. */
   pageLimited: boolean
   /**
    * - `thin`  = fewer than 5 trimmed sold points → no MAD applied, low confidence
@@ -114,8 +126,14 @@ export function computeMarketStats(input: ComputeMarketStatsInput): MarketStats 
     : 0
 
   const medianSoldPrice = median(trimmed)
-  const p10 = percentile(trimmed, 0.10)
-  const p90 = percentile(trimmed, 0.90)
+  // Withhold p10/p90 when the sample is too thin to percentile-rank
+  // meaningfully. With N<5 the linear interpolation pulls extremes inward —
+  // two comps get averaged into a band that looks tighter than reality
+  // exactly when uncertainty is highest. Consumers already fall back to
+  // priceRange.min/max in this case.
+  const hasBand = trimmed.length >= 5
+  const p10 = hasBand ? percentile(trimmed, 0.10) : undefined
+  const p90 = hasBand ? percentile(trimmed, 0.90) : undefined
 
   const priceRange = trimmed.length > 0
     ? { min: Math.min(...trimmed), max: Math.max(...trimmed) }
@@ -127,7 +145,9 @@ export function computeMarketStats(input: ComputeMarketStatsInput): MarketStats 
     ? (soldCount / (soldCount + activeCount)) * 100
     : 0
 
-  const pageLimited = Boolean(input.soldPageLimited || input.activePageLimited)
+  const soldPageLimited = Boolean(input.soldPageLimited)
+  const activePageLimited = Boolean(input.activePageLimited)
+  const pageLimited = soldPageLimited || activePageLimited
 
   let sampleQuality: SampleQuality = 'ok'
   if (trimmed.length < 5) {
@@ -149,6 +169,8 @@ export function computeMarketStats(input: ComputeMarketStatsInput): MarketStats 
     activeCount,
     trimmedSoldCount,
     sellThroughRate,
+    soldPageLimited,
+    activePageLimited,
     pageLimited,
     sampleQuality,
     recommendedPrice,

@@ -228,9 +228,13 @@ export class ListingOptimizationService {
       : marketData?.ebaySampleQuality === 'skewed'
         ? '\n- NOTE: sample is skewed (wide mean/median gap) — trust the median over any listed average.'
         : ''
-    const pageNote = marketData?.ebayPageLimited
-      ? '\n- NOTE: eBay API page-limited — true sold count is higher than shown.'
-      : ''
+    const soldCapped = marketData?.ebaySoldPageLimited ?? marketData?.ebayPageLimited
+    const activeCapped = marketData?.ebayActivePageLimited ?? marketData?.ebayPageLimited
+    const pageNote = soldCapped
+      ? '\n- NOTE: sold-comp fetch was page-limited — true sold count is higher than shown.'
+      : activeCapped
+        ? '\n- NOTE: active-listings fetch was page-limited — true active count is higher than shown.'
+        : ''
     const bandLine = marketData?.ebayP10 !== undefined && marketData?.ebayP90 !== undefined && marketData.ebayP90 > 0
       ? `\n- Typical price band (p10–p90): $${marketData.ebayP10.toFixed(2)} – $${marketData.ebayP90.toFixed(2)}`
       : ''
@@ -239,8 +243,8 @@ export class ListingOptimizationService {
 Market Data:
 - Median sold price: $${marketData.ebayMedianSold?.toFixed(2) || 'N/A'}${bandLine}
 - Sell-through rate: ${marketData.ebaySellThroughRate?.toFixed(1) || 'N/A'}%
-- Active listings: ${marketData.ebayActiveListings || 0}${marketData.ebayPageLimited ? '+' : ''}
-- Sold count: ${marketData.ebaySoldCount || 0}${marketData.ebayPageLimited ? '+' : ''}${qualityNote}${pageNote}
+- Active listings: ${marketData.ebayActiveListings || 0}${activeCapped ? '+' : ''}
+- Sold count: ${marketData.ebaySoldCount || 0}${soldCapped ? '+' : ''}${qualityNote}${pageNote}
 ${marketData.ebayRecentSales?.slice(0, 3).map(sale => `  - "${sanitizeForPrompt(sale.title, 120)}" sold for $${sale.price}`).join('\n') || ''}
 ` : ''
 

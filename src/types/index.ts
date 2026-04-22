@@ -346,7 +346,10 @@ export interface MarketData {
   /** 10th/90th percentile of trimmed sold prices — preferred for range chips. */
   ebayP10?: number
   ebayP90?: number
-  /** True if either eBay fetch hit its API page limit; "counts" are a floor, not total. */
+  /** Per-source page-limit flags — apply `+` only to the metric that was capped. */
+  ebaySoldPageLimited?: boolean
+  ebayActivePageLimited?: boolean
+  /** Derived: true if either eBay fetch hit its page limit. Legacy convenience. */
   ebayPageLimited?: boolean
   /** Data-quality signal: 'thin' = <5 samples, 'skewed' = wide avg/median gap, 'ok' = trust median. */
   ebaySampleQuality?: 'thin' | 'skewed' | 'ok'
