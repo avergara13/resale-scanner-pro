@@ -4,6 +4,7 @@ import { getCategoryInfo } from './ebay-category-table'
 import { calculateProfitFallback } from './ebay-service'
 import type { GeminiVisionResponse } from './gemini-service'
 import { fetchCategoryAspects, pickImportantAspects, aspectsToPromptBlock } from './ebay-taxonomy-service'
+import { logDebug } from '@/lib/debug-log'
 
 /**
  * Sanitize a user-supplied string before interpolating it into an LLM prompt.
@@ -97,22 +98,26 @@ export class ListingOptimizationService {
         anthropicApiKey: this.anthropicApiKey,
         jsonMode: true,
         // Listing JSON includes long description + item specifics + SEO arrays.
-        // 2048 (the callLLM default) truncated mid-string, causing the
-        // "Unterminated string" JSON.parse failures that fell back to a
-        // generic skeleton listing. 4096 fits the full optimized schema.
-        maxTokens: 4096,
+        // 2048 (the callLLM default) and 4096 both truncated mid-string on
+        // rich items (MacBooks, jackets), causing "Unterminated string"
+        // JSON.parse failures that fell back to a generic skeleton listing.
+        // 8192 is Gemini 2.5 Flash's supported output ceiling and fits the
+        // full optimized schema with headroom. callGemini now also throws
+        // on finishReason === 'MAX_TOKENS' so any remaining truncation
+        // surfaces as a clean warn instead of a silent JSON.parse death.
+        maxTokens: 8192,
       })
 
       let parsed: unknown
       try {
         parsed = JSON.parse(response)
       } catch (parseErr) {
-        console.error('Listing optimizer returned non-JSON response, falling back:', parseErr)
+        logDebug('Listing optimizer returned non-JSON — falling back', 'warn', 'gemini', { message: (parseErr as Error).message })
         return this.generateFallbackListing(context)
       }
 
       if (!validateOptimizedListingShape(parsed)) {
-        console.error('Listing optimizer JSON missing required fields (title/description), falling back')
+        logDebug('Listing optimizer JSON missing required fields — falling back', 'warn', 'gemini')
         return this.generateFallbackListing(context)
       }
 
