@@ -1120,6 +1120,7 @@ const server = http.createServer(async (req, res) => {
         price: parseFloat(s.price?.value) || 0,
         currency: s.price?.currency || 'USD',
         condition: s.condition || 'Unknown',
+        itemId: s.itemId || '',
         itemWebUrl: s.itemWebUrl || '',
         thumbnail: s.thumbnailImages?.[0]?.imageUrl || s.image?.imageUrl || '',
       }))
@@ -1214,6 +1215,7 @@ const server = http.createServer(async (req, res) => {
         currency: s.lastSoldPrice?.currency || 'USD',
         condition: s.condition || 'Unknown',
         soldDate: s.lastSoldDate || '',
+        itemId: s.itemId || '',
         itemWebUrl: s.itemWebUrl || '',
         thumbnail: s.thumbnailImages?.[0]?.imageUrl || s.image?.imageUrl || '',
       }))

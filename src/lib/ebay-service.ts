@@ -4,11 +4,17 @@ export interface EbayMarketData {
     price: number
     soldDate: string
     condition: string
+    itemId?: string
+    itemWebUrl?: string
+    thumbnail?: string
   }>
   activeListings: Array<{
     title: string
     price: number
     quantity: number
+    itemId?: string
+    itemWebUrl?: string
+    thumbnail?: string
   }>
   averageSoldPrice: number
   medianSoldPrice: number
@@ -110,7 +116,15 @@ export class EbayService {
         return []
       }
       const data = await resp.json() as {
-        items?: Array<{ title: string; price: number; soldDate: string; condition: string }>
+        items?: Array<{
+          title: string
+          price: number
+          soldDate: string
+          condition: string
+          itemId?: string
+          itemWebUrl?: string
+          thumbnail?: string
+        }>
       }
       return Array.isArray(data.items)
         ? data.items.map(it => ({
@@ -118,6 +132,9 @@ export class EbayService {
             price: it.price,
             soldDate: it.soldDate || '',
             condition: it.condition || 'Unknown',
+            itemId: it.itemId || '',
+            itemWebUrl: it.itemWebUrl || '',
+            thumbnail: it.thumbnail || '',
           }))
         : []
     } catch (error) {
@@ -138,13 +155,23 @@ export class EbayService {
         return { soldItems: [], activeListings: [] }
       }
       const data = await resp.json() as {
-        items?: Array<{ title: string; price: number; condition: string }>
+        items?: Array<{
+          title: string
+          price: number
+          condition: string
+          itemId?: string
+          itemWebUrl?: string
+          thumbnail?: string
+        }>
       }
       const items = Array.isArray(data.items) ? data.items : []
       const listings = items.map(it => ({
         title: it.title,
         price: it.price,
         quantity: 1,
+        itemId: it.itemId || '',
+        itemWebUrl: it.itemWebUrl || '',
+        thumbnail: it.thumbnail || '',
       }))
       // Marketplace Insights is the source of sold comps now. This proxy
       // only returns active listings; if Insights is unavailable the caller
@@ -156,6 +183,9 @@ export class EbayService {
         price: it.price,
         soldDate: '',
         condition: it.condition || 'Unknown',
+        itemId: it.itemId || '',
+        itemWebUrl: it.itemWebUrl || '',
+        thumbnail: it.thumbnail || '',
       }))
       return { soldItems, activeListings: listings }
     } catch (error) {

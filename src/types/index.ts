@@ -347,11 +347,17 @@ export interface MarketData {
     price: number
     soldDate: string
     condition: string
+    itemId?: string
+    itemWebUrl?: string
+    thumbnail?: string
   }>
   ebayActiveItems?: Array<{
     title: string
     price: number
     quantity: number
+    itemId?: string
+    itemWebUrl?: string
+    thumbnail?: string
   }>
   googleShoppingMin?: number
   googleShoppingMax?: number

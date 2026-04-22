@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -6,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { TrendUp, Tag, ChartBar, Package, CaretDown } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useCollapsePreference } from '@/hooks/use-collapse-preference'
+import { CompDetailModal, type Comp } from '@/components/CompDetailModal'
 import type { MarketData } from '@/types'
 
 interface MarketDataPanelProps {
@@ -14,6 +16,7 @@ interface MarketDataPanelProps {
 
 export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
   const [isOpen, setIsOpen] = useCollapsePreference('market-data', false)
+  const [activeComp, setActiveComp] = useState<Comp | null>(null)
 
   if (!marketData) {
     return null
@@ -130,21 +133,49 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
           </div>
           <ScrollArea className="h-32 sm:h-40">
             <div className="space-y-2 pr-3">
-              {marketData.ebayRecentSales.map((sale, idx) => (
-                <div key={idx} className="p-2 rounded-lg border border-s2 bg-bg">
-                  <div className="flex justify-between items-start gap-2">
-                    <p className="text-[11px] sm:text-xs text-t1 line-clamp-2 flex-1">{sale.title}</p>
-                    <Badge variant="secondary" className="font-mono text-[10px] sm:text-xs shrink-0">
-                      {formatPrice(sale.price)}
-                    </Badge>
+              {marketData.ebayRecentSales.map((sale, idx) => {
+                // A row is only interactive if we have *something* to show in
+                // the drill-down — itemId drives the enrichment fetch,
+                // itemWebUrl drives the "View on eBay" CTA. Neither = dead row.
+                const tappable = Boolean(sale.itemId || sale.itemWebUrl)
+                const content = (
+                  <>
+                    <div className="flex justify-between items-start gap-2">
+                      <p className="text-[11px] sm:text-xs text-t1 line-clamp-2 flex-1">{sale.title}</p>
+                      <Badge variant="secondary" className="font-mono text-[10px] sm:text-xs shrink-0">
+                        {formatPrice(sale.price)}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] sm:text-xs text-t3">{sale.condition}</span>
+                      <span className="text-[10px] sm:text-xs text-t3">•</span>
+                      <span className="text-[10px] sm:text-xs text-t3">{formatDate(sale.soldDate)}</span>
+                    </div>
+                  </>
+                )
+                return tappable ? (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveComp({
+                      title: sale.title,
+                      price: sale.price,
+                      condition: sale.condition,
+                      soldDate: sale.soldDate,
+                      itemId: sale.itemId,
+                      itemWebUrl: sale.itemWebUrl,
+                      thumbnail: sale.thumbnail,
+                    })}
+                    className="w-full text-left p-2 rounded-lg border border-s2 bg-bg hover:border-b1/60 hover:bg-bg/60 active:bg-s2/40 transition-colors"
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div key={idx} className="p-2 rounded-lg border border-s2 bg-bg">
+                    {content}
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] sm:text-xs text-t3">{sale.condition}</span>
-                    <span className="text-[10px] sm:text-xs text-t3">•</span>
-                    <span className="text-[10px] sm:text-xs text-t3">{formatDate(sale.soldDate)}</span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </ScrollArea>
         </div>
@@ -161,22 +192,44 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
           </div>
           <ScrollArea className="h-28 sm:h-32">
             <div className="space-y-2 pr-3">
-              {marketData.ebayActiveItems.map((item, idx) => (
-                <div key={idx} className="p-2 rounded-lg border border-s2 bg-bg">
+              {marketData.ebayActiveItems.map((item, idx) => {
+                const tappable = Boolean(item.itemId || item.itemWebUrl)
+                const content = (
                   <div className="flex justify-between items-start gap-2">
                     <p className="text-[11px] sm:text-xs text-t1 line-clamp-2 flex-1">{item.title}</p>
                     <Badge variant="outline" className="font-mono text-[10px] sm:text-xs shrink-0">
                       {formatPrice(item.price)}
                     </Badge>
                   </div>
-                </div>
-              ))}
+                )
+                return tappable ? (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveComp({
+                      title: item.title,
+                      price: item.price,
+                      itemId: item.itemId,
+                      itemWebUrl: item.itemWebUrl,
+                      thumbnail: item.thumbnail,
+                    })}
+                    className="w-full text-left p-2 rounded-lg border border-s2 bg-bg hover:border-b1/60 hover:bg-bg/60 active:bg-s2/40 transition-colors"
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div key={idx} className="p-2 rounded-lg border border-s2 bg-bg">
+                    {content}
+                  </div>
+                )
+              })}
             </div>
           </ScrollArea>
         </div>
       )}
         </CollapsibleContent>
       </Card>
+      <CompDetailModal comp={activeComp} onClose={() => setActiveComp(null)} />
     </Collapsible>
   )
 }
