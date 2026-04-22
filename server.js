@@ -66,6 +66,15 @@ const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.marketing',
   'https://api.ebay.com/oauth/api_scope/sell.account',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
+  'https://api.ebay.com/oauth/api_scope/sell.finances',
+  'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
+].join(' ')
+// Application (client_credentials) scopes — covers Browse, Taxonomy, and
+// Marketplace Insights. The Insights scope requires eBay approval which
+// this account has. Separate from the user OAuth scopes above.
+const EBAY_APP_SCOPES = [
+  'https://api.ebay.com/oauth/api_scope',
+  'https://api.ebay.com/oauth/api_scope/buy.marketplace.insights',
 ].join(' ')
 const EBAY_MERCHANT_LOCATION_KEY = 'hobbyst-orlando'
 // Fixed UUID for the ebay_tokens singleton row. The table always holds exactly
@@ -292,7 +301,7 @@ async function getEbayAppToken() {
   const basicAuth = Buffer.from(`${ebayAppId}:${ebayCertId}`).toString('base64')
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
-    scope: 'https://api.ebay.com/oauth/api_scope',
+    scope: EBAY_APP_SCOPES,
   }).toString()
   const tokenData = await fetchJson(`${ebayBaseUrl}/identity/v1/oauth2/token`, {
     method: 'POST',
@@ -1098,6 +1107,223 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const status = error.status || 500
       console.error('[ebay/market-search] failed:', error.message)
+      sendJson(res, status, { error: error.message })
+    }
+    return
+  }
+
+  // ── eBay sold-comps — Marketplace Insights (real 90-day sold items) ──────
+  // Closes the gap that market-search couldn't: Browse returns *active*
+  // listings, Insights returns actual *sold* prices with dates. Combined
+  // they give the scanner a real supply/demand picture for any query.
+  // Body: { query, categoryId?, limit? (max 200), daysBack? (max 90) }
+  if (requestUrl.pathname === '/api/ebay/sold-comps' && req.method === 'POST') {
+    try {
+      const body = await readRequestBody(req)
+      const query = typeof body.query === 'string' ? body.query.trim() : ''
+      if (!query) { sendJson(res, 400, { error: 'query is required' }); return }
+      const limit = Math.min(Math.max(parseInt(body.limit, 10) || 50, 1), 200)
+      const categoryId = typeof body.categoryId === 'string' ? body.categoryId : null
+      const daysBack = Math.min(Math.max(parseInt(body.daysBack, 10) || 90, 1), 90)
+
+      const accessToken = await getEbayAppToken()
+      const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
+      const params = new URLSearchParams({
+        q: query,
+        limit: String(limit),
+        filter: `lastSoldDate:[${since}..]`,
+      })
+      if (categoryId) params.set('category_ids', categoryId)
+
+      const insightsUrl = `${ebayBaseUrl}/buy/marketplace_insights/v1_beta/item_sales/search?${params.toString()}`
+      const resp = await fetch(insightsUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '')
+        console.error('[ebay/sold-comps] Marketplace Insights error', resp.status, text.slice(0, 300))
+        sendJson(res, resp.status, { error: `Marketplace Insights ${resp.status}`, detail: text.slice(0, 300) })
+        return
+      }
+      const data = await resp.json()
+      const sales = Array.isArray(data.itemSales) ? data.itemSales : []
+      const items = sales.map(s => ({
+        title: s.title || '',
+        price: parseFloat(s.lastSoldPrice?.value) || 0,
+        currency: s.lastSoldPrice?.currency || 'USD',
+        condition: s.condition || 'Unknown',
+        soldDate: s.lastSoldDate || '',
+        itemWebUrl: s.itemWebUrl || '',
+        thumbnail: s.thumbnailImages?.[0]?.imageUrl || s.image?.imageUrl || '',
+      }))
+      const prices = items.map(i => i.price).filter(p => p > 0)
+      const sorted = [...prices].sort((a, b) => a - b)
+      const avgSoldPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
+      const mid = Math.floor(sorted.length / 2)
+      const medianSoldPrice = sorted.length === 0
+        ? 0
+        : sorted.length % 2 === 1
+          ? sorted[mid]
+          : (sorted[mid - 1] + sorted[mid]) / 2
+      sendJson(res, 200, {
+        soldCount: items.length,
+        avgSoldPrice: Math.round(avgSoldPrice * 100) / 100,
+        medianSoldPrice: Math.round(medianSoldPrice * 100) / 100,
+        lowSoldPrice: sorted[0] || 0,
+        highSoldPrice: sorted[sorted.length - 1] || 0,
+        daysBack,
+        items,
+      })
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ebay/sold-comps] failed:', error.message)
+      sendJson(res, status, { error: error.message })
+    }
+    return
+  }
+
+  // ── eBay item detail — Browse API for rich product page ─────────────────
+  // GET /api/ebay/item/:itemId → full listing incl. specifications, seller,
+  // returns, shipping options. Drives the "research deeper" UX when a user
+  // taps a comp in the market card.
+  const itemDetailMatch = requestUrl.pathname.match(/^\/api\/ebay\/item\/(.+)$/)
+  if (itemDetailMatch && req.method === 'GET') {
+    try {
+      const itemId = decodeURIComponent(itemDetailMatch[1])
+      const accessToken = await getEbayAppToken()
+      const detailUrl = `${ebayBaseUrl}/buy/browse/v1/item/${encodeURIComponent(itemId)}`
+      const resp = await fetch(detailUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      })
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '')
+        sendJson(res, resp.status, { error: `eBay Browse item ${resp.status}`, detail: text.slice(0, 200) })
+        return
+      }
+      sendJson(res, 200, await resp.json())
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ebay/item] failed:', error.message)
+      sendJson(res, status, { error: error.message })
+    }
+    return
+  }
+
+  // ── eBay taxonomy aspects — official item-specifics schema per category ──
+  // GET /api/ebay/taxonomy/:categoryId/aspects → required + recommended
+  // aspects for a category. Feeding these into the listing optimizer means
+  // item specifics match eBay's schema instead of being AI-guessed.
+  const aspectsMatch = requestUrl.pathname.match(/^\/api\/ebay\/taxonomy\/([^/]+)\/aspects$/)
+  if (aspectsMatch && req.method === 'GET') {
+    try {
+      const categoryId = decodeURIComponent(aspectsMatch[1])
+      const accessToken = await getEbayAppToken()
+      // Tree ID 0 = US marketplace. Hardcoded because this service only
+      // serves EBAY_US (see X-EBAY-C-MARKETPLACE-ID everywhere else).
+      const url = `${ebayBaseUrl}/commerce/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=${encodeURIComponent(categoryId)}`
+      const resp = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      })
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '')
+        sendJson(res, resp.status, { error: `eBay Taxonomy ${resp.status}`, detail: text.slice(0, 200) })
+        return
+      }
+      sendJson(res, 200, await resp.json())
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ebay/taxonomy] failed:', error.message)
+      sendJson(res, status, { error: error.message })
+    }
+    return
+  }
+
+  // ── eBay finances — real payouts + transactions for profit reconciliation
+  // User-scoped (sell.finances). Uses getValidEbayToken so refresh-token flow
+  // runs automatically. Date window: ?daysBack=30 (default).
+  if (requestUrl.pathname === '/api/ebay/finances/transactions' && req.method === 'GET') {
+    try {
+      const daysBack = Math.min(Math.max(parseInt(requestUrl.searchParams.get('daysBack') || '30', 10), 1), 90)
+      const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
+      const accessToken = await getValidEbayToken()
+      const url = `${ebayBaseUrl}/sell/finances/v1/transaction?filter=${encodeURIComponent(`transactionDate:[${since}..]`)}&limit=200`
+      const resp = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      })
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '')
+        sendJson(res, resp.status, { error: `eBay Finances ${resp.status}`, detail: text.slice(0, 200) })
+        return
+      }
+      sendJson(res, 200, await resp.json())
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ebay/finances/transactions] failed:', error.message)
+      sendJson(res, status, { error: error.message })
+    }
+    return
+  }
+
+  if (requestUrl.pathname === '/api/ebay/finances/payouts' && req.method === 'GET') {
+    try {
+      const daysBack = Math.min(Math.max(parseInt(requestUrl.searchParams.get('daysBack') || '90', 10), 1), 180)
+      const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
+      const accessToken = await getValidEbayToken()
+      const url = `${ebayBaseUrl}/sell/finances/v1/payout?filter=${encodeURIComponent(`payoutDate:[${since}..]`)}&limit=200`
+      const resp = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      })
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '')
+        sendJson(res, resp.status, { error: `eBay Payouts ${resp.status}`, detail: text.slice(0, 200) })
+        return
+      }
+      sendJson(res, 200, await resp.json())
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ebay/finances/payouts] failed:', error.message)
+      sendJson(res, status, { error: error.message })
+    }
+    return
+  }
+
+  // ── eBay analytics — seller standards profile (seller health) ────────────
+  // User-scoped (sell.analytics.readonly). Surface in Settings so the user
+  // sees eBay's own assessment of their account (Top Rated, Above Standard,
+  // Below Standard, defect rate, late shipment rate).
+  if (requestUrl.pathname === '/api/ebay/seller-standards' && req.method === 'GET') {
+    try {
+      const accessToken = await getValidEbayToken()
+      // CURRENT = current quarter's running performance
+      const url = `${ebayBaseUrl}/sell/analytics/v1/seller_standards_profile/PROGRAM_US/CURRENT`
+      const resp = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '')
+        sendJson(res, resp.status, { error: `eBay Analytics ${resp.status}`, detail: text.slice(0, 200) })
+        return
+      }
+      sendJson(res, 200, await resp.json())
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ebay/seller-standards] failed:', error.message)
       sendJson(res, status, { error: error.message })
     }
     return

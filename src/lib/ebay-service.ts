@@ -35,14 +35,17 @@ export class EbayService {
 
   async searchCompletedListings(keywords: string, categoryId?: string): Promise<EbayMarketData> {
     try {
-      // Browse API proxy (server.js) returns active-listing market stats.
-      // Sold-comps parity requires eBay Marketplace Insights API (separate
-      // approval) — tracked as a follow-up. Until then we use active listings
-      // as the market signal for both buckets: it's a real, apples-to-apples
-      // price distribution, unlike the prior browser Finding API which always
-      // failed with CORS and returned [].
-      const browse = await this.fetchViaBrowseProxy(keywords, categoryId)
-      const soldItems = browse.soldItems
+      // Two-source market data:
+      //   soldItems     ← Marketplace Insights (real 90-day sold prices)
+      //   activeListings ← Browse API (current competing listings)
+      // Both run in parallel. If Insights fails (e.g. scope not granted on
+      // the server), we fall back to the Browse-approximation that Branch B
+      // shipped so the pipeline never hard-fails on market data.
+      const [sold, browse] = await Promise.all([
+        this.fetchSoldComps(keywords, categoryId),
+        this.fetchViaBrowseProxy(keywords, categoryId),
+      ])
+      const soldItems = sold.length > 0 ? sold : browse.soldItems
       const activeListings = browse.activeListings
 
       const soldPrices = soldItems.map(item => item.price).filter(p => p > 0)
@@ -92,6 +95,37 @@ export class EbayService {
     }
   }
 
+  private async fetchSoldComps(
+    keywords: string,
+    categoryId?: string,
+  ): Promise<EbayMarketData['soldItems']> {
+    try {
+      const resp = await fetch('/api/ebay/sold-comps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: keywords, categoryId, limit: 100, daysBack: 90 }),
+      })
+      if (!resp.ok) {
+        console.warn(`eBay sold-comps returned ${resp.status} — using Browse approximation`)
+        return []
+      }
+      const data = await resp.json() as {
+        items?: Array<{ title: string; price: number; soldDate: string; condition: string }>
+      }
+      return Array.isArray(data.items)
+        ? data.items.map(it => ({
+            title: it.title,
+            price: it.price,
+            soldDate: it.soldDate || '',
+            condition: it.condition || 'Unknown',
+          }))
+        : []
+    } catch (error) {
+      console.warn('eBay sold-comps unreachable — using Browse approximation', error)
+      return []
+    }
+  }
+
   private async fetchViaBrowseProxy(keywords: string, categoryId?: string) {
     try {
       const resp = await fetch('/api/ebay/market-search', {
@@ -112,9 +146,11 @@ export class EbayService {
         price: it.price,
         quantity: 1,
       }))
-      // Use the active listings as sold-approximation until Marketplace Insights lands.
-      // Empty soldItems array keeps sell-through rate math honest (it will be
-      // 50% rather than a fake "100% sell-through" from mocked sold comps).
+      // Marketplace Insights is the source of sold comps now. This proxy
+      // only returns active listings; if Insights is unavailable the caller
+      // falls back to this active list as a sold-approximation (see
+      // searchCompletedListings). The approximation path is kept to ensure
+      // the scan pipeline never hard-fails when Insights is degraded.
       const soldItems = items.map(it => ({
         title: it.title,
         price: it.price,
