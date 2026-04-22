@@ -139,6 +139,16 @@ async function callGemini(
   if (candidate?.finishReason === 'SAFETY') {
     throw new Error('Response blocked by safety filter. Try rephrasing.')
   }
+  // MAX_TOKENS means Gemini stopped mid-response. For jsonMode callers the
+  // payload is a truncated JSON string and JSON.parse dies with "Unterminated
+  // string". Surface that as a distinguishable thrown error so callers log it
+  // cleanly instead of silently returning a broken JSON blob.
+  //
+  // For non-jsonMode (chat, freeform), a cut-off response is still partially
+  // readable — don't throw; fall through and return the partial text as today.
+  if (candidate?.finishReason === 'MAX_TOKENS' && jsonMode) {
+    throw new Error(`Gemini truncated JSON response at maxTokens=${maxTokens} — raise maxTokens or shrink prompt`)
+  }
   const text = candidate?.content?.parts?.[0]?.text
   if (!text) {
     throw new Error('Gemini returned empty response — the model may not have received proper context')
