@@ -1,3 +1,5 @@
+import { logDebug } from '@/lib/debug-log'
+
 export interface EbayMarketData {
   soldItems: Array<{
     title: string
@@ -96,7 +98,7 @@ export class EbayService {
         recommendedPrice,
       }
     } catch (error) {
-      console.error('eBay market data fetch failed:', error)
+      logDebug('eBay market data fetch failed', 'error', 'ebay', { message: (error as Error).message })
       throw error
     }
   }
@@ -112,7 +114,7 @@ export class EbayService {
         body: JSON.stringify({ query: keywords, categoryId, limit: 100, daysBack: 90 }),
       })
       if (!resp.ok) {
-        console.warn(`eBay sold-comps returned ${resp.status} — using Browse approximation`)
+        logDebug('eBay sold-comps non-200 — using Browse approximation', 'warn', 'ebay', { status: resp.status })
         return []
       }
       const data = await resp.json() as {
@@ -138,7 +140,7 @@ export class EbayService {
           }))
         : []
     } catch (error) {
-      console.warn('eBay sold-comps unreachable — using Browse approximation', error)
+      logDebug('eBay sold-comps unreachable — using Browse approximation', 'warn', 'ebay', { message: (error as Error).message })
       return []
     }
   }
@@ -151,7 +153,7 @@ export class EbayService {
         body: JSON.stringify({ query: keywords, categoryId, limit: 50 }),
       })
       if (!resp.ok) {
-        console.warn(`eBay Browse proxy returned ${resp.status} — falling back to Gemini market data`)
+        logDebug('eBay Browse proxy non-200 — falling back to Gemini market data', 'warn', 'ebay', { status: resp.status })
         return { soldItems: [], activeListings: [] }
       }
       const data = await resp.json() as {
@@ -189,7 +191,7 @@ export class EbayService {
       }))
       return { soldItems, activeListings: listings }
     } catch (error) {
-      console.warn('eBay Browse proxy unreachable — falling back to Gemini market data', error)
+      logDebug('eBay Browse proxy unreachable — falling back to Gemini market data', 'warn', 'ebay', { message: (error as Error).message })
       return { soldItems: [], activeListings: [] }
     }
   }

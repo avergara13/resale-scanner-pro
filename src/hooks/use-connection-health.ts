@@ -179,45 +179,31 @@ async function checkEbayHealth(
   apiKey?: string,
   appId?: string
 ): Promise<Omit<ServiceHealth, 'name' | 'configured' | 'critical'>> {
+  // Keep apiKey/appId check so the indicator renders "configure eBay" vs
+  // "API down" distinctly. The probe itself doesn't use them — it hits the
+  // server-side /api/ebay/health proxy which uses the app OAuth token.
   if (!apiKey || !appId) {
     return { status: 'offline', error: 'API credentials not configured' }
   }
 
   const startTime = Date.now()
-  
   try {
-    const response = await fetch(
-      `https://svcs.ebay.com/services/search/FindingService/v1?OPERATION-NAME=findItemsByKeywords&SERVICE-VERSION=1.0.0&SECURITY-APPNAME=${appId}&RESPONSE-DATA-FORMAT=JSON&keywords=test&paginationInput.entriesPerPage=1`,
-      {
-        method: 'GET',
-      }
-    )
-    
+    const resp = await fetch('/api/ebay/health')
     const latency = Date.now() - startTime
-    
-    if (response.ok) {
-      const data = await response.json()
-      const hasError = data.findItemsByKeywordsResponse?.[0]?.ack?.[0] === 'Failure'
-      
-      if (hasError) {
-        return {
-          status: 'offline',
-          error: 'Invalid credentials',
-          latency,
-          lastChecked: Date.now(),
-        }
-      }
-      
+    if (!resp.ok) {
+      return { status: 'offline', error: `HTTP ${resp.status}`, latency, lastChecked: Date.now() }
+    }
+    const data = (await resp.json()) as { ok: boolean; error?: string }
+    if (!data.ok) {
       return {
-        status: latency < 2000 ? 'healthy' : 'degraded',
+        status: 'degraded',
+        error: data.error || 'eBay API unavailable',
         latency,
         lastChecked: Date.now(),
       }
     }
-    
     return {
-      status: 'offline',
-      error: `HTTP ${response.status}`,
+      status: latency < 2000 ? 'healthy' : 'degraded',
       latency,
       lastChecked: Date.now(),
     }

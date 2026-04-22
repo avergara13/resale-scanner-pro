@@ -1,4 +1,5 @@
 import { retryFetch } from './retry-service'
+import { logDebug } from '@/lib/debug-log'
 
 export interface GeminiVisionResponse {
   productName: string
@@ -125,7 +126,7 @@ export class GeminiService {
         result = JSON.parse(cleaned) as GeminiVisionResponse
       } catch {
         // Attempt to extract key fields from the raw text as a fallback
-        console.warn('Gemini returned non-JSON vision response, attempting regex extraction')
+        logDebug('Gemini non-JSON vision response — attempting regex extraction', 'warn', 'gemini')
         const nameMatch = textContent.match(/"productName"\s*:\s*"([^"]+)"/)
         const descMatch = textContent.match(/"description"\s*:\s*"([^"]+)"/)
         const catMatch = textContent.match(/"category"\s*:\s*"([^"]+)"/)
@@ -165,7 +166,7 @@ export class GeminiService {
         upcEan: result.upcEan,
       }
     } catch (error) {
-      console.error('Gemini vision analysis failed:', error)
+      logDebug('Gemini vision analysis failed', 'error', 'gemini', { message: (error as Error).message })
       throw error
     }
   }
@@ -282,7 +283,7 @@ Focus on clearly identifying the product boundaries to create a clean cutout.`
 
       return this.applyBackgroundRemoval(imageData, result.boundingBox, backgroundColor)
     } catch (error) {
-      console.error('Gemini background removal failed:', error)
+      logDebug('Gemini background removal failed', 'error', 'gemini', { message: (error as Error).message })
       throw error
     }
   }
@@ -461,7 +462,7 @@ You are an expert resale consultant helping a reseller make informed buying deci
 
       return this.extractResponseText(data)
     } catch (error) {
-      console.error('Gemini chat failed:', error)
+      logDebug('Gemini chat failed', 'error', 'gemini', { message: (error as Error).message })
       throw error
     }
   }
@@ -529,7 +530,7 @@ Make the title compelling and searchable. The description should be professional
       const textContent = this.extractResponseText(data)
       return JSON.parse(textContent)
     } catch (error) {
-      console.error('Gemini listing generation failed:', error)
+      logDebug('Gemini listing generation failed', 'error', 'gemini', { message: (error as Error).message })
       throw error
     }
   }

@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Toaster, toast } from 'sonner'
 import { logActivity, ACTIVITY_LOG_KEY, MAX_ACTIVITY_ENTRIES, type ActivityEntry } from './lib/activity-log'
-import { logDebug, DEBUG_LOG_KEY, MAX_DEBUG_ENTRIES, type DebugEntry } from './lib/debug-log'
+import { logDebug, redactUrl, DEBUG_LOG_KEY, MAX_DEBUG_ENTRIES, type DebugEntry } from './lib/debug-log'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BottomNav } from './components/BottomNav'
 import { AppHeader } from './components/AppHeader'
@@ -660,7 +660,7 @@ function App() {
                     i === 2 ? { ...s, data: `Est. market value ~$${directPrice.toFixed(2)}` } : s
                   ))
                 }
-              } catch (e) { console.warn('[Scan] Tier 2 LLM pricing failed:', e) }
+              } catch (e) { logDebug('Tier 2 LLM pricing failed', 'warn', 'scan', { message: (e as Error).message }) }
 
               if (!gotPrice) {
                 // Tier 3: Claude deep research fallback (task: 'complex' tries Anthropic first)
@@ -682,7 +682,7 @@ function App() {
                     ))
                   }
                 } catch (e) {
-                  console.warn('[Scan] Tier 3 Claude research failed:', e)
+                  logDebug('Tier 3 Claude research failed', 'warn', 'scan', { message: (e as Error).message })
                   setPipeline(prev => prev.map((s, i) =>
                     i === 2 ? { ...s, data: 'Market data unavailable — enter price above' } : s
                   ))
@@ -708,7 +708,7 @@ function App() {
                   i === 2 ? { ...s, data: `Est. value ~$${fallbackPrice.toFixed(2)} (Claude research)` } : s
                 ))
               }
-            } catch (e) { console.warn('[Scan] Outer LLM fallback failed:', e) }
+            } catch (e) { logDebug('Outer LLM fallback failed', 'warn', 'scan', { message: (e as Error).message }) }
             if (!recovered) {
               setPipeline(prev => prev.map((s, i) =>
                 i === 2 ? { ...s, data: 'Search unavailable' } : s
@@ -849,7 +849,7 @@ function App() {
         }).catch((err: unknown) => {
           // Non-blocking enrichment — log for ops visibility but never surface to UI
           const msg = err instanceof Error ? err.message : String(err)
-          console.warn('[research] Non-blocking enrichment failed for', newItem.id, '—', msg)
+          logDebug('Non-blocking enrichment failed', 'warn', 'scan', { id: newItem.id, message: msg })
         })
       }
 
@@ -947,7 +947,7 @@ function App() {
           setScanHistory(prev => (prev || []).map(i =>
             i.id === updatedItem.id ? { ...i, optimizedListing: optimized } : i
           ))
-        }).catch(e => console.warn('[opt] background optimization failed:', e))
+        }).catch(e => logDebug('Background optimization failed', 'warn', 'scan', { message: (e as Error).message }))
       }
     } catch (error) {
       console.error('Pipeline error:', error)
@@ -2606,12 +2606,12 @@ function App() {
       const isLens = url.includes('customsearch.googleapis.com') || url.includes('lens.google')
       const service = isGemini ? 'gemini' : isEbay ? 'ebay' : isLens ? 'google-lens' : null
       if (service) {
-        logDebug(`${service} request`, 'debug', service, { url: url.slice(0, 120) })
+        logDebug(`${service} request`, 'debug', service, { url: redactUrl(url).slice(0, 120) })
       }
       try {
         const res = await origFetch(...args)
         if (service && !res.ok) {
-          logDebug(`${service} HTTP ${res.status}`, 'error', service, { status: res.status, url: url.slice(0, 120) })
+          logDebug(`${service} HTTP ${res.status}`, 'error', service, { status: res.status, url: redactUrl(url).slice(0, 120) })
         }
         return res
       } catch (err) {
