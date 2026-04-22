@@ -97,20 +97,25 @@ export function useBuyMetrics(items: ScannedItem[], settings?: AppSettings): Buy
 /**
  * Session Dashboard scope: all items belonging to a single session, all time.
  * Used by SessionDetailScreen and SessionScreen's per-session cards.
+ *
+ * Filter by sessionId BEFORE dedup: `dedupById` keeps first occurrence, so if an
+ * ID ever collided across sessions (defensive — IDs should be globally unique)
+ * the cross-session dupe would steal the slot and under-report this session.
  */
 export function getSessionItems(
   queue: ScannedItem[] | undefined,
   scanHistory: ScannedItem[] | undefined,
   sessionId: string,
 ): ScannedItem[] {
-  return dedupById([...(queue || []), ...(scanHistory || [])])
-    .filter(i => i.sessionId === sessionId)
-    .sort((a, b) => b.timestamp - a.timestamp)
+  const scoped = [...(queue || []), ...(scanHistory || [])].filter(i => i.sessionId === sessionId)
+  return dedupById(scoped).sort((a, b) => b.timestamp - a.timestamp)
 }
 
 /**
  * Cost Tracking scope: items within a time cutoff, optionally narrowed to one session.
  * Used by CostTrackingScreen. Pass cutoff = 0 for "All Time".
+ *
+ * Filter before dedup for the same reason as getSessionItems.
  */
 export function getPeriodItems(
   queue: ScannedItem[] | undefined,
@@ -118,9 +123,9 @@ export function getPeriodItems(
   cutoff: number,
   sessionId?: string,
 ): ScannedItem[] {
-  return dedupById([...(queue || []), ...(scanHistory || [])])
-    .filter(i => {
-      if (sessionId && i.sessionId !== sessionId) return false
-      return i.timestamp >= cutoff
-    })
+  const scoped = [...(queue || []), ...(scanHistory || [])].filter(i => {
+    if (sessionId && i.sessionId !== sessionId) return false
+    return i.timestamp >= cutoff
+  })
+  return dedupById(scoped)
 }
