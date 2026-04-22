@@ -1090,7 +1090,10 @@ const server = http.createServer(async (req, res) => {
       )
       sendJson(res, 200, { ok: resp.ok, status: resp.status })
     } catch (err) {
-      sendJson(res, 200, { ok: false, error: err.message })
+      const errorMessage =
+        (err instanceof Error ? err.message : String(err ?? '')).trim() ||
+        'Unknown eBay health check error'
+      sendJson(res, 200, { ok: false, error: errorMessage })
     }
     return
   }
