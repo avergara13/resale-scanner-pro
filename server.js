@@ -69,10 +69,13 @@ const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.finances',
   'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
 ].join(' ')
-// Application (client_credentials) scopes — covers Browse, Taxonomy, and
-// Marketplace Insights. The Insights scope requires eBay approval which
-// this account has. Separate from the user OAuth scopes above.
-const EBAY_APP_SCOPES = [
+// Application (client_credentials) scopes are split per-use-case. Combining
+// them in one token request was the reason Browse + Taxonomy stopped working
+// in PR #170 — if the app registration doesn't have Insights granted, eBay
+// returns invalid_scope 400 on the whole token request, killing Browse too.
+// Per-scope tokens cached independently.
+const EBAY_APP_BASIC_SCOPE = 'https://api.ebay.com/oauth/api_scope'
+const EBAY_APP_INSIGHTS_SCOPE = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/buy.marketplace.insights',
 ].join(' ')
@@ -283,39 +286,76 @@ async function getValidEbayToken() {
 }
 
 // ── eBay Application Access Token (client_credentials) ──────────────────────
-// Browse API reads don't need a user token. Client_credentials is simpler and
-// works even before the user has completed the Authorization Code flow — so
-// the market-search route can serve every scanner user from day one.
-// In-process cache; Railway runs one instance, so we don't need distributed storage.
-let ebayAppTokenCache = { token: '', expiresAt: 0 }
-async function getEbayAppToken() {
+// Browse / Taxonomy / item-detail read APIs don't need a user token.
+// client_credentials is simpler and works even before the user has completed
+// the Authorization Code flow — so the scanner serves every user from day one.
+//
+// Tokens are cached per-scope because eBay rejects a combined scope request
+// if any one scope isn't granted on the app. Keeping Basic and Insights
+// separate means Browse keeps working even if Insights isn't approved on
+// the app registration.
+// In-process cache; Railway runs one instance, so no distributed storage.
+const ebayAppTokenCaches = new Map() // scope -> { token, expiresAt }
+
+async function requestEbayAppToken(scope) {
   if (!ebayAppId || !ebayCertId) {
     const err = new Error('EBAY_CREDENTIALS_MISSING')
     err.status = 503
     throw err
   }
+  const cached = ebayAppTokenCaches.get(scope)
   // Refresh with 60s headroom so a token that expires mid-request doesn't 401.
-  if (ebayAppTokenCache.token && ebayAppTokenCache.expiresAt > Date.now() + 60_000) {
-    return ebayAppTokenCache.token
+  if (cached && cached.token && cached.expiresAt > Date.now() + 60_000) {
+    return cached.token
   }
   const basicAuth = Buffer.from(`${ebayAppId}:${ebayCertId}`).toString('base64')
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
-    scope: EBAY_APP_SCOPES,
+    scope,
   }).toString()
-  const tokenData = await fetchJson(`${ebayBaseUrl}/identity/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${basicAuth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body,
-  })
-  ebayAppTokenCache = {
-    token: tokenData.access_token,
-    expiresAt: Date.now() + tokenData.expires_in * 1000,
+  try {
+    const tokenData = await fetchJson(`${ebayBaseUrl}/identity/v1/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    })
+    ebayAppTokenCaches.set(scope, {
+      token: tokenData.access_token,
+      expiresAt: Date.now() + tokenData.expires_in * 1000,
+    })
+    return tokenData.access_token
+  } catch (error) {
+    // fetchJson attaches the eBay error payload. When scope is unavailable,
+    // eBay returns { error: 'invalid_scope', error_description: '...' }.
+    // Surfacing both lets the operator see exactly which scope is missing
+    // from the app registration without re-running with more logging.
+    const payload = error.payload || {}
+    const ebayErr = payload.error || ''
+    const ebayDesc = payload.error_description || ''
+    console.error(
+      `[ebay/app-token] failed for scope=${scope} status=${error.status} ` +
+      `ebay_error=${ebayErr} ebay_desc=${ebayDesc}`
+    )
+    throw error
   }
-  return ebayAppTokenCache.token
+}
+
+// Basic scope — Browse, Taxonomy, item detail. Every public-market read.
+// This token request should only ever fail if the app credentials themselves
+// are wrong; api_scope is auto-granted to every registered eBay app.
+function getEbayAppToken() {
+  return requestEbayAppToken(EBAY_APP_BASIC_SCOPE)
+}
+
+// Insights scope — sold-comps (Marketplace Insights) only. Requires eBay
+// approval on the *app* registration (separate from account-level approval).
+// Isolated from getEbayAppToken so an unapproved Insights scope can't take
+// down Browse/Taxonomy as collateral.
+function getEbayInsightsToken() {
+  return requestEbayAppToken(EBAY_APP_INSIGHTS_SCOPE)
 }
 
 function getPlainText(property) {
@@ -1126,7 +1166,24 @@ const server = http.createServer(async (req, res) => {
       const categoryId = typeof body.categoryId === 'string' ? body.categoryId : null
       const daysBack = Math.min(Math.max(parseInt(body.daysBack, 10) || 90, 1), 90)
 
-      const accessToken = await getEbayAppToken()
+      let accessToken
+      try {
+        accessToken = await getEbayInsightsToken()
+      } catch (tokenErr) {
+        // The app registration doesn't have buy.marketplace.insights enabled.
+        // Return a structured error so the client can distinguish "scope not
+        // granted" (user needs to enable it in eBay Developer portal) from
+        // "no sold data for this query" (real empty result).
+        const payload = tokenErr.payload || {}
+        if (payload.error === 'invalid_scope') {
+          sendJson(res, 403, {
+            error: 'insights_scope_missing',
+            detail: 'buy.marketplace.insights is not granted on this eBay app. Enable it in the eBay Developer portal.',
+          })
+          return
+        }
+        throw tokenErr
+      }
       const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
       const params = new URLSearchParams({
         q: query,

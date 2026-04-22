@@ -48,7 +48,14 @@ export async function fetchCategoryAspects(
       `/api/ebay/taxonomy/${encodeURIComponent(categoryId)}/aspects`,
     )
     if (!resp.ok) {
-      console.warn(`eBay taxonomy returned ${resp.status} for category ${categoryId}`)
+      // 400 from get_item_aspects_for_category means the category is a parent,
+      // not a leaf — eBay only publishes aspects at the leaf level. That's a
+      // lookup-table authoring issue, not a runtime failure: the optimizer
+      // falls back cleanly to AI-only specifics. Log at debug level for 400,
+      // keep a real warn for anything else (401/403/5xx).
+      const level = resp.status === 400 ? 'debug' : 'warn'
+      // eslint-disable-next-line no-console
+      console[level](`eBay taxonomy ${resp.status} for category ${categoryId} (likely non-leaf)`)
       return null
     }
     const data = (await resp.json()) as EbayAspectsResponse
