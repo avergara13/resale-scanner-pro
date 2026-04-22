@@ -168,7 +168,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       className="flex h-full flex-col overflow-x-hidden overflow-y-auto bg-system-grouped-background"
     >
       <div className="material-chrome px-4 py-3 border-b border-separator">
-        <div className="flex items-center gap-4 overflow-x-auto scrollbar-none">
+        <div className="flex items-center justify-evenly gap-2">
           {([
             ['AI', aiConfigured],
             ['Google', googleConfigured],
@@ -180,7 +180,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
               key={label}
               variant="outline"
               className={cn(
-                'min-h-7 px-3 text-footnote font-semibold flex-shrink-0',
+                'min-h-7 px-3 text-footnote font-semibold',
                 ok
                   ? 'border-system-green/20 bg-system-green/10 text-chip-label-green'
                   : 'border-border bg-secondary-system-background text-secondary-label'
