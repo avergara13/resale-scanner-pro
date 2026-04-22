@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { EmptyState } from '@/components/ui/empty-state'
+import { SwipeableRow } from '@/components/ui/SwipeableRow'
 import { logActivity } from '@/lib/activity-log'
 import { getCardPhoto } from '@/lib/photo'
 import { runListingGate, gateInputFromItem } from '@/lib/listing-gate'
@@ -140,7 +141,33 @@ function SortableItem({
     opacity: isDragging ? 0.5 : 1,
   }
 
+  // Swipe actions — mirror what the tap action-bar below offers, per card state:
+  //   live      → right swipe marks Sold (matches the Sold tap button)
+  //   ready     → right swipe lists on eBay (matches List tap button)
+  //   unoptim.  → right swipe runs Optimize
+  // Swipe left always arms the same 2-step confirm the trash tap uses, by
+  // flipping setConfirmDelete(true). The user still taps Remove in the panel
+  // that opens — we never skip the confirm step.
+  const rightSwipeAction = item.listingStatus === 'published' && onOpenSoldDialog
+    ? { icon: <Lightning size={16} weight="bold" />, label: 'Mark Sold', color: 'bg-green', onTrigger: () => onOpenSoldDialog(item) }
+    : item.decision === 'BUY' && item.optimizedListing && !item.ebayListingId && onListItem
+    ? { icon: <Lightning size={16} weight="bold" />, label: 'List', color: 'bg-amber', onTrigger: () => onListItem(item.id) }
+    : item.decision === 'BUY' && !item.optimizedListing
+    ? { icon: <Lightning size={16} weight="bold" />, label: 'Optimize', color: 'bg-b1', onTrigger: () => onCreateListing(item.id) }
+    : undefined
+
   return (
+    <SwipeableRow
+      disabled={isDragging}
+      leftAction={{
+        icon: <Trash size={16} weight="bold" />,
+        label: 'Delete',
+        color: 'bg-red-500',
+        onTrigger: () => setConfirmDelete(true),
+      }}
+      rightAction={rightSwipeAction}
+      className="rounded-2xl"
+    >
     <Card
       ref={setNodeRef}
       id={`queue-item-${item.id}`}
@@ -464,6 +491,7 @@ function SortableItem({
         </div>
       )}
     </Card>
+    </SwipeableRow>
   )
 }
 

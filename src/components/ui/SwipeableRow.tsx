@@ -58,9 +58,11 @@ export function SwipeableRow({
   const leftTrailOpacity = useTransform(x, [0, 20, threshold], [0, 0.4, 1])
   const rightTrailOpacity = useTransform(x, [-threshold, -20, 0], [1, 0.4, 0])
 
-  if (disabled) {
-    return <div className={className}>{children}</div>
-  }
+  // Note: when `disabled` is true we keep motion.div mounted but turn off its
+  // drag prop. Unmounting/remounting mid-gesture (e.g. when dnd-kit flips
+  // isDragging partway through an 8 px activation window) would drop drag
+  // state and cause visual glitches on Queue rows. This way the node stays
+  // stable and we just stop responding to new pan input.
 
   const handleDragEnd = (_: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
     const offset = info.offset.x
@@ -121,7 +123,7 @@ export function SwipeableRow({
       )}
 
       <motion.div
-        drag={committing ? false : 'x'}
+        drag={disabled || committing ? false : 'x'}
         dragConstraints={{ left: -MAX_DRAG, right: MAX_DRAG }}
         dragElastic={0.15}
         dragMomentum={false}
