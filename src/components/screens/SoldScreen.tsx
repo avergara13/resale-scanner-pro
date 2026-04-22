@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { StatusChip } from '@/components/ui/status-chip'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SwipeableRow } from '@/components/ui/SwipeableRow'
+import { Trash, ArrowRight } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { logActivity } from '@/lib/activity-log'
 import { cn } from '@/lib/utils'
@@ -435,9 +437,41 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
             const reconciliationDelta = reconciliation ? reconciliation.net - netIncome : 0
             const deltaIsMeaningful = reconciliation && !isAmbiguousOrder ? Math.abs(reconciliationDelta) > 2 : false
 
+            // iOS swipe convention: right-swipe = left-edge (positive/safe),
+            // left-swipe = right-edge (destructive).
+            // Cycle status (positive) → leftAction (right-swipe, left edge).
+            // Delete (destructive)    → rightAction (left-swipe, right edge),
+            //   manual entries only; eBay-imported rows have no delete path.
+            const currentStatusIdx = SHIPPING_STATUS_OPTIONS.indexOf(draft.shippingStatus)
+            const nextStatus = currentStatusIdx >= 0 && currentStatusIdx < SHIPPING_STATUS_OPTIONS.length - 1
+              ? SHIPPING_STATUS_OPTIONS[currentStatusIdx + 1]
+              : null
+
             return (
-              <Card
+              <SwipeableRow
                 key={item.salePageId}
+                leftAction={nextStatus ? {
+                  icon: <ArrowRight size={16} weight="bold" />,
+                  label: nextStatus.split(' ').slice(1).join(' '),
+                  color: 'bg-b1',
+                  onTrigger: () => {
+                    handleDraftChange(item.salePageId, 'shippingStatus', nextStatus)
+                    setDrafts(prev => ({ ...prev, [item.salePageId]: { ...draft, shippingStatus: nextStatus } }))
+                  },
+                } : undefined}
+                rightAction={item.isManualEntry ? {
+                  icon: <Trash size={16} weight="bold" />,
+                  label: 'Delete',
+                  color: 'bg-red-500',
+                  onTrigger: () => {
+                    const manualId = item.salePageId.replace(/^manual-/, '')
+                    setManualSales(prev => (prev || []).filter(m => m.id !== manualId))
+                    logActivity('Manual sale removed')
+                  },
+                } : undefined}
+                className="rounded-2xl"
+              >
+              <Card
                 className="material-thin border-s2/60 p-3 overflow-hidden"
               >
                 {/* ── Row 1: thumbnail + title + price ──────────────── */}
@@ -735,6 +769,7 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
                   </div>
                 )}
               </Card>
+              </SwipeableRow>
             )
           })
         )}

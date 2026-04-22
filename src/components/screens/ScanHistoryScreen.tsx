@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { StatusChip } from '@/components/ui/status-chip'
 import { EmptyState } from '@/components/ui/empty-state'
+import { SwipeableRow } from '@/components/ui/SwipeableRow'
 import { cn } from '@/lib/utils'
 import { getCardPhoto } from '@/lib/photo'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
@@ -208,9 +209,30 @@ export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanH
           ) : (
             filteredHistory.map(item => {
               const isSelected = selectedIds.has(item.id)
+              // iOS swipe convention: right-swipe reveals left edge (positive),
+              // left-swipe reveals right edge (destructive).
+              // Save Draft (positive) → leftAction (right-swipe, left edge).
+              // Delete (destructive)  → rightAction (left-swipe, right edge),
+              //   only wired when onDeleteItems is present — no no-op actions.
+              const canSaveDraft = !item.inQueue
               return (
-                <Card
+                <SwipeableRow
                   key={item.id}
+                  leftAction={canSaveDraft ? {
+                    icon: <FloppyDisk size={16} weight="bold" />,
+                    label: 'Save Draft',
+                    color: 'bg-b1',
+                    onTrigger: () => onSaveAsDraft(item),
+                  } : undefined}
+                  rightAction={onDeleteItems ? {
+                    icon: <Trash size={16} weight="bold" />,
+                    label: 'Delete',
+                    color: 'bg-red-500',
+                    onTrigger: () => onDeleteItems([item.id]),
+                  } : undefined}
+                  className="rounded-2xl"
+                >
+                <Card
                   className={cn(
                     'p-3 transition-all',
                     isSelected ? 'border border-b1 bg-b1/5' : 'border border-s2/60 material-thin'
@@ -288,6 +310,7 @@ export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanH
                     </div>
                   </div>
                 </Card>
+                </SwipeableRow>
               )
             })
           )}

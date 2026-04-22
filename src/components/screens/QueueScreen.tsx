@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { EmptyState } from '@/components/ui/empty-state'
+import { SwipeableRow } from '@/components/ui/SwipeableRow'
 import { logActivity } from '@/lib/activity-log'
 import { getCardPhoto } from '@/lib/photo'
 import { runListingGate, gateInputFromItem } from '@/lib/listing-gate'
@@ -140,7 +141,31 @@ function SortableItem({
     opacity: isDragging ? 0.5 : 1,
   }
 
+  // iOS swipe convention: right-swipe = left-edge (positive/safe),
+  // left-swipe = right-edge (destructive).
+  // Primary action (Optimize/List/MarkSold) → leftAction (right-swipe, left edge).
+  // Delete confirm                           → rightAction (left-swipe, right edge).
+  // Swipe-left arms the existing 2-step confirm panel — user taps Remove to commit.
+  const leftSwipeAction = item.listingStatus === 'published' && onOpenSoldDialog
+    ? { icon: <Lightning size={16} weight="bold" />, label: 'Mark Sold', color: 'bg-green', onTrigger: () => onOpenSoldDialog(item) }
+    : item.decision === 'BUY' && item.optimizedListing && !item.ebayListingId && onListItem
+    ? { icon: <Lightning size={16} weight="bold" />, label: 'List', color: 'bg-amber', onTrigger: () => onListItem(item.id) }
+    : item.decision === 'BUY' && !item.optimizedListing
+    ? { icon: <Lightning size={16} weight="bold" />, label: 'Optimize', color: 'bg-b1', onTrigger: () => onCreateListing(item.id) }
+    : undefined
+
   return (
+    <SwipeableRow
+      disabled={isDragging}
+      leftAction={leftSwipeAction}
+      rightAction={{
+        icon: <Trash size={16} weight="bold" />,
+        label: 'Delete',
+        color: 'bg-red-500',
+        onTrigger: () => setConfirmDelete(true),
+      }}
+      className="rounded-2xl"
+    >
     <Card
       ref={setNodeRef}
       id={`queue-item-${item.id}`}
@@ -464,6 +489,7 @@ function SortableItem({
         </div>
       )}
     </Card>
+    </SwipeableRow>
   )
 }
 
