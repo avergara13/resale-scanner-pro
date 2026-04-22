@@ -509,13 +509,23 @@ function App() {
             } : s
           ))
         } catch (error) {
-          console.error('Google Lens failed:', error)
+          const status = (error as { status?: number })?.status
+          const msg = error instanceof Error ? error.message : String(error)
+          const is403 = status === 403 || /HTTP 403/.test(msg)
+          console.error(
+            is403
+              ? 'Google Lens 403 — check that the Google Cloud project has Vision API + Custom Search enabled, billing active, and VITE_GOOGLE_API_KEY has no referer restrictions.'
+              : 'Google Lens failed:',
+            error,
+          )
           setPipeline(prev => prev.map((s, i) =>
             i === 1 ? {
               ...s,
               status: 'complete' as const,
               progress: 100,
-              data: 'Google Lens unavailable — using Gemini only'
+              data: is403
+                ? 'Google Lens 403 — API key/permissions issue. Using Gemini only.'
+                : 'Google Lens unavailable — using Gemini only',
             } : s
           ))
         }

@@ -87,7 +87,11 @@ export class GeminiService {
         temperature: 0.4,
         topK: 32,
         topP: 1,
-        maxOutputTokens: 1024,
+        // 2048 is the smallest tier that reliably fits the vision JSON schema
+        // (productName + description + itemSpecifics + eBay enrichment fields).
+        // At 1024 the model frequently truncated mid-string, triggering the
+        // regex-extraction fallback and losing ~half the structured fields.
+        maxOutputTokens: 2048,
         responseMimeType: 'application/json',
       },
     }
