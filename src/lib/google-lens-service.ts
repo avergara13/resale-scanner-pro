@@ -30,20 +30,14 @@ export class GoogleLensService {
   }
 
   async searchByImage(imageData: string, productName?: string): Promise<GoogleLensAnalysis> {
-    try {
-      const results = await this.performVisualSearch(imageData, productName)
-
-      if (results.length === 0) {
-        return { results: [], dominantSources: [] }
-      }
-
-      const analysis = this.analyzeResults(results)
-      return analysis
-    } catch (error) {
-      console.error('Google Lens search failed:', error)
-      // Re-throw so callers can handle/retry — don't mask errors with mock data
-      throw error
+    // No internal console.error — the caller (App.tsx handleCapture) logs once
+    // with pipeline context. Previously we logged here AND at the call site,
+    // producing every failure as a duplicate pair in the DEBUG panel.
+    const results = await this.performVisualSearch(imageData, productName)
+    if (results.length === 0) {
+      return { results: [], dominantSources: [] }
     }
+    return this.analyzeResults(results)
   }
 
   private async performVisualSearch(imageData: string, productName?: string): Promise<GoogleLensResult[]> {

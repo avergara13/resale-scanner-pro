@@ -273,6 +273,42 @@ async function getValidEbayToken() {
   return tokenData.access_token
 }
 
+// ── eBay Application Access Token (client_credentials) ──────────────────────
+// Browse API reads don't need a user token. Client_credentials is simpler and
+// works even before the user has completed the Authorization Code flow — so
+// the market-search route can serve every scanner user from day one.
+// In-process cache; Railway runs one instance, so we don't need distributed storage.
+let ebayAppTokenCache = { token: '', expiresAt: 0 }
+async function getEbayAppToken() {
+  if (!ebayAppId || !ebayCertId) {
+    const err = new Error('EBAY_CREDENTIALS_MISSING')
+    err.status = 503
+    throw err
+  }
+  // Refresh with 60s headroom so a token that expires mid-request doesn't 401.
+  if (ebayAppTokenCache.token && ebayAppTokenCache.expiresAt > Date.now() + 60_000) {
+    return ebayAppTokenCache.token
+  }
+  const basicAuth = Buffer.from(`${ebayAppId}:${ebayCertId}`).toString('base64')
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    scope: 'https://api.ebay.com/oauth/api_scope',
+  }).toString()
+  const tokenData = await fetchJson(`${ebayBaseUrl}/identity/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  })
+  ebayAppTokenCache = {
+    token: tokenData.access_token,
+    expiresAt: Date.now() + tokenData.expires_in * 1000,
+  }
+  return ebayAppTokenCache.token
+}
+
 function getPlainText(property) {
   if (!property) return ''
   if (property.type === 'title' || property.type === 'rich_text') {
@@ -985,6 +1021,83 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       const status = error.status || 500
       console.error('[ebay/refresh-token] failed:', error.message)
+      sendJson(res, status, { error: error.message })
+    }
+    return
+  }
+
+  // ── eBay market-search — Browse API proxy for scanner ────────────────────
+  // Replaces the browser's failing Finding API call (which has no CORS headers
+  // and has been silently failing for every user). Uses client_credentials so
+  // it works without the user having completed the Authorization Code flow.
+  // Body: { query: string, categoryId?: string, limit?: number (max 50) }
+  // Returns: { activeCount, avgPrice, medianPrice, lowPrice, highPrice, items[] }
+  if (requestUrl.pathname === '/api/ebay/market-search' && req.method === 'POST') {
+    try {
+      const body = await readRequestBody(req)
+      const query = typeof body.query === 'string' ? body.query.trim() : ''
+      if (!query) {
+        sendJson(res, 400, { error: 'query is required' })
+        return
+      }
+      const limit = Math.min(Math.max(parseInt(body.limit, 10) || 20, 1), 50)
+      const categoryId = typeof body.categoryId === 'string' ? body.categoryId : null
+
+      const accessToken = await getEbayAppToken()
+      const params = new URLSearchParams({
+        q: query,
+        limit: String(limit),
+      })
+      if (categoryId) params.set('category_ids', categoryId)
+
+      const browseUrl = `${ebayBaseUrl}/buy/browse/v1/item_summary/search?${params.toString()}`
+      const browseResp = await fetch(browseUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!browseResp.ok) {
+        const text = await browseResp.text().catch(() => '')
+        console.error('[ebay/market-search] Browse API error', browseResp.status, text.slice(0, 200))
+        sendJson(res, browseResp.status, { error: `eBay Browse API ${browseResp.status}`, detail: text.slice(0, 200) })
+        return
+      }
+      const data = await browseResp.json()
+      const summaries = Array.isArray(data.itemSummaries) ? data.itemSummaries : []
+      const items = summaries.map(s => ({
+        title: s.title || '',
+        price: parseFloat(s.price?.value) || 0,
+        currency: s.price?.currency || 'USD',
+        condition: s.condition || 'Unknown',
+        itemWebUrl: s.itemWebUrl || '',
+        thumbnail: s.thumbnailImages?.[0]?.imageUrl || s.image?.imageUrl || '',
+      }))
+      const prices = items.map(i => i.price).filter(p => p > 0)
+      const sorted = [...prices].sort((a, b) => a - b)
+      const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
+      const mid = Math.floor(sorted.length / 2)
+      const medianPrice = sorted.length === 0
+        ? 0
+        : sorted.length % 2 === 1
+          ? sorted[mid]
+          : (sorted[mid - 1] + sorted[mid]) / 2
+      const lowPrice = sorted[0] || 0
+      const highPrice = sorted[sorted.length - 1] || 0
+      const activeCount = typeof data.total === 'number' ? data.total : items.length
+
+      sendJson(res, 200, {
+        activeCount,
+        avgPrice: Math.round(avgPrice * 100) / 100,
+        medianPrice: Math.round(medianPrice * 100) / 100,
+        lowPrice,
+        highPrice,
+        items,
+      })
+    } catch (error) {
+      const status = error.status || 500
+      console.error('[ebay/market-search] failed:', error.message)
       sendJson(res, status, { error: error.message })
     }
     return

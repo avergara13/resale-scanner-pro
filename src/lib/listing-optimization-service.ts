@@ -83,6 +83,11 @@ export class ListingOptimizationService {
         openaiApiKey: this.openaiApiKey,
         anthropicApiKey: this.anthropicApiKey,
         jsonMode: true,
+        // Listing JSON includes long description + item specifics + SEO arrays.
+        // 2048 (the callLLM default) truncated mid-string, causing the
+        // "Unterminated string" JSON.parse failures that fell back to a
+        // generic skeleton listing. 4096 fits the full optimized schema.
+        maxTokens: 4096,
       })
 
       let parsed: unknown
