@@ -1,6 +1,20 @@
+import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowsClockwise } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+
+// iOS-native pull-to-refresh dial.
+//
+// Design intent — iOS Mail / Safari / Notes:
+//   • Single circular dial that fills clockwise as the user pulls.
+//   • No text label. No separate progress bar. Just the dial.
+//   • 28 px footprint — Apple's actual PTR size, not a custom 40 px pill.
+//   • Stroke opacity tracks progress so the dial fades in as it fills.
+//   • On refresh: same dial, constant-rotation spinner — no morph, no arrow flip.
+//   • A light haptic tick the moment the threshold is crossed (the "click").
+//   • iOS system spring for the scale/opacity transition, not a generic easeOut.
+//
+// The dial sits immediately below the fixed AppHeader (h-11 + safe-area-top).
+// Fade opacity lives on the outer wrapper so the dial never pops in hard.
 
 interface PullToRefreshIndicatorProps {
   isPulling: boolean
@@ -10,9 +24,13 @@ interface PullToRefreshIndicatorProps {
   shouldTrigger: boolean
 }
 
-// AppHeader is h-11 = 44px. The indicator sits immediately below it.
-// We add env(safe-area-inset-top) for notched devices.
 const HEADER_OFFSET = 'calc(44px + env(safe-area-inset-top, 0px))'
+
+// 28 px outer size, 2 px stroke, leaves ~12 px inner radius after half-stroke.
+const DIAL_SIZE = 28
+const STROKE_WIDTH = 2
+const RADIUS = (DIAL_SIZE - STROKE_WIDTH) / 2
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 export function PullToRefreshIndicator({
   isPulling,
@@ -24,6 +42,26 @@ export function PullToRefreshIndicator({
   const isVisible = isPulling || isRefreshing
   const indicatorHeight = isRefreshing ? 60 : Math.max(pullDistance, 0)
 
+  // Haptic tick on the rising edge of shouldTrigger — the "click" moment.
+  // navigator.vibrate is a no-op on desktop and unsupported iOS Safari, so
+  // no guard needed. Only fire once per threshold crossing.
+  const prevTriggered = useRef(false)
+  useEffect(() => {
+    if (shouldTrigger && !prevTriggered.current) {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        navigator.vibrate(10)
+      }
+    }
+    prevTriggered.current = shouldTrigger
+  }, [shouldTrigger])
+
+  // Progress → stroke-dashoffset. At progress=0 the circle is invisible
+  // (dash offset = full circumference); at progress=1 it's a complete ring.
+  const dashOffset = CIRCUMFERENCE * (1 - Math.min(Math.max(progress, 0), 1))
+
+  // Dial fades in from 0.05 so an idle-at-zero state isn't a visible ghost.
+  const dialOpacity = Math.min(progress * 1.4, 1)
+
   return (
     <AnimatePresence>
       {isVisible && (
@@ -31,71 +69,74 @@ export function PullToRefreshIndicator({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.15 } }}
-          transition={{ duration: 0.1 }}
+          transition={{ duration: 0.12, ease: [0.32, 0.72, 0, 1] }}
           className="fixed left-0 right-0 z-40 flex items-center justify-center pointer-events-none overflow-hidden"
           style={{
             top: HEADER_OFFSET,
             height: indicatorHeight,
-            // GPU-composited: no layout impact
             willChange: 'opacity',
           }}
         >
-          <div className="relative flex flex-col items-center justify-end pb-2 h-full">
-            <motion.div
-              animate={{
-                rotate: isRefreshing ? 360 : shouldTrigger ? 180 : progress * 180,
-                scale: isRefreshing ? 1 : Math.max(0.65, Math.min(progress * 1.15, 1)),
-              }}
-              transition={{
-                rotate: isRefreshing
-                  ? { duration: 0.8, repeat: Infinity, ease: 'linear' }
-                  : { duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] },
-                scale: { duration: 0.15, ease: [0.25, 0.46, 0.45, 0.94] },
-              }}
-              className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors duration-200",
-                shouldTrigger || isRefreshing
-                  ? "bg-b1 shadow-lg shadow-b1/25"
-                  : "bg-s1/90 border border-s2"
-              )}
-            >
-              <ArrowsClockwise
-                className={cn(
-                  "transition-colors duration-200",
-                  shouldTrigger || isRefreshing ? "text-white" : "text-t3"
-                )}
-                size={20}
-                weight="bold"
-              />
-            </motion.div>
-
-            <motion.div
-              animate={{
-                opacity: shouldTrigger || isRefreshing ? 1 : 0,
-                scale: shouldTrigger || isRefreshing ? 1 : 0.85,
-              }}
-              transition={{ duration: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="mt-1.5 text-[10px] font-bold uppercase tracking-wider"
-            >
-              <span className={cn(
-                "transition-colors duration-200",
-                isRefreshing ? "text-b1" : shouldTrigger ? "text-b1" : "text-t3"
-              )}>
-                {isRefreshing ? 'Refreshing…' : 'Release to refresh'}
-              </span>
-            </motion.div>
-
-            {!isRefreshing && progress > 0.1 && (
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-s1 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-b1 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress * 100}%` }}
-                  transition={{ duration: 0.05 }}
-                />
-              </div>
+          <motion.div
+            animate={{
+              rotate: isRefreshing ? 360 : 0,
+              scale: isRefreshing ? 1 : Math.max(0.85, Math.min(progress * 1.1, 1)),
+            }}
+            transition={{
+              rotate: isRefreshing
+                ? { duration: 0.8, repeat: Infinity, ease: 'linear' }
+                : { type: 'spring', stiffness: 400, damping: 40 },
+              scale: { type: 'spring', stiffness: 400, damping: 40 },
+            }}
+            className={cn(
+              'flex items-center justify-center',
+              // subtle drop shadow at rest, b1-tinted when armed/refreshing
+              shouldTrigger || isRefreshing ? 'text-b1' : 'text-t3',
             )}
-          </div>
+            style={{
+              width: DIAL_SIZE,
+              height: DIAL_SIZE,
+              opacity: isRefreshing ? 1 : dialOpacity,
+            }}
+          >
+            <svg
+              width={DIAL_SIZE}
+              height={DIAL_SIZE}
+              viewBox={`0 0 ${DIAL_SIZE} ${DIAL_SIZE}`}
+              aria-hidden
+            >
+              {/* Track — faint ring at low opacity so the dial has a home. */}
+              <circle
+                cx={DIAL_SIZE / 2}
+                cy={DIAL_SIZE / 2}
+                r={RADIUS}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={STROKE_WIDTH}
+                strokeOpacity={isRefreshing ? 0.15 : 0.12}
+              />
+              {/* Progress arc — fills clockwise as the user pulls. */}
+              <circle
+                cx={DIAL_SIZE / 2}
+                cy={DIAL_SIZE / 2}
+                r={RADIUS}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={STROKE_WIDTH}
+                strokeLinecap="round"
+                strokeDasharray={CIRCUMFERENCE}
+                // On refresh show a 25%-arc that rotates; on pull, a progress arc.
+                strokeDashoffset={isRefreshing ? CIRCUMFERENCE * 0.75 : dashOffset}
+                // Start the arc at 12 o'clock (default is 3 o'clock in SVG).
+                transform={`rotate(-90 ${DIAL_SIZE / 2} ${DIAL_SIZE / 2})`}
+                style={{
+                  transition: isRefreshing
+                    ? 'none'
+                    : 'stroke-dashoffset 80ms linear',
+                }}
+              />
+            </svg>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

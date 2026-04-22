@@ -2442,3 +2442,28 @@ button:disabled {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
+
+/* ── App scroll container ───────────────────────────────────────────────
+ * Unified scroll-region primitive for the PTR-enabled list screens
+ * (Sold, ScanHistory, Queue, AI, Agent). Codifies the five properties those
+ * screens hand-rolled inconsistently:
+ *   • overflow-y: auto          — vertical scrolling
+ *   • overflow-x: hidden        — clip SwipeableRow's x-translation during
+ *                                 diagonal pull-to-refresh gestures
+ *   • overscroll-behavior-y: contain — trap bounce at the region edge;
+ *                                       parent never receives overscroll
+ *   • -webkit-overflow-scrolling: touch — momentum scrolling on iOS
+ *   • touch-action: pan-y       — browser handles vertical panning natively;
+ *                                  Framer Motion inside can claim x for swipe
+ *
+ * Using this class replaces the hand-rolled combo
+ * `flex-1 overflow-y-auto overflow-x-hidden scrollable-content overscroll-y-contain`
+ * — layout classes (flex-1, h-full, etc.) still come from the caller.
+ */
+.app-scroll-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}

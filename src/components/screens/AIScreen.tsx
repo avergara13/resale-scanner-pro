@@ -398,7 +398,7 @@ export function AIScreen({
       )}
 
       {/* ── Scrollable content ── */}
-      <div className="flex-1 overflow-y-auto" ref={pullToRefresh.containerRef}>
+      <div className="flex-1 app-scroll-container" ref={pullToRefresh.containerRef}>
         <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 pb-6">
           {(!currentItem && pipeline.length === 0) ? null : (
             /* Scan result — shown as soon as currentItem exists OR pipeline is running */
