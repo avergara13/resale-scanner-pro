@@ -57,6 +57,11 @@ export function CompDetailModal({ comp, onClose }: CompDetailModalProps) {
       return
     }
     if (!comp.itemId) {
+      // Prev tap may have populated `detail` via a different comp's fetch.
+      // Without clearing it, a tappable-via-itemWebUrl-only comp would
+      // inherit the prior listing's thumbnail / seller / shipping — a quiet
+      // cross-item data bleed. Reset alongside enrichState.
+      setDetail(null)
       setEnrichState('idle')
       return
     }
