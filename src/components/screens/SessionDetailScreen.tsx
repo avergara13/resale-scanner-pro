@@ -18,7 +18,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { logActivity } from '@/lib/activity-log'
-import { useSessionMetrics } from '@/lib/use-session-metrics'
+import { useBuyMetrics, getSessionItems } from '@/lib/use-buy-metrics'
 import { cn } from '@/lib/utils'
 import type { Session, ScannedItem, ThriftStoreLocation, Screen, AppSettings } from '@/types'
 
@@ -69,17 +69,10 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     [allSessions, sessionId]
   )
 
-  const sessionItems = useMemo(() => {
-    const allItems = [...(queue || []), ...(scanHistory || [])]
-    const seen = new Set<string>()
-    return allItems
-      .filter(i => {
-        if (i.sessionId !== sessionId || seen.has(i.id)) return false
-        seen.add(i.id)
-        return true
-      })
-      .sort((a, b) => b.timestamp - a.timestamp)
-  }, [queue, scanHistory, sessionId])
+  const sessionItems = useMemo(
+    () => getSessionItems(queue, scanHistory, sessionId),
+    [queue, scanHistory, sessionId]
+  )
 
   const filteredItems = useMemo(() => {
     if (filter === 'all') return sessionItems
@@ -177,6 +170,18 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     return () => window.clearInterval(interval)
   }, [session?.endTime])
 
+  // Hooks must run in the same order every render — call before any early return.
+  const {
+    buyCount: liveBuyCount,
+    passCount: livePassCount,
+    maybeCount,
+    buyRate,
+    totalInvested,
+    estimatedProfit,
+    avgROI,
+    hasROI,
+  } = useBuyMetrics(sessionItems, settings)
+
   if (!session) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -198,17 +203,6 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
   const duration = (session.endTime || currentTimestamp) - session.startTime
   const startDate = new Date(session.startTime)
 
-  const {
-    buyItems,
-    buyCount: liveBuyCount,
-    passCount: livePassCount,
-    maybeCount,
-    buyRate,
-    totalInvested,
-    estimatedProfit,
-    avgROI,
-    hasROI,
-  } = useSessionMetrics(sessionItems, settings)
   const totalScans = sessionItems.length
 
   const locationTypes: { value: ThriftStoreLocation['type']; label: string }[] = [

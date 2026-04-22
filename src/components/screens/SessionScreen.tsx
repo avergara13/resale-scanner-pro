@@ -4,7 +4,8 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
-import { computeSessionMetrics } from '@/lib/use-session-metrics'
+import { computeBuyMetrics } from '@/lib/use-buy-metrics'
+import { dedupById } from '@/lib/item-dedup'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
@@ -230,15 +231,10 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
 
   // Memoize combined items to avoid recreating on every render
   const scanHistory = scanHistoryProp
-  const allCombinedItems = useMemo(() => {
-    const items = [...(queue || []), ...(scanHistory || [])]
-    const seen = new Set<string>()
-    return items.filter(i => {
-      if (seen.has(i.id)) return false
-      seen.add(i.id)
-      return true
-    })
-  }, [queue, scanHistory])
+  const allCombinedItems = useMemo(
+    () => dedupById([...(queue || []), ...(scanHistory || [])]),
+    [queue, scanHistory]
+  )
   const [goals] = useKV<ProfitGoal[]>('profit-goals', [])
   const deviceId = useDeviceId()
   const [currentDeviceSession] = useKV<Session | undefined>(`device-current-session-${deviceId}`, undefined)
@@ -412,7 +408,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
                   {openSessions.slice().reverse().map(s => {
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
                     const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
-                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, buyRate } = computeSessionMetrics(sessionItems, settings)
+                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, buyRate } = computeBuyMetrics(sessionItems, settings)
                     const duration = (s.endTime || Date.now()) - s.startTime
                     return (
                       <PastSessionCard
@@ -452,7 +448,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
                   {pastSessions.slice().reverse().map(s => {
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
                     const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
-                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, buyRate } = computeSessionMetrics(sessionItems, settings)
+                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, buyRate } = computeBuyMetrics(sessionItems, settings)
                     const duration = (s.endTime || Date.now()) - s.startTime
                     return (
                       <PastSessionCard

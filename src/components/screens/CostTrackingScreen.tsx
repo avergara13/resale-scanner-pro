@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useCostTracking } from '@/hooks/use-cost-tracking'
 import { API_COST_CONFIGS } from '@/lib/cost-tracking-service'
 import { getEstimatedNetProfit } from '@/lib/profit-utils'
-import { useSessionMetrics } from '@/lib/use-session-metrics'
+import { useBuyMetrics, getPeriodItems } from '@/lib/use-buy-metrics'
 import { cn } from '@/lib/utils'
 import { getCardPhoto } from '@/lib/photo'
 import type { ScannedItem, AppSettings } from '@/types'
@@ -36,16 +36,10 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId,
     return period === 'all' ? 0 : Date.now() - PERIOD_MS[period]
   }, [period])
 
-  const periodItems = useMemo(() => {
-    const all = [...(queueItems || []), ...(scanHistory || [])]
-    const seen = new Set<string>()
-    return all.filter(i => {
-      if (seen.has(i.id)) return false
-      seen.add(i.id)
-      if (sessionId && i.sessionId !== sessionId) return false
-      return i.timestamp >= cutoff
-    })
-  }, [queueItems, scanHistory, cutoff, sessionId])
+  const periodItems = useMemo(
+    () => getPeriodItems(queueItems, scanHistory, cutoff, sessionId),
+    [queueItems, scanHistory, cutoff, sessionId]
+  )
 
   const {
     buyItems: unsortedBuyItems,
@@ -55,7 +49,7 @@ export function CostTrackingScreen({ onBack, queueItems, scanHistory, sessionId,
     avgROI,
     buyRate,
     hasROI,
-  } = useSessionMetrics(periodItems, settings)
+  } = useBuyMetrics(periodItems, settings)
 
   // Sort by profit margin for the inventory list display only
   const buyItems = useMemo(

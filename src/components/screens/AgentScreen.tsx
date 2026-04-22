@@ -35,7 +35,8 @@ import { logActivity } from '@/lib/activity-log'
 import { getCardPhoto } from '@/lib/photo'
 import { useDeviceId } from '@/hooks/use-device-id'
 import { cn } from '@/lib/utils'
-import { getNetProfit } from '@/lib/profit-utils'
+import { getNetProfit, getEstimatedNetProfit } from '@/lib/profit-utils'
+import { dedupById } from '@/lib/item-dedup'
 import { callLLM, researchProduct } from '@/lib/llm-service'
 import { haptics } from '@/lib/haptics'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
@@ -343,22 +344,22 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
 
   const queueStats = useMemo(() => {
     // Combine queue items + scan history for this session, deduplicated by ID
-    // so BUY/PASS/MAYBE counts reflect ALL scans, not just items still in queue
-    const combined = [...sessionItems, ...(scanHistoryKV || []).filter(i =>
-      currentSession?.id ? i.sessionId === currentSession.id : true
-    )]
-    const seen = new Set<string>()
-    const unique = combined.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true })
+    // so BUY/PASS/MAYBE counts reflect ALL scans, not just items still in queue.
+    // Fee-aware profit keeps this in lockstep with Session Dashboard + Cost Tracking.
+    const unique = dedupById([
+      ...sessionItems,
+      ...(scanHistoryKV || []).filter(i => currentSession?.id ? i.sessionId === currentSession.id : true),
+    ])
 
     const buy = unique.filter(i => i.decision === 'BUY').length
     const pass = unique.filter(i => i.decision === 'PASS').length
     const maybe = unique.filter(i => i.decision === 'MAYBE').length
     const totalProfit = unique
       .filter(i => i.decision === 'BUY')
-      .reduce((sum, i) => sum + ((i.estimatedSellPrice || 0) - i.purchasePrice), 0)
+      .reduce((sum, i) => sum + getEstimatedNetProfit(i, settings).netProfit, 0)
 
     return { total: unique.length, buy, pass, maybe, totalProfit }
-  }, [sessionItems, scanHistoryKV, currentSession?.id])
+  }, [sessionItems, scanHistoryKV, currentSession?.id, settings])
 
   // Session-scoped MAYBE/PENDING scan cards for the active scan pile.
   const sessionScans = useMemo(() => {
