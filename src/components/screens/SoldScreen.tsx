@@ -172,14 +172,32 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
   // view and keeps the initial window fast.
   const [earningsPeriod, setEarningsPeriod] = useKV<EarningsPeriod>('ebay-finances-period', 30)
   const finances = useEbayFinances(earningsPeriod ?? 30)
-  const reconciliationByItem = useMemo(() => {
-    const map = new Map<string, OrderReconciliation>()
-    if (finances.authStatus !== 'ok' || finances.byOrderId.size === 0) return map
+  // Multi-item orders (one buyer buys 2+ line items in one checkout) produce a
+  // single OrderReconciliation bucket whose `net` is the full order total. If
+  // we assign that bucket to every line, each item's card would show the whole
+  // order's net next to a single item's predicted net — visually correct delta,
+  // actually wrong. We tag those orders as ambiguous and suppress the per-item
+  // delta for them; the header card still reflects the correct order-level
+  // totals. A future per-line-item allocator would be the real fix, but eBay
+  // Finances doesn't break out line-item fees, so it can't be exact today.
+  const { reconciliationByItem, ambiguousOrders } = useMemo(() => {
+    const byItem = new Map<string, OrderReconciliation>()
+    const itemsPerOrder = new Map<string, number>()
+    if (finances.authStatus !== 'ok' || finances.byOrderId.size === 0) {
+      return { reconciliationByItem: byItem, ambiguousOrders: new Set<string>() }
+    }
     for (const item of mergedItems) {
       const match = lookupReconciliation(finances.byOrderId, item.orderNumber)
-      if (match) map.set(item.salePageId, match)
+      if (match) {
+        byItem.set(item.salePageId, match)
+        itemsPerOrder.set(match.orderId, (itemsPerOrder.get(match.orderId) || 0) + 1)
+      }
     }
-    return map
+    const ambiguous = new Set<string>()
+    for (const [orderId, count] of itemsPerOrder) {
+      if (count > 1) ambiguous.add(orderId)
+    }
+    return { reconciliationByItem: byItem, ambiguousOrders: ambiguous }
   }, [finances.authStatus, finances.byOrderId, mergedItems])
   const reconciliationStats = useMemo(() => {
     // Only sold items that *claim* an orderNumber are reconcilable candidates;
@@ -413,8 +431,9 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
             const netIncome = item.netIncome ?? ((item.salePrice || 0) - (item.platformFee || 0))
             const reconciliation = reconciliationByItem.get(item.salePageId)
             const hasOrderNumber = !!(item.orderNumber && item.orderNumber.trim().length > 0)
+            const isAmbiguousOrder = reconciliation ? ambiguousOrders.has(reconciliation.orderId) : false
             const reconciliationDelta = reconciliation ? reconciliation.net - netIncome : 0
-            const deltaIsMeaningful = reconciliation ? Math.abs(reconciliationDelta) > 2 : false
+            const deltaIsMeaningful = reconciliation && !isAmbiguousOrder ? Math.abs(reconciliationDelta) > 2 : false
 
             return (
               <Card
@@ -461,7 +480,7 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
                           <div className="text-[9px] text-t3 mt-0.5">Fee −{formatMoney(item.platformFee)}</div>
                         )}
                         <div className="text-[10px] text-green font-bold mt-0.5">Net {formatMoney(netIncome)}</div>
-                        {reconciliation && (
+                        {reconciliation && !isAmbiguousOrder && (
                           <div
                             className={cn(
                               'text-[9px] font-black mt-0.5 flex items-center gap-1 justify-end',
@@ -481,6 +500,14 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
                                 {formatMoney(Math.abs(reconciliationDelta))}
                               </span>
                             )}
+                          </div>
+                        )}
+                        {reconciliation && isAmbiguousOrder && (
+                          <div
+                            className="text-[9px] text-t3 mt-0.5 flex items-center gap-1 justify-end"
+                            title="This order contains multiple line items. eBay Finances only reports order-level totals, so per-item net can't be broken out."
+                          >
+                            <span className="uppercase tracking-wide">Multi-item</span>
                           </div>
                         )}
                         {!reconciliation && hasOrderNumber && finances.authStatus === 'ok' && (

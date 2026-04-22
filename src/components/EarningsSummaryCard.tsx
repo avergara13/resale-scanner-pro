@@ -20,7 +20,15 @@ interface EarningsSummaryCardProps {
 
 const PERIODS: EarningsPeriod[] = [30, 60, 90]
 
+// Preserves sign so a loss period (refunds/fees > sales) reads as negative net
+// instead of a reassuring-but-wrong positive dollar figure. Callers that know
+// the value is always positive (gross, last-payout) can use formatAbs.
 function formatMoney(n: number): string {
+  const abs = Math.abs(n).toFixed(2)
+  return n < 0 ? `−$${abs}` : `$${abs}`
+}
+
+function formatAbs(n: number): string {
   return `$${Math.abs(n).toFixed(2)}`
 }
 
@@ -155,7 +163,7 @@ export function EarningsSummaryCard({
           </div>
           <div className="text-[11px] font-black text-t1">
             {lastSucceededPayout
-              ? `${formatMoney(parseFloat(lastSucceededPayout.amount.value))} · ${formatPayoutDate(lastSucceededPayout.payoutDate)}`
+              ? `${formatAbs(parseFloat(lastSucceededPayout.amount.value))} · ${formatPayoutDate(lastSucceededPayout.payoutDate)}`
               : loading
                 ? '—'
                 : 'None yet'}
@@ -165,9 +173,9 @@ export function EarningsSummaryCard({
 
       {/* Bottom row: gross · fees · refunds · reconciled */}
       <div className="mt-2 grid grid-cols-4 gap-1 border-t border-s1/60 pt-2">
-        <Metric label="Gross" value={summary ? formatMoney(summary.grossSales) : '—'} tone="neutral" />
-        <Metric label="Fees" value={summary ? `−${formatMoney(summary.fees)}` : '—'} tone="negative" />
-        <Metric label="Refunds" value={summary ? `−${formatMoney(summary.refunds)}` : '—'} tone="negative" />
+        <Metric label="Gross" value={summary ? formatAbs(summary.grossSales) : '—'} tone="neutral" />
+        <Metric label="Fees" value={summary ? `−${formatAbs(summary.fees)}` : '—'} tone="negative" />
+        <Metric label="Refunds" value={summary ? `−${formatAbs(summary.refunds)}` : '—'} tone="negative" />
         <Metric
           label="Reconciled"
           value={totalCount > 0 ? `${reconciledCount}/${totalCount}` : '—'}
