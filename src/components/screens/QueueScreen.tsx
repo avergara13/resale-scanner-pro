@@ -141,14 +141,12 @@ function SortableItem({
     opacity: isDragging ? 0.5 : 1,
   }
 
-  // Swipe actions — mirror what the tap action-bar below offers, per card state:
-  //   live      → right swipe marks Sold (matches the Sold tap button)
-  //   ready     → right swipe lists on eBay (matches List tap button)
-  //   unoptim.  → right swipe runs Optimize
-  // Swipe left always arms the same 2-step confirm the trash tap uses, by
-  // flipping setConfirmDelete(true). The user still taps Remove in the panel
-  // that opens — we never skip the confirm step.
-  const rightSwipeAction = item.listingStatus === 'published' && onOpenSoldDialog
+  // iOS swipe convention: right-swipe = left-edge (positive/safe),
+  // left-swipe = right-edge (destructive).
+  // Primary action (Optimize/List/MarkSold) → leftAction (right-swipe, left edge).
+  // Delete confirm                           → rightAction (left-swipe, right edge).
+  // Swipe-left arms the existing 2-step confirm panel — user taps Remove to commit.
+  const leftSwipeAction = item.listingStatus === 'published' && onOpenSoldDialog
     ? { icon: <Lightning size={16} weight="bold" />, label: 'Mark Sold', color: 'bg-green', onTrigger: () => onOpenSoldDialog(item) }
     : item.decision === 'BUY' && item.optimizedListing && !item.ebayListingId && onListItem
     ? { icon: <Lightning size={16} weight="bold" />, label: 'List', color: 'bg-amber', onTrigger: () => onListItem(item.id) }
@@ -159,13 +157,13 @@ function SortableItem({
   return (
     <SwipeableRow
       disabled={isDragging}
-      leftAction={{
+      leftAction={leftSwipeAction}
+      rightAction={{
         icon: <Trash size={16} weight="bold" />,
         label: 'Delete',
         color: 'bg-red-500',
         onTrigger: () => setConfirmDelete(true),
       }}
-      rightAction={rightSwipeAction}
       className="rounded-2xl"
     >
     <Card

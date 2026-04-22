@@ -1,20 +1,29 @@
 import { useState, type ReactNode } from 'react'
-import { animate, motion, useMotionValue, useTransform, useReducedMotion, type PanInfo } from 'framer-motion'
+import { motion, animate, useMotionValue, useTransform, useReducedMotion, type PanInfo } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 // SwipeableRow wraps a row (typically a Card) with horizontal-swipe actions.
 //
-// Architecture note — this is the "sibling wrapper" pattern that lets dnd-kit
-// and Framer Motion coexist on the same row. dnd-kit writes its transform to
-// the draggable element it owns (the Card's setNodeRef); this component writes
-// Framer Motion's transform to its own inner <motion.div>. Two DOM elements,
-// two transform writers, no collision. When a row is actively being reordered
-// by dnd-kit, pass `disabled` so we render a plain div and never capture the
-// pointer — see QueueScreen integration for the exact pattern.
+// Prop naming convention — matches iOS Mail:
+//   leftAction  = the action on the LEFT edge, revealed by swiping RIGHT
+//   rightAction = the action on the RIGHT edge, revealed by swiping LEFT
 //
-// iOS guards: dragConstraints cap at ±120 px so the edge-swipe-back gesture is
-// not hijacked; `prefers-reduced-motion` users get an instant snap with no
-// spring animation.
+// Callers should wire destructive actions (Delete) to rightAction so they live
+// on the right edge revealed by a left-swipe, matching the iOS convention.
+// Positive/safe actions (Save Draft, Optimize) go on leftAction.
+//
+// Architecture note — sibling-wrapper pattern for dnd-kit coexistence.
+// dnd-kit writes its transform to the element it owns (the Card's setNodeRef);
+// this component writes Framer Motion's transform to its own motion.div.
+// Two DOM elements, two transform writers, no last-writer-wins collision.
+// Pass `disabled` when dnd-kit is actively dragging — turns drag={false} on
+// motion.div WITHOUT unmounting it (no state loss mid-gesture).
+//
+// iOS guards: dragConstraints cap at ±120 px (edge-swipe-back safety);
+// `prefers-reduced-motion` gets instant snap with no spring animation;
+// drag is disabled entirely when neither action is defined (no hijacking).
+// Wrapper uses overflow-x-hidden (not overflow-hidden) so dnd-kit's vertical
+// transforms on children are never clipped during reorder.
 
 export interface SwipeAction {
   icon: ReactNode
@@ -28,11 +37,13 @@ export interface SwipeAction {
 
 interface SwipeableRowProps {
   children: ReactNode
+  /** Action on the LEFT edge — revealed by swiping right. Positive/safe actions. */
   leftAction?: SwipeAction
+  /** Action on the RIGHT edge — revealed by swiping left. Destructive actions. */
   rightAction?: SwipeAction
   /** Swipe past this many px to commit the action. Default 80. */
   threshold?: number
-  /** When true, renders children without any drag behavior. */
+  /** When true, drag is disabled (keeps motion.div mounted — no state loss). */
   disabled?: boolean
   className?: string
 }
@@ -51,57 +62,50 @@ export function SwipeableRow({
   const prefersReducedMotion = useReducedMotion()
   const [committing, setCommitting] = useState(false)
 
+  // Only enable drag when there is at least one action to reveal — prevents
+  // hijacking horizontal gestures when the row has nothing to offer.
+  const isSwipeEnabled = !!(leftAction || rightAction)
+
   // Action trails fade in proportional to drag distance — starts showing at
-  // 20px drag, fully opaque at threshold. The leftAction is revealed when the
-  // user swipes right (pulls the row right, exposing the left edge); the
-  // rightAction is revealed when the user swipes left. That matches iOS Mail.
+  // 20 px, fully opaque at threshold. Left trail appears on right-swipe;
+  // right trail appears on left-swipe (iOS Mail convention).
   const leftTrailOpacity = useTransform(x, [0, 20, threshold], [0, 0.4, 1])
   const rightTrailOpacity = useTransform(x, [-threshold, -20, 0], [1, 0.4, 0])
 
-  // Note: when `disabled` is true we keep motion.div mounted but turn off its
-  // drag prop. Unmounting/remounting mid-gesture (e.g. when dnd-kit flips
-  // isDragging partway through an 8 px activation window) would drop drag
-  // state and cause visual glitches on Queue rows. This way the node stays
-  // stable and we just stop responding to new pan input.
-
-  const snapToOrigin = () => {
+  const snapBack = () => {
     if (prefersReducedMotion) {
       x.set(0)
-      return
+    } else {
+      // Use animate() so the spring config actually runs — x.set(0) bypasses
+      // the transition prop and jumps immediately without animation.
+      void animate(x, 0, { type: 'spring', stiffness: 500, damping: 40 })
     }
-
-    void animate(x, 0, {
-      type: 'spring',
-      stiffness: 500,
-      damping: 40,
-    })
   }
 
   const handleDragEnd = (_: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
     const offset = info.offset.x
     if (offset <= -threshold && rightAction) {
+      // Swiped left past threshold → fire right-edge action (e.g. Delete)
       setCommitting(true)
       rightAction.onTrigger()
-      // Snap back after the action fires so the row returns to rest. If the
-      // action removed the row from the list it unmounts before this runs —
-      // harmless either way.
-      snapToOrigin()
+      snapBack()
       setCommitting(false)
     } else if (offset >= threshold && leftAction) {
+      // Swiped right past threshold → fire left-edge action (e.g. Save Draft)
       setCommitting(true)
       leftAction.onTrigger()
-      snapToOrigin()
+      snapBack()
       setCommitting(false)
     } else {
-      snapToOrigin()
+      snapBack()
     }
   }
 
-  const isSwipeEnabled = Boolean(leftAction || rightAction)
-
   return (
-    <div className={cn('relative overflow-hidden', className)}>
-      {/* Left-edge action trail — revealed on swipe right */}
+    // overflow-x-hidden clips the action trails horizontally without clipping
+    // dnd-kit's vertical transforms on child rows during reorder.
+    <div className={cn('relative overflow-x-hidden', className)}>
+      {/* Left-edge action trail — revealed when row slides right */}
       {leftAction && (
         <motion.div
           aria-hidden
@@ -119,7 +123,7 @@ export function SwipeableRow({
         </motion.div>
       )}
 
-      {/* Right-edge action trail — revealed on swipe left */}
+      {/* Right-edge action trail — revealed when row slides left */}
       {rightAction && (
         <motion.div
           aria-hidden
@@ -144,8 +148,6 @@ export function SwipeableRow({
         dragMomentum={false}
         onDragEnd={handleDragEnd}
         style={{ x }}
-        // Reduced motion: disable the spring so snap-back is instant.
-        transition={prefersReducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 40 }}
         className="relative touch-pan-y"
       >
         {children}

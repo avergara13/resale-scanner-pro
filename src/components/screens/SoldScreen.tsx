@@ -437,12 +437,11 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
             const reconciliationDelta = reconciliation ? reconciliation.net - netIncome : 0
             const deltaIsMeaningful = reconciliation && !isAmbiguousOrder ? Math.abs(reconciliationDelta) > 2 : false
 
-            // Swipe-right cycles draft shipping status forward (🔴→🟡→📦→✅).
-            // Matches the tap-button row's local-only semantics — user still taps
-            // Save to persist. Past ✅ Shipped there is nowhere to advance, so
-            // the action is omitted. Swipe-left deletes manual entries only;
-            // eBay-imported rows have no client-side delete path, so leftAction
-            // is undefined there.
+            // iOS swipe convention: right-swipe = left-edge (positive/safe),
+            // left-swipe = right-edge (destructive).
+            // Cycle status (positive) → leftAction (right-swipe, left edge).
+            // Delete (destructive)    → rightAction (left-swipe, right edge),
+            //   manual entries only; eBay-imported rows have no delete path.
             const currentStatusIdx = SHIPPING_STATUS_OPTIONS.indexOf(draft.shippingStatus)
             const nextStatus = currentStatusIdx >= 0 && currentStatusIdx < SHIPPING_STATUS_OPTIONS.length - 1
               ? SHIPPING_STATUS_OPTIONS[currentStatusIdx + 1]
@@ -451,7 +450,16 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
             return (
               <SwipeableRow
                 key={item.salePageId}
-                leftAction={item.isManualEntry ? {
+                leftAction={nextStatus ? {
+                  icon: <ArrowRight size={16} weight="bold" />,
+                  label: nextStatus.split(' ').slice(1).join(' '),
+                  color: 'bg-b1',
+                  onTrigger: () => {
+                    handleDraftChange(item.salePageId, 'shippingStatus', nextStatus)
+                    setDrafts(prev => ({ ...prev, [item.salePageId]: { ...draft, shippingStatus: nextStatus } }))
+                  },
+                } : undefined}
+                rightAction={item.isManualEntry ? {
                   icon: <Trash size={16} weight="bold" />,
                   label: 'Delete',
                   color: 'bg-red-500',
@@ -459,15 +467,6 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
                     const manualId = item.salePageId.replace(/^manual-/, '')
                     setManualSales(prev => (prev || []).filter(m => m.id !== manualId))
                     logActivity('Manual sale removed')
-                  },
-                } : undefined}
-                rightAction={nextStatus ? {
-                  icon: <ArrowRight size={16} weight="bold" />,
-                  label: nextStatus.split(' ').slice(1).join(' '),
-                  color: 'bg-b1',
-                  onTrigger: () => {
-                    handleDraftChange(item.salePageId, 'shippingStatus', nextStatus)
-                    setDrafts(prev => ({ ...prev, [item.salePageId]: { ...draft, shippingStatus: nextStatus } }))
                   },
                 } : undefined}
                 className="rounded-2xl"
