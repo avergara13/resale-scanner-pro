@@ -30,8 +30,9 @@ export interface PhotoManagerProps {
   /** App.tsx handles upload + queue add + navigation.
    *  Photo Manager shows a spinner while this promise is pending.
    *  Pass existing URLs back unchanged; new local photos need uploading.
-   *  Called with (orderedSlots, primaryIndex) where orderedSlots preserves type info. */
-  onDone: (existingUrls: string[], localPhotos: string[], primaryIndex: number) => Promise<void>
+   *  slotOrder encodes the drag-reordered interleaving so App.tsx can reconstruct
+   *  finalPhotoUrls in the correct slot sequence instead of grouping existing-then-new. */
+  onDone: (existingUrls: string[], localPhotos: string[], primaryIndex: number, slotOrder: Array<'existing' | 'local'>) => Promise<void>
   onBack: () => void
   /** Called when user taps "Use Listing Camera". App opens the camera overlay and calls
    *  onCapturedPhotoConsumed after passing the result back via capturedPhoto. */
@@ -220,36 +221,37 @@ export function PhotoManager({
   // ── Done ──────────────────────────────────────────────────────────────────────
 
   const handleDone = useCallback(async () => {
+    const dropExisting = showKeepExistingToggle && !keepExisting
+    // Copilot: block Done when dropping all existing photos with no new ones to replace them
+    const localCount = slots.filter(s => s.type === 'local').length
+    if (dropExisting && localCount === 0) {
+      toast.error('Add at least one photo to replace the existing ones, or turn on "Keep existing photos".')
+      return
+    }
     setIsUploading(true)
     setUploadError(null)
-    // WS-21 Phase 2: when the keep-existing toggle is OFF (edit mode default),
-    // drop existing URLs so the save overwrites the listing's photos with only
-    // the new local captures. Downstream delete-cascade handles the old photos.
-    const existingUrls = showKeepExistingToggle && !keepExisting
-      ? []
-      : slots.filter(s => s.type === 'existing').map(s => (s as { type: 'existing'; url: string }).url)
-    const localPhotos = slots.filter(s => s.type === 'local').map(s => (s as { type: 'local'; data: string }).data)
-    // primaryIndex is measured against the full slot list. When we drop the
-    // existing slots (keep-existing toggle OFF), the remaining localPhotos
-    // array indexes over a reordered subset — so we remap by counting how
-    // many existing slots sat *before* the primary, not total. Handles the
-    // case where drag-reorder interleaves existing and local slots like
-    // [local, existing, local, existing] with primary somewhere in the middle.
-    const dropExisting = showKeepExistingToggle && !keepExisting
+    // Derive ordered arrays from keptSlots so drag-reorder interleaving between
+    // existing and new photos is preserved end-to-end. App.tsx uses slotOrder to
+    // reconstruct finalPhotoUrls in the same sequence rather than grouping existing-then-new.
+    const keptSlots = dropExisting ? slots.filter(s => s.type === 'local') : slots
+    const existingUrls = keptSlots
+      .filter(s => s.type === 'existing')
+      .map(s => (s as { type: 'existing'; url: string }).url)
+    const localPhotos = keptSlots
+      .filter(s => s.type === 'local')
+      .map(s => (s as { type: 'local'; data: string }).data)
+    const slotOrder = keptSlots.map(s => s.type) as Array<'existing' | 'local'>
+    // Remap primaryIndex into keptSlots space
     const existingBeforePrimary = dropExisting
       ? slots.slice(0, primaryIndex).filter(s => s.type === 'existing').length
       : 0
     const primarySlot = slots[primaryIndex]
-    // If the primary slot itself was an existing URL being dropped, fall back to
-    // the first remaining local (index 0) — the user saw a dimmed slot and
-    // accepted the replacement.
     const remappedPrimaryIndex = dropExisting && primarySlot?.type === 'existing'
       ? 0
       : Math.max(0, primaryIndex - existingBeforePrimary)
-    // Count total uploads for progress (only local photos need uploading)
     setUploadProgress({ done: 0, total: localPhotos.length })
     try {
-      await onDone(existingUrls, localPhotos, remappedPrimaryIndex)
+      await onDone(existingUrls, localPhotos, remappedPrimaryIndex, slotOrder)
     } catch {
       setUploadError('Upload failed — listing saved without photos. You can retry from the listing card.')
     } finally {
@@ -258,7 +260,10 @@ export function PhotoManager({
     }
   }, [slots, primaryIndex, onDone, showKeepExistingToggle, keepExisting])
 
-  // ── Done button label ─────────────────────────────────────────────────────────
+  // ── Done button label + block state ──────────────────────────────────────────
+
+  const doneBlocked = showKeepExistingToggle && !keepExisting &&
+    slots.filter(s => s.type === 'local').length === 0
 
   const doneLabel =
     mode === 'buy' ? 'Save Photos & Add to Listings' :
@@ -503,9 +508,14 @@ export function PhotoManager({
 
       {/* Done button */}
       <div className="px-4 pb-6 pt-2 border-t border-s2/40">
+        {doneBlocked && (
+          <p className="text-xs text-red text-center mb-2">
+            Add at least one new photo to replace the existing ones.
+          </p>
+        )}
         <Button
           onClick={handleDone}
-          disabled={isUploading}
+          disabled={isUploading || doneBlocked}
           className="w-full h-14 bg-b1 text-white hover:bg-b1/90 text-sm font-bold rounded-xl transition-all active:scale-98 disabled:opacity-70"
         >
           {isUploading ? (

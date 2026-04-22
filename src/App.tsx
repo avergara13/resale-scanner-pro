@@ -1751,6 +1751,7 @@ function App() {
     existingUrls: string[],
     localPhotos: string[],
     primaryIndex: number,
+    slotOrder: Array<'existing' | 'local'>,
   ) => {
     // WS-21 Phase 2: defensive guard — if the user navigated away mid-upload
     // (e.g. pulled back to sessions), pendingPhotoDecision gets cleared but
@@ -1762,8 +1763,10 @@ function App() {
     }
     const { item, decision, returnScreen } = pendingPhotoDecision
 
-    // Upload new local photos only — existing URLs are already on Supabase
-    let newlyUploadedUrls: string[] = []
+    // Upload new local photos only — existing URLs are already on Supabase.
+    // Preserve per-index results so we can reconstruct finalPhotoUrls in the
+    // exact drag-reordered slot sequence (slotOrder) rather than existing-then-new.
+    let uploadedByIndex: (string | null)[] = localPhotos.map(() => null)
     if (supabaseService && localPhotos.length > 0) {
       // Guarantee a SKU exists — generate one if missing so upload is never silently skipped
       let sku = item.tags?.find(t => t.startsWith('HRBO-'))
@@ -1778,10 +1781,10 @@ function App() {
           supabaseService.uploadPhoto(photo, sku!, `${sku}-0${startIndex + i + 1}.jpg`)
         )
       )
-      newlyUploadedUrls = results
-        .filter(r => r.status === 'fulfilled' && r.value)
-        .map(r => (r as PromiseFulfilledResult<string>).value)
-      const failedCount = localPhotos.length - newlyUploadedUrls.length
+      uploadedByIndex = results.map(r =>
+        r.status === 'fulfilled' && r.value ? r.value : null
+      )
+      const failedCount = uploadedByIndex.filter(v => !v).length
       if (failedCount > 0) {
         toast.warning(`📷 ${failedCount} photo${failedCount > 1 ? 's' : ''} failed to upload — item saved.`)
       }
@@ -1791,7 +1794,19 @@ function App() {
       toast.warning('⚠️ Photos not saved — Supabase storage is not configured.')
     }
 
-    const finalPhotoUrls = [...existingUrls, ...newlyUploadedUrls]
+    // Reconstruct finalPhotoUrls in drag-reordered slot sequence.
+    // Walk slotOrder, pulling from existingUrls or uploadedByIndex in turn.
+    // Failed uploads produce a null entry which flatMap skips cleanly.
+    let eIdx = 0
+    let lIdx = 0
+    const finalPhotoUrls = slotOrder.flatMap((type): string[] => {
+      if (type === 'existing') {
+        const url = existingUrls[eIdx++]
+        return url ? [url] : []
+      }
+      const uploaded = uploadedByIndex[lIdx++]
+      return uploaded ? [uploaded] : []
+    })
 
     // WS-21 Phase 2: delete-cascade for dropped Supabase blobs.
     // When the user turns OFF "keep existing photos" on re-scan, existingUrls
