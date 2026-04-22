@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { SectionHeader } from '@/components/ui/section-header'
+import { SellerStandardsBadge } from '@/components/SellerStandardsBadge'
 import {
   Select,
   SelectContent,
@@ -480,6 +481,10 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                 {/* ── eBay ── */}
                 <div className="space-y-4">
                   <SectionHeader title="eBay" detail={ebayConfigured ? 'Configured' : 'Needs setup'} />
+
+                  {/* Seller-standards pill — only fetch when eBay is already configured, */}
+                  {/* otherwise we'd guarantee a 503 on every settings open. */}
+                  {ebayConfigured && <SellerStandardsBadge />}
 
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
