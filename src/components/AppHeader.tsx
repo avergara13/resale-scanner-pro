@@ -13,7 +13,6 @@ const SCREEN_TITLES: Partial<Record<Screen, string>> = {
   'scan-history': 'Scan History',
   'tag-analytics': 'Tag Analytics',
   'location-insights': 'Locations',
-  'cost-tracking': 'Cost Tracking',
 }
 
 /** Screens that have no back button (top-level tabs) */

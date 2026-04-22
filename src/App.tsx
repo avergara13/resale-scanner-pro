@@ -16,7 +16,6 @@ import { QueueScreen } from './components/screens/QueueScreen'
 import { SettingsScreen } from './components/screens/SettingsScreen'
 import { TagAnalyticsScreen } from './components/screens/TagAnalyticsScreen'
 import { LocationInsightsScreen } from './components/screens/LocationInsightsScreen'
-import { CostTrackingScreen } from './components/screens/CostTrackingScreen'
 import { ScanHistoryScreen } from './components/screens/ScanHistoryScreen'
 import { SoldScreen } from './components/screens/SoldScreen'
 import { SessionDetailScreen } from './components/screens/SessionDetailScreen'
@@ -2791,7 +2790,7 @@ function App() {
   // Remembers where the user was before opening Settings so back returns there
   const settingsReturnScreen = useRef<Screen>('session')
   // Remembers where the user came from before opening any secondary screen
-  // (cost-tracking, scan-history) so back returns to the originating screen
+  // (scan-history) so back returns to the originating screen
   const secondaryReturnScreen = useRef<Screen>('session')
 
   if (prevScreenRef.current !== screen) {
@@ -2907,7 +2906,7 @@ function App() {
             ? () => setScreen(settingsReturnScreen.current)
             : screen === 'session-detail'
             ? () => setScreen('session')
-            : screen === 'scan-history' || screen === 'cost-tracking'
+            : screen === 'scan-history'
             ? () => setScreen(secondaryReturnScreen.current)
             : screen === 'tag-analytics' || screen === 'location-insights'
             ? () => setScreen('queue')
@@ -3154,27 +3153,6 @@ function App() {
               <LocationInsightsScreen
                 items={queue || []}
                 onBack={() => setScreen('queue')}
-              />
-            </motion.div>
-          )}
-          {screen === 'cost-tracking' && (
-            <motion.div
-              key="cost-tracking"
-              custom={slideDir.current}
-              variants={screenVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-              style={{ willChange: 'opacity, transform' }}
-              className="absolute inset-0"
-            >
-              <CostTrackingScreen
-                onBack={() => setScreen(secondaryReturnScreen.current)}
-                queueItems={queue || []}
-                scanHistory={scanHistory || []}
-                sessionId={secondaryReturnScreen.current === 'session-detail' ? selectedSessionId ?? undefined : undefined}
-                settings={settings}
               />
             </motion.div>
           )}

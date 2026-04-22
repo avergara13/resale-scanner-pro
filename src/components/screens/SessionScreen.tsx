@@ -101,25 +101,13 @@ function PastSessionCard({
       {expanded && (
         <div className="space-y-3 border-t border-s2/60 px-4 py-3">
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div
-              onClick={() => onNavigateTo?.('cost-tracking')}
-              className={cn(
-                'material-thin rounded-xl border border-s2/40 p-3 transition-colors',
-                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
-              )}
-            >
+            <div className="material-thin rounded-xl border border-s2/40 p-3">
               <p className="text-caption-1 uppercase tracking-[0.12em] text-t3">Avg Profit</p>
               <p className="text-footnote font-bold text-t1 font-mono">
                 ${buyCount > 0 ? (totalProfit / buyCount).toFixed(2) : '0.00'}
               </p>
             </div>
-            <div
-              onClick={() => onNavigateTo?.('cost-tracking')}
-              className={cn(
-                'material-thin rounded-xl border border-s2/40 p-3 transition-colors',
-                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
-              )}
-            >
+            <div className="material-thin rounded-xl border border-s2/40 p-3">
               <p className="text-caption-1 uppercase tracking-[0.12em] text-t3">ROI</p>
               <p className={cn('text-footnote font-bold font-mono', buyCount === 0 ? 'text-t3' : roi >= 0 ? 'text-green' : 'text-red')}>
                 {buyCount === 0 ? '—' : `${roi >= 0 ? '+' : ''}${roi}%`}
