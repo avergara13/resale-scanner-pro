@@ -143,6 +143,35 @@ export function fetchSellerStandards(): Promise<FinancesFetch<EbaySellerStandard
   return getJson<EbaySellerStandards>('/api/ebay/seller-standards', 'standards')
 }
 
+// Browse API item-detail record. Only fields the CompDetailModal reads are
+// typed — eBay's real payload is much larger, but we stay narrow so schema
+// drift in unused fields never breaks the UI.
+export interface EbayItemDetail {
+  itemId?: string
+  title?: string
+  price?: { value?: string; currency?: string }
+  condition?: string
+  image?: { imageUrl?: string }
+  additionalImages?: Array<{ imageUrl?: string }>
+  itemWebUrl?: string
+  itemLocation?: { country?: string; city?: string; stateOrProvince?: string }
+  seller?: { username?: string; feedbackPercentage?: string; feedbackScore?: number }
+  shippingOptions?: Array<{
+    shippingCost?: { value?: string; currency?: string }
+    minEstimatedDeliveryDate?: string
+    maxEstimatedDeliveryDate?: string
+    type?: string
+  }>
+  returnTerms?: { returnsAccepted?: boolean; returnPeriod?: { value?: number; unit?: string } }
+}
+
+export function fetchItemDetail(itemId: string): Promise<FinancesFetch<EbayItemDetail>> {
+  return getJson<EbayItemDetail>(
+    `/api/ebay/item/${encodeURIComponent(itemId)}`,
+    `item:${itemId}`,
+  )
+}
+
 // ── Transaction math (corrected) ────────────────────────────────────────────
 // Prior bug: amount was parsed as signed, then refunds/fees were subtracted
 // again — double-counting in both directions (net off by 5–15%). Fixed by
