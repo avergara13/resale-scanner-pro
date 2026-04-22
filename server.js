@@ -1075,6 +1075,29 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // ── eBay health probe — server-side proxy for connection indicator ───────
+  // Browser cannot reach svcs.ebay.com directly (no CORS). This route runs a
+  // tiny Browse API call under the app token so the UI can distinguish
+  // "server reachable but eBay down" from a local network failure. Always
+  // returns 200; the body carries ok/status so the hook drives UI state off
+  // payload, not HTTP status.
+  if (requestUrl.pathname === '/api/ebay/health' && req.method === 'GET') {
+    try {
+      const accessToken = await getEbayAppToken()
+      const resp = await fetch(
+        `${ebayBaseUrl}/buy/browse/v1/item_summary/search?q=test&limit=1`,
+        { headers: { Authorization: `Bearer ${accessToken}`, 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } }
+      )
+      sendJson(res, 200, { ok: resp.ok, status: resp.status })
+    } catch (err) {
+      const errorMessage =
+        (err instanceof Error ? err.message : String(err ?? '')).trim() ||
+        'Unknown eBay health check error'
+      sendJson(res, 200, { ok: false, error: errorMessage })
+    }
+    return
+  }
+
   // ── eBay market-search — Browse API proxy for scanner ────────────────────
   // Replaces the browser's failing Finding API call (which has no CORS headers
   // and has been silently failing for every user). Uses client_credentials so

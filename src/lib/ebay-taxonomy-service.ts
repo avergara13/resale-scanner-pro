@@ -3,6 +3,8 @@
 // instead of AI-guessed keys. Backed by /api/ebay/taxonomy/:categoryId/aspects
 // which calls the Commerce Taxonomy API with a client_credentials token.
 
+import { logDebug } from '@/lib/debug-log'
+
 export interface EbayAspectValue {
   localizedValue: string
 }
@@ -70,7 +72,7 @@ export async function fetchCategoryAspects(
       allowedValues: (a.aspectValues || []).map(v => v.localizedValue).filter(Boolean),
     }))
   } catch (error) {
-    console.warn('eBay taxonomy fetch failed:', error)
+    logDebug('eBay taxonomy fetch failed', 'warn', 'ebay', { message: (error as Error).message })
     return null
   }
 }
