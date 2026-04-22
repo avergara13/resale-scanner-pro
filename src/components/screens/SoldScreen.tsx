@@ -16,7 +16,10 @@ import { cn } from '@/lib/utils'
 import { createPirateShipUrl } from '@/lib/shipping-rate-service'
 import { recommendShipping, analyzeSoldBatch } from '@/lib/shipping-intelligence'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { useEbayFinances } from '@/hooks/use-ebay-finances'
+import { lookupReconciliation, type OrderReconciliation } from '@/lib/ebay-finances-service'
 import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
+import { EarningsSummaryCard, type EarningsPeriod } from '../EarningsSummaryCard'
 import type { SoldItem, SoldShippingStatus, SoldShippingUpdateInput, SoldDelistStatus, ManualSaleEntry } from '@/types'
 
 type FulfillmentFilter = 'all' | 'need-label' | 'label-ready' | 'shipped'
@@ -163,6 +166,49 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
 
   const batchStats = useMemo(() => analyzeSoldBatch(mergedItems), [mergedItems])
 
+  // ── eBay Finances reconciliation ──────────────────────────────────────────
+  // Period persists across sessions so the user doesn't have to re-pick 90d
+  // every time they open Sold. Default 30d matches eBay's own "Last 30 days"
+  // view and keeps the initial window fast.
+  const [earningsPeriod, setEarningsPeriod] = useKV<EarningsPeriod>('ebay-finances-period', 30)
+  const finances = useEbayFinances(earningsPeriod ?? 30)
+  // Multi-item orders (one buyer buys 2+ line items in one checkout) produce a
+  // single OrderReconciliation bucket whose `net` is the full order total. If
+  // we assign that bucket to every line, each item's card would show the whole
+  // order's net next to a single item's predicted net — visually correct delta,
+  // actually wrong. We tag those orders as ambiguous and suppress the per-item
+  // delta for them; the header card still reflects the correct order-level
+  // totals. A future per-line-item allocator would be the real fix, but eBay
+  // Finances doesn't break out line-item fees, so it can't be exact today.
+  const { reconciliationByItem, ambiguousOrders } = useMemo(() => {
+    const byItem = new Map<string, OrderReconciliation>()
+    const itemsPerOrder = new Map<string, number>()
+    if (finances.authStatus !== 'ok' || finances.byOrderId.size === 0) {
+      return { reconciliationByItem: byItem, ambiguousOrders: new Set<string>() }
+    }
+    for (const item of mergedItems) {
+      const match = lookupReconciliation(finances.byOrderId, item.orderNumber)
+      if (match) {
+        byItem.set(item.salePageId, match)
+        itemsPerOrder.set(match.orderId, (itemsPerOrder.get(match.orderId) || 0) + 1)
+      }
+    }
+    const ambiguous = new Set<string>()
+    for (const [orderId, count] of itemsPerOrder) {
+      if (count > 1) ambiguous.add(orderId)
+    }
+    return { reconciliationByItem: byItem, ambiguousOrders: ambiguous }
+  }, [finances.authStatus, finances.byOrderId, mergedItems])
+  const reconciliationStats = useMemo(() => {
+    // Only sold items that *claim* an orderNumber are reconcilable candidates;
+    // items missing the field aren't counted against the "X of Y" ratio.
+    let candidates = 0
+    for (const item of mergedItems) {
+      if (item.orderNumber && item.orderNumber.trim().length > 0) candidates += 1
+    }
+    return { reconciled: reconciliationByItem.size, candidates }
+  }, [mergedItems, reconciliationByItem])
+
   const handleDraftChange = (pageId: string, key: keyof SoldItemDraft, value: string) => {
     setDrafts((previous) => ({
       ...previous,
@@ -290,6 +336,19 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
         </div>
       </div>
 
+      {/* ── Earnings reconciliation card — real eBay payouts + fees ───── */}
+      <EarningsSummaryCard
+        authStatus={finances.authStatus}
+        errorMessage={finances.errorMessage}
+        summary={finances.summary}
+        lastSucceededPayout={finances.lastSucceededPayout}
+        reconciledCount={reconciliationStats.reconciled}
+        totalCount={reconciliationStats.candidates}
+        period={earningsPeriod ?? 30}
+        onPeriodChange={setEarningsPeriod}
+        onRefresh={finances.refresh}
+      />
+
       {/* ── Slim stats strip — matches Agent inline style ─────────────── */}
       <div className="material-thin flex h-[38px] flex-shrink-0 items-center overflow-hidden border-b border-s1/60 px-3">
         <div className="flex items-center gap-2 flex-1 text-[10px]">
@@ -370,6 +429,11 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
               : 'https://www.ebay.com/sh/ord/?status=AWAITING_SHIPMENT'
 
             const netIncome = item.netIncome ?? ((item.salePrice || 0) - (item.platformFee || 0))
+            const reconciliation = reconciliationByItem.get(item.salePageId)
+            const hasOrderNumber = !!(item.orderNumber && item.orderNumber.trim().length > 0)
+            const isAmbiguousOrder = reconciliation ? ambiguousOrders.has(reconciliation.orderId) : false
+            const reconciliationDelta = reconciliation ? reconciliation.net - netIncome : 0
+            const deltaIsMeaningful = reconciliation && !isAmbiguousOrder ? Math.abs(reconciliationDelta) > 2 : false
 
             return (
               <Card
@@ -416,6 +480,45 @@ export function SoldScreen({ soldItems, loading, error, warnings: _warnings, las
                           <div className="text-[9px] text-t3 mt-0.5">Fee −{formatMoney(item.platformFee)}</div>
                         )}
                         <div className="text-[10px] text-green font-bold mt-0.5">Net {formatMoney(netIncome)}</div>
+                        {reconciliation && !isAmbiguousOrder && (
+                          <div
+                            className={cn(
+                              'text-[9px] font-black mt-0.5 flex items-center gap-1 justify-end',
+                              deltaIsMeaningful
+                                ? reconciliationDelta > 0
+                                  ? 'text-green'
+                                  : 'text-red'
+                                : 'text-t3',
+                            )}
+                            title={`eBay actual net: $${reconciliation.net.toFixed(2)} · fees $${reconciliation.fees.toFixed(2)} · refunds $${reconciliation.refunds.toFixed(2)}`}
+                          >
+                            <span className="uppercase tracking-wide">eBay</span>
+                            <span>{formatMoney(reconciliation.net)}</span>
+                            {deltaIsMeaningful && (
+                              <span>
+                                {reconciliationDelta > 0 ? '+' : '−'}
+                                {formatMoney(Math.abs(reconciliationDelta))}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {reconciliation && isAmbiguousOrder && (
+                          <div
+                            className="text-[9px] text-t3 mt-0.5 flex items-center gap-1 justify-end"
+                            title="This order contains multiple line items. eBay Finances only reports order-level totals, so per-item net can't be broken out."
+                          >
+                            <span className="uppercase tracking-wide">Multi-item</span>
+                          </div>
+                        )}
+                        {!reconciliation && hasOrderNumber && finances.authStatus === 'ok' && (
+                          <div
+                            className="text-[9px] text-t3 mt-0.5 flex items-center gap-1 justify-end"
+                            title="Order not found in recent eBay Finances window — may still be pending payout."
+                          >
+                            <span>⏳</span>
+                            <span className="uppercase tracking-wide">Pending</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
