@@ -183,7 +183,7 @@ export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanH
       {/* History list — PTR-enabled */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto scrollable-content overscroll-y-contain"
+        className="flex-1 overflow-y-auto overflow-x-hidden scrollable-content overscroll-y-contain"
       >
         <PullToRefreshIndicator
           isPulling={isPulling}
