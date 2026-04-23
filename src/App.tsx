@@ -185,6 +185,10 @@ function App() {
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
     ebayAdFeePercent: 3.0,
+    mercariFeePercent: 12.9,
+    poshmarkFeePercent: 20.0,
+    whatnotFeePercent: 10.9,
+    stockxFeePercent: 12.0,
     shippingMaterialsCost: 0.75,
     paypalFeePercent: 0,
     preferredAiModel: 'gemini-2.5-flash',
@@ -858,7 +862,11 @@ function App() {
         settings?.defaultShippingCost ?? 5.0,
         settings?.shippingMaterialsCost ?? 0.75,
         settings?.ebayFeePercent ?? 12.9,
-        settings?.ebayAdFeePercent ?? 3.0
+        settings?.ebayAdFeePercent ?? 3.0,
+        settings?.mercariFeePercent ?? 12.9,
+        settings?.poshmarkFeePercent ?? 20.0,
+        settings?.whatnotFeePercent ?? 10.9,
+        settings?.stockxFeePercent ?? 12.0,
       ) : []
       const bestAlt = platformComparison.find(p => p.recommended)
 
@@ -1217,6 +1225,10 @@ function App() {
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
         ebayAdFeePercent: 0,
+        mercariFeePercent: 12.9,
+        poshmarkFeePercent: 20.0,
+        whatnotFeePercent: 10.9,
+        stockxFeePercent: 12.0,
         shippingMaterialsCost: 0,
         paypalFeePercent: 0,
         preferredAiModel: 'gemini-2.5-flash',

@@ -6,14 +6,32 @@ import type { ScannedItem, AppSettings } from '@/types'
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Fee schedules for pre-sale profit projections.
- * Rates are kept in sync with calculatePlatformROI() in platform-roi-service.ts.
+ * Per-platform fee math for pre-sale profit projections.
  *
- * eBay:      12.9% FVF + $0.30 per-order + 3% ad/promoted listings fee (all configurable via AppSettings)
- * Mercari:   10% selling fee + $0.30 payment processing; seller pays shipping
- * Poshmark:  <$15 → $2.95 flat; ≥$15 → 20%; Poshmark provides shipping label (no shipping cost)
- * Whatnot:   8% commission + 3% payment = 11% total; seller pays shipping
- * Facebook:  5% selling fee; typically local pickup (no shipping cost)
+ * FORMULA (applied identically on every platform):
+ *
+ *   netProfit = sellPrice
+ *             − (sellPrice × feeRate)            // commission + payment-processing %
+ *             − perOrderFee                       // flat fixed-dollar fee per transaction
+ *             − (sellerPaysShipping ? shippingCost : 0)
+ *             − (sellerPaysMaterials ? materialsCost : 0)
+ *             − purchasePrice                     // COGS
+ *
+ * Fee defaults below track published US seller schedules (early 2026). The
+ * `editable` flag marks which values are user-tunable via AppSettings — the
+ * rest are platform policy constants (per-order fees, flat <$15 Poshmark
+ * commission, etc.) and should not be surfaced as settings.
+ *
+ *   eBay:      12.9% FVF + 3% Ad fee + $0.30 per-order                (editable: FVF%, Ad%)
+ *   Mercari:   10% marketplace + 2.9% payment processing = 12.9%,
+ *              plus $0.50 per-order payment fee                        (editable: combined %)
+ *   Poshmark:  <$15 → flat $2.95; ≥$15 → 20% commission; Poshmark
+ *              provides shipping label (seller ships $0)               (editable: ≥$15 %)
+ *   Whatnot:   8% commission + 2.9% payment processing = 10.9%         (editable: combined %)
+ *   StockX:    9% transaction + 3% payment = 12% (Level 1 seller);
+ *              StockX issues prepaid authentication label (seller
+ *              ships $0 but pays for packaging materials)              (editable: combined %)
+ *   Facebook:  5% selling fee; local pickup, no shipping               (editable: none)
  */
 interface PlatformFeeSchedule {
   feePercent: number
@@ -25,11 +43,16 @@ interface PlatformFeeSchedule {
 
 const PLATFORM_FEE_SCHEDULES: Record<string, PlatformFeeSchedule> = {
   ebay:     { feePercent: 12.9, perOrderFee: 0.30, adFeePercent: 3.0,  sellerPaysShipping: true,  sellerPaysMaterials: true  },
-  mercari:  { feePercent: 10.0, perOrderFee: 0.30, adFeePercent: 0,    sellerPaysShipping: true,  sellerPaysMaterials: true  },
+  mercari:  { feePercent: 12.9, perOrderFee: 0.50, adFeePercent: 0,    sellerPaysShipping: true,  sellerPaysMaterials: true  },
   poshmark: { feePercent: 20.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: false, sellerPaysMaterials: false },
-  whatnot:  { feePercent: 11.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: true,  sellerPaysMaterials: true  },
+  whatnot:  { feePercent: 10.9, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: true,  sellerPaysMaterials: true  },
+  stockx:   { feePercent: 12.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: false, sellerPaysMaterials: true  },
   facebook: { feePercent:  5.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: false, sellerPaysMaterials: false },
 }
+
+/** Platform policy constants — NOT user-editable, encoded per-platform. */
+const POSHMARK_FLAT_FEE_UNDER_15 = 2.95   // Poshmark charges a flat $2.95 on sales under $15
+const POSHMARK_FLAT_THRESHOLD    = 15     // Cutoff where Poshmark switches from flat fee to commission %
 
 /**
  * Project net profit for an item before it's sold.
@@ -49,41 +72,50 @@ export function getEstimatedNetProfit(
   let shippingCost: number
   let materialsCost: number
 
+  // Look up the platform's policy row (shipping/materials/per-order rules).
+  // User-editable percentages come from AppSettings and override the default in the schedule.
+  const rates = PLATFORM_FEE_SCHEDULES[platform] ?? PLATFORM_FEE_SCHEDULES['ebay']
+
   if (platform === 'ebay') {
-    // eBay: FVF%, ad%, default shipping, and materials are user-configurable via
-    // Business Rules settings. Per-order fee ($0.30) is fixed by eBay and not surfaced.
-    feePercent    = settings?.ebayFeePercent    ?? 12.9
-    perOrderFee   = 0.30
-    adFeePercent  = settings?.ebayAdFeePercent  ?? 3.0
-    shippingCost  = item.optimizedListing?.shippingCost ?? settings?.defaultShippingCost ?? 5.0
-    materialsCost = settings?.shippingMaterialsCost ?? 0.75
+    feePercent   = settings?.ebayFeePercent   ?? rates.feePercent
+    adFeePercent = settings?.ebayAdFeePercent ?? rates.adFeePercent
+    perOrderFee  = rates.perOrderFee
+  } else if (platform === 'mercari') {
+    feePercent   = settings?.mercariFeePercent ?? rates.feePercent
+    adFeePercent = 0
+    perOrderFee  = rates.perOrderFee
   } else if (platform === 'poshmark') {
-    // Poshmark provides the shipping label — no shipping or materials cost to seller
-    feePercent    = sellPrice < 15 ? 0 : 20.0
-    perOrderFee   = sellPrice < 15 ? 2.95 : 0
-    adFeePercent  = 0
-    shippingCost  = 0
-    materialsCost = 0
-  } else if (platform === 'facebook') {
-    // Facebook Marketplace — typically local pickup, no shipping
-    feePercent    = 5.0
-    perOrderFee   = 0
-    adFeePercent  = 0
-    shippingCost  = 0
-    materialsCost = 0
+    // Poshmark: flat fee below threshold, commission % above. <$15 flat is a platform
+    // policy constant (Poshmark decides it, not the seller), so it's not in settings.
+    if (sellPrice < POSHMARK_FLAT_THRESHOLD) {
+      feePercent  = 0
+      perOrderFee = POSHMARK_FLAT_FEE_UNDER_15
+    } else {
+      feePercent  = settings?.poshmarkFeePercent ?? rates.feePercent
+      perOrderFee = 0
+    }
+    adFeePercent = 0
+  } else if (platform === 'whatnot') {
+    feePercent   = settings?.whatnotFeePercent ?? rates.feePercent
+    adFeePercent = 0
+    perOrderFee  = rates.perOrderFee
+  } else if (platform === 'stockx') {
+    feePercent   = settings?.stockxFeePercent ?? rates.feePercent
+    adFeePercent = 0
+    perOrderFee  = rates.perOrderFee
   } else {
-    // Mercari, Whatnot, or unknown platform
-    const rates = PLATFORM_FEE_SCHEDULES[platform] ?? PLATFORM_FEE_SCHEDULES['ebay']
-    feePercent    = rates.feePercent
-    perOrderFee   = rates.perOrderFee
-    adFeePercent  = rates.adFeePercent
-    shippingCost  = rates.sellerPaysShipping
-      ? (item.optimizedListing?.shippingCost ?? settings?.defaultShippingCost ?? 5.0)
-      : 0
-    materialsCost = rates.sellerPaysMaterials
-      ? (settings?.shippingMaterialsCost ?? 0.75)
-      : 0
+    // facebook or any future platform — fall back to schedule defaults.
+    feePercent   = rates.feePercent
+    adFeePercent = rates.adFeePercent
+    perOrderFee  = rates.perOrderFee
   }
+
+  shippingCost = rates.sellerPaysShipping
+    ? (item.optimizedListing?.shippingCost ?? settings?.defaultShippingCost ?? 5.0)
+    : 0
+  materialsCost = rates.sellerPaysMaterials
+    ? (settings?.shippingMaterialsCost ?? 0.75)
+    : 0
 
   const { netProfit, totalFees } = calculateProfitFallback(
     item.purchasePrice,

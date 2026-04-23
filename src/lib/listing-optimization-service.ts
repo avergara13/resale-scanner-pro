@@ -553,6 +553,12 @@ Return a JSON object with this exact structure:
         feePercent: 0,
         rules: 'Local buyer tone — conversational and direct. No shipping required (local pickup). No strict brand restrictions. Mention city/area availability. Price should be negotiable-friendly (slightly above target). Description should be brief (3-5 sentences max). No formal return policy needed.',
       },
+      stockx: {
+        name: 'StockX',
+        titleMax: 80,
+        feePercent: 12,
+        rules: 'StockX is an authentication-based marketplace for sneakers, streetwear, trading cards, and collectibles. Listings are keyed to an existing product record — use the exact brand, model, colorway, and style code. Sizes (for apparel/shoes) and set/edition (for collectibles) must be precise. Condition is almost always DS/NEW since StockX prefers deadstock. Seller ships to StockX with a prepaid authentication label; buyer-facing shipping cost is $0. Combined fee: 9% transaction + 3% payment = 12% (Level 1 seller; improves with volume).',
+      },
     }
 
     const p = platformRules[platform]
