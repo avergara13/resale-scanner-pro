@@ -404,7 +404,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
             <div className="stat-card flex-1 p-3">
-              <div className={cn('text-base font-bold mono leading-tight', !hasROI ? 'text-t3' : avgROI >= 0 ? 'text-green' : 'text-red')}>
+              <div className="text-base font-bold mono text-t1 leading-tight">
                 {!hasROI ? '—' : `${avgROI >= 0 ? '+' : ''}${avgROI}%`}
               </div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">ROI</div>
