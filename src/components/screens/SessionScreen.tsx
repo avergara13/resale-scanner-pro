@@ -16,7 +16,7 @@ import { useDeviceId } from '@/hooks/use-device-id'
 import type { Session, ScannedItem, ProfitGoal, Screen, AppSettings, SessionArchive } from '@/types'
 
 function PastSessionCard({
-  session, items, buyCount, passCount, totalProfit, roi, bestFind, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail, onOpenItem, onNavigateTo, isCurrentSession = false
+  session, items, buyCount, passCount, totalProfit, roi, bestFind, bestFindNetProfit, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail, onOpenItem, onNavigateTo, isCurrentSession = false
 }: {
   session: Session
   items: ScannedItem[]
@@ -25,6 +25,7 @@ function PastSessionCard({
   totalProfit: number
   roi: number
   bestFind: ScannedItem | null
+  bestFindNetProfit: number
   duration: number
   buyRate: number
   listedCount: number
@@ -128,7 +129,14 @@ function PastSessionCard({
               )}
             >
               <TrendUp size={14} className="text-green flex-shrink-0" />
-              <span className="truncate text-footnote text-t2">Best: <span className="font-bold text-t1">{bestFind.productName}</span> ({bestFind.profitMargin?.toFixed(0)}%)</span>
+              {bestFind.imageThumbnail && (
+                <img src={bestFind.imageThumbnail} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />
+              )}
+              <span className="text-[10px] font-bold text-t3 uppercase flex-shrink-0">Best:</span>
+              <span className="min-w-0 flex-1 truncate text-footnote text-t2">
+                <span className="font-bold text-t1">{bestFind.productName}</span>
+                <span className="text-t3"> · +{bestFind.profitMargin?.toFixed(0)}% · ${bestFindNetProfit.toFixed(0)} net</span>
+              </span>
             </div>
           )}
 
@@ -408,7 +416,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
                   {openSessions.slice().reverse().map(s => {
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
                     const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
-                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, buyRate } = computeBuyMetrics(sessionItems, settings)
+                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, bestFindNetProfit, buyRate } = computeBuyMetrics(sessionItems, settings)
                     const duration = (s.endTime || Date.now()) - s.startTime
                     return (
                       <PastSessionCard
@@ -421,6 +429,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
                         totalProfit={totalProfit}
                         roi={roi}
                         bestFind={bestFind}
+                        bestFindNetProfit={bestFindNetProfit}
                         duration={duration}
                         buyRate={buyRate}
                         formatDuration={formatDuration}
@@ -448,7 +457,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
                   {pastSessions.slice().reverse().map(s => {
                     const sessionItems = allCombinedItems.filter(i => i.sessionId === s.id)
                     const listedItems = sessionItems.filter(i => i.listingStatus === 'published')
-                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, buyRate } = computeBuyMetrics(sessionItems, settings)
+                    const { buyCount, passCount, estimatedProfit: totalProfit, avgROI: roi, bestFind, bestFindNetProfit, buyRate } = computeBuyMetrics(sessionItems, settings)
                     const duration = (s.endTime || Date.now()) - s.startTime
                     return (
                       <PastSessionCard
@@ -461,6 +470,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
                         totalProfit={totalProfit}
                         roi={roi}
                         bestFind={bestFind}
+                        bestFindNetProfit={bestFindNetProfit}
                         duration={duration}
                         buyRate={buyRate}
                         formatDuration={formatDuration}

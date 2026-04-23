@@ -39,6 +39,8 @@ export interface BuyMetrics {
   /** False when buyCount === 0. Callers should render "—" instead of "+0%". */
   hasROI: boolean
   bestFind: ScannedItem | null
+  /** Net profit of `bestFind` under current settings. 0 when bestFind is null. */
+  bestFindNetProfit: number
 }
 
 /**
@@ -58,6 +60,7 @@ export function computeBuyMetrics(items: ScannedItem[], settings?: AppSettings):
   const bestFind = buyItems.length > 0
     ? buyItems.reduce((best, i) => (i.profitMargin || 0) > (best.profitMargin || 0) ? i : best)
     : null
+  const bestFindNetProfit = bestFind ? getEstimatedNetProfit(bestFind, settings).netProfit : 0
 
   return {
     buyItems,
@@ -72,6 +75,7 @@ export function computeBuyMetrics(items: ScannedItem[], settings?: AppSettings):
     avgROI,
     hasROI: buyItems.length > 0,
     bestFind,
+    bestFindNetProfit,
   }
 }
 
