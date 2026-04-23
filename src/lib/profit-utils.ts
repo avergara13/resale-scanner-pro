@@ -77,8 +77,6 @@ export function getEstimatedNetProfit(
   let feePercent: number
   let perOrderFee: number
   let adFeePercent: number
-  let shippingCost: number
-  let materialsCost: number
 
   // Look up the platform's policy row (shipping/materials/per-order rules).
   // User-editable percentages come from AppSettings and override the default in the schedule.
@@ -118,10 +116,10 @@ export function getEstimatedNetProfit(
     perOrderFee  = rates.perOrderFee
   }
 
-  shippingCost = rates.sellerPaysShipping
+  const shippingCost = rates.sellerPaysShipping
     ? (item.optimizedListing?.shippingCost ?? settings?.defaultShippingCost ?? 5.0)
     : 0
-  materialsCost = rates.sellerPaysMaterials
+  const materialsCost = rates.sellerPaysMaterials
     ? (settings?.shippingMaterialsCost ?? 0.75)
     : 0
 
@@ -139,18 +137,62 @@ export function getEstimatedNetProfit(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Post-sale net profit. Uses `item.soldOn` to pick the fee schedule, mirroring
+ * `getEstimatedNetProfit`'s pre-sale math so BUY-time projections and post-sale
+ * actuals use identical formulas. Platforms that provide prepaid labels
+ * (Poshmark, StockX) zero out `shippingCost` regardless of `actualShippingCost`
+ * because the seller didn't pay that cost.
+ */
 export function getNetProfit(
   item: ScannedItem,
   settings: AppSettings
 ): { netProfit: number; totalFees: number; shippingCost: number } {
   const soldPrice = item.soldPrice || 0
-  const shippingCost = item.actualShippingCost ?? settings.defaultShippingCost ?? 5.0
+  const platform = (item.soldOn || 'ebay').toLowerCase()
+  const rates = PLATFORM_FEE_SCHEDULES[platform] ?? PLATFORM_FEE_SCHEDULES['ebay']
 
-  // Only eBay has configured fees; other marketplaces default to 0% for now
-  const feePercent = item.soldOn === 'ebay' ? (settings.ebayFeePercent ?? 12.9) : 0
-  const perOrderFee = item.soldOn === 'ebay' ? 0.30 : 0
-  const adFeePercent = item.soldOn === 'ebay' ? (settings.ebayAdFeePercent ?? 3.0) : 0
-  const materialsCost = settings.shippingMaterialsCost ?? 0.75
+  let feePercent: number
+  let perOrderFee: number
+  let adFeePercent: number
+
+  if (platform === 'ebay') {
+    feePercent   = settings.ebayFeePercent   ?? rates.feePercent
+    adFeePercent = settings.ebayAdFeePercent ?? rates.adFeePercent
+    perOrderFee  = rates.perOrderFee
+  } else if (platform === 'mercari') {
+    feePercent   = settings.mercariFeePercent ?? rates.feePercent
+    adFeePercent = 0
+    perOrderFee  = rates.perOrderFee
+  } else if (platform === 'poshmark') {
+    if (soldPrice > 0 && soldPrice < POSHMARK_FLAT_THRESHOLD) {
+      feePercent  = 0
+      perOrderFee = POSHMARK_FLAT_FEE_UNDER_15
+    } else {
+      feePercent  = settings.poshmarkFeePercent ?? rates.feePercent
+      perOrderFee = 0
+    }
+    adFeePercent = 0
+  } else if (platform === 'whatnot') {
+    feePercent   = settings.whatnotFeePercent ?? rates.feePercent
+    adFeePercent = 0
+    perOrderFee  = rates.perOrderFee
+  } else if (platform === 'stockx') {
+    feePercent   = settings.stockxFeePercent ?? rates.feePercent
+    adFeePercent = 0
+    perOrderFee  = rates.perOrderFee
+  } else {
+    feePercent   = rates.feePercent
+    adFeePercent = rates.adFeePercent
+    perOrderFee  = rates.perOrderFee
+  }
+
+  const shippingCost = rates.sellerPaysShipping
+    ? (item.actualShippingCost ?? settings.defaultShippingCost ?? 5.0)
+    : 0
+  const materialsCost = rates.sellerPaysMaterials
+    ? (settings.shippingMaterialsCost ?? 0.75)
+    : 0
 
   const { netProfit, totalFees } = calculateProfitFallback(
     item.purchasePrice,

@@ -851,7 +851,7 @@ function App() {
         settings?.shippingMaterialsCost ?? 0.75
       )
 
-      const minMargin = settings?.minProfitMargin || 30
+      const minMargin = settings?.minProfitMargin ?? 30
       const minROI = settings?.minROI ?? 100
       const decision = makeDecision(ebayAvgPrice, price, profitMetrics.profitMargin, profitMetrics.netProfit, profitMetrics.roi, minMargin, minROI)
 
@@ -1609,11 +1609,11 @@ function App() {
     // Use form-provided shipping if valid; fall back to settings default.
     const effectiveShipping = (newShipping != null && Number.isFinite(newShipping) && newShipping >= 0)
       ? newShipping
-      : (settings?.defaultShippingCost || 5.0)
+      : (settings?.defaultShippingCost ?? 5.0)
 
-    const feePercent = settings?.ebayFeePercent || 12.9
-    const adFeePercent = settings?.ebayAdFeePercent || 3.0
-    const minMargin = settings?.minProfitMargin || 30
+    const feePercent = settings?.ebayFeePercent ?? 12.9
+    const adFeePercent = settings?.ebayAdFeePercent ?? 3.0
+    const minMargin = settings?.minProfitMargin ?? 30
     const minROI = settings?.minROI ?? 100
 
     const profitMetrics = calculateProfitFallback(
@@ -1716,7 +1716,7 @@ function App() {
         settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
-      resolvedDecision = makeDecision(effectiveSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, freshMetrics.roi, settings?.minProfitMargin || 30, settings?.minROI ?? 100)
+      resolvedDecision = makeDecision(effectiveSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, freshMetrics.roi, settings?.minProfitMargin ?? 30, settings?.minROI ?? 100)
     }
     const listingItem: ScannedItem = {
       ...lightweight,
@@ -2355,7 +2355,7 @@ function App() {
           settings?.shippingMaterialsCost ?? 0.75
         )
 
-        const minMargin = settings?.minProfitMargin || 30
+        const minMargin = settings?.minProfitMargin ?? 30
         const minROI = settings?.minROI ?? 100
         const decision = makeDecision(sellPrice, item.purchasePrice, profitMetrics.profitMargin, profitMetrics.netProfit, profitMetrics.roi, minMargin, minROI)
 
