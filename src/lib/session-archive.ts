@@ -25,6 +25,7 @@
  *   treats it as a live archive via buildLiveArchive() at read time.
  */
 import { computeBuyMetrics } from '@/lib/use-buy-metrics'
+import { dedupById } from '@/lib/item-dedup'
 import type { Session, ScannedItem, AppSettings, SessionArchive } from '@/types'
 
 export const ARCHIVE_KV_KEY = 'session-archives'
@@ -32,13 +33,17 @@ export const ARCHIVE_KV_KEY = 'session-archives'
 /**
  * Compute a SessionArchive row from a session and its items.
  * Pure — no I/O. Safe to call in any context.
+ *
+ * Dedups by id before reducing — callers build items by concatenating
+ * `queue` and `scanHistory`, and BUY/MAYBE items are mirrored in both stores.
+ * Without dedup, mirrored items would double-count in archive totals.
  */
 export function computeArchive(
   session: Session,
   items: ScannedItem[],
   settings?: AppSettings,
 ): SessionArchive {
-  const metrics = computeBuyMetrics(items, settings)
+  const metrics = computeBuyMetrics(dedupById(items), settings)
   return {
     schemaVersion: 1,
     sessionId: session.id,
@@ -79,13 +84,36 @@ export function upsertArchive(
 
 /**
  * Freeze-before-purge helper. Returns the archive array with a row for
- * the given session, computing one if it didn't already exist.
+ * the given session, computing one ONLY if it doesn't already exist.
+ *
+ * NO-OP when an archive row for this sessionId is already present — that
+ * preserves archive immutability, so delayed hard-deletes or backfills
+ * running after fee settings changed can't silently rewrite historical
+ * trend values. Use {@link freezeArchive} at end-of-session when you
+ * intentionally want to (re)compute and overwrite.
  *
  * Call this BEFORE removing a session's items from queue/scanHistory,
  * otherwise the archive computation would see an empty item list and
  * freeze zeros. Idempotent — calling it twice is safe.
  */
 export function ensureArchived(
+  prev: SessionArchive[] | undefined,
+  session: Session,
+  items: ScannedItem[],
+  settings?: AppSettings,
+): SessionArchive[] {
+  const existing = prev || []
+  if (existing.some(a => a.sessionId === session.id)) return existing
+  return upsertArchive(existing, computeArchive(session, items, settings))
+}
+
+/**
+ * End-of-session freeze — always recomputes and overwrites the archive row.
+ * Use this from the session-end flow (and end → reopen → end-again) where
+ * the latest numbers should win. Delete/backfill paths should use
+ * {@link ensureArchived} instead to preserve immutability.
+ */
+export function freezeArchive(
   prev: SessionArchive[] | undefined,
   session: Session,
   items: ScannedItem[],

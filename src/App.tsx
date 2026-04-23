@@ -43,7 +43,7 @@ import type { GeminiVisionResponse } from './lib/gemini-service'
 import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { BarcodeProduct } from './lib/barcode-service'
 import type { Screen, ScannedItem, PipelineStep, Session, SessionArchive, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, SoldItem, SoldShippingUpdateInput, UserProfile, ResalePlatform } from './types'
-import { ARCHIVE_KV_KEY, ensureArchived } from './lib/session-archive'
+import { ARCHIVE_KV_KEY, ensureArchived, freezeArchive } from './lib/session-archive'
 import { cn } from './lib/utils'
 import { useDeviceId } from './hooks/use-device-id'
 
@@ -254,7 +254,8 @@ function App() {
 
   // Backfill archive rows for ended sessions that don't have one yet. Runs
   // after a short delay so large session lists don't block startup.
-  // Safe to re-run — ensureArchived is keyed by sessionId.
+  // Safe to re-run — ensureArchived no-ops when an archive already exists,
+  // so this effect can't rewrite historical rows if fees/items changed later.
   useEffect(() => {
     if (!allSessions?.length) return
     const archived = new Set((sessionArchives || []).map(a => a.sessionId))
@@ -1123,13 +1124,14 @@ function App() {
         return lean as ScannedItem
       }))
       const endedSession = { ...session, endTime: Date.now(), active: false }
-      // Freeze tier-2 aggregate now that the session is done. Archive is keyed
-      // by sessionId so end → reopen → end-again overwrites cleanly.
+      // Freeze tier-2 aggregate now that the session is done. End-of-session
+      // is the designated (re)compute moment — `freezeArchive` overwrites so
+      // end → reopen → end-again lands the latest numbers.
       const sessionItems = [
         ...(queue || []).filter(i => i.sessionId === session.id),
         ...(scanHistory || []).filter(i => i.sessionId === session.id),
       ]
-      setSessionArchives(prev => ensureArchived(prev, endedSession, sessionItems, settings))
+      setSessionArchives(prev => freezeArchive(prev, endedSession, sessionItems, settings))
       // Update in allSessions
       setAllSessions((prev) =>
         (prev || []).map(s => s.id === session.id ? endedSession : s)
