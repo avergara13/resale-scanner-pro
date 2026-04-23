@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { Trash, FloppyDisk, CheckSquare, Square, Clock, Package } from '@phosphor-icons/react'
+import { Trash, FloppyDisk, CheckSquare, Square, Clock, Package, ArrowCounterClockwise } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { StatusChip } from '@/components/ui/status-chip'
@@ -15,6 +15,8 @@ import type { ScannedItem } from '@/types'
 interface ScanHistoryScreenProps {
   onBack: () => void
   onSaveAsDraft: (item: ScannedItem) => void
+  /** Promote a PASS row back to MAYBE + queue. Same handler wired on AgentScreen + SessionDetailScreen. */
+  onRestorePassItem?: (item: ScannedItem) => void
   sessionId?: string
   scanHistory?: ScannedItem[]
   // Permanent delete with Supabase photo cascade owned by App.tsx.
@@ -22,7 +24,7 @@ interface ScanHistoryScreenProps {
   onDeleteItems?: (ids?: string[]) => void
 }
 
-export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanHistoryProp, onDeleteItems }: ScanHistoryScreenProps) {
+export function ScanHistoryScreen({ onSaveAsDraft, onRestorePassItem, sessionId, scanHistory: scanHistoryProp, onDeleteItems }: ScanHistoryScreenProps) {
   // Read-only: provides data when no scanHistoryProp is passed (non-session view).
   // Write path goes through onDeleteItems (App-level, Supabase-photo-safe). Never
   // call the KV setter directly — that would skip Supabase photo cleanup.
@@ -211,19 +213,20 @@ export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanH
               const isSelected = selectedIds.has(item.id)
               // iOS swipe convention: right-swipe reveals left edge (positive),
               // left-swipe reveals right edge (destructive).
-              // Save Draft (positive) → leftAction (right-swipe, left edge).
-              // Delete (destructive)  → rightAction (left-swipe, right edge),
-              //   only wired when onDeleteItems is present — no no-op actions.
-              const canSaveDraft = !item.inQueue
+              // Positive action (Save Draft / Restore) → leftAction; PASS rows get Restore, PENDING/MAYBE get Save Draft.
+              // BUY rows are always `inQueue` so they render no left action.
+              // Delete (destructive) → rightAction, only wired when onDeleteItems is present.
+              const isRestorable = !item.inQueue && item.decision === 'PASS' && !!onRestorePassItem
+              const isDraftable  = !item.inQueue && (item.decision === 'PENDING' || item.decision === 'MAYBE')
+              const leftAction = isRestorable
+                ? { icon: <ArrowCounterClockwise size={16} weight="bold" />, label: 'Restore',    color: 'bg-amber',  onTrigger: () => onRestorePassItem!(item) }
+                : isDraftable
+                ? { icon: <FloppyDisk size={16} weight="bold" />,            label: 'Save Draft', color: 'bg-b1',     onTrigger: () => onSaveAsDraft(item) }
+                : undefined
               return (
                 <SwipeableRow
                   key={item.id}
-                  leftAction={canSaveDraft ? {
-                    icon: <FloppyDisk size={16} weight="bold" />,
-                    label: 'Save Draft',
-                    color: 'bg-b1',
-                    onTrigger: () => onSaveAsDraft(item),
-                  } : undefined}
+                  leftAction={leftAction}
                   rightAction={onDeleteItems ? {
                     icon: <Trash size={16} weight="bold" />,
                     label: 'Delete',
@@ -294,12 +297,24 @@ export function ScanHistoryScreen({ onSaveAsDraft, sessionId, scanHistory: scanH
                         )}
                       </div>
 
-                      {!item.inQueue && (
+                      {isRestorable && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onRestorePassItem!(item)}
+                          className="mt-2 h-7 text-[10px] border-amber/30 text-amber"
+                          aria-label="Restore to scan pile"
+                        >
+                          <ArrowCounterClockwise size={12} className="mr-1" /> Restore
+                        </Button>
+                      )}
+                      {isDraftable && (
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => onSaveAsDraft(item)}
                           className="mt-2 h-7 text-[10px] border-b1/30 text-b1"
+                          aria-label="Save as draft in queue"
                         >
                           <FloppyDisk size={12} className="mr-1" /> Save as Draft
                         </Button>
