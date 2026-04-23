@@ -26,12 +26,20 @@ import type { ScannedItem, AppSettings } from '@/types'
  *   Mercari:   10% marketplace + 2.9% payment processing = 12.9%,
  *              plus $0.50 per-order payment fee                        (editable: combined %)
  *   Poshmark:  <$15 → flat $2.95; ≥$15 → 20% commission; Poshmark
- *              provides shipping label (seller ships $0)               (editable: ≥$15 %)
+ *              provides shipping label (seller ships $0 but still
+ *              pays for packaging materials)                           (editable: ≥$15 %)
  *   Whatnot:   8% commission + 2.9% payment processing = 10.9%         (editable: combined %)
  *   StockX:    9% transaction + 3% payment = 12% (Level 1 seller);
  *              StockX issues prepaid authentication label (seller
  *              ships $0 but pays for packaging materials)              (editable: combined %)
- *   Facebook:  5% selling fee; local pickup, no shipping               (editable: none)
+ *   Facebook:  5% selling fee; local pickup, no shipping, no packaging (editable: none)
+ *
+ * Shipping-cost sourcing:
+ *   For ship-it-yourself platforms (eBay, Mercari, Whatnot) the seller buys the
+ *   label through the platform's integrated USPS partnership — that's what
+ *   `settings.defaultShippingCost` represents. Override per-item with
+ *   `item.optimizedListing.shippingCost` when we have a specific quote.
+ *   Poshmark and StockX provide a prepaid label, so seller shipping = $0.
  */
 interface PlatformFeeSchedule {
   feePercent: number
@@ -44,7 +52,7 @@ interface PlatformFeeSchedule {
 const PLATFORM_FEE_SCHEDULES: Record<string, PlatformFeeSchedule> = {
   ebay:     { feePercent: 12.9, perOrderFee: 0.30, adFeePercent: 3.0,  sellerPaysShipping: true,  sellerPaysMaterials: true  },
   mercari:  { feePercent: 12.9, perOrderFee: 0.50, adFeePercent: 0,    sellerPaysShipping: true,  sellerPaysMaterials: true  },
-  poshmark: { feePercent: 20.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: false, sellerPaysMaterials: false },
+  poshmark: { feePercent: 20.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: false, sellerPaysMaterials: true  },
   whatnot:  { feePercent: 10.9, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: true,  sellerPaysMaterials: true  },
   stockx:   { feePercent: 12.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: false, sellerPaysMaterials: true  },
   facebook: { feePercent:  5.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: false, sellerPaysMaterials: false },

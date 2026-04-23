@@ -21,13 +21,19 @@ export interface PlatformROIResult {
  *             − (sellPrice × feeRate/100)
  *             − perOrderFee
  *             − (sellerPaysShipping ? shippingCost : 0)
+ *             − shippingMaterials              // applies to every non-local platform
  *             − purchasePrice
+ *
+ * Shipping model: seller buys the label through the platform's integrated USPS
+ * partnership (what `shippingCost` represents) on ship-it-yourself platforms.
+ * Poshmark and StockX provide a prepaid label — seller shipping = $0, but the
+ * seller still boxes and tapes the item, so materials applies everywhere here.
  */
 export function calculatePlatformROI(
   purchasePrice: number,
   sellPrice: number,
   shippingCost: number,
-  _shippingMaterials: number,  // reserved — materials applied uniformly upstream
+  shippingMaterials: number,   // seller's per-item packaging overhead (applies on every platform)
   _ebayFeePercent: number,     // reserved — eBay handled separately in main pipeline
   _ebayAdFeePercent: number,   // reserved — eBay handled separately in main pipeline
   mercariFeePercent: number  = 12.9,  // 10% marketplace + 2.9% payment processing
@@ -40,10 +46,10 @@ export function calculatePlatformROI(
   const results: PlatformROIResult[] = []
 
   // ── Mercari ──────────────────────────────────────────────────────────────
-  // Combined fee %  + $0.50 fixed payment processing fee + seller-paid shipping.
+  // Combined fee %  + $0.50 fixed payment processing fee + seller-paid shipping + materials.
   const MERCARI_PER_ORDER = 0.50
   const mercariFee = sellPrice * (mercariFeePercent / 100) + MERCARI_PER_ORDER
-  const mercariNet = sellPrice - mercariFee - shippingCost - purchasePrice
+  const mercariNet = sellPrice - mercariFee - shippingCost - shippingMaterials - purchasePrice
   results.push({
     platform: 'Mercari',
     netProfit: mercariNet,
@@ -54,12 +60,13 @@ export function calculatePlatformROI(
   })
 
   // ── Poshmark ─────────────────────────────────────────────────────────────
-  // Under $15 → flat $2.95 (policy constant). ≥$15 → commission %. Shipping label provided.
+  // Under $15 → flat $2.95 (policy constant). ≥$15 → commission %. Shipping label provided
+  // (seller ships $0) but seller still pays for the packaging materials they ship in.
   const POSHMARK_FLAT_UNDER_15 = 2.95
   const poshFee = sellPrice < 15
     ? POSHMARK_FLAT_UNDER_15
     : sellPrice * (poshmarkFeePercent / 100)
-  const poshNet = sellPrice - poshFee - purchasePrice
+  const poshNet = sellPrice - poshFee - shippingMaterials - purchasePrice
   results.push({
     platform: 'Poshmark',
     netProfit: poshNet,
@@ -70,9 +77,9 @@ export function calculatePlatformROI(
   })
 
   // ── Whatnot ──────────────────────────────────────────────────────────────
-  // Combined fee % (commission + payment processing), seller-paid shipping.
+  // Combined fee % (commission + payment processing), seller-paid shipping + materials.
   const whatnotFee = sellPrice * (whatnotFeePercent / 100)
-  const whatnotNet = sellPrice - whatnotFee - shippingCost - purchasePrice
+  const whatnotNet = sellPrice - whatnotFee - shippingCost - shippingMaterials - purchasePrice
   results.push({
     platform: 'Whatnot',
     netProfit: whatnotNet,
@@ -84,9 +91,10 @@ export function calculatePlatformROI(
 
   // ── StockX ───────────────────────────────────────────────────────────────
   // Combined fee % (transaction + payment). StockX supplies the prepaid authentication
-  // shipping label, so seller-shipping cost is $0. Materials still apply upstream.
+  // shipping label, so seller-shipping cost is $0, but the seller still pays for the
+  // packaging materials (box, tape, poly mailer) they ship to StockX in.
   const stockxFee = sellPrice * (stockxFeePercent / 100)
-  const stockxNet = sellPrice - stockxFee - purchasePrice
+  const stockxNet = sellPrice - stockxFee - shippingMaterials - purchasePrice
   results.push({
     platform: 'StockX',
     netProfit: stockxNet,
