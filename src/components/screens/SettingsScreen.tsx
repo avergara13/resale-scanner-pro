@@ -102,6 +102,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       useAmbientLight: false,
       apiNotificationsEnabled: false,
       minProfitMargin: 30,
+      minROI: 100,
       defaultShippingCost: 5.0,
       ebayFeePercent: 12.9,
       ebayAdFeePercent: 3.0,
@@ -127,6 +128,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       useAmbientLight: false,
       apiNotificationsEnabled: false,
       minProfitMargin: 30,
+      minROI: 100,
       defaultShippingCost: 5.0,
       ebayFeePercent: 12.9,
       ebayAdFeePercent: 3.0,
@@ -727,21 +729,39 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   </p>
                 </div>
 
-                <div>
-                  <Label htmlFor="min-profit" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
-                    Min. Profit Margin (%)
-                  </Label>
-                  <Input
-                    id="min-profit"
-                    type="number"
-                    step="1"
-                    min="0"
-                    max="100"
-                    value={settings.minProfitMargin}
-                    onChange={(e) => onUpdate({ minProfitMargin: parseInt(e.target.value) || 0 })}
-                    className="font-mono"
-                  />
-                  <p className="text-xs text-t2 mt-1">Minimum margin for BUY decision</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="min-profit" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Min. Profit Margin (%)
+                    </Label>
+                    <Input
+                      id="min-profit"
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="100"
+                      value={settings.minProfitMargin}
+                      onChange={(e) => onUpdate({ minProfitMargin: parseInt(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-t2 mt-1">Margin floor (MAYBE cushion −6pp)</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="min-roi" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Min. ROI (%)
+                    </Label>
+                    <Input
+                      id="min-roi"
+                      type="number"
+                      step="5"
+                      min="0"
+                      max="1000"
+                      value={settings.minROI ?? 100}
+                      onChange={(e) => onUpdate({ minROI: parseInt(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-t2 mt-1">ROI floor (MAYBE cushion −20pp)</p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

@@ -47,21 +47,41 @@ import { ARCHIVE_KV_KEY, ensureArchived, freezeArchive } from './lib/session-arc
 import { cn } from './lib/utils'
 import { useDeviceId } from './hooks/use-device-id'
 
-/** Pure helper — determines BUY / MAYBE / PASS from profit metrics.
- *  MAYBE fires when margin lands within 6 pp below the user's minMargin threshold
- *  (e.g. threshold 30% → margin 24.0–29.99% = MAYBE; ≥30% = BUY; <24% = PASS). */
+/** MAYBE cushions — how far below each threshold still qualifies for MAYBE instead of PASS. */
+const MARGIN_MAYBE_CUSHION = 6   // pp — margin within 6pp of minMargin = MAYBE
+const ROI_MAYBE_CUSHION = 20     // pp — ROI within 20pp of minROI = MAYBE
+
+/** Pure helper — 2D decision matrix (margin × ROI). ROI is the primary driver.
+ *
+ *   Both PASS thresholds → BUY.
+ *   Both fail even MAYBE → PASS.
+ *   Anything else        → MAYBE (user decides from the printed margin + ROI).
+ *
+ *   marginPass  = margin ≥ minMargin
+ *   marginMaybe = margin ≥ minMargin − MARGIN_MAYBE_CUSHION
+ *   roiPass     = roi    ≥ minROI
+ *   roiMaybe    = roi    ≥ minROI    − ROI_MAYBE_CUSHION
+ */
 function makeDecision(
   sellPrice: number,
   buyPrice: number,
   profitMargin: number,
   netProfit: number,
-  minMargin: number
+  roi: number,
+  minMargin: number,
+  minROI: number
 ): 'BUY' | 'PASS' | 'MAYBE' | 'PENDING' {
   if (sellPrice <= 0) return 'PASS'
   if (buyPrice === 0) return netProfit > 0 ? 'BUY' : 'PASS'
-  if (profitMargin >= minMargin) return 'BUY'
-  if (profitMargin >= minMargin - 6) return 'MAYBE'
-  return 'PASS'
+
+  const marginPass  = profitMargin >= minMargin
+  const marginMaybe = profitMargin >= minMargin - MARGIN_MAYBE_CUSHION
+  const roiPass     = roi >= minROI
+  const roiMaybe    = roi >= minROI - ROI_MAYBE_CUSHION
+
+  if (marginPass && roiPass) return 'BUY'
+  if (!marginMaybe && !roiMaybe) return 'PASS'
+  return 'MAYBE'
 }
 
 // Synthesize a completed 5-step pipeline for items re-opened from the scan queue.
@@ -161,6 +181,7 @@ function App() {
     useAmbientLight: false,
     apiNotificationsEnabled: false,
     minProfitMargin: 30,
+    minROI: 100,
     defaultShippingCost: 5.0,
     ebayFeePercent: 12.9,
     ebayAdFeePercent: 3.0,
@@ -827,7 +848,8 @@ function App() {
       )
 
       const minMargin = settings?.minProfitMargin || 30
-      const decision = makeDecision(ebayAvgPrice, price, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
+      const minROI = settings?.minROI ?? 100
+      const decision = makeDecision(ebayAvgPrice, price, profitMetrics.profitMargin, profitMetrics.netProfit, profitMetrics.roi, minMargin, minROI)
 
       // Multi-platform ROI comparison (Mercari / Poshmark / Whatnot — eBay is primary, FB excluded)
       const platformComparison = sellPrice > 0 ? calculatePlatformROI(
@@ -1191,6 +1213,7 @@ function App() {
         themeMode: 'auto',
         useAmbientLight: false,
         minProfitMargin: 30,
+        minROI: 100,
         defaultShippingCost: 5.0,
         ebayFeePercent: 12.9,
         ebayAdFeePercent: 0,
@@ -1579,6 +1602,7 @@ function App() {
     const feePercent = settings?.ebayFeePercent || 12.9
     const adFeePercent = settings?.ebayAdFeePercent || 3.0
     const minMargin = settings?.minProfitMargin || 30
+    const minROI = settings?.minROI ?? 100
 
     const profitMetrics = calculateProfitFallback(
       newPrice,
@@ -1595,7 +1619,9 @@ function App() {
       newPrice,
       profitMetrics.profitMargin,
       profitMetrics.netProfit,
+      profitMetrics.roi,
       minMargin,
+      minROI,
     )
 
     const freeItemPlatformHint =
@@ -1678,7 +1704,7 @@ function App() {
         settings?.shippingMaterialsCost ?? 0.75
       )
       resolvedMargin = freshMetrics.profitMargin
-      resolvedDecision = makeDecision(effectiveSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, settings?.minProfitMargin || 30)
+      resolvedDecision = makeDecision(effectiveSellPrice, effectivePrice, freshMetrics.profitMargin, freshMetrics.netProfit, freshMetrics.roi, settings?.minProfitMargin || 30, settings?.minROI ?? 100)
     }
     const listingItem: ScannedItem = {
       ...lightweight,
@@ -2318,7 +2344,8 @@ function App() {
         )
 
         const minMargin = settings?.minProfitMargin || 30
-        const decision = makeDecision(sellPrice, item.purchasePrice, profitMetrics.profitMargin, profitMetrics.netProfit, minMargin)
+        const minROI = settings?.minROI ?? 100
+        const decision = makeDecision(sellPrice, item.purchasePrice, profitMetrics.profitMargin, profitMetrics.netProfit, profitMetrics.roi, minMargin, minROI)
 
         const updatedItem: ScannedItem = {
           ...item,

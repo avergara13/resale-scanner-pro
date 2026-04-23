@@ -614,14 +614,31 @@ export function AIScreen({
                             {currentItem.profitMargin?.toFixed(1) || '--'}%
                           </p>
                         </div>
-                        <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
-                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
-                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                            {currentItem.profitMargin != null && currentItem.estimatedSellPrice
-                              ? `$${((currentItem.estimatedSellPrice * currentItem.profitMargin) / 100).toFixed(2)}`
-                              : '--'}
-                          </p>
-                        </div>
+                        {(() => {
+                          // ROI = net profit / purchase price × 100.
+                          // Derived from persisted profitMargin (fee-aware) so it stays in sync
+                          // with the Profit Margin tile without re-running calculateProfitMetrics.
+                          const sellPrice = currentItem.estimatedSellPrice || 0
+                          const buyPrice = currentItem.purchasePrice || 0
+                          const margin = currentItem.profitMargin
+                          const canShow = margin != null && sellPrice > 0 && buyPrice > 0
+                          const roi = canShow ? (sellPrice * margin) / buyPrice : null
+                          const roiColor = roi == null
+                            ? 'text-t1'
+                            : roi >= 100
+                              ? 'text-green'
+                              : roi >= 80
+                                ? 'text-amber'
+                                : 'text-red'
+                          return (
+                            <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
+                              <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">ROI</p>
+                              <p className={cn('text-base sm:text-lg font-mono font-bold', roiColor)}>
+                                {roi != null ? `${roi.toFixed(1)}%` : '--'}
+                              </p>
+                            </div>
+                          )
+                        })()}
                       </div>
                     </CollapsibleContent>
                   </Card>

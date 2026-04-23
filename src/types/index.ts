@@ -505,6 +505,8 @@ export interface AppSettings {
   useAmbientLight?: boolean
   apiNotificationsEnabled?: boolean
   minProfitMargin: number
+  /** Minimum ROI % for BUY decision. ROI is the primary driver; margin is secondary. */
+  minROI: number
   defaultShippingCost: number
   ebayFeePercent: number
   ebayAdFeePercent: number
