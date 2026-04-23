@@ -177,7 +177,6 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
     maybeCount,
     buyRate,
     totalInvested,
-    totalRevenue,
     estimatedProfit,
     avgROI,
     hasROI,
@@ -405,7 +404,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">Scans</div>
             </div>
             <div className="stat-card flex-1 p-3">
-              <div className={cn('text-base font-bold mono leading-tight', !hasROI ? 'text-t3' : avgROI >= 0 ? 'text-green' : 'text-red')}>
+              <div className="text-base font-bold mono text-t1 leading-tight">
                 {!hasROI ? '—' : `${avgROI >= 0 ? '+' : ''}${avgROI}%`}
               </div>
               <div className="text-[9px] text-t3 font-medium uppercase tracking-wider mt-0.5">ROI</div>
@@ -465,7 +464,7 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
             </div>
           </Card>
 
-          {/* Potential Profit card — fee-aware net profit, revenue, and invested all in one place. */}
+          {/* Potential Profit card — fee-aware net profit. Invested + ROI live in the top stat tiles. */}
           <Card className="p-6 mb-4">
             <h3 className="text-sm font-semibold text-t3 uppercase tracking-wide mb-3">Potential Profit</h3>
             <p className="text-4xl font-bold mono text-t1">
@@ -479,20 +478,6 @@ export function SessionDetailScreen({ sessionId, onBack, onDeleteSession, onEndS
                 </span>
               )}
             </p>
-            {liveBuyCount > 0 && (
-              <div className="mt-4 pt-4 border-t border-s2/60 grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-[10px] text-t3 uppercase tracking-wider">Est. Revenue</p>
-                  <p className="font-bold mono text-b1">${totalRevenue.toFixed(2)}</p>
-                  <p className="text-[10px] text-t3 mt-0.5">if all sell</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-t3 uppercase tracking-wider">Invested</p>
-                  <p className="font-bold mono text-t1">${totalInvested.toFixed(2)}</p>
-                  <p className="text-[10px] text-t3 mt-0.5">purchase cost</p>
-                </div>
-              </div>
-            )}
           </Card>
 
           {/* Items from this session */}
