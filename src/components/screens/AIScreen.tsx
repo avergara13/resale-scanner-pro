@@ -616,18 +616,24 @@ export function AIScreen({
                         </div>
                         {(() => {
                           // ROI = net profit / purchase price × 100.
-                          // Derived from persisted profitMargin (fee-aware) so it stays in sync
-                          // with the Profit Margin tile without re-running calculateProfitMetrics.
+                          // Derived from the persisted fee-aware profitMargin so it matches the
+                          // Profit Margin tile without re-running calculateProfitMetrics:
+                          //   margin = netProfit / sellPrice × 100
+                          //   ROI    = netProfit / buyPrice  × 100 = (sellPrice × margin) / buyPrice
+                          // Color bands mirror the 2D decision zones (BUY / MAYBE / PASS) from
+                          // makeDecision, so the tile stays truthful when the user edits Min. ROI.
                           const sellPrice = currentItem.estimatedSellPrice || 0
                           const buyPrice = currentItem.purchasePrice || 0
                           const margin = currentItem.profitMargin
+                          const minROI = settings?.minROI ?? 100
+                          const ROI_MAYBE_CUSHION = 20
                           const canShow = margin != null && sellPrice > 0 && buyPrice > 0
                           const roi = canShow ? (sellPrice * margin) / buyPrice : null
                           const roiColor = roi == null
                             ? 'text-t1'
-                            : roi >= 100
+                            : roi >= minROI
                               ? 'text-green'
-                              : roi >= 80
+                              : roi >= minROI - ROI_MAYBE_CUSHION
                                 ? 'text-amber'
                                 : 'text-red'
                           return (
