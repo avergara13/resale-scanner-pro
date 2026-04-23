@@ -217,10 +217,10 @@ When Spark (or any design tool) publishes a new App.tsx shell:
 
 Anchor-miss warnings are the expected "reconnect these" TODO list. They are non-fatal by design.
 
-### Boundary Exception (5 Screens with Direct Service Imports)
+### Boundary Exception (3 Screens with Direct Service Imports)
 
 These screens import from `src/lib/` directly instead of receiving services as props:
-`AIScreen`, `AgentScreen`, `CostTrackingScreen`, `ListingDetailScreen`, `SoldScreen`
+`AIScreen`, `AgentScreen`, `SoldScreen`
 
 When a design tool redesigns these screens from scratch, the direct imports are lost and must be manually re-added (or the screen refactored to receive the service as a prop from App.tsx). The wiring script does not guard these — tsc will surface missing imports as type errors.
 
