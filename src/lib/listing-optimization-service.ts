@@ -123,13 +123,13 @@ export class ListingOptimizationService {
         if (repaired && validateOptimizedListingShape(repaired)) {
           logDebug('Listing optimizer JSON repaired after parse failure', 'warn', 'gemini', {
             message: (parseErr as Error).message,
-            originalBytes: response.length,
+            originalLength: response.length,
           })
           parsed = repaired
         } else {
           logDebug('Listing optimizer returned non-JSON — falling back', 'warn', 'gemini', {
             message: (parseErr as Error).message,
-            originalBytes: response.length,
+            originalLength: response.length,
             tail: response.slice(-80),
           })
           return this.generateFallbackListing(context)
