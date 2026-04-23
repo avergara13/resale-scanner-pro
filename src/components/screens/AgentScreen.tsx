@@ -250,7 +250,7 @@ interface AgentScreenProps {
   onBatchAnalyze?: () => Promise<void>
   onEditItem?: (itemId: string, updates: Partial<ScannedItem>) => void
   onRerunPipeline?: (itemId: string) => Promise<void>
-  onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
+  onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'stockx' | 'other') => void
   onMarkShipped?: (itemId: string, trackingNumber: string, shippingCarrier: string) => void
   onNavigateToQueue?: () => void
   /** Open a specific queue item in the scan analysis screen (loads it as currentItem) */

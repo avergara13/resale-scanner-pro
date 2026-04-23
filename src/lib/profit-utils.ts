@@ -56,6 +56,9 @@ const PLATFORM_FEE_SCHEDULES: Record<string, PlatformFeeSchedule> = {
   whatnot:  { feePercent: 10.9, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: true,  sellerPaysMaterials: true  },
   stockx:   { feePercent: 12.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: false, sellerPaysMaterials: true  },
   facebook: { feePercent:  5.0, perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: false, sellerPaysMaterials: false },
+  // "other" = local cash, peer-to-peer, consignment, etc. No marketplace commission;
+  // seller still pays shipping + materials if the sale required shipping the item.
+  other:    { feePercent: 0,    perOrderFee: 0,    adFeePercent: 0,    sellerPaysShipping: true,  sellerPaysMaterials: true  },
 }
 
 /** Platform policy constants — NOT user-editable, encoded per-platform. */
@@ -182,6 +185,9 @@ export function getNetProfit(
     adFeePercent = 0
     perOrderFee  = rates.perOrderFee
   } else {
+    // facebook, other, or an unrecognized platform → use that platform's schedule
+    // verbatim. For "other" (local cash, consignment, etc.) that's 0% fees —
+    // do NOT fall back to eBay rates when the soldOn value is unknown.
     feePercent   = rates.feePercent
     adFeePercent = rates.adFeePercent
     perOrderFee  = rates.perOrderFee

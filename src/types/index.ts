@@ -228,7 +228,7 @@ export interface ScannedItem {
   publishedDate?: number
   soldPrice?: number
   soldDate?: number
-  soldOn?: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
+  soldOn?: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'stockx' | 'other'
   soldBuyerName?: string
   trackingNumber?: string
   shippedDate?: number

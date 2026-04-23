@@ -1334,7 +1334,7 @@ function App() {
   const handleMarkAsSold = useCallback((
     itemId: string,
     soldPrice: number,
-    soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
+    soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'stockx' | 'other'
   ) => {
     const soldDate = Date.now()
     const item = (queue || []).find(i => i.id === itemId)

@@ -57,7 +57,7 @@ interface QueueScreenProps {
   geminiService?: GeminiService | null
   onNavigateToTagAnalytics?: () => void
   onNavigateToLocationInsights?: () => void
-  onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
+  onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'stockx' | 'other') => void
   onDelist?: (itemId: string) => void
   personalSessionIds?: Set<string>
   onReanalyze?: (itemId: string) => void
@@ -516,7 +516,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
   const previousItemCountRef = useRef(queueItems.length)
   const [soldDialogItemId, setSoldDialogItemId] = useState<string | null>(null)
   const [soldPrice, setSoldPrice] = useState('')
-  const [soldMarketplace, setSoldMarketplace] = useState<'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'>('ebay')
+  const [soldMarketplace, setSoldMarketplace] = useState<'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'stockx' | 'other'>('ebay')
   const [locationInsightsOpen, setLocationInsightsOpen] = useState(false)
 
   // Scroll-to + flash-highlight when arriving from "View in Queue"
@@ -980,7 +980,7 @@ export function QueueScreen({ queueItems, onRemove, onCreateListing, onEdit, onR
             <div>
               <label className="text-[10px] font-bold text-t3 uppercase tracking-wide block mb-1.5">Marketplace</label>
               <div className="flex flex-wrap gap-1.5">
-                {(['ebay', 'mercari', 'poshmark', 'facebook', 'whatnot', 'other'] as const).map(m => (
+                {(['ebay', 'mercari', 'poshmark', 'facebook', 'whatnot', 'stockx', 'other'] as const).map(m => (
                   <button
                     key={m}
                     onClick={() => setSoldMarketplace(m)}
