@@ -5,20 +5,14 @@
  * SCOPE CONTRACT — read this before changing where these metrics render.
  * ─────────────────────────────────────────────────────────────────────────────
  *
- * Two surfaces render these numbers. They use the SAME math at DIFFERENT scopes:
+ * Session scope (one session, all time):
+ *   • SessionDetailScreen, SessionScreen per-session cards
+ *   • Input: getSessionItems(queue, scanHistory, sessionId)
+ *   • Purpose: "How did this specific thrifting trip perform?"
  *
- *   • Session Dashboard (SessionDetailScreen, SessionScreen cards)
- *       scope    = one session, all time
- *       input    = getSessionItems(queue, scanHistory, sessionId)
- *       purpose  = "How did this specific thrifting trip perform?"
+ * Time-scope (across sessions) lives in Performance Trends and reads from the
+ * SessionArchive store, not from live items — see src/lib/session-archive.ts.
  *
- *   • Cost Tracking (CostTrackingScreen)
- *       scope    = a time period (today / week / month / all), optionally
- *                  narrowed to one session
- *       input    = getPeriodItems(queue, scanHistory, cutoff, sessionId?)
- *       purpose  = "How am I performing over time?" (history tracker)
- *
- * Both feed their scoped item list into useBuyMetrics / computeBuyMetrics.
  * Math lives HERE ONLY — do not duplicate reduce/filter logic in screens.
  *
  * ROI formula: fee-adjusted net profit ÷ invested capital × 100.
@@ -83,7 +77,7 @@ export function computeBuyMetrics(items: ScannedItem[], settings?: AppSettings):
 
 /**
  * Hook wrapper — memoises computeBuyMetrics for stable item lists.
- * Use in components that render once per commit (SessionDetailScreen, CostTrackingScreen).
+ * Use in components that render once per commit (SessionDetailScreen).
  * Use computeBuyMetrics directly inside map() callbacks (SessionScreen) where hook rules forbid it.
  */
 export function useBuyMetrics(items: ScannedItem[], settings?: AppSettings): BuyMetrics {
@@ -109,23 +103,4 @@ export function getSessionItems(
 ): ScannedItem[] {
   const scoped = [...(queue || []), ...(scanHistory || [])].filter(i => i.sessionId === sessionId)
   return dedupById(scoped).sort((a, b) => b.timestamp - a.timestamp)
-}
-
-/**
- * Cost Tracking scope: items within a time cutoff, optionally narrowed to one session.
- * Used by CostTrackingScreen. Pass cutoff = 0 for "All Time".
- *
- * Filter before dedup for the same reason as getSessionItems.
- */
-export function getPeriodItems(
-  queue: ScannedItem[] | undefined,
-  scanHistory: ScannedItem[] | undefined,
-  cutoff: number,
-  sessionId?: string,
-): ScannedItem[] {
-  const scoped = [...(queue || []), ...(scanHistory || [])].filter(i => {
-    if (sessionId && i.sessionId !== sessionId) return false
-    return i.timestamp >= cutoff
-  })
-  return dedupById(scoped)
 }

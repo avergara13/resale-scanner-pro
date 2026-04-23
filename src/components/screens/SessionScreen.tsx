@@ -6,13 +6,14 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 import { computeBuyMetrics } from '@/lib/use-buy-metrics'
 import { dedupById } from '@/lib/item-dedup'
+import { buildLiveArchive } from '@/lib/session-archive'
 import { TrendVisualization } from '../TrendVisualization'
 import { ProfitGoalManager } from '../ProfitGoalManager'
 import { GoalAchievementTracker } from '../GoalAchievementTracker'
 import { LocationInsights } from '../LocationInsights'
 import { useKV } from '@github/spark/hooks'
 import { useDeviceId } from '@/hooks/use-device-id'
-import type { Session, ScannedItem, ProfitGoal, Screen, AppSettings } from '@/types'
+import type { Session, ScannedItem, ProfitGoal, Screen, AppSettings, SessionArchive } from '@/types'
 
 function PastSessionCard({
   session, items, buyCount, passCount, totalProfit, roi, bestFind, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail, onOpenItem, onNavigateTo, isCurrentSession = false
@@ -100,25 +101,13 @@ function PastSessionCard({
       {expanded && (
         <div className="space-y-3 border-t border-s2/60 px-4 py-3">
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div
-              onClick={() => onNavigateTo?.('cost-tracking')}
-              className={cn(
-                'material-thin rounded-xl border border-s2/40 p-3 transition-colors',
-                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
-              )}
-            >
+            <div className="material-thin rounded-xl border border-s2/40 p-3">
               <p className="text-caption-1 uppercase tracking-[0.12em] text-t3">Avg Profit</p>
               <p className="text-footnote font-bold text-t1 font-mono">
                 ${buyCount > 0 ? (totalProfit / buyCount).toFixed(2) : '0.00'}
               </p>
             </div>
-            <div
-              onClick={() => onNavigateTo?.('cost-tracking')}
-              className={cn(
-                'material-thin rounded-xl border border-s2/40 p-3 transition-colors',
-                onNavigateTo && 'cursor-pointer hover:border-b1/40 hover:bg-b1/5 active:bg-b1/10'
-              )}
-            >
+            <div className="material-thin rounded-xl border border-s2/40 p-3">
               <p className="text-caption-1 uppercase tracking-[0.12em] text-t3">ROI</p>
               <p className={cn('text-footnote font-bold font-mono', buyCount === 0 ? 'text-t3' : roi >= 0 ? 'text-green' : 'text-red')}>
                 {buyCount === 0 ? '—' : `${roi >= 0 ? '+' : ''}${roi}%`}
@@ -199,13 +188,15 @@ interface SessionScreenProps {
   onPermanentDeleteSession?: (sessionId: string) => void
   queueItems?: ScannedItem[]
   scanHistory?: ScannedItem[]
+  /** Tier-2 frozen aggregates — source of truth for Performance Trends. */
+  sessionArchives?: SessionArchive[]
   onOpenItem?: (item: ScannedItem) => void
   onNavigateTo?: (screen: Screen) => void
   /** Business-rule settings — drives fee-aware profit projections on session cards */
   settings?: AppSettings
 }
 
-export function SessionScreen({ showTrends = false, onCloseTrends, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp, onOpenItem, onNavigateTo, settings }: SessionScreenProps) {
+export function SessionScreen({ showTrends = false, onCloseTrends, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp, sessionArchives, onOpenItem, onNavigateTo, settings }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   // 2-step delete verification for permanent session delete: first tap arms the
   // button (shows warning copy), second tap within 4s actually purges. Prevents
@@ -244,6 +235,18 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
     ;(allSessions || []).forEach(s => { if (s.sessionType === 'personal') ids.add(s.id) })
     return ids
   }, [allSessions])
+
+  // Performance Trends data: frozen archives + a live archive for the active
+  // session (if any). Active session overwrites any stale archive row for
+  // the same sessionId (reopen-then-end path).
+  const trendsArchives = useMemo<SessionArchive[]>(() => {
+    const frozen = sessionArchives || []
+    if (!currentDeviceSession?.active) return frozen
+    const liveItems = (queue || []).concat(scanHistory || [])
+      .filter(i => i.sessionId === currentDeviceSession.id)
+    const live = buildLiveArchive(currentDeviceSession, liveItems, settings)
+    return [...frozen.filter(a => a.sessionId !== live.sessionId), live]
+  }, [sessionArchives, currentDeviceSession, queue, scanHistory, settings])
 
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
@@ -306,10 +309,7 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
                   <div className="text-caption-1 font-semibold uppercase tracking-[0.12em] text-t3">Active Goals</div>
                 </button>
               </div>
-              <TrendVisualization
-                items={queue || []}
-                sessions={allSessions || []}
-              />
+              <TrendVisualization archives={trendsArchives} />
             </div>
           )}
 

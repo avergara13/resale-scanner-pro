@@ -37,6 +37,7 @@ import { useDeviceId } from '@/hooks/use-device-id'
 import { cn } from '@/lib/utils'
 import { getNetProfit, getEstimatedNetProfit } from '@/lib/profit-utils'
 import { dedupById } from '@/lib/item-dedup'
+import { getSessionItems } from '@/lib/use-buy-metrics'
 import { callLLM, researchProduct } from '@/lib/llm-service'
 import { haptics } from '@/lib/haptics'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
@@ -370,12 +371,20 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     return [...filtered].sort((a, b) => b.timestamp - a.timestamp).slice(0, 100)
   }, [queueItems, currentSession?.id])
 
-  // Session History — BUY items from queue + PASS items from scanHistory, current session
+  // Session History — decisioned items (BUY/PASS) in the current session.
+  // Goes through the shared getSessionItems helper so BUY items that have
+  // since been listed or sold still appear. The previous code read BUY only
+  // from queueItems, so anything that left the queue (moved to ListingQueue
+  // or Sold) silently dropped out of the agent's view.
   const sessionHistory = useMemo(() => {
-    const sessionFilter = (i: ScannedItem) => currentSession?.id ? i.sessionId === currentSession.id : true
-    const buyItems = queueItems.filter(i => i.decision === 'BUY' && sessionFilter(i))
-    const passItems = scanHistory.filter(i => i.decision === 'PASS' && sessionFilter(i))
-    return [...buyItems, ...passItems].sort((a, b) => b.timestamp - a.timestamp)
+    if (!currentSession?.id) {
+      return [
+        ...queueItems.filter(i => i.decision === 'BUY'),
+        ...scanHistory.filter(i => i.decision === 'PASS'),
+      ].sort((a, b) => b.timestamp - a.timestamp)
+    }
+    return getSessionItems(queueItems, scanHistory, currentSession.id)
+      .filter(i => i.decision === 'BUY' || i.decision === 'PASS')
   }, [queueItems, scanHistory, currentSession?.id])
 
   // Context memory chips (PKT-20260420-008) — surfaced in empty states to

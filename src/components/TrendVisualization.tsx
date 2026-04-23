@@ -3,11 +3,16 @@ import { TrendUp, TrendDown, Minus, Calendar, CurrencyDollar, Package, CheckCirc
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import type { ScannedItem, Session } from '@/types'
+import type { SessionArchive } from '@/types'
 
 interface TrendVisualizationProps {
-  items: ScannedItem[]
-  sessions?: Session[]
+  /**
+   * Frozen per-session aggregates + an optional live archive for the
+   * currently-active session. Trends bucket by `startTime` into daily
+   * rows — one archive per session, already aggregated, so deleting
+   * a session's raw items never affects the history.
+   */
+  archives: SessionArchive[]
 }
 
 type TimeRange = '7d' | '30d' | '90d' | 'all'
@@ -31,18 +36,8 @@ interface TrendMetrics {
   trend: 'up' | 'down' | 'flat'
 }
 
-export function TrendVisualization({ items, sessions = [] }: TrendVisualizationProps) {
+export function TrendVisualization({ archives }: TrendVisualizationProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d')
-
-  // Exclude items from personal sessions in profit calculations
-  const personalSessionIds = useMemo(() => {
-    const ids = new Set<string>()
-    sessions.forEach(s => { if (s.sessionType === 'personal') ids.add(s.id) })
-    return ids
-  }, [sessions])
-
-  const isBusinessItem = (item: ScannedItem) =>
-    !item.sessionId || !personalSessionIds.has(item.sessionId)
 
   const getDaysInRange = (range: TimeRange): number => {
     switch (range) {
@@ -59,14 +54,12 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
     const now = Date.now()
     const startTime = now - (days * 24 * 60 * 60 * 1000)
 
-    const filteredItems = items.filter(item => item.timestamp >= startTime)
-    
     const metricsByDay = new Map<string, DailyMetrics>()
 
     for (let i = 0; i < days; i++) {
       const dayTimestamp = now - (i * 24 * 60 * 60 * 1000)
       const dateStr = new Date(dayTimestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      
+
       metricsByDay.set(dateStr, {
         date: dateStr,
         timestamp: dayTimestamp,
@@ -79,21 +72,19 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
       })
     }
 
-    filteredItems.forEach(item => {
-      const dateStr = new Date(item.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    for (const archive of archives) {
+      if (archive.startTime < startTime) continue
+      const dateStr = new Date(archive.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       const existing = metricsByDay.get(dateStr)
-      
-      if (existing) {
-        existing.itemsScanned++
-        if (item.decision === 'BUY') existing.buyCount++
-        if (item.decision === 'PASS') existing.passCount++
-
-        // Only count profit from business sessions
-        if (item.decision === 'BUY' && item.estimatedSellPrice && item.purchasePrice && isBusinessItem(item)) {
-          existing.totalProfit += (item.estimatedSellPrice - item.purchasePrice)
-        }
+      if (!existing) continue
+      existing.itemsScanned += archive.itemsScanned
+      existing.buyCount += archive.buyCount
+      existing.passCount += archive.passCount
+      // Personal sessions excluded from profit totals — matches pre-archive behavior
+      if (archive.sessionType !== 'personal') {
+        existing.totalProfit += archive.estimatedProfit
       }
-    })
+    }
 
     metricsByDay.forEach(metrics => {
       if (metrics.itemsScanned > 0) {
@@ -103,7 +94,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
     })
 
     return Array.from(metricsByDay.values()).reverse()
-  }, [items, timeRange])
+  }, [archives, timeRange])
 
   const calculateTrend = (values: number[]): TrendMetrics => {
     if (values.length < 2) {
@@ -129,7 +120,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
     }
   }
 
-  const profitTrend = useMemo(() => 
+  const profitTrend = useMemo(() =>
     calculateTrend(dailyMetrics.map(m => m.totalProfit)), [dailyMetrics]
   )
 
@@ -137,26 +128,26 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
     calculateTrend(dailyMetrics.map(m => m.buyRate)), [dailyMetrics]
   )
 
-  const volumeTrend = useMemo(() => 
+  const volumeTrend = useMemo(() =>
     calculateTrend(dailyMetrics.map(m => m.itemsScanned)), [dailyMetrics]
   )
 
-  const avgProfitTrend = useMemo(() => 
+  const avgProfitTrend = useMemo(() =>
     calculateTrend(dailyMetrics.map(m => m.avgProfit)), [dailyMetrics]
   )
 
-  const maxProfit = useMemo(() => 
+  const maxProfit = useMemo(() =>
     Math.max(...dailyMetrics.map(m => m.totalProfit), 1), [dailyMetrics]
   )
 
-  const maxVolume = useMemo(() => 
+  const maxVolume = useMemo(() =>
     Math.max(...dailyMetrics.map(m => m.itemsScanned), 1), [dailyMetrics]
   )
 
   const TrendIndicator = ({ trend }: { trend: TrendMetrics }) => {
     const Icon = trend.trend === 'up' ? TrendUp : trend.trend === 'down' ? TrendDown : Minus
     const colorClass = trend.trend === 'up' ? 'text-green' : trend.trend === 'down' ? 'text-red' : 'text-t3'
-    
+
     return (
       <div className={cn('flex items-center gap-1 text-xs font-bold', colorClass)}>
         <Icon size={14} weight="bold" />
@@ -253,7 +244,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
         <div className="h-32 flex items-end justify-between gap-0.5">
           {dailyMetrics.map((day, idx) => {
             const heightPercent = maxProfit > 0 ? (day.totalProfit / maxProfit) * 100 : 0
-            
+
             return (
               <div
                 key={idx}
@@ -292,7 +283,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
         <div className="h-24 flex items-end justify-between gap-0.5">
           {dailyMetrics.map((day, idx) => {
             const heightPercent = maxVolume > 0 ? (day.itemsScanned / maxVolume) * 100 : 0
-            
+
             return (
               <div
                 key={idx}
@@ -334,7 +325,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
                 <stop offset="100%" stopColor="oklch(0.52 0.20 145)" stopOpacity="0.05" />
               </linearGradient>
             </defs>
-            
+
             <path
               d={dailyMetrics.map((day, idx) => {
                 const x = idx
@@ -346,7 +337,7 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
               strokeWidth="2"
               className="transition-all duration-300"
             />
-            
+
             <path
               d={[
                 ...dailyMetrics.map((day, idx) => {
@@ -410,99 +401,37 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 bg-s1 rounded-lg">
             <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">Profit Growth</p>
-            <div className="flex items-baseline gap-1">
-              <p className={cn(
-                'text-lg font-bold mono',
-                profitTrend.trend === 'up' ? 'text-green' : profitTrend.trend === 'down' ? 'text-red' : 'text-t3'
-              )}>
-                {profitTrend.changePercent >= 0 ? '+' : ''}{profitTrend.changePercent.toFixed(1)}%
-              </p>
-            </div>
-            <p className="text-[9px] text-t4 mt-0.5">
-              vs previous period
+            <p className={cn('text-lg font-bold mono', profitTrend.trend === 'up' ? 'text-green' : profitTrend.trend === 'down' ? 'text-red' : 'text-t3')}>
+              {profitTrend.changePercent >= 0 ? '+' : ''}{profitTrend.changePercent.toFixed(1)}%
             </p>
+            <p className="text-[9px] text-t4 mt-0.5">vs previous period</p>
           </div>
-          
           <div className="p-3 bg-s1 rounded-lg">
             <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">Volume Growth</p>
-            <div className="flex items-baseline gap-1">
-              <p className={cn(
-                'text-lg font-bold mono',
-                volumeTrend.trend === 'up' ? 'text-green' : volumeTrend.trend === 'down' ? 'text-red' : 'text-t3'
-              )}>
-                {volumeTrend.changePercent >= 0 ? '+' : ''}{volumeTrend.changePercent.toFixed(1)}%
-              </p>
-            </div>
-            <p className="text-[9px] text-t4 mt-0.5">
-              scans per day
+            <p className={cn('text-lg font-bold mono', volumeTrend.trend === 'up' ? 'text-green' : volumeTrend.trend === 'down' ? 'text-red' : 'text-t3')}>
+              {volumeTrend.changePercent >= 0 ? '+' : ''}{volumeTrend.changePercent.toFixed(1)}%
             </p>
+            <p className="text-[9px] text-t4 mt-0.5">scans per day</p>
           </div>
-          
           <div className="p-3 bg-s1 rounded-lg">
             <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">BUY Rate Change</p>
-            <div className="flex items-baseline gap-1">
-              <p className={cn(
-                'text-lg font-bold mono',
-                buyRateTrend.trend === 'up' ? 'text-green' : buyRateTrend.trend === 'down' ? 'text-red' : 'text-t3'
-              )}>
-                {buyRateTrend.changePercent >= 0 ? '+' : ''}{buyRateTrend.changePercent.toFixed(1)}%
-              </p>
-            </div>
-            <p className="text-[9px] text-t4 mt-0.5">
-              success rate change
+            <p className={cn('text-lg font-bold mono', buyRateTrend.trend === 'up' ? 'text-green' : buyRateTrend.trend === 'down' ? 'text-red' : 'text-t3')}>
+              {buyRateTrend.changePercent >= 0 ? '+' : ''}{buyRateTrend.changePercent.toFixed(1)}%
             </p>
+            <p className="text-[9px] text-t4 mt-0.5">success rate change</p>
           </div>
-          
           <div className="p-3 bg-s1 rounded-lg">
             <p className="text-[10px] uppercase tracking-wide text-t3 mb-1">Avg Profit/Item</p>
-            <div className="flex items-baseline gap-1">
-              <p className={cn(
-                'text-lg font-bold mono',
-                avgProfitTrend.trend === 'up' ? 'text-green' : avgProfitTrend.trend === 'down' ? 'text-red' : 'text-t3'
-              )}>
-                {avgProfitTrend.changePercent >= 0 ? '+' : ''}{avgProfitTrend.changePercent.toFixed(1)}%
-              </p>
-            </div>
-            <p className="text-[9px] text-t4 mt-0.5">
-              per item growth
+            <p className={cn('text-lg font-bold mono', avgProfitTrend.trend === 'up' ? 'text-green' : avgProfitTrend.trend === 'down' ? 'text-red' : 'text-t3')}>
+              {avgProfitTrend.changePercent >= 0 ? '+' : ''}{avgProfitTrend.changePercent.toFixed(1)}%
             </p>
+            <p className="text-[9px] text-t4 mt-0.5">per item growth</p>
           </div>
         </div>
       </Card>
 
-      <Card className="p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-green/10 flex items-center justify-center">
-            <CurrencyDollar size={16} weight="bold" className="text-green" />
-          </div>
-          <h3 className="text-sm font-bold text-t1 uppercase tracking-wide">Profit Breakdown</h3>
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between p-2 bg-s1 rounded-lg">
-            <span className="text-xs text-t2">Current Period Total</span>
-            <span className="text-sm font-bold mono text-green">
-              ${(profitTrend.current * Math.ceil(dailyMetrics.length / 2)).toFixed(2)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between p-2 bg-s1 rounded-lg">
-            <span className="text-xs text-t2">Previous Period Total</span>
-            <span className="text-sm font-bold mono text-t3">
-              ${(profitTrend.previous * Math.floor(dailyMetrics.length / 2)).toFixed(2)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between p-2 bg-gradient-to-r from-green/10 to-transparent rounded-lg border border-green/20">
-            <span className="text-xs font-bold text-t1">Net Change</span>
-            <span className={cn(
-              'text-base font-bold mono',
-              profitTrend.change >= 0 ? 'text-green' : 'text-red'
-            )}>
-              {profitTrend.change >= 0 ? '+' : ''}${((profitTrend.current - profitTrend.previous) * Math.ceil(dailyMetrics.length / 2)).toFixed(2)}
-            </span>
-          </div>
-        </div>
-      </Card>
-
-      {sessions && sessions.length > 0 && (
+      {/* Recent Sessions — sourced from archives (survives item deletion). */}
+      {archives.length > 0 && (
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-lg bg-amber/10 flex items-center justify-center">
@@ -511,148 +440,46 @@ export function TrendVisualization({ items, sessions = [] }: TrendVisualizationP
             <h3 className="text-sm font-bold text-t1 uppercase tracking-wide">Recent Sessions</h3>
           </div>
           <div className="space-y-2">
-            {sessions.slice(-5).reverse().map((session, idx) => {
-              const duration = session.endTime 
-                ? session.endTime - session.startTime 
-                : Date.now() - session.startTime
-              const profitPerHour = (session.totalPotentialProfit / (duration / 3600000)).toFixed(2)
-              
+            {[...archives].sort((a, b) => b.startTime - a.startTime).slice(0, 5).map(archive => {
+              const duration = archive.endTime
+                ? archive.endTime - archive.startTime
+                : Date.now() - archive.startTime
+              const profitPerHour = (archive.estimatedProfit / Math.max(duration / 3600000, 0.01)).toFixed(2)
+
               return (
-                <div key={session.id} className="p-3 bg-s1 rounded-lg hover:bg-s2 transition-colors">
+                <div key={archive.sessionId} className="p-3 bg-s1 rounded-lg hover:bg-s2 transition-colors">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <Badge variant={session.active ? "default" : "secondary"} className={cn(
-                        "text-[9px] uppercase px-2 py-0.5",
-                        session.active ? "bg-green text-white" : ""
+                      <Badge variant="secondary" className={cn(
+                        'text-[9px] uppercase px-2 py-0.5',
+                        !archive.endTime ? 'bg-green text-white' : ''
                       )}>
-                        {session.active ? 'Active' : 'Ended'}
+                        {!archive.endTime ? 'Active' : 'Ended'}
                       </Badge>
                       <span className="text-[10px] text-t3">
-                        {new Date(session.startTime).toLocaleDateString('en-US', { 
-                          month: 'short', 
+                        {new Date(archive.startTime).toLocaleDateString('en-US', {
+                          month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
-                          minute: '2-digit'
+                          minute: '2-digit',
                         })}
                       </span>
                     </div>
                     <span className="text-sm font-bold mono text-green">
-                      ${session.totalPotentialProfit.toFixed(2)}
+                      ${archive.estimatedProfit.toFixed(2)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[10px]">
                     <div className="flex items-center gap-3 text-t3">
-                      <span>{session.itemsScanned} scans</span>
-                      <span className="text-green">{session.buyCount} BUY</span>
-                      <span className="text-red">{session.passCount} PASS</span>
+                      <span>{archive.itemsScanned} scans</span>
+                      <span className="text-green">{archive.buyCount} BUY</span>
+                      <span className="text-red">{archive.passCount} PASS</span>
                     </div>
                     <span className="text-t4 mono">${profitPerHour}/hr</span>
                   </div>
                 </div>
               )
             })}
-          </div>
-        </Card>
-      )}
-
-      {sessions && sessions.length >= 2 && (
-        <Card className="p-4 bg-gradient-to-br from-b1/5 to-transparent border-b1/20">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-b1/10 flex items-center justify-center">
-              <TrendUp size={16} weight="bold" className="text-b1" />
-            </div>
-            <h3 className="text-sm font-bold text-t1 uppercase tracking-wide">Session Comparison</h3>
-          </div>
-          <div className="space-y-4">
-            {(() => {
-              const completedSessions = sessions.filter(s => !s.active && s.endTime)
-              if (completedSessions.length < 2) return null
-              
-              const lastSession = completedSessions[completedSessions.length - 1]
-              const previousSession = completedSessions[completedSessions.length - 2]
-              
-              const profitChange = lastSession.totalPotentialProfit - previousSession.totalPotentialProfit
-              const profitChangePercent = previousSession.totalPotentialProfit > 0 
-                ? (profitChange / previousSession.totalPotentialProfit) * 100 
-                : 0
-              
-              const volumeChange = lastSession.itemsScanned - previousSession.itemsScanned
-              const volumeChangePercent = previousSession.itemsScanned > 0 
-                ? (volumeChange / previousSession.itemsScanned) * 100 
-                : 0
-              
-              const buyRateChange = (
-                (lastSession.itemsScanned > 0 ? (lastSession.buyCount / lastSession.itemsScanned) * 100 : 0) -
-                (previousSession.itemsScanned > 0 ? (previousSession.buyCount / previousSession.itemsScanned) * 100 : 0)
-              )
-              
-              return (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="p-3 bg-fg rounded-lg">
-                      <p className="text-[9px] uppercase tracking-wide text-t4 mb-1">Last Session</p>
-                      <p className="text-base font-bold mono text-green">${lastSession.totalPotentialProfit.toFixed(2)}</p>
-                      <p className="text-[9px] text-t3 mt-0.5">{lastSession.itemsScanned} scans</p>
-                    </div>
-                    <div className="p-3 bg-fg rounded-lg">
-                      <p className="text-[9px] uppercase tracking-wide text-t4 mb-1">Previous Session</p>
-                      <p className="text-base font-bold mono text-t3">${previousSession.totalPotentialProfit.toFixed(2)}</p>
-                      <p className="text-[9px] text-t3 mt-0.5">{previousSession.itemsScanned} scans</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-fg rounded-lg">
-                      <span className="text-xs text-t2">Profit Change</span>
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          'text-sm font-bold mono',
-                          profitChange >= 0 ? 'text-green' : 'text-red'
-                        )}>
-                          {profitChange >= 0 ? '+' : ''}${profitChange.toFixed(2)}
-                        </span>
-                        <Badge variant="secondary" className={cn(
-                          'text-[9px] font-bold',
-                          profitChange >= 0 ? 'bg-green/10 text-green' : 'bg-red/10 text-red'
-                        )}>
-                          {profitChangePercent >= 0 ? '+' : ''}{profitChangePercent.toFixed(1)}%
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-2 bg-fg rounded-lg">
-                      <span className="text-xs text-t2">Volume Change</span>
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          'text-sm font-bold mono',
-                          volumeChange >= 0 ? 'text-green' : 'text-red'
-                        )}>
-                          {volumeChange >= 0 ? '+' : ''}{volumeChange}
-                        </span>
-                        <Badge variant="secondary" className={cn(
-                          'text-[9px] font-bold',
-                          volumeChange >= 0 ? 'bg-green/10 text-green' : 'bg-red/10 text-red'
-                        )}>
-                          {volumeChangePercent >= 0 ? '+' : ''}{volumeChangePercent.toFixed(1)}%
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-2 bg-fg rounded-lg">
-                      <span className="text-xs text-t2">BUY Rate Change</span>
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          'text-sm font-bold mono',
-                          buyRateChange >= 0 ? 'text-green' : 'text-red'
-                        )}>
-                          {buyRateChange >= 0 ? '+' : ''}{buyRateChange.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )
-            })()}
           </div>
         </Card>
       )}
