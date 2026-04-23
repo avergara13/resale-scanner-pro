@@ -133,9 +133,12 @@ function PastSessionCard({
                 <img src={bestFind.imageThumbnail} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" />
               )}
               <span className="text-[10px] font-bold text-t3 uppercase flex-shrink-0">Best:</span>
-              <span className="min-w-0 flex-1 truncate text-footnote text-t2">
-                <span className="font-bold text-t1">{bestFind.productName}</span>
-                <span className="text-t3"> · +{bestFind.profitMargin?.toFixed(0)}% · ${bestFindNetProfit.toFixed(0)} net</span>
+              {/* Name truncates; numbers are flex-shrink-0 so they stay readable on narrow cards. */}
+              <span className="min-w-0 flex-1 truncate text-footnote font-bold text-t1">
+                {bestFind.productName}
+              </span>
+              <span className="flex-shrink-0 font-mono text-caption-1 text-t3">
+                +{(bestFind.profitMargin ?? 0).toFixed(0)}% · {bestFindNetProfit < 0 ? '-$' : '$'}{Math.abs(bestFindNetProfit).toFixed(0)} net
               </span>
             </div>
           )}
