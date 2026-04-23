@@ -24,6 +24,7 @@ import {
   ShoppingCart,
   X,
   ArrowClockwise,
+  ArrowCounterClockwise,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -1930,7 +1931,7 @@ ${settings.userProfile.aiContext}` : ''}`
                         className="text-[10px] font-bold text-b1 hover:underline flex items-center gap-0.5"
                         style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        <ArrowClockwise size={10} weight="bold" />
+                        <ArrowCounterClockwise size={10} weight="bold" />
                         Restore
                       </button>
                     )}
