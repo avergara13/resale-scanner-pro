@@ -250,7 +250,7 @@ interface AgentScreenProps {
   onBatchAnalyze?: () => Promise<void>
   onEditItem?: (itemId: string, updates: Partial<ScannedItem>) => void
   onRerunPipeline?: (itemId: string) => Promise<void>
-  onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other') => void
+  onMarkAsSold?: (itemId: string, soldPrice: number, soldOn: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'stockx' | 'other') => void
   onMarkShipped?: (itemId: string, trackingNumber: string, shippingCarrier: string) => void
   onNavigateToQueue?: () => void
   /** Open a specific queue item in the scan analysis screen (loads it as currentItem) */
@@ -1151,7 +1151,7 @@ ${activeGoalsSummary || 'None'}
 ${(todos || []).length > 0 ? (todos || []).map(t => `- [${t.completed ? 'x' : ' '}] (${t.id}) ${t.text} [${t.createdBy}]`).join('\n') : 'No tasks yet.'}
 
 ### Settings
-- Min margin: ${settings?.minProfitMargin ?? 30}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%${settings?.userProfile?.aiContext ? `
+- Min margin: ${settings?.minProfitMargin ?? 30}%, Min ROI: ${settings?.minROI ?? 100}%, Shipping: $${settings?.defaultShippingCost ?? 5}, eBay fee: ${settings?.ebayFeePercent ?? 12.9}%${settings?.userProfile?.aiContext ? `
 
 ### Operator Context
 ${settings.userProfile.aiContext}` : ''}`

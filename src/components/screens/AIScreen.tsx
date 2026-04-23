@@ -614,14 +614,37 @@ export function AIScreen({
                             {currentItem.profitMargin?.toFixed(1) || '--'}%
                           </p>
                         </div>
-                        <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
-                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Net Profit</p>
-                          <p className="text-base sm:text-lg font-mono font-bold text-t1">
-                            {currentItem.profitMargin != null && currentItem.estimatedSellPrice
-                              ? `$${((currentItem.estimatedSellPrice * currentItem.profitMargin) / 100).toFixed(2)}`
-                              : '--'}
-                          </p>
-                        </div>
+                        {(() => {
+                          // ROI = net profit / purchase price × 100.
+                          // Derived from the persisted fee-aware profitMargin so it matches the
+                          // Profit Margin tile without re-running calculateProfitMetrics:
+                          //   margin = netProfit / sellPrice × 100
+                          //   ROI    = netProfit / buyPrice  × 100 = (sellPrice × margin) / buyPrice
+                          // Color bands mirror the 2D decision zones (BUY / MAYBE / PASS) from
+                          // makeDecision, so the tile stays truthful when the user edits Min. ROI.
+                          const sellPrice = currentItem.estimatedSellPrice || 0
+                          const buyPrice = currentItem.purchasePrice || 0
+                          const margin = currentItem.profitMargin
+                          const minROI = settings?.minROI ?? 100
+                          const ROI_MAYBE_CUSHION = 20
+                          const canShow = margin != null && sellPrice > 0 && buyPrice > 0
+                          const roi = canShow ? (sellPrice * margin) / buyPrice : null
+                          const roiColor = roi == null
+                            ? 'text-t1'
+                            : roi >= minROI
+                              ? 'text-green'
+                              : roi >= minROI - ROI_MAYBE_CUSHION
+                                ? 'text-amber'
+                                : 'text-red'
+                          return (
+                            <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
+                              <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">ROI</p>
+                              <p className={cn('text-base sm:text-lg font-mono font-bold', roiColor)}>
+                                {roi != null ? `${roi.toFixed(1)}%` : '--'}
+                              </p>
+                            </div>
+                          )
+                        })()}
                       </div>
                     </CollapsibleContent>
                   </Card>

@@ -102,9 +102,14 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       useAmbientLight: false,
       apiNotificationsEnabled: false,
       minProfitMargin: 30,
+      minROI: 100,
       defaultShippingCost: 5.0,
       ebayFeePercent: 12.9,
       ebayAdFeePercent: 3.0,
+      mercariFeePercent: 12.9,
+      poshmarkFeePercent: 20.0,
+      whatnotFeePercent: 10.9,
+      stockxFeePercent: 12.0,
       shippingMaterialsCost: 0.75,
       paypalFeePercent: 0,
       preferredAiModel: 'gemini-2.5-flash',
@@ -127,9 +132,14 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
       useAmbientLight: false,
       apiNotificationsEnabled: false,
       minProfitMargin: 30,
+      minROI: 100,
       defaultShippingCost: 5.0,
       ebayFeePercent: 12.9,
       ebayAdFeePercent: 3.0,
+      mercariFeePercent: 12.9,
+      poshmarkFeePercent: 20.0,
+      whatnotFeePercent: 10.9,
+      stockxFeePercent: 12.0,
       shippingMaterialsCost: 0.75,
       paypalFeePercent: 0,
       preferredAiModel: 'gemini-2.5-flash',
@@ -727,21 +737,39 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   </p>
                 </div>
 
-                <div>
-                  <Label htmlFor="min-profit" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
-                    Min. Profit Margin (%)
-                  </Label>
-                  <Input
-                    id="min-profit"
-                    type="number"
-                    step="1"
-                    min="0"
-                    max="100"
-                    value={settings.minProfitMargin}
-                    onChange={(e) => onUpdate({ minProfitMargin: parseInt(e.target.value) || 0 })}
-                    className="font-mono"
-                  />
-                  <p className="text-xs text-t2 mt-1">Minimum margin for BUY decision</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="min-profit" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Min. Profit Margin (%)
+                    </Label>
+                    <Input
+                      id="min-profit"
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="100"
+                      value={settings.minProfitMargin}
+                      onChange={(e) => onUpdate({ minProfitMargin: parseInt(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-t2 mt-1">Margin floor (MAYBE cushion −6pp)</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="min-roi" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Min. ROI (%)
+                    </Label>
+                    <Input
+                      id="min-roi"
+                      type="number"
+                      step="5"
+                      min="0"
+                      max="1000"
+                      value={settings.minROI ?? 100}
+                      onChange={(e) => onUpdate({ minROI: parseInt(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-t2 mt-1">ROI floor (MAYBE cushion −20pp)</p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -762,7 +790,7 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                   </div>
                   <div>
                     <Label htmlFor="ad-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
-                      Ad Fee (%)
+                      eBay Ad Fee (%)
                     </Label>
                     <Input
                       id="ad-fee"
@@ -774,6 +802,82 @@ export function SettingsScreen({ settings, onUpdate }: SettingsScreenProps) {
                       onChange={(e) => onUpdate({ ebayAdFeePercent: parseFloat(e.target.value) || 0 })}
                       className="font-mono"
                     />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-s1/60 border border-s2/60 rounded-md">
+                  <p className="text-xs text-t2 leading-relaxed">
+                    Other platform fees — editable, used for ROI comparison when deciding the best place to sell. eBay is still the primary BUY/PASS driver.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="mercari-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Mercari Fee (%)
+                    </Label>
+                    <Input
+                      id="mercari-fee"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="50"
+                      value={settings.mercariFeePercent ?? 12.9}
+                      onChange={(e) => onUpdate({ mercariFeePercent: parseFloat(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-t2 mt-1">10% marketplace + 2.9% payment</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="poshmark-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Poshmark Fee (%)
+                    </Label>
+                    <Input
+                      id="poshmark-fee"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="50"
+                      value={settings.poshmarkFeePercent ?? 20.0}
+                      onChange={(e) => onUpdate({ poshmarkFeePercent: parseFloat(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-t2 mt-1">≥$15 commission (&lt;$15 flat $2.95)</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="whatnot-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      Whatnot Fee (%)
+                    </Label>
+                    <Input
+                      id="whatnot-fee"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="50"
+                      value={settings.whatnotFeePercent ?? 10.9}
+                      onChange={(e) => onUpdate({ whatnotFeePercent: parseFloat(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-t2 mt-1">8% commission + 2.9% payment</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="stockx-fee" className="text-xs uppercase tracking-wide text-t2 mb-1.5">
+                      StockX Fee (%)
+                    </Label>
+                    <Input
+                      id="stockx-fee"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="50"
+                      value={settings.stockxFeePercent ?? 12.0}
+                      onChange={(e) => onUpdate({ stockxFeePercent: parseFloat(e.target.value) || 0 })}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-t2 mt-1">9% transaction + 3% payment (Level 1)</p>
                   </div>
                 </div>
 

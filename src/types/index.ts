@@ -90,7 +90,7 @@ export interface SoldFeedResponse {
   fetchedAt: number
 }
 
-export type ResalePlatform = 'ebay' | 'mercari' | 'poshmark' | 'whatnot' | 'facebook'
+export type ResalePlatform = 'ebay' | 'mercari' | 'poshmark' | 'whatnot' | 'facebook' | 'stockx'
 
 /** @deprecated Platform-specific listing generation moved to n8n downstream pipeline. RSP is data collection only. */
 export interface PlatformListing {
@@ -228,7 +228,7 @@ export interface ScannedItem {
   publishedDate?: number
   soldPrice?: number
   soldDate?: number
-  soldOn?: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'other'
+  soldOn?: 'ebay' | 'mercari' | 'poshmark' | 'facebook' | 'whatnot' | 'stockx' | 'other'
   soldBuyerName?: string
   trackingNumber?: string
   shippedDate?: number
@@ -505,9 +505,19 @@ export interface AppSettings {
   useAmbientLight?: boolean
   apiNotificationsEnabled?: boolean
   minProfitMargin: number
+  /** Minimum ROI % for BUY decision. ROI is the primary driver; margin is secondary. */
+  minROI: number
   defaultShippingCost: number
   ebayFeePercent: number
   ebayAdFeePercent: number
+  /** Mercari combined seller fee % (marketplace 10% + payment processing 2.9% = 12.9% default). */
+  mercariFeePercent: number
+  /** Poshmark commission % on sales ≥$15 (default 20%). The <$15 flat $2.95 is a platform policy constant. */
+  poshmarkFeePercent: number
+  /** Whatnot combined seller fee % (commission 8% + payment processing 2.9% = 10.9% default). */
+  whatnotFeePercent: number
+  /** StockX combined seller fee % (Level 1: 9% transaction + 3% payment = 12% default). Improves with seller level. */
+  stockxFeePercent: number
   shippingMaterialsCost: number
   paypalFeePercent: number  // Deprecated — kept for backward compat, always 0
   imageQuality?: ImageQualitySettings
