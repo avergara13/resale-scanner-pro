@@ -5,6 +5,7 @@ import { calculateProfitFallback } from './ebay-service'
 import type { GeminiVisionResponse } from './gemini-service'
 import { fetchCategoryAspects, pickImportantAspects, aspectsToPromptBlock } from './ebay-taxonomy-service'
 import { logDebug } from '@/lib/debug-log'
+import { tryRepairJSON } from '@/lib/json-repair'
 
 /**
  * Sanitize a user-supplied string before interpolating it into an LLM prompt.
@@ -112,8 +113,27 @@ export class ListingOptimizationService {
       try {
         parsed = JSON.parse(response)
       } catch (parseErr) {
-        logDebug('Listing optimizer returned non-JSON — falling back', 'warn', 'gemini', { message: (parseErr as Error).message })
-        return this.generateFallbackListing(context)
+        // Attempt structured repair before giving up. Common truncation shapes
+        // (unterminated trailing string, unclosed braces/brackets, trailing
+        // comma) recover the rich title+description+price+itemSpecifics block
+        // that already landed — only the tail was malformed. Repair output
+        // still flows through validateOptimizedListingShape + per-field
+        // coercion below, so a garbage repair falls back cleanly.
+        const repaired = tryRepairJSON(response)
+        if (repaired && validateOptimizedListingShape(repaired)) {
+          logDebug('Listing optimizer JSON repaired after parse failure', 'warn', 'gemini', {
+            message: (parseErr as Error).message,
+            originalBytes: response.length,
+          })
+          parsed = repaired
+        } else {
+          logDebug('Listing optimizer returned non-JSON — falling back', 'warn', 'gemini', {
+            message: (parseErr as Error).message,
+            originalBytes: response.length,
+            tail: response.slice(-80),
+          })
+          return this.generateFallbackListing(context)
+        }
       }
 
       if (!validateOptimizedListingShape(parsed)) {
