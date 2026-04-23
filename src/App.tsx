@@ -3218,6 +3218,7 @@ function App() {
                     return [...current, { ...item, inQueue: true }]
                   })
                 }}
+                onRestorePassItem={handleRestorePassItem}
                 sessionId={secondaryReturnScreen.current === 'session-detail' ? selectedSessionId ?? undefined : undefined}
                 scanHistory={secondaryReturnScreen.current === 'session-detail' ? scanHistory || [] : undefined}
                 onDeleteItems={handleScanHistoryDelete}
