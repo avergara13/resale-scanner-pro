@@ -31,6 +31,7 @@ import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useCollapsePreference } from '@/hooks/use-collapse-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { getEstimatedNetProfit } from '@/lib/profit-utils'
 import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -599,50 +600,46 @@ export function AIScreen({
                             ${currentItem.estimatedSellPrice?.toFixed(2) || '--'}
                           </p>
                         </div>
-                        <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
-                          <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
-                          <p
-                            className={cn(
-                              'text-base sm:text-lg font-mono font-bold',
-                              (currentItem.profitMargin || 0) > 50
-                                ? 'text-green'
-                                : (currentItem.profitMargin || 0) > 20
-                                  ? 'text-amber'
-                                  : 'text-red',
-                            )}
-                          >
-                            {currentItem.profitMargin?.toFixed(1) || '--'}%
-                          </p>
-                        </div>
                         {(() => {
-                          // ROI = net profit / purchase price × 100.
-                          // Derived from the persisted fee-aware profitMargin so it matches the
-                          // Profit Margin tile without re-running calculateProfitMetrics:
-                          //   margin = netProfit / sellPrice × 100
-                          //   ROI    = netProfit / buyPrice  × 100 = (sellPrice × margin) / buyPrice
-                          // Color bands mirror the 2D decision zones (BUY / MAYBE / PASS) from
-                          // makeDecision, so the tile stays truthful when the user edits Min. ROI.
+                          // Compute margin + ROI live from current settings (fee/shipping/materials)
+                          // instead of trusting `currentItem.profitMargin`, which is a snapshot from
+                          // when the item was scanned. If the user edited fee settings after that,
+                          // the persisted margin would drift from what BUY/PASS now decides.
                           const sellPrice = currentItem.estimatedSellPrice || 0
                           const buyPrice = currentItem.purchasePrice || 0
-                          const margin = currentItem.profitMargin
+                          const canShow = sellPrice > 0 && buyPrice > 0
+                          const netProfit = canShow
+                            ? getEstimatedNetProfit(currentItem, settings).netProfit
+                            : 0
+                          const margin = canShow ? (netProfit / sellPrice) * 100 : null
+                          const roi    = canShow ? (netProfit / buyPrice)  * 100 : null
                           const minROI = settings?.minROI ?? 100
                           const ROI_MAYBE_CUSHION = 20
-                          const canShow = margin != null && sellPrice > 0 && buyPrice > 0
-                          const roi = canShow ? (sellPrice * margin) / buyPrice : null
+                          const marginColor = margin == null
+                            ? 'text-t1'
+                            : margin > 50 ? 'text-green'
+                            : margin > 20 ? 'text-amber'
+                            : 'text-red'
                           const roiColor = roi == null
                             ? 'text-t1'
-                            : roi >= minROI
-                              ? 'text-green'
-                              : roi >= minROI - ROI_MAYBE_CUSHION
-                                ? 'text-amber'
-                                : 'text-red'
+                            : roi >= minROI ? 'text-green'
+                            : roi >= minROI - ROI_MAYBE_CUSHION ? 'text-amber'
+                            : 'text-red'
                           return (
-                            <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
-                              <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">ROI</p>
-                              <p className={cn('text-base sm:text-lg font-mono font-bold', roiColor)}>
-                                {roi != null ? `${roi.toFixed(1)}%` : '--'}
-                              </p>
-                            </div>
+                            <>
+                              <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
+                                <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">Profit Margin</p>
+                                <p className={cn('text-base sm:text-lg font-mono font-bold', marginColor)}>
+                                  {margin != null ? `${margin.toFixed(1)}%` : '--'}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-s2/60 bg-system-background/85 p-2.5 sm:p-3">
+                                <p className="text-[10px] sm:text-xs text-t3 mb-0.5 sm:mb-1">ROI</p>
+                                <p className={cn('text-base sm:text-lg font-mono font-bold', roiColor)}>
+                                  {roi != null ? `${roi.toFixed(1)}%` : '--'}
+                                </p>
+                              </div>
+                            </>
                           )
                         })()}
                       </div>
