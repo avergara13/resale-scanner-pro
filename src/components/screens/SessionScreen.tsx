@@ -1,4 +1,4 @@
-import { Play, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, TrendUp, ArrowLeft, ListMagnifyingGlass } from '@phosphor-icons/react'
+import { Play, ChartLine, Trophy, MapPin, CaretDown, CaretUp, Trash, TrendUp, ArrowLeft, ListMagnifyingGlass, Sparkle, Package } from '@phosphor-icons/react'
 import { useState, useCallback, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,31 @@ import { LocationInsights } from '../LocationInsights'
 import { useKV } from '@github/spark/hooks'
 import { useDeviceId } from '@/hooks/use-device-id'
 import type { Session, ScannedItem, ProfitGoal, Screen, AppSettings, SessionArchive } from '@/types'
+
+// Splash quick-prompts shown under the "Ask the Agent" card. Tapping a pill
+// navigates to the Agent screen and seeds the message via the existing
+// pendingMessage path (App.tsx → AgentScreen useEffect auto-sends).
+//
+// Prompts mirror the canonical set in AgentScreen's QUICK_ACTIONS but skip
+// the "Session Recap" entry — splash is the no-active-session state, so a
+// session recap is contextually wrong here.
+const SPLASH_AGENT_PROMPTS: ReadonlyArray<{ icon: typeof TrendUp; label: string; prompt: string }> = [
+  {
+    icon: TrendUp,
+    label: 'Best flips',
+    prompt: 'Which items in my queue have the highest estimated ROI? Rank them and tell me what to list first to maximize profit.',
+  },
+  {
+    icon: Package,
+    label: 'Ship now',
+    prompt: 'Which sold items still need shipping labels? Show me the most urgent first, with the best carrier recommendation and estimated cost for each.',
+  },
+  {
+    icon: Sparkle,
+    label: 'Smart picks',
+    prompt: "Based on my scan history and profit data, what types of items should I be targeting today? Give me 3–5 specific categories or brands with the best ROI potential.",
+  },
+]
 
 function PastSessionCard({
   session, items, buyCount, passCount, totalProfit, roi, bestFind, bestFindNetProfit, duration, buyRate, listedCount, formatDuration, onDelete, onViewDetail, onOpenItem, onNavigateTo, isCurrentSession = false
@@ -187,7 +212,10 @@ type TrendsTab = 'trends' | 'stores' | 'goals'
 interface SessionScreenProps {
   showTrends?: boolean
   onCloseTrends?: () => void
+  /** Send a starter prompt to the Agent (auto-sends on next render via App.tsx pendingMessage). */
   onAgentMessage?: (text: string) => void
+  /** Navigate to the Agent screen with no prefilled prompt — for the splash "Ask the Agent" card. */
+  onOpenAgent?: () => void
   isAgentProcessing?: boolean
   onStartSession: () => void
   onResumeSession?: (sessionId: string) => void
@@ -207,7 +235,7 @@ interface SessionScreenProps {
   settings?: AppSettings
 }
 
-export function SessionScreen({ showTrends = false, onCloseTrends, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp, sessionArchives, onOpenItem, onNavigateTo, settings }: SessionScreenProps) {
+export function SessionScreen({ showTrends = false, onCloseTrends, onAgentMessage, onOpenAgent, onStartSession, onResumeSession, onDeleteSession, onViewSessionDetail, allSessions: allSessionsProp, deletedSessions = [], onRestoreSession, onPermanentDeleteSession, queueItems: queueProp, scanHistory: scanHistoryProp, sessionArchives, onOpenItem, onNavigateTo, settings }: SessionScreenProps) {
   const [trendsTab, setTrendsTab] = useState<TrendsTab>('trends')
   // 2-step delete verification for permanent session delete: first tap arms the
   // button (shows warning copy), second tap within 4s actually purges. Prevents
@@ -362,6 +390,48 @@ export function SessionScreen({ showTrends = false, onCloseTrends, onStartSessio
               <p className="text-footnote text-t3">Begin tracking scans and profits</p>
             </div>
           </button>
+
+          {/* Ask the Agent — secondary entry point to general agent chat without
+              an active session. Mirrors the Start New Session card chassis for
+              visual rhythm; purple→blue gradient (vs blue→blue) signals the
+              hierarchy: primary action is starting a session, agent is the
+              alternate path. Pills below seed canonical prompts via the existing
+              pendingMessage path, so taps go straight to a useful answer. */}
+          {(onOpenAgent || onAgentMessage) && (
+            <div className="space-y-2">
+              {onOpenAgent && (
+                <button
+                  onClick={onOpenAgent}
+                  className="w-full flex items-center gap-4 p-4 bg-fg rounded-xl border border-s1 active:scale-[0.98] transition-all"
+                >
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg, var(--system-purple) 0%, var(--b1) 100%)' }}
+                  >
+                    <Sparkle size={22} weight="fill" className="text-white" />
+                  </div>
+                  <div className="text-left flex-1 min-w-0">
+                    <h2 className="text-headline font-semibold text-t1">Ask the Agent</h2>
+                    <p className="text-footnote text-t3">Plan flips, recap sessions, or ship anything</p>
+                  </div>
+                </button>
+              )}
+              {onAgentMessage && (
+                <div className="flex flex-wrap gap-1.5">
+                  {SPLASH_AGENT_PROMPTS.map(({ icon: Icon, label, prompt }) => (
+                    <button
+                      key={label}
+                      onClick={() => onAgentMessage(prompt)}
+                      className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 rounded-full bg-s1 active:bg-s2 active:scale-[0.97] transition-all px-3 py-2"
+                    >
+                      <Icon size={14} weight="bold" className="text-b1 flex-shrink-0" />
+                      <span className="text-caption-1 font-semibold text-t1 truncate">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Recently deleted — recoverable within 60s */}
           {deletedSessions.length > 0 && (
