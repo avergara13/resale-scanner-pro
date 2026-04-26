@@ -65,51 +65,31 @@ const PLATFORM_FEE_SCHEDULES: Record<string, PlatformFeeSchedule> = {
 const POSHMARK_FLAT_FEE_UNDER_15 = 2.95   // Poshmark charges a flat $2.95 on sales under $15
 const POSHMARK_FLAT_THRESHOLD    = 15     // Cutoff where Poshmark switches from flat fee to commission %
 
-/**
- * Canonical platform keys used throughout the fee schedule. `soldOn` is already
- * type-narrowed to this set, but `preferredPlatform: string` is open, so any
- * future writer (AI drafts, Notion sync, import scripts, external UI) could
- * put a display string like "Facebook Marketplace" or "eBay" into it.
- *
- * This map normalizes any reasonable input — raw user typing, display strings,
- * common abbreviations — to a canonical key. It returns `null` for truly
- * unrecognized values so callers can decide how to handle the miss rather
- * than silently charging eBay fees against a non-eBay sale (the previous
- * behavior of `PLATFORM_FEE_SCHEDULES[x] ?? PLATFORM_FEE_SCHEDULES['ebay']`).
- */
 type PlatformKey = keyof typeof PLATFORM_FEE_SCHEDULES
 
+// `preferredPlatform: string` is open-typed; AI drafts / Notion sync can write display strings
+// like "Facebook Marketplace". Returning null on unknown input forces callers to default
+// explicitly instead of silently charging eBay fees against a non-eBay sale.
 const PLATFORM_ALIASES: Record<string, PlatformKey> = {
-  // eBay
   'ebay': 'ebay', 'e-bay': 'ebay',
-  // Mercari
   'mercari': 'mercari',
-  // Poshmark
   'poshmark': 'poshmark', 'posh': 'poshmark',
-  // Whatnot
   'whatnot': 'whatnot', 'what not': 'whatnot',
-  // StockX
   'stockx': 'stockx', 'stock x': 'stockx', 'stock-x': 'stockx',
-  // Facebook Marketplace — common display strings and abbreviations
   'facebook': 'facebook', 'fb': 'facebook', 'fb mkt': 'facebook',
   'fb marketplace': 'facebook', 'facebook marketplace': 'facebook',
   'marketplace': 'facebook',
-  // Other / local
   'other': 'other', 'local': 'other', 'cash': 'other', 'consignment': 'other',
 }
 
-/** Map an arbitrary platform label to a canonical schedule key, or null if unknown. */
 export function normalizePlatform(raw: string | undefined | null): PlatformKey | null {
   if (!raw) return null
-  // Lowercase, collapse whitespace, strip parenthetical qualifiers (e.g.
-  // "Facebook Marketplace (local, no fees)" → "facebook marketplace").
   const cleaned = raw
     .toLowerCase()
     .replace(/\([^)]*\)/g, '')
     .replace(/\s+/g, ' ')
     .trim()
   if (cleaned in PLATFORM_ALIASES) return PLATFORM_ALIASES[cleaned]
-  // Direct hit on a canonical key (cheap path for already-normalized input).
   if (cleaned in PLATFORM_FEE_SCHEDULES) return cleaned as PlatformKey
   return null
 }
@@ -124,10 +104,6 @@ export function getEstimatedNetProfit(
   settings?: Partial<AppSettings>
 ): { netProfit: number; totalFees: number; shippingCost: number; grossRevenue: number } {
   const sellPrice = item.estimatedSellPrice || 0
-  // Normalize preferredPlatform through the alias map so display strings like
-  // "Facebook Marketplace" or "FB Mkt" land on the right schedule instead of
-  // silently falling through to eBay rates. Unknown → 'ebay' default (matches
-  // the pre-normalization behavior for genuinely missing values).
   const platform = normalizePlatform(item.preferredPlatform) ?? 'ebay'
 
   let feePercent: number
@@ -205,9 +181,9 @@ export function getNetProfit(
   settings: AppSettings
 ): { netProfit: number; totalFees: number; shippingCost: number } {
   const soldPrice = item.soldPrice || 0
-  // soldOn is type-narrowed to lowercase slugs today, but we still route through
-  // normalizePlatform for defense-in-depth (future Notion sync or import could
-  // widen the type) and to share the same resolution path as pre-sale projections.
+  // soldOn is type-narrowed today, but route through normalizePlatform anyway —
+  // future Notion sync / import paths could widen it, and this keeps pre/post-sale
+  // resolution identical.
   const platform = normalizePlatform(item.soldOn) ?? 'ebay'
   const rates = PLATFORM_FEE_SCHEDULES[platform]
 
