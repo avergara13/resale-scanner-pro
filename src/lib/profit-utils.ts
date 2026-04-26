@@ -65,6 +65,38 @@ const PLATFORM_FEE_SCHEDULES: Record<string, PlatformFeeSchedule> = {
 const POSHMARK_FLAT_FEE_UNDER_15 = 2.95   // Poshmark charges a flat $2.95 on sales under $15
 const POSHMARK_FLAT_THRESHOLD    = 15     // Cutoff where Poshmark switches from flat fee to commission %
 
+type PlatformKey = keyof typeof PLATFORM_FEE_SCHEDULES
+
+// `preferredPlatform: string` is open-typed; AI drafts / Notion sync can write display strings
+// like "Facebook Marketplace". Returning null on unknown input forces callers to default
+// explicitly instead of silently charging eBay fees against a non-eBay sale.
+const PLATFORM_ALIASES: Record<string, PlatformKey> = {
+  'ebay': 'ebay', 'e-bay': 'ebay',
+  'mercari': 'mercari',
+  'poshmark': 'poshmark', 'posh': 'poshmark',
+  'whatnot': 'whatnot', 'what not': 'whatnot',
+  'stockx': 'stockx', 'stock x': 'stockx', 'stock-x': 'stockx',
+  'facebook': 'facebook', 'fb': 'facebook', 'fb mkt': 'facebook',
+  'fb marketplace': 'facebook', 'facebook marketplace': 'facebook',
+  'marketplace': 'facebook',
+  'other': 'other', 'local': 'other', 'cash': 'other', 'consignment': 'other',
+}
+
+export function normalizePlatform(raw: string | undefined | null): PlatformKey | null {
+  if (!raw) return null
+  const cleaned = raw
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  // Own-property check — plain `in` would match prototype keys ('constructor',
+  // '__proto__', 'toString', etc.) and return a function/undefined as a schedule.
+  const hasOwn = Object.prototype.hasOwnProperty
+  if (hasOwn.call(PLATFORM_ALIASES, cleaned)) return PLATFORM_ALIASES[cleaned]
+  if (hasOwn.call(PLATFORM_FEE_SCHEDULES, cleaned)) return cleaned as PlatformKey
+  return null
+}
+
 /**
  * Project net profit for an item before it's sold.
  * Uses estimatedSellPrice + platform-appropriate fee schedule.
@@ -75,7 +107,7 @@ export function getEstimatedNetProfit(
   settings?: Partial<AppSettings>
 ): { netProfit: number; totalFees: number; shippingCost: number; grossRevenue: number } {
   const sellPrice = item.estimatedSellPrice || 0
-  const platform = (item.preferredPlatform || 'ebay').toLowerCase()
+  const platform = normalizePlatform(item.preferredPlatform) ?? 'ebay'
 
   let feePercent: number
   let perOrderFee: number
@@ -83,7 +115,7 @@ export function getEstimatedNetProfit(
 
   // Look up the platform's policy row (shipping/materials/per-order rules).
   // User-editable percentages come from AppSettings and override the default in the schedule.
-  const rates = PLATFORM_FEE_SCHEDULES[platform] ?? PLATFORM_FEE_SCHEDULES['ebay']
+  const rates = PLATFORM_FEE_SCHEDULES[platform]
 
   if (platform === 'ebay') {
     feePercent   = settings?.ebayFeePercent   ?? rates.feePercent
@@ -152,8 +184,11 @@ export function getNetProfit(
   settings: AppSettings
 ): { netProfit: number; totalFees: number; shippingCost: number } {
   const soldPrice = item.soldPrice || 0
-  const platform = (item.soldOn || 'ebay').toLowerCase()
-  const rates = PLATFORM_FEE_SCHEDULES[platform] ?? PLATFORM_FEE_SCHEDULES['ebay']
+  // soldOn is type-narrowed today, but route through normalizePlatform anyway —
+  // future Notion sync / import paths could widen it, and this keeps pre/post-sale
+  // resolution identical.
+  const platform = normalizePlatform(item.soldOn) ?? 'ebay'
+  const rates = PLATFORM_FEE_SCHEDULES[platform]
 
   let feePercent: number
   let perOrderFee: number
