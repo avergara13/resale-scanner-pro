@@ -173,8 +173,10 @@ export function MarketDataPanel({ marketData, isLoading = false }: MarketDataPan
 
         <CollapsibleContent className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
 
-      {/* Fallback state — Gemini AI research summary in lieu of live eBay data */}
-      {state === 'fallback' && marketData?.researchSummary && (
+      {/* Fallback state — Gemini AI research summary in lieu of live eBay data.
+          Explicit `marketData &&` narrows the variable for the JSX body so
+          TypeScript flow analysis stays happy under strictNullChecks. */}
+      {state === 'fallback' && marketData && marketData.researchSummary && (
         <div className="p-2.5 sm:p-3 rounded-lg bg-bg border border-s2">
           <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-1.5">AI Market Research</p>
           <p className="text-[11px] sm:text-xs text-t1 leading-relaxed whitespace-pre-wrap">
@@ -195,7 +197,7 @@ export function MarketDataPanel({ marketData, isLoading = false }: MarketDataPan
         </div>
       )}
 
-      {state === 'has-data' && marketData?.ebayPriceRange && (
+      {state === 'has-data' && marketData && marketData.ebayPriceRange && (
         <div className="p-2.5 sm:p-3 rounded-lg bg-bg border border-s2">
           <div className="flex items-center justify-between">
             <div>
@@ -222,7 +224,7 @@ export function MarketDataPanel({ marketData, isLoading = false }: MarketDataPan
         </div>
       )}
 
-      {state === 'has-data' && marketData?.recommendedPrice && (
+      {state === 'has-data' && marketData && marketData.recommendedPrice && (
         <div className="p-2.5 sm:p-3 rounded-lg bg-green-bg border border-green">
           <div className="flex items-center gap-2">
             <Tag size={16} weight="bold" className="text-green sm:w-[18px] sm:h-[18px]" />
@@ -236,7 +238,7 @@ export function MarketDataPanel({ marketData, isLoading = false }: MarketDataPan
         </div>
       )}
 
-      {state === 'has-data' && marketData?.ebayRecentSales && marketData.ebayRecentSales.length > 0 && (
+      {state === 'has-data' && marketData && marketData.ebayRecentSales && marketData.ebayRecentSales.length > 0 && (
         <div>
           <Separator className="mb-3" />
           <div className="mb-2">
@@ -298,7 +300,7 @@ export function MarketDataPanel({ marketData, isLoading = false }: MarketDataPan
       {/* Active listings render in 'has-data' (full panel) AND 'no-comps' (when
           eBay returned 0 sold but Browse API still found active competitors —
           partial signal is better than nothing for buying decisions). */}
-      {(state === 'has-data' || state === 'no-comps') && marketData?.ebayActiveItems && marketData.ebayActiveItems.length > 0 && (
+      {(state === 'has-data' || state === 'no-comps') && marketData && marketData.ebayActiveItems && marketData.ebayActiveItems.length > 0 && (
         <div>
           <Separator className="mb-3" />
           <div className="mb-2">
