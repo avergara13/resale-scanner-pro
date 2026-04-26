@@ -523,10 +523,18 @@ export function AIScreen({
                 )
               })()}
 
-              {/* Decision signal — show once pipeline produces a final BUY / MAYBE / PASS */}
+              {/* Decision signal — show once pipeline produces a final BUY / MAYBE / PASS.
+                  When the decision is BUY, the banner becomes a tappable commit surface
+                  wired to the SAME `handleAddToQueue` handler as the bottom green pill —
+                  same path, same logic, can't diverge. PASS / MAYBE stay display-only. */}
               {pipelineComplete && decision && (
                 <div className="mt-3 sm:mt-4" ref={decisionRef}>
-                  <DecisionSignal decision={decision} item={currentItem} />
+                  <DecisionSignal
+                    decision={decision}
+                    item={currentItem}
+                    onCommit={!listingAdded ? handleAddToQueue : undefined}
+                    committing={isAddingToQueue}
+                  />
                 </div>
               )}
 
@@ -645,6 +653,19 @@ export function AIScreen({
                     </CollapsibleContent>
                   </Card>
                 </Collapsible>
+              )}
+
+              {/* ── 1.5 eBay Market Data — comp evidence behind the BUY/PASS call ──
+                  Always rendered (no truthy gate) so users get an explicit state
+                  instead of a silently-missing section. The panel handles its own
+                  loading / no-data / fallback / no-comps / has-data branches.
+                  Position is intentional: decision snapshot → platform projections →
+                  Quick Summary numbers → THIS comp evidence → Listing Draft → artifacts. */}
+              {currentItem && (
+                <MarketDataPanel
+                  marketData={currentItem.marketData}
+                  isLoading={!pipelineComplete && !currentItem.marketData}
+                />
               )}
 
               {/* ── 2. Listing draft form — always visible once pipeline is done ── */}
@@ -1016,14 +1037,9 @@ export function AIScreen({
                 </Collapsible>
               )}
 
-              {/* Google Lens results */}
+              {/* Google Lens results — visual-search evidence when available. */}
               {currentItem?.lensAnalysis && (
                 <GoogleLensResults lensAnalysis={currentItem.lensAnalysis} />
-              )}
-
-              {/* Market data */}
-              {currentItem?.marketData && (
-                <MarketDataPanel marketData={currentItem.marketData} />
               )}
             </div>
           )}
