@@ -94,19 +94,59 @@ const EMPTY_TODOS: SharedTodo[] = []
 const EMPTY_MESSAGES: ChatMessage[] = []
 
 // Anchored imperative-command matcher used by handleSendMessage's shortcut layer.
-// Returns true only if `msg` starts with one of `commands` (after stripping common
-// polite/imperative lead-ins like "please" or "run the"). Replaces a previous
-// `.includes()`-based shortcut layer that triggered on substring matches —
-// e.g., "tell me about the full pipeline" used to incorrectly fire the
-// pipeline shortcut, and "based on my scan history" used to open the camera.
+// Returns true only if `msg` starts with one of `commands`, after normalizing
+// for common polite ("please"/"can you") and imperative ("run"/"execute")
+// lead-ins.
+//
+// Three things this guards against, learned the hard way:
+//
+// 1. **Substring matches** — plain `.includes()` triggered shortcuts on any
+//    occurrence of a keyword. "Based on my scan history" used to open the
+//    camera; "tell me about the full pipeline" used to start a 30s job.
+//
+// 2. **Prefix-without-boundary** — naive `startsWith("research")` matches
+//    "researching items". The match check requires the command to be followed
+//    by whitespace or end-of-string.
+//
+// 3. **Verb-prefixed commands** — the command list contains both bare forms
+//    ("full pipeline") and verb-prefixed forms ("run pipeline"). A single
+//    leading-verb strip on the message would convert "run pipeline" → "pipeline"
+//    and miss the literal "run pipeline" command. We match against both the
+//    pre- and post-verb-stripped forms of message AND command, so all four
+//    combinations resolve correctly.
+//
+// Lead-in stripping is also looped — "can you please run pipeline" requires
+// stripping "can you" then "please" before the verb-strip pass.
 function matchesCommand(msg: string, commands: readonly string[]): boolean {
-  const trimmed = msg
-    .trim()
-    .toLowerCase()
-    .replace(/[?!.]+$/, '')
-    .replace(/^(please|can you|could you|let'?s)\s+/i, '')
-    .replace(/^(go|do|run|execute|start)\s+(the\s+)?/i, '')
-  return commands.some(cmd => trimmed.startsWith(cmd.toLowerCase()))
+  const stripLeadIns = (s: string): string => {
+    let prev = ''
+    let cur = s
+    while (prev !== cur) {
+      prev = cur
+      cur = cur.replace(/^(please|can you|could you|let'?s)\s+/i, '')
+    }
+    return cur
+  }
+  const stripVerb = (s: string): string =>
+    s.replace(/^(go|do|run|execute|start)\s+(the\s+)?/i, '')
+
+  const base = stripLeadIns(msg.trim().toLowerCase().replace(/[?!.]+$/, ''))
+  const noVerb = stripVerb(base)
+  const msgVariants = base === noVerb ? [base] : [base, noVerb]
+
+  // Word-boundary-safe startsWith: command must be followed by whitespace
+  // or end-of-string. "researching" no longer matches "research".
+  const startsWithCmd = (haystack: string, needle: string): boolean =>
+    needle.length > 0 &&
+    haystack.startsWith(needle) &&
+    (haystack.length === needle.length || /\s/.test(haystack[needle.length]))
+
+  return commands.some(cmd => {
+    const cmdBase = stripLeadIns(cmd.trim().toLowerCase())
+    const cmdNoVerb = stripVerb(cmdBase)
+    const cmdVariants = cmdBase === cmdNoVerb ? [cmdBase] : [cmdBase, cmdNoVerb]
+    return msgVariants.some(m => cmdVariants.some(c => startsWithCmd(m, c)))
+  })
 }
 
 function describeToolCall(call: AgentToolCall, items?: ScannedItem[]): string {
@@ -605,8 +645,16 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
     // user's text vanished. Centralizing this here removes a class of "my
     // message disappeared" UX bugs and keeps shortcut branches focused on
     // the assistant response only.
+    // Chat-message IDs are React keys — they MUST be unique across messages
+    // in a session. `Date.now()` resolution is per-millisecond, so two messages
+    // created in the same tick (e.g., user push + immediate assistant reply
+    // in the task shortcut below) would collide and cause dropped/merged
+    // renders. Suffix with 4 random chars to make collisions astronomically
+    // unlikely. Mirrors the helper at addMsg() further down in this function.
+    const newMessageId = () => Date.now().toString() + Math.random().toString(36).slice(2, 6)
+
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: newMessageId(),
       role: 'user',
       content: text,
       timestamp: Date.now(),
@@ -633,7 +681,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
           createdAt: Date.now(),
         }])
         const addMsg: ChatMessage = {
-          id: Date.now().toString(),
+          id: newMessageId(),
           role: 'assistant',
           content: `✅ Added task: "${taskText}"`,
           timestamp: Date.now(),
@@ -941,8 +989,10 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       }
 
       // Edit item command — user says "change price to X", "update description", etc.
-      if ((lowerText.includes('change') || lowerText.includes('update') || lowerText.includes('set')) &&
-          (lowerText.includes('price') || lowerText.includes('description') || lowerText.includes('title') || lowerText.includes('category')) &&
+      // Anchored: requires verb + property at message start so conversational
+      // mentions like "we should change our pricing strategy" or "update me
+      // on the description" don't silently mutate the user's most recent item.
+      if (/^(?:please\s+)?(change|update|set)\b(?:\s+\S+){0,3}\s+(price|description|title|category)\b/i.test(text.trim()) &&
           onEditItem) {
         const recentItem = sessionItems[sessionItems.length - 1]
         if (recentItem) {
@@ -972,7 +1022,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
             setChatSessions((prev) =>
               (prev || []).map(s =>
                 s.id === sessionId
-                  ? { ...s, messages: [...s.messages, { id: Date.now().toString(), role: 'assistant' as const, content: `Updated **${recentItem.productName || 'item'}**: ${updateSummary}`, timestamp: Date.now() }], lastMessageAt: Date.now() }
+                  ? { ...s, messages: [...s.messages, { id: newMessageId(), role: 'assistant' as const, content: `Updated **${recentItem.productName || 'item'}**: ${updateSummary}`, timestamp: Date.now() }], lastMessageAt: Date.now() }
                   : s
               )
             )
@@ -1030,8 +1080,12 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         }
       }
 
-      // Set session location
-      if (/\b(set|at)\b.*\b(location|store)\b/i.test(text) && onEditSession && currentSession?.active) {
+      // Set session location.
+      // Anchored on imperative "set" only — the previous `\b(set|at)\b…\b(location|store)\b`
+      // would fire on conversational "I bought a hat at the store" and overwrite
+      // the session location. "at" alone is too common to be a command verb.
+      if (/^(?:please\s+)?set\b(?:\s+\S+){0,3}\s+(location|store)\b/i.test(text.trim()) &&
+          onEditSession && currentSession?.active) {
         const locMatch = text.match(/(?:location|store|at)\s+(?:to\s+|is\s+)?["']?(.+?)["']?\s*$/i)
         if (locMatch) {
           const name = locMatch[1].trim()
@@ -1048,18 +1102,24 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       }
 
       // Mark as sold command: "mark [item name] as sold on [marketplace] for $X"
-      // Require "mark" + "sold" pattern to avoid false positives on generic "sold" questions
-      if (/\bmark\b.*\bsold\b/i.test(text) && onMarkAsSold) {
+      // Anchored on "mark" at message start AND requires both "sold" mention
+      // and an explicit price. The previous `\bmark\b.*\bsold\b` would fire
+      // on questions like "what did you mark as sold yesterday?" — and
+      // because soldPrice defaulted to 0 when no $ amount was extracted,
+      // the agent would silently mark the user's most recent published
+      // listing as sold for $0. Both guards (start-anchor + priceMatch
+      // required) close that hole before reaching the destructive call.
+      if (/^(?:please\s+)?mark\b/i.test(text.trim()) && /\bsold\b/i.test(text) && onMarkAsSold) {
         const priceMatch = text.match(/\$(\d+(?:\.\d{2})?)|\bfor\s+(\d+(?:\.\d{2})?)\b/)?.[1] || text.match(/\$(\d+(?:\.\d{2})?)/)?.[1]
         const marketplaces = ['ebay', 'mercari', 'poshmark', 'facebook', 'whatnot', 'other'] as const
         const foundMarketplace = marketplaces.find(m => lowerText.includes(m)) || 'other'
-        const soldPrice = priceMatch ? parseFloat(priceMatch) : 0
 
         const matchedItem = sessionItems.find(i =>
           i.listingStatus === 'published' && i.productName && lowerText.includes(i.productName.toLowerCase())
         ) || sessionItems.filter(i => i.listingStatus === 'published').slice(-1)[0]
 
-        if (matchedItem) {
+        if (priceMatch && matchedItem) {
+          const soldPrice = parseFloat(priceMatch)
           onMarkAsSold(matchedItem.id, soldPrice, foundMarketplace)
           addMsg(`✅ Marked **${matchedItem.productName || 'item'}** as sold on **${foundMarketplace}** for **$${soldPrice.toFixed(2)}**. It's now in your Sold tab.`)
           setIsProcessing(false)
@@ -1238,7 +1298,7 @@ ${settings.userProfile.aiContext}` : ''}`
       } else {
         // Transient error — add a subtle inline message instead of a loud toast
         const errorMessage: ChatMessage = {
-          id: Date.now().toString(),
+          id: newMessageId(),
           role: 'assistant',
           content: 'I had trouble processing that. Please try again.',
           timestamp: Date.now(),
