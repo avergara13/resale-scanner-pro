@@ -38,7 +38,10 @@ interface MarketDataPanelProps {
 type PanelState = 'loading' | 'no-data' | 'fallback' | 'no-comps' | 'has-data'
 
 function derivePanelState(marketData: MarketData | undefined, isLoading: boolean): PanelState {
-  if (marketData?.ebaySoldCount !== undefined && marketData.ebaySoldCount > 0) return 'has-data'
+  // Null-coalescing keeps narrowing safe under strictNullChecks: the optional
+  // chain short-circuits to 0 when marketData is undefined, so the comparison
+  // doesn't depend on TypeScript narrowing `marketData` across two accesses.
+  if ((marketData?.ebaySoldCount ?? 0) > 0) return 'has-data'
   if (!marketData && isLoading) return 'loading'
   if (!marketData) return 'no-data'
   if (marketData.researchSummary) return 'fallback'
