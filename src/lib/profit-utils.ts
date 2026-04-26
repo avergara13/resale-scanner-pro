@@ -89,8 +89,11 @@ export function normalizePlatform(raw: string | undefined | null): PlatformKey |
     .replace(/\([^)]*\)/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-  if (cleaned in PLATFORM_ALIASES) return PLATFORM_ALIASES[cleaned]
-  if (cleaned in PLATFORM_FEE_SCHEDULES) return cleaned as PlatformKey
+  // Own-property check — plain `in` would match prototype keys ('constructor',
+  // '__proto__', 'toString', etc.) and return a function/undefined as a schedule.
+  const hasOwn = Object.prototype.hasOwnProperty
+  if (hasOwn.call(PLATFORM_ALIASES, cleaned)) return PLATFORM_ALIASES[cleaned]
+  if (hasOwn.call(PLATFORM_FEE_SCHEDULES, cleaned)) return cleaned as PlatformKey
   return null
 }
 
