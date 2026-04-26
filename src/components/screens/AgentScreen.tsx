@@ -93,6 +93,22 @@ const QUICK_ACTIONS: QuickAction[] = [
 const EMPTY_TODOS: SharedTodo[] = []
 const EMPTY_MESSAGES: ChatMessage[] = []
 
+// Anchored imperative-command matcher used by handleSendMessage's shortcut layer.
+// Returns true only if `msg` starts with one of `commands` (after stripping common
+// polite/imperative lead-ins like "please" or "run the"). Replaces a previous
+// `.includes()`-based shortcut layer that triggered on substring matches —
+// e.g., "tell me about the full pipeline" used to incorrectly fire the
+// pipeline shortcut, and "based on my scan history" used to open the camera.
+function matchesCommand(msg: string, commands: readonly string[]): boolean {
+  const trimmed = msg
+    .trim()
+    .toLowerCase()
+    .replace(/[?!.]+$/, '')
+    .replace(/^(please|can you|could you|let'?s)\s+/i, '')
+    .replace(/^(go|do|run|execute|start)\s+(the\s+)?/i, '')
+  return commands.some(cmd => trimmed.startsWith(cmd.toLowerCase()))
+}
+
 function describeToolCall(call: AgentToolCall, items?: ScannedItem[]): string {
   const item = items?.find(i => i.id === call.itemId)
   const name = item?.productName || call.itemId || ''
@@ -583,31 +599,27 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       setViewMode('chat')
     }
 
-    const lowerText = text.toLowerCase()
-    
-    if ((lowerText.includes('scan') || lowerText.includes('capture') || lowerText.includes('camera') || lowerText.includes('photo')) && onOpenCamera) {
-      const quickResponse: ChatMessage = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: '📸 Opening the AI Camera for you now! Point it at an item and I\'ll analyze it for you.',
-        timestamp: Date.now(),
-      }
-      
-      setChatSessions((prev) => 
-        (prev || []).map(s => 
-          s.id === sessionId
-            ? { ...s, messages: [...s.messages, quickResponse], lastMessageAt: Date.now() }
-            : s
-        )
-      )
-      
-      setTimeout(() => {
-        onOpenCamera()
-      }, 500)
-      
-      setInput('')
-      return
+    // Push the user's message to chat history FIRST, before any shortcut
+    // branches run. Previously each early-return shortcut had to remember to
+    // push it inline, and the deleted camera shortcut never did — so the
+    // user's text vanished. Centralizing this here removes a class of "my
+    // message disappeared" UX bugs and keeps shortcut branches focused on
+    // the assistant response only.
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
     }
+    setChatSessions((prev) =>
+      (prev || []).map(s =>
+        s.id === sessionId
+          ? { ...s, messages: [...s.messages, userMessage], lastMessageAt: Date.now() }
+          : s
+      )
+    )
+    setInput('')
+    setIsProcessing(true)
 
     // Add task command: "add task X", "remind me to X", "todo X"
     if (/\b(add task|remind me to|todo)\b/i.test(text)) {
@@ -629,33 +641,14 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         setChatSessions((prev) =>
           (prev || []).map(s =>
             s.id === sessionId
-              ? { ...s, messages: [...s.messages, { id: (Date.now() - 1).toString(), role: 'user' as const, content: text, timestamp: Date.now() }, addMsg], lastMessageAt: Date.now() }
+              ? { ...s, messages: [...s.messages, addMsg], lastMessageAt: Date.now() }
               : s
           )
         )
-        setInput('')
         setIsProcessing(false)
         return
       }
     }
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: text,
-      timestamp: Date.now(),
-    }
-
-    setChatSessions((prev) => 
-      (prev || []).map(s =>
-        s.id === sessionId 
-          ? { ...s, messages: [...s.messages, userMessage], lastMessageAt: Date.now() }
-          : s
-      )
-    )
-
-    setInput('')
-    setIsProcessing(true)
 
     try {
       const lowerText = text.toLowerCase()
@@ -677,8 +670,10 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         )
       }
 
-      // Full agentic pipeline: analyze → optimize → push
-      if (lowerText.includes('full pipeline') || lowerText.includes('auto-list') || lowerText.includes('process queue') || lowerText.includes('run pipeline')) {
+      // Full agentic pipeline: analyze → optimize → push.
+      // Anchored command match (not substring) — "tell me about the full
+      // pipeline" must reach the LLM, not trigger a 30s job.
+      if (matchesCommand(text, ['full pipeline', 'auto-list', 'auto list', 'process queue', 'run pipeline'])) {
         // Step 1: Batch analyze unanalyzed items
         const drafts = sessionItems.filter(i => !i.productName || i.productName === 'Quick Draft')
         if (drafts.length > 0 && onBatchAnalyze) {
@@ -745,7 +740,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         return
       }
 
-      if (lowerText.includes('create listing') || lowerText.includes('optimize listing')) {
+      if (matchesCommand(text, ['create listing', 'create listings', 'optimize listing', 'optimize listings'])) {
         const buyItems = sessionItems.filter(item => item.decision === 'BUY' && !item.optimizedListing)
         
         if (buyItems.length === 0) {
@@ -809,7 +804,7 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         return
       }
 
-      if (lowerText.includes('push to notion') || lowerText.includes('send to notion')) {
+      if (matchesCommand(text, ['push to notion', 'send to notion'])) {
         const readyItems = sessionItems.filter(item => item.optimizedListing && !item.notionPageId)
         
         if (readyItems.length === 0) {
@@ -917,8 +912,9 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
         return
       }
 
-      // Research command — uses Gemini with Google Search grounding for real market data
-      if ((lowerText.includes('research') || lowerText.includes('look up') || lowerText.includes('double check') || lowerText.includes('price check') || lowerText.includes('market value')) && settings?.geminiApiKey) {
+      // Research command — uses Gemini with Google Search grounding for real market data.
+      // Anchored to imperative form so "I'll do my own research" doesn't trigger it.
+      if (matchesCommand(text, ['research', 'look up', 'double check', 'price check', 'market value']) && settings?.geminiApiKey) {
         // Find the most recently discussed item or the most recent queue item
         const recentItem = sessionItems.find(i =>
           lowerText.includes(i.productName?.toLowerCase() || '')
@@ -1260,7 +1256,7 @@ ${settings.userProfile.aiContext}` : ''}`
       // but short-circuit here as well to avoid the dev-mode warning.
       if (isMountedRef.current) setIsProcessing(false)
     }
-  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, liveSoldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onOpenCamera, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
+  }, [input, isProcessing, activeSessionId, setChatSessions, setActiveSessionId, queueStats, settings, sessionItems, soldItems, liveSoldItems, chatMessages, pendingTodos, todos, setTodos, setPendingToolCalls, onOptimizeItem, onBatchAnalyze, onEditItem, onMarkAsSold, onMarkShipped, onStartSession, onEndSession, onEditSession, currentSession, allSessions, profitGoals])
 
   // Broadcast processing state to parent (for external widget indicators)
   useEffect(() => {
