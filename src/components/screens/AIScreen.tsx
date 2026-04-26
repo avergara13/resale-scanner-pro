@@ -341,6 +341,24 @@ export function AIScreen({
   const decision = currentItem?.decision
   const canSaveDraft = !!(currentItem?.imageData || description.trim().length > 0)
 
+  // Live margin + ROI for currentItem under current settings — single source
+  // of truth shared by:
+  //   - the BUY/PASS/MAYBE banner (DecisionSignal — shows ROI)
+  //   - the Quick Summary tiles (Profit Margin + ROI)
+  // Sharing eliminates drift between the two surfaces. Returns nulls when
+  // sell/buy prices aren't both > 0 (consumers render "--").
+  const liveMetrics = useMemo<{ margin: number | null; roi: number | null }>(() => {
+    if (!currentItem) return { margin: null, roi: null }
+    const sellPrice = currentItem.estimatedSellPrice || 0
+    const buyPrice = currentItem.purchasePrice || 0
+    if (sellPrice <= 0 || buyPrice <= 0) return { margin: null, roi: null }
+    const { netProfit } = getEstimatedNetProfit(currentItem, settings)
+    return {
+      margin: (netProfit / sellPrice) * 100,
+      roi: (netProfit / buyPrice) * 100,
+    }
+  }, [currentItem, settings])
+
   // Derived floats for form-change detection (computed once, used in multiple places)
   const buyPriceFloat = parseFloat(buyPrice)
   const sellPriceFloat = parseFloat(estSellPrice)
@@ -532,6 +550,7 @@ export function AIScreen({
                   <DecisionSignal
                     decision={decision}
                     item={currentItem}
+                    roi={liveMetrics.roi}
                     onCommit={!listingAdded ? handleAddToQueue : undefined}
                     committing={isAddingToQueue}
                   />
@@ -609,18 +628,10 @@ export function AIScreen({
                           </p>
                         </div>
                         {(() => {
-                          // Compute margin + ROI live from current settings (fee/shipping/materials)
-                          // instead of trusting `currentItem.profitMargin`, which is a snapshot from
-                          // when the item was scanned. If the user edited fee settings after that,
-                          // the persisted margin would drift from what BUY/PASS now decides.
-                          const sellPrice = currentItem.estimatedSellPrice || 0
-                          const buyPrice = currentItem.purchasePrice || 0
-                          const canShow = sellPrice > 0 && buyPrice > 0
-                          const netProfit = canShow
-                            ? getEstimatedNetProfit(currentItem, settings).netProfit
-                            : 0
-                          const margin = canShow ? (netProfit / sellPrice) * 100 : null
-                          const roi    = canShow ? (netProfit / buyPrice)  * 100 : null
+                          // Reads `liveMetrics` from the shared memo above so the
+                          // Quick Summary tiles and the BUY/PASS/MAYBE banner show
+                          // identical numbers — no path for them to drift.
+                          const { margin, roi } = liveMetrics
                           const minROI = settings?.minROI ?? 100
                           const marginColor = margin == null
                             ? 'text-t1'
