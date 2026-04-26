@@ -6,6 +6,17 @@ interface DecisionSignalProps {
   decision: Decision
   item?: ScannedItem
   /**
+   * Live net ROI percentage for this scan, computed by the parent from
+   * current settings (fee/shipping/materials) — same value the Quick
+   * Summary tile shows. Replaces the legacy `item.profitMargin` snapshot
+   * read so the banner reflects the *current* buying-decision metric.
+   * ROI is the primary buying metric (margin is secondary); makeDecision
+   * gives ROI the wider MAYBE cushion accordingly.
+   * Pass `null` (or omit) when sell/buy prices aren't both known yet —
+   * the ROI line then hides cleanly.
+   */
+  roi?: number | null
+  /**
    * When provided AND `decision === 'BUY'`, the banner becomes a clickable
    * commit surface that mirrors the bottom "Add to Queue" button. Both
    * surfaces flow through the SAME handler reference, so behavior cannot
@@ -23,7 +34,7 @@ interface DecisionSignalProps {
   committing?: boolean
 }
 
-export function DecisionSignal({ decision, item, onCommit, committing = false }: DecisionSignalProps) {
+export function DecisionSignal({ decision, item, roi, onCommit, committing = false }: DecisionSignalProps) {
   // WS-21 Phase 3: honor prefers-reduced-motion — swap spring for an instant
   // fade-in so the card still enters cleanly but without the scale bounce.
   // Call the hook before any early return to satisfy rules-of-hooks.
@@ -59,9 +70,12 @@ export function DecisionSignal({ decision, item, onCommit, committing = false }:
   const inner = (
     <>
       <div className="text-4xl tracking-tight mb-1">{decision}</div>
-      {item?.profitMargin != null && isFinite(item.profitMargin) && (
+      {/* ROI is the primary buying metric (per makeDecision's wider ROI MAYBE
+          cushion). Margin still drives the BUY/PASS/MAYBE call as a co-equal
+          hard floor — it's just secondary in the displayed snapshot here. */}
+      {roi != null && isFinite(roi) && (
         <div className="text-base font-bold opacity-80">
-          Margin: {item.profitMargin.toFixed(1)}%
+          ROI: {roi.toFixed(1)}%
         </div>
       )}
       {item?.marketData?.recommendedPlatform && (
