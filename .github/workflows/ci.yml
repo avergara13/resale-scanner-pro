@@ -44,4 +44,10 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Lint
+        # Bump Node heap to 6GB. ESLint's TypeScript-aware rules build a
+        # full type graph and have been hitting the default 4GB heap on
+        # GitHub-hosted runners (failure on PR #201). 6GB stays well under
+        # the 7GB available on ubuntu-latest while leaving headroom.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run lint
