@@ -1110,7 +1110,13 @@ export function AgentScreen({ queueItems = [], soldItems = [], liveSoldItems = [
       // listing as sold for $0. Both guards (start-anchor + priceMatch
       // required) close that hole before reaching the destructive call.
       if (/^(?:please\s+)?mark\b/i.test(text.trim()) && /\bsold\b/i.test(text) && onMarkAsSold) {
-        const priceMatch = text.match(/\$(\d+(?:\.\d{2})?)|\bfor\s+(\d+(?:\.\d{2})?)\b/)?.[1] || text.match(/\$(\d+(?:\.\d{2})?)/)?.[1]
+        // Alternation regex: group 1 captures `$25.00`, group 2 captures
+        // `for 25.00`. The previous code only read `?.[1]`, so "mark X as
+        // sold for 25" (no $) populated group 2, group 1 was undefined,
+        // and the shortcut silently fell through to the LLM. Read both
+        // groups from a single match result so either form works.
+        const soldPriceMatch = text.match(/\$(\d+(?:\.\d{2})?)|\bfor\s+(\d+(?:\.\d{2})?)\b/)
+        const priceMatch = soldPriceMatch?.[1] || soldPriceMatch?.[2]
         const marketplaces = ['ebay', 'mercari', 'poshmark', 'facebook', 'whatnot', 'other'] as const
         const foundMarketplace = marketplaces.find(m => lowerText.includes(m)) || 'other'
 
