@@ -12,15 +12,42 @@ import type { MarketData } from '@/types'
 
 interface MarketDataPanelProps {
   marketData?: MarketData
+  /**
+   * True while the scan pipeline is still in flight. When this is true AND
+   * `marketData` is undefined we render the loading skeleton instead of the
+   * "no data captured" state — the data is on its way, not absent.
+   * If `marketData` is already populated (e.g. from a prior scan during a
+   * Re-analyze run), the component keeps showing the existing data instead
+   * of flickering back to a loading skeleton.
+   */
+  isLoading?: boolean
 }
 
-export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
+/**
+ * Derived render state for the panel. Computed from the marketData shape so
+ * each branch has a single source of truth and can't disagree with itself.
+ *
+ *  - 'loading'   pipeline running, no data populated yet
+ *  - 'no-data'   marketData entirely absent (item predates pipeline, or both
+ *                eBay + Gemini fallback failed)
+ *  - 'fallback'  Gemini AI research summary present but no eBay sold comps
+ *  - 'no-comps'  marketData populated but ebaySoldCount === 0; we may still
+ *                have Browse-API active listings to show as partial signal
+ *  - 'has-data'  ebaySoldCount > 0 — full headline grid + comp lists
+ */
+type PanelState = 'loading' | 'no-data' | 'fallback' | 'no-comps' | 'has-data'
+
+function derivePanelState(marketData: MarketData | undefined, isLoading: boolean): PanelState {
+  if (marketData?.ebaySoldCount !== undefined && marketData.ebaySoldCount > 0) return 'has-data'
+  if (!marketData && isLoading) return 'loading'
+  if (!marketData) return 'no-data'
+  if (marketData.researchSummary) return 'fallback'
+  return 'no-comps'
+}
+
+export function MarketDataPanel({ marketData, isLoading = false }: MarketDataPanelProps) {
   const [isOpen, setIsOpen] = useCollapsePreference('market-data', false)
   const [activeComp, setActiveComp] = useState<Comp | null>(null)
-
-  if (!marketData) {
-    return null
-  }
 
   const formatPrice = (price?: number) => {
     if (!price) return 'N/A'
@@ -36,29 +63,31 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
     }
   }
 
-  const hasEbayData = marketData.ebaySoldCount !== undefined && marketData.ebaySoldCount > 0
-
-  if (!hasEbayData) {
-    return null
-  }
+  const state = derivePanelState(marketData, isLoading)
 
   // Per-metric suffix — sold and active can be truncated independently.
   // Fall back to the legacy combined flag when per-source flags aren't set
   // (e.g. older persisted items that predate WS-21 Phase 1).
-  const soldSuffix = (marketData.ebaySoldPageLimited ?? marketData.ebayPageLimited) ? '+' : ''
-  const activeSuffix = (marketData.ebayActivePageLimited ?? marketData.ebayPageLimited) ? '+' : ''
+  const soldSuffix = marketData && (marketData.ebaySoldPageLimited ?? marketData.ebayPageLimited) ? '+' : ''
+  const activeSuffix = marketData && (marketData.ebayActivePageLimited ?? marketData.ebayPageLimited) ? '+' : ''
   // The mean/median gap already drove the `skewed` flag in market-stats.ts,
   // but the 'thin' state also deserves a visible signal — few samples = low
   // confidence, and the user should know before trusting the range chip.
-  const showQualityWarning =
-    marketData.ebaySampleQuality === 'skewed' || marketData.ebaySampleQuality === 'thin'
-  const qualityLabel = marketData.ebaySampleQuality === 'thin'
+  const showQualityWarning = state === 'has-data' && (
+    marketData?.ebaySampleQuality === 'skewed' || marketData?.ebaySampleQuality === 'thin'
+  )
+  const qualityLabel = marketData?.ebaySampleQuality === 'thin'
     ? 'Thin sample — wide spread'
     : 'Wide spread — using median'
 
+  // Active listings can exist independently of sold comps — eBay Browse API
+  // populates `ebayActiveItems` in parallel to Marketplace Insights. So in
+  // 'no-comps' state we may still have meaningful active-listing signal.
+  const hasActiveListings = (marketData?.ebayActiveItems?.length ?? 0) > 0
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="p-3 sm:p-4 border-s2 bg-fg mt-3 sm:mt-4 overflow-hidden">
+      <Card className="mt-3 sm:mt-4 p-3 sm:p-4 border-s2/60 overflow-hidden material-thin">
         <CollapsibleTrigger className="w-full">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2">
@@ -76,45 +105,97 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
           </div>
         </CollapsibleTrigger>
 
-        {/* Median leads — it's the trustworthy anchor. Avg is secondary. */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
-          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
-            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Median</p>
-            <p className="text-base sm:text-lg font-mono font-bold text-t1">
-              {formatPrice(marketData.ebayMedianSold)}
-            </p>
-          </div>
-          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
-            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Avg Sold</p>
-            <p className="text-base sm:text-lg font-mono font-bold text-t1">
-              {formatPrice(marketData.ebayAvgSold)}
-            </p>
-          </div>
-          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
-            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Sold</p>
-            <p className="text-base sm:text-lg font-mono font-bold text-green">
-              {marketData.ebaySoldCount}{soldSuffix}
-            </p>
-          </div>
-          <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
-            <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Active</p>
-            <p className="text-base sm:text-lg font-mono font-bold text-amber">
-              {marketData.ebayActiveListings}{activeSuffix}
-            </p>
-          </div>
-        </div>
+        {/* Empty / loading status lines — only shown when not has-data. The
+            has-data state preserves the always-visible 2x2 headline grid below,
+            matching the prior UX where the most important numbers don't hide. */}
+        {state === 'loading' && (
+          <p className="text-[11px] sm:text-xs text-t3 mt-1">
+            Searching eBay sold + active comps…
+          </p>
+        )}
+        {state === 'no-data' && (
+          <p className="text-[11px] sm:text-xs text-t3 mt-1">
+            No eBay data captured for this item. Tap <span className="font-semibold text-t2">Re-analyze</span> to fetch live comps.
+          </p>
+        )}
+        {state === 'no-comps' && (
+          <p className="text-[11px] sm:text-xs text-t3 mt-1">
+            No eBay sold matches in the last 90 days{hasActiveListings ? ` — ${marketData?.ebayActiveItems?.length} active listing(s) below` : ''}.
+          </p>
+        )}
+        {state === 'fallback' && (
+          <p className="text-[11px] sm:text-xs text-amber mt-1">
+            eBay API unavailable — using AI market research below. Tap <span className="font-semibold">Re-analyze</span> to retry the live API.
+          </p>
+        )}
 
-        {showQualityWarning && (
-          <div className="mt-2 px-2 py-1 rounded-md bg-amber/10 border border-amber/30">
-            <p className="text-[10px] sm:text-xs text-amber font-medium">
-              {qualityLabel}
-            </p>
-          </div>
+        {/* Always-visible 2x2 headline grid — only when we have real eBay sold data.
+            Median leads (trustworthy anchor); Avg, Sold count, Active count follow.
+            Empty/loading/fallback states above replace this with a single status line. */}
+        {state === 'has-data' && marketData && (
+          <>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
+                <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Median</p>
+                <p className="text-base sm:text-lg font-mono font-bold text-t1">
+                  {formatPrice(marketData.ebayMedianSold)}
+                </p>
+              </div>
+              <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
+                <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Avg Sold</p>
+                <p className="text-base sm:text-lg font-mono font-bold text-t1">
+                  {formatPrice(marketData.ebayAvgSold)}
+                </p>
+              </div>
+              <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
+                <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Sold</p>
+                <p className="text-base sm:text-lg font-mono font-bold text-green">
+                  {marketData.ebaySoldCount}{soldSuffix}
+                </p>
+              </div>
+              <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
+                <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Active</p>
+                <p className="text-base sm:text-lg font-mono font-bold text-amber">
+                  {marketData.ebayActiveListings}{activeSuffix}
+                </p>
+              </div>
+            </div>
+
+            {showQualityWarning && (
+              <div className="mt-2 px-2 py-1 rounded-md bg-amber/10 border border-amber/30">
+                <p className="text-[10px] sm:text-xs text-amber font-medium">
+                  {qualityLabel}
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         <CollapsibleContent className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
 
-      {marketData.ebayPriceRange && (
+      {/* Fallback state — Gemini AI research summary in lieu of live eBay data */}
+      {state === 'fallback' && marketData?.researchSummary && (
+        <div className="p-2.5 sm:p-3 rounded-lg bg-bg border border-s2">
+          <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-1.5">AI Market Research</p>
+          <p className="text-[11px] sm:text-xs text-t1 leading-relaxed whitespace-pre-wrap">
+            {marketData.researchSummary}
+          </p>
+        </div>
+      )}
+
+      {/* Empty-state hint inside the expanded body — gives the user a next step
+          when there's nothing to show. */}
+      {(state === 'no-data' || (state === 'no-comps' && !hasActiveListings)) && (
+        <div className="p-2.5 sm:p-3 rounded-lg bg-bg border border-s2 border-dashed">
+          <p className="text-[11px] sm:text-xs text-t3 leading-relaxed">
+            {state === 'no-data'
+              ? 'eBay sold + active comps will populate here after a scan. Older items can re-fetch via Re-analyze.'
+              : 'Try a different keyword via Re-analyze — the eBay search returned no sold matches in the last 90 days.'}
+          </p>
+        </div>
+      )}
+
+      {state === 'has-data' && marketData?.ebayPriceRange && (
         <div className="p-2.5 sm:p-3 rounded-lg bg-bg border border-s2">
           <div className="flex items-center justify-between">
             <div>
@@ -141,7 +222,7 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
         </div>
       )}
 
-      {marketData.recommendedPrice && (
+      {state === 'has-data' && marketData?.recommendedPrice && (
         <div className="p-2.5 sm:p-3 rounded-lg bg-green-bg border border-green">
           <div className="flex items-center gap-2">
             <Tag size={16} weight="bold" className="text-green sm:w-[18px] sm:h-[18px]" />
@@ -155,7 +236,7 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
         </div>
       )}
 
-      {marketData.ebayRecentSales && marketData.ebayRecentSales.length > 0 && (
+      {state === 'has-data' && marketData?.ebayRecentSales && marketData.ebayRecentSales.length > 0 && (
         <div>
           <Separator className="mb-3" />
           <div className="mb-2">
@@ -214,7 +295,10 @@ export function MarketDataPanel({ marketData }: MarketDataPanelProps) {
         </div>
       )}
 
-      {marketData.ebayActiveItems && marketData.ebayActiveItems.length > 0 && (
+      {/* Active listings render in 'has-data' (full panel) AND 'no-comps' (when
+          eBay returned 0 sold but Browse API still found active competitors —
+          partial signal is better than nothing for buying decisions). */}
+      {(state === 'has-data' || state === 'no-comps') && marketData?.ebayActiveItems && marketData.ebayActiveItems.length > 0 && (
         <div>
           <Separator className="mb-3" />
           <div className="mb-2">
