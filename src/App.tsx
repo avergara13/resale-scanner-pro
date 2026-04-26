@@ -22,8 +22,6 @@ import { SessionDetailScreen } from './components/screens/SessionDetailScreen'
 import { PhotoManager } from './components/screens/PhotoManager'
 import { ListingBuilder } from './components/screens/ListingBuilder'
 import { createEbayService, calculateProfitFallback } from './lib/ebay-service'
-import { retryOperation } from './lib/retry-service'
-import { getRetryOptions } from './lib/retry-config'
 import { callLLM, researchProduct, parseResearchPrice, parseSellThroughRate } from './lib/llm-service'
 import { calculatePlatformROI } from './lib/platform-roi-service'
 import { createGeminiService } from './lib/gemini-service'
@@ -640,58 +638,58 @@ function App() {
       simulateProgress(2, 3800)
 
       if (ebayService) {
-        await retryOperation(
-          async () => {
-            const searchTerm = visionResult?.searchTerms?.[0] || mockProductName
-            const categoryId = await ebayService.getCategoryId(searchTerm)
-            const searchResults = await ebayService.searchCompletedListings(searchTerm, categoryId)
+        // Retry is now per-fetcher inside ebay-service.ts (fetchSoldComps +
+        // fetchViaBrowseProxy each wrap their fetch in retryOperation with
+        // ebay-search config). The previous outer retryOperation here was
+        // a no-op — searchCompletedListings catches inner errors and returns
+        // empty rather than throwing — so the outer retry never fired.
+        // Per-fetcher retries are also better: when sold-comps is being
+        // retried for a 429, Browse's success isn't lost in a Promise.all
+        // re-roll. A defensive try/catch still guards against unexpected
+        // exceptions from computeMarketStats or contract violations.
+        try {
+          const searchTerm = visionResult?.searchTerms?.[0] || mockProductName
+          const categoryId = await ebayService.getCategoryId(searchTerm)
+          const searchResults = await ebayService.searchCompletedListings(searchTerm, categoryId)
 
-            marketData = {
-              ebayAvgSold: searchResults.averageSoldPrice,
-              ebayMedianSold: searchResults.medianSoldPrice,
-              ebayActiveListings: searchResults.activeCount,
-              ebaySoldCount: searchResults.soldCount,
-              ebayTrimmedSoldCount: searchResults.trimmedSoldCount,
-              ebayPriceRange: searchResults.priceRange,
-              ebayP10: searchResults.p10,
-              ebayP90: searchResults.p90,
-              ebaySoldPageLimited: searchResults.soldPageLimited,
-              ebayActivePageLimited: searchResults.activePageLimited,
-              ebayPageLimited: searchResults.pageLimited,
-              ebaySampleQuality: searchResults.sampleQuality,
-              ebaySellThroughRate: searchResults.sellThroughRate,
-              ebayRecentSales: searchResults.soldItems.slice(0, 10),
-              ebayActiveItems: searchResults.activeListings.slice(0, 10),
-              recommendedPrice: searchResults.recommendedPrice,
-            }
-
-            ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : 0
-
-            // Pipeline label: show the honest "50+" suffix *only* on the
-            // metric that actually hit its page limit — sold and active can
-            // be truncated independently. Lead with median (not mean).
-            const soldSuffix = searchResults.soldPageLimited ? '+' : ''
-            const activeSuffix = searchResults.activePageLimited ? '+' : ''
-            setPipeline(prev => prev.map((s, i) =>
-              i === 2 ? {
-                ...s,
-                data: `Found ${searchResults.soldCount}${soldSuffix} sold, ${searchResults.activeCount}${activeSuffix} active. Median: $${searchResults.medianSoldPrice.toFixed(2)}`
-              } : s
-            ))
-          },
-          {
-            ...getRetryOptions('ebay-search'),
-            onRetry: (_err, attempt) => {
-              setPipeline(prev => prev.map((s, i) =>
-                i === 2 ? { ...s, data: `Retrying market data (${attempt}/5)...` } : s
-              ))
-            },
+          marketData = {
+            ebayAvgSold: searchResults.averageSoldPrice,
+            ebayMedianSold: searchResults.medianSoldPrice,
+            ebayActiveListings: searchResults.activeCount,
+            ebaySoldCount: searchResults.soldCount,
+            ebayTrimmedSoldCount: searchResults.trimmedSoldCount,
+            ebayPriceRange: searchResults.priceRange,
+            ebayP10: searchResults.p10,
+            ebayP90: searchResults.p90,
+            ebaySoldPageLimited: searchResults.soldPageLimited,
+            ebayActivePageLimited: searchResults.activePageLimited,
+            ebayPageLimited: searchResults.pageLimited,
+            ebaySampleQuality: searchResults.sampleQuality,
+            ebaySellThroughRate: searchResults.sellThroughRate,
+            ebayRecentSales: searchResults.soldItems.slice(0, 10),
+            ebayActiveItems: searchResults.activeListings.slice(0, 10),
+            recommendedPrice: searchResults.recommendedPrice,
           }
-        ).catch(() => {
+
+          ebayAvgPrice = searchResults.recommendedPrice > 0 ? searchResults.recommendedPrice : 0
+
+          // Pipeline label: show the honest "50+" suffix *only* on the
+          // metric that actually hit its page limit — sold and active can
+          // be truncated independently. Lead with median (not mean).
+          const soldSuffix = searchResults.soldPageLimited ? '+' : ''
+          const activeSuffix = searchResults.activePageLimited ? '+' : ''
+          setPipeline(prev => prev.map((s, i) =>
+            i === 2 ? {
+              ...s,
+              data: `Found ${searchResults.soldCount}${soldSuffix} sold, ${searchResults.activeCount}${activeSuffix} active. Median: $${searchResults.medianSoldPrice.toFixed(2)}`
+            } : s
+          ))
+        } catch (error) {
+          logDebug('eBay market data fetch threw unexpectedly — falling back', 'error', 'ebay', { message: (error as Error).message })
           setPipeline(prev => prev.map((s, i) =>
             i === 2 ? { ...s, data: 'Using estimated pricing (eBay API unavailable)' } : s
           ))
-        })
+        }
       }
 
       // Run Gemini market research if: no eBay service was available, OR eBay returned no usable price

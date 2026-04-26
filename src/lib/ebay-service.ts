@@ -1,8 +1,20 @@
 import { logDebug } from '@/lib/debug-log'
 import { computeMarketStats, type SampleQuality } from '@/lib/market-stats'
+import { retryOperation, NetworkError } from '@/lib/retry-service'
+import { getRetryOptions } from '@/lib/retry-config'
 
 const SOLD_COMPS_LIMIT = 100
 const BROWSE_LIMIT = 50
+
+// Statuses worth retrying — same set retry-config defines for ebay-search
+// (408 timeout, 429 rate limit, 5xx transient server errors). 4xx-other
+// (400 bad query, 401 auth, 403 scope-missing, 404, 422) are NOT retryable —
+// retrying won't change the outcome and just burns rate-limit headroom.
+const RETRYABLE_EBAY_STATUSES = new Set([408, 429, 500, 502, 503, 504])
+
+function isRetryableEbayStatus(status: number): boolean {
+  return RETRYABLE_EBAY_STATUSES.has(status)
+}
 
 export interface EbayMarketData {
   soldItems: Array<{
@@ -117,66 +129,89 @@ export class EbayService {
     categoryId?: string,
   ): Promise<{ items: EbayMarketData['soldItems']; pageLimited: boolean }> {
     try {
-      const resp = await fetch('/api/ebay/sold-comps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: keywords, categoryId, limit: SOLD_COMPS_LIMIT, daysBack: 90 }),
-      })
-      if (!resp.ok) {
-        logDebug('eBay sold-comps non-200 — using Browse approximation', 'warn', 'ebay', { status: resp.status })
-        return { items: [], pageLimited: false }
-      }
-      const data = await resp.json() as {
-        items?: Array<{
-          title: string
-          price: number
-          soldDate: string
-          condition: string
-          itemId?: string
-          itemWebUrl?: string
-          thumbnail?: string
-        }>
-      }
-      const items = Array.isArray(data.items)
-        ? data.items.map(it => ({
-            title: it.title,
-            price: it.price,
-            soldDate: it.soldDate || '',
-            condition: it.condition || 'Unknown',
-            itemId: it.itemId || '',
-            itemWebUrl: it.itemWebUrl || '',
-            thumbnail: it.thumbnail || '',
-          }))
-        : []
+      // Wrap the actual fetch in retryOperation so transient eBay issues
+      // (429 rate-limit, 503 transient, network blip) are retried per the
+      // ebay-search config (5 attempts, 1s→20s exponential backoff).
+      // Throw NetworkError ONLY on retryable statuses — 403 (insights scope
+      // missing), 401 (auth), 400 (bad query) are non-retryable; surface
+      // them as `null` from the inner op so the outer catch returns empty
+      // without burning retries.
+      const data = await retryOperation(async () => {
+        const resp = await fetch('/api/ebay/sold-comps', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: keywords, categoryId, limit: SOLD_COMPS_LIMIT, daysBack: 90 }),
+        })
+        if (resp.ok) {
+          return await resp.json() as {
+            items?: Array<{
+              title: string
+              price: number
+              soldDate: string
+              condition: string
+              itemId?: string
+              itemWebUrl?: string
+              thumbnail?: string
+            }>
+          }
+        }
+        if (isRetryableEbayStatus(resp.status)) {
+          // Retryable — let retryOperation's NetworkError handling kick in.
+          throw new NetworkError(`eBay sold-comps ${resp.status}`, resp.status, resp.statusText)
+        }
+        // Non-retryable — log + signal "no data, but don't retry" via null.
+        logDebug('eBay sold-comps non-retryable status — falling back', 'warn', 'ebay', { status: resp.status })
+        return null
+      }, getRetryOptions('ebay-search'))
+      const rawItems = data && Array.isArray(data.items) ? data.items : []
+      const items = rawItems.map(it => ({
+        title: it.title,
+        price: it.price,
+        soldDate: it.soldDate || '',
+        condition: it.condition || 'Unknown',
+        itemId: it.itemId || '',
+        itemWebUrl: it.itemWebUrl || '',
+        thumbnail: it.thumbnail || '',
+      }))
       return { items, pageLimited: items.length >= SOLD_COMPS_LIMIT }
     } catch (error) {
-      logDebug('eBay sold-comps unreachable — using Browse approximation', 'warn', 'ebay', { message: (error as Error).message })
+      // After all retries exhausted (or on a hard network failure) — fall
+      // back to empty so searchCompletedListings can still return a result
+      // from Browse-API. searchCompletedListings's contract: never throw.
+      logDebug('eBay sold-comps unreachable after retries — using Browse approximation', 'warn', 'ebay', { message: (error as Error).message })
       return { items: [], pageLimited: false }
     }
   }
 
   private async fetchViaBrowseProxy(keywords: string, categoryId?: string) {
     try {
-      const resp = await fetch('/api/ebay/market-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: keywords, categoryId, limit: BROWSE_LIMIT }),
-      })
-      if (!resp.ok) {
-        logDebug('eBay Browse proxy non-200 — falling back to Gemini market data', 'warn', 'ebay', { status: resp.status })
-        return { soldItems: [], activeListings: [], pageLimited: false }
-      }
-      const data = await resp.json() as {
-        items?: Array<{
-          title: string
-          price: number
-          condition: string
-          itemId?: string
-          itemWebUrl?: string
-          thumbnail?: string
-        }>
-      }
-      const items = Array.isArray(data.items) ? data.items : []
+      // Same retry contract as fetchSoldComps — transient statuses retry,
+      // non-retryable statuses surface as null and skip retries.
+      const data = await retryOperation(async () => {
+        const resp = await fetch('/api/ebay/market-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: keywords, categoryId, limit: BROWSE_LIMIT }),
+        })
+        if (resp.ok) {
+          return await resp.json() as {
+            items?: Array<{
+              title: string
+              price: number
+              condition: string
+              itemId?: string
+              itemWebUrl?: string
+              thumbnail?: string
+            }>
+          }
+        }
+        if (isRetryableEbayStatus(resp.status)) {
+          throw new NetworkError(`eBay Browse ${resp.status}`, resp.status, resp.statusText)
+        }
+        logDebug('eBay Browse proxy non-retryable status — falling back', 'warn', 'ebay', { status: resp.status })
+        return null
+      }, getRetryOptions('ebay-search'))
+      const items = data && Array.isArray(data.items) ? data.items : []
       const listings = items.map(it => ({
         title: it.title,
         price: it.price,
@@ -205,7 +240,9 @@ export class EbayService {
         pageLimited: items.length >= BROWSE_LIMIT,
       }
     } catch (error) {
-      logDebug('eBay Browse proxy unreachable — falling back to Gemini market data', 'warn', 'ebay', { message: (error as Error).message })
+      // After retry exhaustion — fall back to empty. Gemini chain in App.tsx
+      // takes over from here when both eBay sources have nothing usable.
+      logDebug('eBay Browse proxy unreachable after retries — falling back to Gemini market data', 'warn', 'ebay', { message: (error as Error).message })
       return { soldItems: [], activeListings: [], pageLimited: false }
     }
   }
