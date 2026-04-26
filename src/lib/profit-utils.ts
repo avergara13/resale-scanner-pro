@@ -65,6 +65,14 @@ const PLATFORM_FEE_SCHEDULES: Record<string, PlatformFeeSchedule> = {
 const POSHMARK_FLAT_FEE_UNDER_15 = 2.95   // Poshmark charges a flat $2.95 on sales under $15
 const POSHMARK_FLAT_THRESHOLD    = 15     // Cutoff where Poshmark switches from flat fee to commission %
 
+/**
+ * MAYBE-band cushions for the BUY/PASS/MAYBE decision matrix. Single source of
+ * truth — `makeDecision` and any UI tile that color-bands ROI/margin must
+ * import these so display thresholds never drift from decision thresholds.
+ */
+export const MARGIN_MAYBE_CUSHION = 6   // pp — margin within 6pp of minMargin = MAYBE
+export const ROI_MAYBE_CUSHION    = 20  // pp — ROI within 20pp of minROI = MAYBE
+
 type PlatformKey = keyof typeof PLATFORM_FEE_SCHEDULES
 
 // `preferredPlatform: string` is open-typed; AI drafts / Notion sync can write display strings

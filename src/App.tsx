@@ -44,12 +44,9 @@ import type { GoogleLensAnalysis } from './lib/google-lens-service'
 import type { BarcodeProduct } from './lib/barcode-service'
 import type { Screen, ScannedItem, PipelineStep, Session, SessionArchive, AppSettings, ItemTag, ThriftStoreLocation, ProfitGoal, SoldItem, SoldShippingUpdateInput, UserProfile, ResalePlatform } from './types'
 import { ARCHIVE_KV_KEY, ensureArchived, freezeArchive } from './lib/session-archive'
+import { MARGIN_MAYBE_CUSHION, ROI_MAYBE_CUSHION } from './lib/profit-utils'
 import { cn } from './lib/utils'
 import { useDeviceId } from './hooks/use-device-id'
-
-/** MAYBE cushions — how far below each threshold still qualifies for MAYBE instead of PASS. */
-const MARGIN_MAYBE_CUSHION = 6   // pp — margin within 6pp of minMargin = MAYBE
-const ROI_MAYBE_CUSHION = 20     // pp — ROI within 20pp of minROI = MAYBE
 
 /** Pure helper — 2D decision matrix (margin × ROI). ROI is the primary driver.
  *

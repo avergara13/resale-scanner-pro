@@ -31,7 +31,7 @@ import { PullToRefreshIndicator } from '../PullToRefreshIndicator'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { useCollapsePreference } from '@/hooks/use-collapse-preference'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
-import { getEstimatedNetProfit } from '@/lib/profit-utils'
+import { getEstimatedNetProfit, ROI_MAYBE_CUSHION } from '@/lib/profit-utils'
 import type { ScannedItem, PipelineStep, AppSettings } from '@/types'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -614,7 +614,6 @@ export function AIScreen({
                           const margin = canShow ? (netProfit / sellPrice) * 100 : null
                           const roi    = canShow ? (netProfit / buyPrice)  * 100 : null
                           const minROI = settings?.minROI ?? 100
-                          const ROI_MAYBE_CUSHION = 20
                           const marginColor = margin == null
                             ? 'text-t1'
                             : margin > 50 ? 'text-green'
