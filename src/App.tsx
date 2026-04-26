@@ -2972,7 +2972,20 @@ function App() {
               <SessionScreen
                 showTrends={showSessionTrends}
                 onCloseTrends={() => setShowSessionTrends(false)}
-                onAgentMessage={(text) => setAgentPendingMessage(text)}
+                onAgentMessage={(text) => {
+                  // Pill tap on splash: seed the agent with a starter prompt
+                  // and navigate. The pendingMessage useEffect inside AgentScreen
+                  // auto-sends once the screen mounts, so the user lands directly
+                  // on an answer instead of a blank chat.
+                  setAgentPendingMessage(text)
+                  secondaryReturnScreen.current = screen
+                  setScreen('agent')
+                }}
+                onOpenAgent={() => {
+                  // Card tap on splash: open agent with no prefilled message.
+                  secondaryReturnScreen.current = screen
+                  setScreen('agent')
+                }}
                 onStartSession={handleStartSession}
                 onResumeSession={handleResumeSession}
                 onDeleteSession={handleDeleteSession}
