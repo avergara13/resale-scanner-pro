@@ -30,22 +30,31 @@ interface MarketDataPanelProps {
  *  - 'loading'   pipeline running, no data populated yet
  *  - 'no-data'   marketData entirely absent (item predates pipeline, or both
  *                eBay + Gemini fallback failed)
- *  - 'fallback'  Gemini AI research summary present but no eBay sold comps
- *  - 'no-comps'  marketData populated but ebaySoldCount === 0; we may still
- *                have Browse-API active listings to show as partial signal
+ *  - 'fallback'  Gemini AI research summary present AND eBay sold-count is
+ *                absent (no eBay attempt at all — pure-AI fallback path)
+ *  - 'no-comps'  marketData populated with an explicit ebaySoldCount of 0;
+ *                we may still have Browse-API active listings to show as
+ *                partial signal, and the researchSummary (if Gemini also
+ *                ran) renders alongside in this state — both signals coexist
  *  - 'has-data'  ebaySoldCount > 0 — full headline grid + comp lists
+ *
+ * Order matters: priority must be has-data → no-comps → fallback → no-data,
+ * so a partial-eBay scan (sold=0, active>0, plus researchSummary) is NOT
+ * misclassified as fallback — that would hide the Browse-API active listings.
  */
 type PanelState = 'loading' | 'no-data' | 'fallback' | 'no-comps' | 'has-data'
 
 function derivePanelState(marketData: MarketData | undefined, isLoading: boolean): PanelState {
-  // Null-coalescing keeps narrowing safe under strictNullChecks: the optional
-  // chain short-circuits to 0 when marketData is undefined, so the comparison
-  // doesn't depend on TypeScript narrowing `marketData` across two accesses.
-  if ((marketData?.ebaySoldCount ?? 0) > 0) return 'has-data'
   if (!marketData && isLoading) return 'loading'
   if (!marketData) return 'no-data'
+  const sold = marketData.ebaySoldCount
+  if ((sold ?? 0) > 0) return 'has-data'
+  // eBay attempt happened (soldCount field exists) but returned no sold matches.
+  // Active listings + any AI research summary still render in this state.
+  if (sold !== undefined) return 'no-comps'
+  // No eBay attempt at all — only Gemini's AI research summary is available.
   if (marketData.researchSummary) return 'fallback'
-  return 'no-comps'
+  return 'no-data'
 }
 
 export function MarketDataPanel({ marketData, isLoading = false }: MarketDataPanelProps) {
@@ -159,7 +168,12 @@ export function MarketDataPanel({ marketData, isLoading = false }: MarketDataPan
               <div className="p-2 sm:p-3 rounded-lg bg-bg border border-s2">
                 <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-0.5 sm:mb-1">Active</p>
                 <p className="text-base sm:text-lg font-mono font-bold text-amber">
-                  {marketData.ebayActiveListings}{activeSuffix}
+                  {/* Older persisted items can have ebaySoldCount populated but
+                      no ebayActiveListings field. Show "--" instead of the
+                      literal string "undefined" leaking into the UI. */}
+                  {typeof marketData.ebayActiveListings === 'number'
+                    ? `${marketData.ebayActiveListings}${activeSuffix}`
+                    : '--'}
                 </p>
               </div>
             </div>
@@ -176,10 +190,13 @@ export function MarketDataPanel({ marketData, isLoading = false }: MarketDataPan
 
         <CollapsibleContent className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
 
-      {/* Fallback state — Gemini AI research summary in lieu of live eBay data.
-          Explicit `marketData &&` narrows the variable for the JSX body so
-          TypeScript flow analysis stays happy under strictNullChecks. */}
-      {state === 'fallback' && marketData && marketData.researchSummary && (
+      {/* Gemini AI research summary — renders in BOTH 'fallback' (no eBay
+          attempt at all) AND 'no-comps' (eBay returned 0 sold but Gemini
+          also ran and produced a summary). Showing it in 'no-comps' too
+          means the user gets the AI backup context AND any Browse-API
+          active listings — both signals coexist when both are present.
+          Explicit `marketData &&` keeps narrowing safe under strictNullChecks. */}
+      {(state === 'fallback' || state === 'no-comps') && marketData && marketData.researchSummary && (
         <div className="p-2.5 sm:p-3 rounded-lg bg-bg border border-s2">
           <p className="text-[10px] sm:text-xs text-t3 uppercase tracking-wide mb-1.5">AI Market Research</p>
           <p className="text-[11px] sm:text-xs text-t1 leading-relaxed whitespace-pre-wrap">
