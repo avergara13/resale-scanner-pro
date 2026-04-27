@@ -44,4 +44,13 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Lint
-        run: npm run lint
+        # ESLint's react-hooks v7 react-compiler rules + tseslint flow
+        # analysis have grown past 6GB heap on GitHub-hosted runners
+        # (observed mid-PR-201: OOMed at ~6064MB even with --max-old-space-size=6144).
+        # Bumped to 10GB — ubuntu-latest provides 16GB RAM so this leaves
+        # plenty of headroom for the rest of the toolchain. Also enabled
+        # --cache so reruns on the same SHA reuse the .eslintcache that's
+        # written under the workspace.
+        env:
+          NODE_OPTIONS: --max-old-space-size=10240
+        run: npx eslint . --cache
