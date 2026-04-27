@@ -22,22 +22,33 @@ export default tseslint.config(
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
 
-      // React Compiler rules (new in react-hooks v7) — many pre-existing violations.
-      // Downgraded to warn so the gate passes on current code.
-      // Fix these gradually; the gate blocks new hard errors, not historical patterns.
-      'react-hooks/purity': 'warn',
-      'react-hooks/refs': 'warn',
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/set-state-in-render': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/globals': 'warn',
-      'react-hooks/static-components': 'warn',
-      'react-hooks/use-memo': 'warn',
-      'react-hooks/component-hook-factories': 'warn',
-      'react-hooks/preserve-manual-memoization': 'warn',
-      'react-hooks/error-boundaries': 'warn',
-      'react-hooks/config': 'warn',
-      'react-hooks/gating': 'warn',
+      // React Compiler rules (new in react-hooks v7).
+      //
+      // Disabled because they OOM the GitHub-hosted CI runner. Each rule
+      // walks a Babel-derived flow graph of the component tree, and on
+      // large files (notably AIScreen.tsx at 2k+ lines) the cumulative
+      // memory pressure exceeds 10GB heap (verified on PR #201 — even
+      // --max-old-space-size=10240 OOMed mid mark-compact at ~10090 MB).
+      //
+      // These rules were already at 'warn' with the comment "many
+      // pre-existing violations" — they were flagging legacy patterns,
+      // not gating new code. Setting them to 'off' loses informational
+      // signal but doesn't loosen any blocking gate. Local IDE integrations
+      // can still surface them ad-hoc; revisit if the upstream rule
+      // implementation gets more memory-efficient.
+      'react-hooks/purity': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/set-state-in-render': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/globals': 'off',
+      'react-hooks/static-components': 'off',
+      'react-hooks/use-memo': 'off',
+      'react-hooks/component-hook-factories': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/error-boundaries': 'off',
+      'react-hooks/config': 'off',
+      'react-hooks/gating': 'off',
 
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/no-explicit-any': 'warn',
